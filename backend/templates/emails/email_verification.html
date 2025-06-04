@@ -1,0 +1,24 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Verify Your Email{% endblock %}
+
+{% block content %}
+<h2>Welcome to {{ site_name }}, {{ user.first_name|default:"there" }}!</h2>
+
+<p>Thank you for signing up. To complete your registration and access all features, please verify your email address.</p>
+
+<div style="text-align: center;">
+    <a href="{{ verification_url }}" class="button">Verify Email Address</a>
+</div>
+
+<p>Or copy and paste this link into your browser:</p>
+<p style="word-break: break-all; background-color: #f4f4f4; padding: 10px; border-radius: 4px;">{{ verification_url }}</p>
+
+<div class="success">
+    <strong>Why verify?</strong> Email verification helps us ensure the security of your account and enables important notifications about your financial data.
+</div>
+
+<p>If you didn't create an account with us, please ignore this email.</p>
+
+<p>Best regards,<br>The {{ site_name }} Team</p>
+{% endblock %}

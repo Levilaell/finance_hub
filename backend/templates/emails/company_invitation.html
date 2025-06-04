@@ -1,0 +1,39 @@
+{% extends "emails/base.html" %}
+
+{% block title %}You're Invited!{% endblock %}
+
+{% block content %}
+<h2>You've been invited to join {{ company.name }}!</h2>
+
+<p>{{ inviter.get_full_name|default:inviter.email }} has invited you to join their team on {{ site_name }}.</p>
+
+<div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin: 20px 0;">
+    <h3 style="margin-top: 0;">About {{ company.name }}</h3>
+    <p><strong>Company:</strong> {{ company.name }}</p>
+    <p><strong>Invited by:</strong> {{ inviter.get_full_name|default:inviter.email }}</p>
+    <p><strong>Your role:</strong> {{ role|default:"Team Member" }}</p>
+</div>
+
+<p>By joining, you'll be able to:</p>
+<ul>
+    <li>Access company financial data and reports</li>
+    <li>Collaborate with your team on financial management</li>
+    <li>View shared bank accounts and transactions</li>
+    <li>Generate and share financial insights</li>
+</ul>
+
+<div style="text-align: center;">
+    <a href="{{ invitation_url }}" class="button">Accept Invitation</a>
+</div>
+
+<p>Or copy and paste this link into your browser:</p>
+<p style="word-break: break-all; background-color: #f4f4f4; padding: 10px; border-radius: 4px;">{{ invitation_url }}</p>
+
+<div class="warning">
+    <strong>Note:</strong> This invitation will expire in 7 days.
+</div>
+
+<p>If you have any questions, feel free to reach out to {{ inviter.get_full_name|default:inviter.email }} or our support team.</p>
+
+<p>Best regards,<br>The {{ site_name }} Team</p>
+{% endblock %}

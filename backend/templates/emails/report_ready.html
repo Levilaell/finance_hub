@@ -1,0 +1,31 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Your Report is Ready{% endblock %}
+
+{% block content %}
+<h2>Hi {{ user.first_name|default:user.email }},</h2>
+
+<p>Great news! Your {{ report.report_type|title }} report is ready for download.</p>
+
+<div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin: 20px 0;">
+    <h3 style="margin-top: 0;">Report Details</h3>
+    <p><strong>Report:</strong> {{ report.title }}</p>
+    <p><strong>Period:</strong> {{ report.period_start|date:"M d, Y" }} - {{ report.period_end|date:"M d, Y" }}</p>
+    <p><strong>Generated:</strong> {{ report.completed_at|date:"M d, Y g:i A" }}</p>
+    {% if report.file_size %}
+    <p><strong>Size:</strong> {{ report.file_size|filesizeformat }}</p>
+    {% endif %}
+</div>
+
+<div style="text-align: center;">
+    <a href="{{ download_url }}" class="button">Download Report</a>
+</div>
+
+<div class="warning">
+    <strong>Note:</strong> Reports are available for download for 90 days. After that, you'll need to generate a new report.
+</div>
+
+<p>Thank you for using {{ site_name }} for your financial management needs!</p>
+
+<p>Best regards,<br>The {{ site_name }} Team</p>
+{% endblock %}
