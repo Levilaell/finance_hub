@@ -71,7 +71,7 @@ export default function TestBelvoWidgetPage() {
       const syncResult = await belvoService.syncBankData();
       toast.success(`Sincronização concluída: ${syncResult.transactions_synced} transações`);
       
-      setConnectionResult(prev => ({
+      setConnectionResult((prev: any) => ({
         ...prev,
         lastSync: new Date().toISOString(),
         lastSyncResult: syncResult

@@ -157,7 +157,10 @@ export default function ReportsPage() {
     queryKey: ['cash-flow', selectedPeriod],
     queryFn: () => {
       if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
-      return reportsService.getCashFlowData(selectedPeriod);
+      return reportsService.getCashFlowData({
+        start_date: selectedPeriod.start_date,
+        end_date: selectedPeriod.end_date
+      });
     },
     enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
   });
@@ -166,7 +169,10 @@ export default function ReportsPage() {
     queryKey: ['category-spending', selectedPeriod],
     queryFn: () => {
       if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
-      return reportsService.getCategorySpending(selectedPeriod);
+      return reportsService.getCategorySpending({
+        start_date: selectedPeriod.start_date,
+        end_date: selectedPeriod.end_date
+      });
     },
     enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
   });
@@ -175,7 +181,10 @@ export default function ReportsPage() {
     queryKey: ['income-vs-expenses', selectedPeriod],
     queryFn: () => {
       if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
-      return reportsService.getIncomeVsExpenses(selectedPeriod);
+      return reportsService.getIncomeVsExpenses({
+        start_date: selectedPeriod.start_date,
+        end_date: selectedPeriod.end_date
+      });
     },
     enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
   });
@@ -324,6 +333,8 @@ export default function ReportsPage() {
   };
 
   const handleGenerateReport = () => {
+    if (!selectedPeriod.start_date || !selectedPeriod.end_date) return;
+    
     const parameters: ReportParameters = {
       start_date: selectedPeriod.start_date.toISOString().split('T')[0],
       end_date: selectedPeriod.end_date.toISOString().split('T')[0],
@@ -606,7 +617,7 @@ export default function ReportsPage() {
                   <div>
                     <Label>Período Inicial</Label>
                     <DatePicker
-                      date={selectedPeriod.start_date}
+                      date={selectedPeriod.start_date || undefined}
                       onDateChange={(date) =>
                         setSelectedPeriod({ ...selectedPeriod, start_date: date || new Date() })
                       }
@@ -615,7 +626,7 @@ export default function ReportsPage() {
                   <div>
                     <Label>Período Final</Label>
                     <DatePicker
-                      date={selectedPeriod.end_date}
+                      date={selectedPeriod.end_date || undefined}
                       onDateChange={(date) =>
                         setSelectedPeriod({ ...selectedPeriod, end_date: date || new Date() })
                       }

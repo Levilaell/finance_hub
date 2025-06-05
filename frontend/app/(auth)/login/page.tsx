@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/auth-store';
-import { LoginCredentials } from '@/types';
+import type { LoginCredentials, LoginResponse, TwoFactorVerifyResponse } from '@/types';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 export default function LoginPage() {
@@ -29,7 +29,7 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm<LoginCredentials>();
 
-  const loginMutation = useMutation({
+  const loginMutation = useMutation<LoginResponse, Error, LoginCredentials>({
     mutationFn: async (data: LoginCredentials) => {
       return await authService.login(data);
     },
@@ -52,7 +52,7 @@ export default function LoginPage() {
     },
   });
 
-  const verify2FAMutation = useMutation({
+  const verify2FAMutation = useMutation<TwoFactorVerifyResponse, Error, void>({
     mutationFn: async () => {
       const response = await authService.verify2FA({ code: twoFactorCode });
       return response;

@@ -44,7 +44,7 @@ class PluggyService {
    */
   async getSupportedBanks(): Promise<PluggyBank[]> {
     const response = await apiClient.get('/api/banking/pluggy/banks/');
-    return response.data.data;
+    return (response as any).data.data;
   }
 
   /**
@@ -54,7 +54,7 @@ class PluggyService {
     const response = await apiClient.post('/api/banking/pluggy/connect-token/', {
       item_id: itemId,
     });
-    return response.data.data;
+    return (response as any).data.data;
   }
 
   /**
@@ -68,7 +68,7 @@ class PluggyService {
       item_id: itemId,
       connector_name: connectorName,
     });
-    return response.data.data;
+    return (response as any).data.data;
   }
 
   /**
@@ -85,9 +85,9 @@ class PluggyService {
       });
       
       return {
-        success: response.success || false,
-        message: response.data?.message || response.message,
-        accounts: response.data?.accounts || []
+        success: (response as any).success || false,
+        message: (response as any).data?.message || (response as any).message,
+        accounts: (response as any).data?.accounts || []
       };
     } catch (error) {
       console.error('Error handling Pluggy item:', error);
@@ -100,7 +100,7 @@ class PluggyService {
    */
   async syncAccount(accountId: string): Promise<{ transactions_synced: number; message: string }> {
     const response = await apiClient.post(`/api/banking/pluggy/accounts/${accountId}/sync/`);
-    return response.data.data;
+    return (response as any).data.data;
   }
 
   /**
@@ -108,7 +108,7 @@ class PluggyService {
    */
   async disconnectAccount(accountId: string): Promise<{ message: string }> {
     const response = await apiClient.delete(`/api/banking/pluggy/accounts/${accountId}/disconnect/`);
-    return response.data;
+    return (response as any).data;
   }
 
   /**
@@ -116,7 +116,7 @@ class PluggyService {
    */
   async getAccountStatus(accountId: string): Promise<PluggyAccountStatus> {
     const response = await apiClient.get(`/api/banking/pluggy/accounts/${accountId}/status/`);
-    return response.data.data;
+    return (response as any).data.data;
   }
 
   /**

@@ -36,8 +36,8 @@ interface BankingState {
   fetchAccounts: () => Promise<void>;
   fetchProviders: () => Promise<void>;
   selectAccount: (accountId: string | null) => void;
-  syncAccount: (accountId: number) => Promise<void>;
-  deleteAccount: (accountId: number) => Promise<void>;
+  syncAccount: (accountId: string) => Promise<void>;
+  deleteAccount: (accountId: string) => Promise<void>;
   
   // Actions - Transactions
   fetchTransactions: (page?: number) => Promise<void>;

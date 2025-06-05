@@ -1,6 +1,7 @@
 import { LucideIcon } from "lucide-react";
 import { Button } from "./button";
 import { cn } from "@/lib/utils";
+import { ReactNode } from "react";
 
 interface EmptyStateProps {
   icon?: LucideIcon;
@@ -9,7 +10,7 @@ interface EmptyStateProps {
   action?: {
     label: string;
     onClick: () => void;
-  };
+  } | ReactNode;
   className?: string;
 }
 
@@ -38,7 +39,11 @@ export function EmptyState({
       )}
       {action && (
         <div className="mt-6">
-          <Button onClick={action.onClick}>{action.label}</Button>
+          {typeof action === 'object' && 'label' in action ? (
+            <Button onClick={action.onClick}>{action.label}</Button>
+          ) : (
+            action
+          )}
         </div>
       )}
     </div>

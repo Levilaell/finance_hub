@@ -24,8 +24,8 @@ class CategoriesService {
   }
 
   // Category Rules
-  async getRules(): Promise<CategoryRule[]> {
-    return apiClient.get<CategoryRule[]>("/api/categories/rules/");
+  async getRules(): Promise<CategoryRule[] | any> {
+    return apiClient.get<CategoryRule[] | any>("/api/categories/rules/");
   }
 
   async getRule(id: string): Promise<CategoryRule> {

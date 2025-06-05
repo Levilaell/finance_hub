@@ -47,7 +47,7 @@ interface PasswordForm {
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
-  const { user, setUser } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -68,7 +68,7 @@ export default function SettingsPage() {
   const updateProfileMutation = useMutation({
     mutationFn: (data: Partial<User>) => authService.updateProfile(data),
     onSuccess: (updatedUser) => {
-      setUser(updatedUser);
+      updateUser(updatedUser);
       toast.success('Profile updated successfully');
     },
     onError: (error: any) => {
@@ -90,7 +90,7 @@ export default function SettingsPage() {
 
   const enable2FAMutation = useMutation({
     mutationFn: () => authService.enable2FA(),
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       setQrCode(data.qr_code);
       setIs2FADialogOpen(true);
     },

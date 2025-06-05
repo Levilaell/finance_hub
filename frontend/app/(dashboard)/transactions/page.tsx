@@ -147,7 +147,7 @@ export default function TransactionsPage() {
   // Mutations
   const updateCategoryMutation = useMutation({
     mutationFn: ({ id, categoryId }: { id: string; categoryId: string }) =>
-      bankingService.updateTransaction(id, { category: categoryId }),
+      bankingService.updateTransaction(id, { category_id: categoryId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       toast.success('Category updated successfully');
@@ -854,7 +854,7 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
           <Label>From Date</Label>
           <HydrationBoundary fallback={<div className="h-10 bg-gray-100 rounded animate-pulse" />}>
             <DatePicker
-              date={startDate}
+              date={filters.start_date ? new Date(filters.start_date) : undefined}
               onDateChange={(date) =>
                 setFilters({
                   ...filters,
@@ -868,7 +868,7 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
           <Label>To Date</Label>
           <HydrationBoundary fallback={<div className="h-10 bg-gray-100 rounded animate-pulse" />}>
             <DatePicker
-              date={endDate}
+              date={filters.end_date ? new Date(filters.end_date) : undefined}
               onDateChange={(date) =>
                 setFilters({
                   ...filters,

@@ -192,9 +192,9 @@ export default function NewTransactionPage() {
                     <SelectItem key={account.id} value={account.id.toString()}>
                       <div className="flex items-center space-x-2">
                         <BanknotesIcon className="h-4 w-4" />
-                        <span>{account.display_name || account.nickname}</span>
+                        <span>{account.account_name}</span>
                         <span className="text-gray-500">
-                          ({account.bank_provider?.name})
+                          ({account.provider?.name})
                         </span>
                       </div>
                     </SelectItem>

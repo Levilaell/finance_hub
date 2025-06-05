@@ -9,7 +9,7 @@ export function useNotifications() {
   const wsRef = useRef<WebSocket | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const { setNotificationCount } = useUIStore();
+  const { setNotificationCount, incrementNotificationCount, decrementNotificationCount } = useUIStore();
   const { isAuthenticated } = useAuthStore();
 
   // Fetch notifications
@@ -34,7 +34,7 @@ export function useNotifications() {
   // Handle new notification
   const handleNewNotification = (notification: Notification) => {
     setNotifications((prev) => [notification, ...prev]);
-    setNotificationCount((prev) => prev + 1);
+    incrementNotificationCount();
 
     // Show toast notification
     switch (notification.type) {
@@ -67,7 +67,7 @@ export function useNotifications() {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
       );
-      setNotificationCount((prev) => Math.max(0, prev - 1));
+      decrementNotificationCount();
     } catch (error) {
       console.error("Failed to mark notification as read:", error);
     }

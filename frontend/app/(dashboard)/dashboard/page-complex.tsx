@@ -27,7 +27,7 @@ export default function DashboardPage() {
 
   const { data: recentTransactions } = useQuery({
     queryKey: ['recent-transactions'],
-    queryFn: () => bankingService.getTransactions({ limit: 5 }),
+    queryFn: () => bankingService.getTransactions({ page_size: 5 }),
   });
 
   const { data: accounts } = useQuery({
@@ -76,9 +76,9 @@ export default function DashboardPage() {
       title: 'Net Income',
       value: formatCurrency(stats?.net_income || 0),
       icon: ChartBarIcon,
-      change: stats?.net_income > 0 ? '+' : '',
-      color: stats?.net_income >= 0 ? 'text-green-600' : 'text-red-600',
-      bgColor: stats?.net_income >= 0 ? 'bg-green-100' : 'bg-red-100',
+      change: (stats?.net_income || 0) > 0 ? '+' : '',
+      color: (stats?.net_income || 0) >= 0 ? 'text-green-600' : 'text-red-600',
+      bgColor: (stats?.net_income || 0) >= 0 ? 'bg-green-100' : 'bg-red-100',
     },
   ];
 

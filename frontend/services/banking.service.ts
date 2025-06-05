@@ -177,15 +177,15 @@ class BankingService {
     const response = await apiClient.post("/api/banking/connect/", data);
     
     // Handle both response formats (direct response or wrapped in data)
-    if (response.success !== undefined && response.data) {
+    if ((response as any).success !== undefined && (response as any).data) {
       // Pluggy response format
       return {
-        ...response.data,
-        data: response.data
+        ...(response as any).data,
+        data: (response as any).data
       };
     }
     
-    return response;
+    return response as any;
   }
 }
 

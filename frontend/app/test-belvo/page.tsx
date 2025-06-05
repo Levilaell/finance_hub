@@ -85,7 +85,7 @@ export default function TestBelvoPage() {
       toast.success(`Sincronização concluída: ${syncResult.transactions_synced} transações`);
       
       // Update connection result with sync info
-      setConnectionResult(prev => ({
+      setConnectionResult((prev: any) => ({
         ...prev,
         syncResult
       }));

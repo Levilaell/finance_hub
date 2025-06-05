@@ -46,7 +46,7 @@ export default function BankingCallbackPage() {
         }
 
         // Complete the OAuth flow
-        const result = await bankingService.handleOAuthCallback(code, bankCode, state);
+        const result = await bankingService.handleOAuthCallback(code, bankCode, state || undefined);
 
         if (result.status === 'success') {
           setStatus('success');

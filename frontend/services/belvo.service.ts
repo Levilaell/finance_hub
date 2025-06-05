@@ -29,12 +29,12 @@ export interface BelvoConnection {
 class BelvoService {
   async getInstitutions(): Promise<BelvoInstitution[]> {
     const response = await apiClient.get('/api/banking/belvo/institutions/');
-    return response.data;
+    return (response as any).data;
   }
 
   async createWidgetToken(): Promise<BelvoWidgetToken> {
     const response = await apiClient.post('/api/banking/belvo/widget-token/');
-    return response.data;
+    return (response as any).data;
   }
 
   async createConnection(data: {
@@ -43,17 +43,17 @@ class BelvoService {
     password: string;
   }): Promise<BelvoConnection> {
     const response = await apiClient.post('/api/banking/belvo/connect/', data);
-    return response.data;
+    return (response as any).data;
   }
 
   async syncBankData(): Promise<{ message: string; transactions_synced: number }> {
     const response = await apiClient.post('/api/banking/belvo/sync/');
-    return response.data;
+    return (response as any).data;
   }
 
   async disconnectBank(connectionId: number): Promise<{ message: string }> {
     const response = await apiClient.delete(`/api/banking/belvo/disconnect/${connectionId}/`);
-    return response.data;
+    return (response as any).data;
   }
 }
 

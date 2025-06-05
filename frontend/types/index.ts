@@ -34,6 +34,17 @@ export interface AuthTokens {
   refresh: string;
 }
 
+export interface LoginResponse {
+  user: User;
+  tokens: AuthTokens;
+  requires_2fa?: boolean;
+}
+
+export interface TwoFactorVerifyResponse {
+  user: User;
+  tokens: AuthTokens;
+}
+
 // Company
 export interface Company {
   id: string;
@@ -86,6 +97,7 @@ export interface BankAccount {
   current_balance: number;
   available_balance: number;
   is_active: boolean;
+  status: "active" | "inactive" | "sync_error" | "pending";
   last_synced: string | null;
   created_at: string;
   updated_at: string;

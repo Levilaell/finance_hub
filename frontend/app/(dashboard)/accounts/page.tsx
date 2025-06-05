@@ -75,7 +75,7 @@ export default function AccountsPage() {
   const [selectedProvider, setSelectedProvider] = useState<BankProvider | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [editingAccount, setEditingAccount] = useState<any>(null);
-  const [syncingAccountId, setSyncingAccountId] = useState<number | null>(null);
+  const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [accountFormData, setAccountFormData] = useState({
     agency: '',
@@ -177,7 +177,7 @@ export default function AccountsPage() {
     }
   };
 
-  const handleSyncAccount = async (accountId: number) => {
+  const handleSyncAccount = async (accountId: string) => {
     setSyncingAccountId(accountId);
     try {
       await syncAccount(accountId);
@@ -201,7 +201,7 @@ export default function AccountsPage() {
     }
   };
 
-  const handleRefreshToken = async (accountId: number) => {
+  const handleRefreshToken = async (accountId: string) => {
     try {
       const result = await bankingService.refreshAccountToken(accountId.toString());
       
@@ -315,19 +315,19 @@ export default function AccountsPage() {
                   <div className="flex items-start justify-between">
                     <div className="space-y-1">
                       <CardTitle className="text-lg flex items-center gap-2">
-                        {account.bank_provider?.logo ? (
+                        {account.provider?.logo_url ? (
                           <img 
-                            src={account.bank_provider.logo} 
-                            alt={account.bank_provider.name}
+                            src={account.provider.logo_url} 
+                            alt={account.provider.name}
                             className="h-6 w-6 object-contain"
                           />
                         ) : (
                           <BuildingLibraryIcon className="h-6 w-6 text-gray-400" />
                         )}
-                        {account.nickname || account.display_name}
+                        {account.account_name}
                       </CardTitle>
                       <p className="text-sm text-gray-600">
-                        {account.bank_provider?.name} • {account.masked_account}
+                        {account.provider?.name} • {account.account_number}
                       </p>
                     </div>
                     <div className={`px-2 py-1 rounded-full text-xs font-medium ${typeInfo.color}`}>
@@ -354,15 +354,15 @@ export default function AccountsPage() {
                         <span className={statusInfo.color}>{statusInfo.label}</span>
                       </div>
                       <span className="text-gray-500">
-                        {account.last_sync_at 
-                          ? `Sincronizado ${formatDate(account.last_sync_at)}`
+                        {account.last_synced 
+                          ? `Sincronizado ${formatDate(account.last_synced)}`
                           : 'Nunca sincronizado'}
                       </span>
                     </div>
 
                     {/* Actions */}
                     <div className="flex space-x-2">
-                      {account.status === 'expired' ? (
+                      {account.status === 'sync_error' ? (
                         <Button
                           variant="outline"
                           size="sm"
@@ -385,7 +385,7 @@ export default function AccountsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleSyncAccount(account.id)}
-                        disabled={isSyncing || account.status === 'expired'}
+                        disabled={isSyncing || account.status === 'sync_error'}
                       >
                         <ArrowPathIcon className={`h-4 w-4 mr-1 ${isSyncing ? 'animate-spin' : ''}`} />
                         {isSyncing ? 'Sincronizando...' : 'Sincronizar'}

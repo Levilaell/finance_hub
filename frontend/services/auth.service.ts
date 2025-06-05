@@ -1,8 +1,8 @@
 import apiClient from "@/lib/api-client";
-import { User, LoginCredentials, RegisterData } from "@/types";
+import { User, LoginCredentials, RegisterData, LoginResponse, TwoFactorVerifyResponse } from "@/types";
 
 class AuthService {
-  async login(credentials: LoginCredentials) {
+  async login(credentials: LoginCredentials): Promise<LoginResponse> {
     return apiClient.login(credentials.email, credentials.password);
   }
 
@@ -37,7 +37,7 @@ class AuthService {
     return apiClient.post("/api/auth/2fa/disable/", data);
   }
 
-  async verify2FA(data: { code: string }) {
+  async verify2FA(data: { code: string }): Promise<TwoFactorVerifyResponse> {
     return apiClient.post("/api/auth/2fa/verify/", data);
   }
 

@@ -65,7 +65,7 @@ export default function CategoriesPage() {
 
   const { data: rules } = useQuery({
     queryKey: ['category-rules'],
-    queryFn: () => categoriesService.getCategoryRules(),
+    queryFn: () => categoriesService.getRules(),
   });
 
   const createCategoryMutation = useMutation({
@@ -106,10 +106,10 @@ export default function CategoriesPage() {
   });
 
   const autoCategorizeMutation = useMutation({
-    mutationFn: () => categoriesService.autoCategorize(),
+    mutationFn: () => categoriesService.applyRules(),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
-      toast.success(`${data.categorized_count} transactions categorized automatically`);
+      toast.success(`${data.categorized} transactions categorized automatically`);
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.detail || 'Failed to auto-categorize');
@@ -128,11 +128,13 @@ export default function CategoriesPage() {
     return <ErrorMessage message="Failed to load categories" />;
   }
 
-  const incomeCategories = categories?.results?.filter(cat => cat.type === 'income') || [];
-  const expenseCategories = categories?.results?.filter(cat => cat.type === 'expense') || [];
+  const incomeCategories = categories?.filter(cat => cat.type === 'income') || [];
+  const expenseCategories = categories?.filter(cat => cat.type === 'expense') || [];
 
   const CategoryCard = ({ category }: { category: Category }) => {
-    const categoryRules = rules?.results?.filter(rule => rule.category === category.id) || [];
+    // Handle both array and paginated response
+    const rulesArray = Array.isArray(rules) ? rules : (rules as any)?.results || [];
+    const categoryRules = rulesArray.filter((rule: any) => rule.category === category.id) || [];
     
     return (
       <Card className="hover:shadow-lg transition-shadow">
@@ -328,9 +330,9 @@ export default function CategoriesPage() {
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          {categories?.results && categories.results.length > 0 ? (
+          {categories && categories.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {categories.results.map((category) => (
+              {categories.map((category) => (
                 <CategoryCard key={category.id} category={category} />
               ))}
             </div>
