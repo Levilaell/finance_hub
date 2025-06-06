@@ -1,0 +1,94 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+    
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: caixadigital
+  ECS_SERVICE: caixadigital-service
+  ECS_CLUSTER: caixadigital-cluster
+  ECS_TASK_DEFINITION: .aws/task-definition.json
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+    
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+    
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f backend/Dockerfile backend/
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+    
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: ${{ env.ECS_TASK_DEFINITION }}
+        container-name: caixadigital-backend
+        image: ${{ steps.build-image.outputs.image }}
+    
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ env.ECS_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true
+    
+    - name: Run database migrations
+      run: |
+        aws ecs run-task \
+          --cluster ${{ env.ECS_CLUSTER }} \
+          --task-definition ${{ env.ECS_TASK_DEFINITION }} \
+          --overrides '{"containerOverrides":[{"name":"caixadigital-backend","command":["python","manage.py","migrate"]}]}'
+    
+    - name: Collect static files
+      run: |
+        aws ecs run-task \
+          --cluster ${{ env.ECS_CLUSTER }} \
+          --task-definition ${{ env.ECS_TASK_DEFINITION }} \
+          --overrides '{"containerOverrides":[{"name":"caixadigital-backend","command":["python","manage.py","collectstatic","--noinput"]}]}'
+    
+    - name: Notify deployment status
+      if: always()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        text: 'Production deployment ${{ job.status }}'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        
+    - name: Create Sentry release
+      uses: getsentry/action-release@v1
+      env:
+        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+        SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+      with:
+        environment: production
+        version: ${{ github.sha }}
