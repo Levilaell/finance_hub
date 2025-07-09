@@ -44,7 +44,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
-            raise serializers.ValidationError({"password": "Password fields didn't match."})
+            raise serializers.ValidationError({"password": "As senhas não coincidem."})
         return attrs
     
     def create(self, validated_data):
@@ -89,15 +89,15 @@ class LoginSerializer(serializers.Serializer):
             user = authenticate(username=email, password=password)
             
             if not user:
-                raise serializers.ValidationError('Invalid credentials.')
+                raise serializers.ValidationError('Credenciais inválidas.')
             
             if not user.is_active:
-                raise serializers.ValidationError('User account is disabled.')
+                raise serializers.ValidationError('Conta de usuário desativada.')
                 
             attrs['user'] = user
             return attrs
         else:
-            raise serializers.ValidationError('Must include "email" and "password".')
+            raise serializers.ValidationError('Deve incluir "email" e "senha".')
 
 
 class TokenSerializer(serializers.Serializer):
@@ -118,7 +118,7 @@ class PasswordResetRequestSerializer(serializers.Serializer):
     
     def validate_email(self, value):
         if not User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("No user found with this email address.")
+            raise serializers.ValidationError("Nenhum usuário encontrado com este endereço de e-mail.")
         return value
 
 
@@ -130,7 +130,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
-            raise serializers.ValidationError({"password": "Password fields didn't match."})
+            raise serializers.ValidationError({"password": "As senhas não coincidem."})
         return attrs
 
 
@@ -142,7 +142,7 @@ class ChangePasswordSerializer(serializers.Serializer):
     def validate_old_password(self, value):
         user = self.context['request'].user
         if not user.check_password(value):
-            raise serializers.ValidationError("Old password is not correct.")
+            raise serializers.ValidationError("Senha atual está incorreta.")
         return value
 
 

@@ -322,7 +322,7 @@ class FinancialGoalSerializer(serializers.ModelSerializer):
             'send_reminders', 'reminder_frequency', 'categories', 'bank_accounts',
             'category_ids', 'account_ids', 'created_at', 'updated_at', 'completed_at'
         ]
-        read_only_fields = ['id', 'current_amount', 'created_at', 'updated_at', 'completed_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'completed_at']
     
     def create(self, validated_data):
         category_ids = validated_data.pop('category_ids', [])

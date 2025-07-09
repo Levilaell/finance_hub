@@ -64,12 +64,12 @@ class RegisterView(generics.CreateAPIView):
             expires_at=timezone.now() + timedelta(days=7)
         )
         
-        # Send verification email
-        from apps.notifications.email_service import send_verification_email_task
-        from django.conf import settings
+        # Send verification email (disabled for Celery issues)
+        # from apps.notifications.email_service import send_verification_email_task
+        # from django.conf import settings
         
-        verification_url = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
-        send_verification_email_task.delay(user.id, verification_url)
+        # verification_url = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
+        # send_verification_email_task.delay(user.id, verification_url)
         
         return Response({
             'user': UserSerializer(user).data,
@@ -77,7 +77,7 @@ class RegisterView(generics.CreateAPIView):
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             },
-            'message': 'Registration successful. Please check your email to verify your account.'
+            'message': 'Cadastro realizado com sucesso. Por favor, verifique seu e-mail para confirmar sua conta.'
         }, status=status.HTTP_201_CREATED)
 
 
@@ -104,7 +104,7 @@ class LoginView(APIView):
             if not two_fa_code:
                 return Response({
                     'requires_2fa': True,
-                    'message': 'Two-factor authentication code required'
+                    'message': 'Código de autenticação de dois fatores necessário'
                 }, status=status.HTTP_200_OK)
             
             # Verify 2FA code
@@ -112,7 +112,7 @@ class LoginView(APIView):
                 # Try backup code
                 if not verify_backup_code(user, two_fa_code):
                     return Response({
-                        'error': 'Invalid authentication code'
+                        'error': 'Código de autenticação inválido'
                     }, status=status.HTTP_400_BAD_REQUEST)
         
         # Generate tokens
@@ -148,7 +148,7 @@ class LogoutView(APIView):
                     # If token processing fails, still return success
                     # (frontend should remove token anyway)
                     pass
-            return Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
+            return Response({'message': 'Logout realizado com sucesso'}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -176,7 +176,7 @@ class ChangePasswordView(generics.UpdateAPIView):
         user.set_password(serializer.validated_data['new_password'])
         user.save()
         
-        return Response({'message': 'Password changed successfully'})
+        return Response({'message': 'Senha alterada com sucesso'})
 
 
 @method_decorator(ratelimit(key='ip', rate='3/h', method='POST'), name='dispatch')
@@ -208,7 +208,7 @@ class PasswordResetRequestView(APIView):
         send_password_reset_email_task.delay(user.id, reset_url)
         
         return Response({
-            'message': 'Password reset link has been sent to your email.'
+            'message': 'Link de redefinição de senha foi enviado para seu e-mail.'
         })
 
 
@@ -233,7 +233,7 @@ class PasswordResetConfirmView(APIView):
         
         if not reset:
             return Response({
-                'error': 'Invalid or expired reset token.'
+                'error': 'Token de redefinição inválido ou expirado.'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Reset password
@@ -245,7 +245,7 @@ class PasswordResetConfirmView(APIView):
         reset.is_used = True
         reset.save()
         
-        return Response({'message': 'Password reset successful.'})
+        return Response({'message': 'Senha redefinida com sucesso.'})
 
 
 class EmailVerificationView(APIView):
@@ -268,7 +268,7 @@ class EmailVerificationView(APIView):
         
         if not verification:
             return Response({
-                'error': 'Invalid or expired verification token.'
+                'error': 'Token de verificação inválido ou expirado.'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Verify email
@@ -280,7 +280,7 @@ class EmailVerificationView(APIView):
         verification.is_used = True
         verification.save()
         
-        return Response({'message': 'Email verified successfully.'})
+        return Response({'message': 'E-mail verificado com sucesso.'})
 
 
 class ResendVerificationView(APIView):
@@ -292,7 +292,7 @@ class ResendVerificationView(APIView):
         
         if user.is_email_verified:
             return Response({
-                'message': 'Email is already verified.'
+                'message': 'E-mail já foi verificado.'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Create new verification token
@@ -311,7 +311,7 @@ class ResendVerificationView(APIView):
         send_verification_email_task.delay(user.id, verification_url)
         
         return Response({
-            'message': 'Verification email has been sent.'
+            'message': 'E-mail de verificação foi enviado.'
         })
 
 
@@ -324,7 +324,7 @@ class CustomTokenRefreshView(APIView):
         
         if not refresh_token:
             return Response(
-                {'error': 'Refresh token is required'}, 
+                {'error': 'Token de atualização é obrigatório'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -343,7 +343,7 @@ class CustomTokenRefreshView(APIView):
             
         except Exception as e:
             return Response(
-                {'error': 'Invalid refresh token'}, 
+                {'error': 'Token de atualização inválido'}, 
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
@@ -393,18 +393,18 @@ class Enable2FAView(APIView):
         
         if not token:
             return Response({
-                'error': 'Verification token required'
+                'error': 'Token de verificação necessário'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         if not user.two_factor_secret:
             return Response({
-                'error': 'Please setup 2FA first'
+                'error': 'Por favor, configure a 2FA primeiro'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Verify token
         if not verify_totp_token(user.two_factor_secret, token):
             return Response({
-                'error': 'Invalid verification token'
+                'error': 'Token de verificação inválido'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Enable 2FA and generate hashed backup codes
@@ -415,7 +415,7 @@ class Enable2FAView(APIView):
         
         # Return the plain text codes only once
         return Response({
-            'message': '2FA enabled successfully',
+            'message': '2FA ativada com sucesso',
             'backup_codes': backup_codes  # Show plain codes only once
         })
         
@@ -431,12 +431,12 @@ class Disable2FAView(APIView):
         
         if not password:
             return Response({
-                'error': 'Password required'
+                'error': 'Senha necessária'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         if not user.check_password(password):
             return Response({
-                'error': 'Invalid password'
+                'error': 'Senha inválida'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Disable 2FA
@@ -446,7 +446,7 @@ class Disable2FAView(APIView):
         user.save()
         
         return Response({
-            'message': '2FA disabled successfully'
+            'message': '2FA desativada com sucesso'
         })
 
 
@@ -459,7 +459,7 @@ class BackupCodesView(APIView):
         
         if not user.is_two_factor_enabled:
             return Response({
-                'error': '2FA is not enabled'
+                'error': '2FA não está ativada'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Regenerate hashed backup codes
@@ -469,5 +469,5 @@ class BackupCodesView(APIView):
         
         return Response({
             'backup_codes': backup_codes,  # Show plain codes only once
-            'message': 'New backup codes generated. Please save them securely.'
+            'message': 'Novos códigos de backup gerados. Por favor, guarde-os com segurança.'
         })

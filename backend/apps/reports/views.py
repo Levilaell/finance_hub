@@ -8,10 +8,11 @@ from decimal import Decimal
 from django.db.models import Count, Q, Sum, Avg
 from django.http import FileResponse, Http404
 from django.utils import timezone
-from rest_framework import generics, permissions, status, viewsets
+from rest_framework import generics, permissions, status, viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.banking.models import BankAccount, Transaction, TransactionCategory
 from .models import Report, ReportSchedule, ReportTemplate
@@ -53,8 +54,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             title=request.data.get('title', f'{report_type} Report'),
             period_start=period_start,
             period_end=period_end,
-            created_by=request.user,
-            status='pending'
+            created_by=request.user
         )
         
         # Queue report generation
@@ -70,16 +70,16 @@ class ReportViewSet(viewsets.ModelViewSet):
         """Download report file"""
         report = self.get_object()
         
-        if report.status != 'completed' or not report.file_path:
+        if not report.is_generated or not report.file:
             return Response({
                 'error': 'Report is not ready for download'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             return FileResponse(
-                open(report.file_path, 'rb'),
+                report.file.open('rb'),
                 as_attachment=True,
-                filename=f'{report.title}_{report.created_at.strftime("%Y%m%d")}.pdf'
+                filename=f'{report.title}_{report.created_at.strftime("%Y%m%d")}.{report.file_format}'
             )
         except FileNotFoundError:
             raise Http404("Report file not found")
@@ -92,9 +92,6 @@ class ReportViewSet(viewsets.ModelViewSet):
         
         return Response({
             'total_reports': reports.count(),
-            'pending_reports': reports.filter(status='pending').count(),
-            'completed_reports': reports.filter(status='completed').count(),
-            'failed_reports': reports.filter(status='failed').count(),
             'reports_by_type': reports.values('report_type').annotate(count=Count('id')),
             'recent_reports': ReportSerializer(reports[:5], many=True).data
         })
@@ -106,11 +103,15 @@ class ReportScheduleViewSet(viewsets.ModelViewSet):
     """
     serializer_class = ReportScheduleSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['is_active', 'report_type', 'frequency']
+    ordering_fields = ['report_type', 'frequency', 'next_run_at']
+    ordering = ['report_type']
     
     def get_queryset(self):
         return ReportSchedule.objects.filter(
             company=self.request.user.company
-        ).order_by('name')
+        )
     
     @action(detail=True, methods=['post'])
     def toggle_active(self, request, pk=None):
@@ -133,19 +134,17 @@ class ReportScheduleViewSet(viewsets.ModelViewSet):
         report = Report.objects.create(
             company=schedule.company,
             report_type=schedule.report_type,
-            title=f'{schedule.name} - Manual Run',
+            title=f'{schedule.get_report_type_display()} - Manual Run',
             period_start=timezone.now().date() - timedelta(days=30),
             period_end=timezone.now().date(),
-            created_by=request.user,
-            status='pending'
+            created_by=request.user
         )
         
         # Queue report generation
         generate_report_task.delay(report.id)
         
         # Update schedule
-        schedule.last_run_date = timezone.now()
-        schedule.run_count += 1
+        schedule.last_run_at = timezone.now()
         schedule.save()
         
         return Response({
@@ -264,8 +263,7 @@ class QuickReportsView(APIView):
             title=title,
             period_start=period_start,
             period_end=period_end,
-            created_by=request.user,
-            status='pending'
+            created_by=request.user
         )
         
         generate_report_task.delay(report.id)

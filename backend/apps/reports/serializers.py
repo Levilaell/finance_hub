@@ -15,11 +15,11 @@ class ReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = Report
         fields = [
-            'id', 'report_type', 'title', 'period_start', 'period_end',
-            'status', 'file_path', 'file_size', 'file_size_mb', 'error_message',
-            'created_at', 'completed_at', 'created_by_name'
+            'id', 'report_type', 'title', 'description', 'period_start', 'period_end',
+            'file_format', 'is_generated', 'file', 'file_size', 'file_size_mb', 
+            'generation_time', 'error_message', 'created_at', 'created_by_name'
         ]
-        read_only_fields = ['id', 'created_at', 'completed_at', 'file_size']
+        read_only_fields = ['id', 'created_at', 'file_size', 'is_generated', 'generation_time']
     
     def get_file_size_mb(self, obj):
         """Convert file size to MB"""
@@ -33,16 +33,15 @@ class ReportScheduleSerializer(serializers.ModelSerializer):
     Report schedule serializer for automated reports
     """
     created_by_name = serializers.CharField(source='created_by.full_name', read_only=True)
-    next_run_date = serializers.DateTimeField(read_only=True)
     
     class Meta:
         model = ReportSchedule
         fields = [
-            'id', 'name', 'report_type', 'frequency', 'day_of_month',
-            'day_of_week', 'is_active', 'email_recipients', 'next_run_date',
-            'last_run_date', 'run_count', 'created_at', 'created_by_name'
+            'id', 'report_type', 'frequency', 'send_email', 'email_recipients',
+            'file_format', 'is_active', 'next_run_at', 'last_run_at',
+            'parameters', 'filters', 'created_at', 'created_by_name'
         ]
-        read_only_fields = ['id', 'last_run_date', 'run_count', 'created_at']
+        read_only_fields = ['id', 'last_run_at', 'created_at']
     
     def create(self, validated_data):
         validated_data['company'] = self.context['request'].user.company
@@ -59,10 +58,11 @@ class ReportTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReportTemplate
         fields = [
-            'id', 'name', 'description', 'template_config', 'is_system',
-            'is_active', 'created_at', 'created_by_name'
+            'id', 'name', 'description', 'report_type', 'template_config', 
+            'charts', 'default_parameters', 'default_filters', 'is_public',
+            'is_active', 'created_at', 'updated_at', 'created_by_name'
         ]
-        read_only_fields = ['id', 'is_system', 'created_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
     
     def create(self, validated_data):
         validated_data['company'] = self.context['request'].user.company

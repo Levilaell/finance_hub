@@ -102,7 +102,7 @@ class AICategorizationService:
                     'category': rule.category,
                     'confidence': rule.confidence_threshold,
                     'method': 'rule',
-                    'rule_id': rule.id,
+                    'rule': rule,
                     'rule_name': rule.name
                 }
         
@@ -143,9 +143,8 @@ class AICategorizationService:
         Use OpenAI API for transaction categorization
         """
         try:
-            # Get available categories for this company
+            # Get available categories (system categories only)
             categories = TransactionCategory.objects.filter(
-                Q(is_system=True) | Q(company=transaction.bank_account.company),
                 is_active=True
             )
             
@@ -277,7 +276,7 @@ class AICategorizationService:
             suggested_category=result['category'],
             confidence_score=result['confidence'],
             processing_time_ms=processing_time_ms,
-            rule_used=result.get('rule_id'),
+            rule_used=result.get('rule'),
             ai_model_version=self.model_version if method == 'ai' else ''
         )
     

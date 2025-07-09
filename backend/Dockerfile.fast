@@ -1,0 +1,16 @@
+# Dockerfile rápido para desenvolvimento
+FROM python:3.11-slim
+
+# Dependências mínimas
+RUN apt-get update && apt-get install -y libpq-dev gcc && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Instalar apenas dependências essenciais
+RUN pip install --no-cache-dir django psycopg2-binary python-decouple
+
+COPY . .
+
+EXPOSE 8000
+
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

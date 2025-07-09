@@ -64,7 +64,7 @@ class BankAccountViewSet(viewsets.ModelViewSet):
             serializer.save(company=company)
         except AttributeError:
             from rest_framework.exceptions import ValidationError
-            raise ValidationError("User does not have a company associated")
+            raise ValidationError("Usuário não possui empresa associada")
     
     @action(detail=True, methods=['post'])
     def sync(self, request, pk=None):
@@ -204,7 +204,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         
         if not transaction_ids or not category_id:
             return Response({
-                'error': 'transaction_ids and category_id are required'
+                'error': 'transaction_ids e category_id são obrigatórios'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
@@ -223,7 +223,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
             })
         except TransactionCategory.DoesNotExist:
             return Response({
-                'error': 'Invalid category_id'
+                'error': 'category_id inválido'
             }, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=False, methods=['get'])
@@ -293,7 +293,7 @@ class DashboardView(APIView):
             company = request.user.company
         except AttributeError:
             return Response({
-                'error': 'User does not have a company associated'
+                'error': 'Usuário não possui empresa associada'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Get current month data
@@ -368,7 +368,7 @@ class EnhancedDashboardView(APIView):
             company = request.user.company
         except AttributeError:
             return Response({
-                'error': 'User does not have a company associated'
+                'error': 'Usuário não possui empresa associada'
             }, status=status.HTTP_400_BAD_REQUEST)
         now = timezone.now()
         start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)

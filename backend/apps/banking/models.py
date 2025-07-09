@@ -686,7 +686,7 @@ class FinancialGoal(models.Model):
             return self.remaining_amount
         
         months_remaining = max(1, self.days_remaining / 30)
-        return self.remaining_amount / months_remaining
+        return self.remaining_amount / Decimal(str(months_remaining))
     
     def update_progress(self):
         """Update goal progress based on transactions"""

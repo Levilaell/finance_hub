@@ -1,39 +1,39 @@
 {% extends "emails/base.html" %}
 
-{% block title %}You're Invited!{% endblock %}
+{% block title %}Você foi convidado!{% endblock %}
 
 {% block content %}
-<h2>You've been invited to join {{ company.name }}!</h2>
+<h2>Você foi convidado para participar de {{ company.name }}!</h2>
 
-<p>{{ inviter.get_full_name|default:inviter.email }} has invited you to join their team on {{ site_name }}.</p>
+<p>{{ inviter.get_full_name|default:inviter.email }} convidou você para se juntar à equipe no {{ site_name }}.</p>
 
 <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin: 20px 0;">
-    <h3 style="margin-top: 0;">About {{ company.name }}</h3>
-    <p><strong>Company:</strong> {{ company.name }}</p>
-    <p><strong>Invited by:</strong> {{ inviter.get_full_name|default:inviter.email }}</p>
-    <p><strong>Your role:</strong> {{ role|default:"Team Member" }}</p>
+    <h3 style="margin-top: 0;">Sobre {{ company.name }}</h3>
+    <p><strong>Empresa:</strong> {{ company.name }}</p>
+    <p><strong>Convidado por:</strong> {{ inviter.get_full_name|default:inviter.email }}</p>
+    <p><strong>Seu cargo:</strong> {{ role|default:"Membro da Equipe" }}</p>
 </div>
 
-<p>By joining, you'll be able to:</p>
+<p>Ao participar, você poderá:</p>
 <ul>
-    <li>Access company financial data and reports</li>
-    <li>Collaborate with your team on financial management</li>
-    <li>View shared bank accounts and transactions</li>
-    <li>Generate and share financial insights</li>
+    <li>Acessar dados e relatórios financeiros da empresa</li>
+    <li>Colaborar com sua equipe na gestão financeira</li>
+    <li>Visualizar contas bancárias e transações compartilhadas</li>
+    <li>Gerar e compartilhar insights financeiros</li>
 </ul>
 
 <div style="text-align: center;">
-    <a href="{{ invitation_url }}" class="button">Accept Invitation</a>
+    <a href="{{ invitation_url }}" class="button">Aceitar Convite</a>
 </div>
 
-<p>Or copy and paste this link into your browser:</p>
+<p>Ou copie e cole este link em seu navegador:</p>
 <p style="word-break: break-all; background-color: #f4f4f4; padding: 10px; border-radius: 4px;">{{ invitation_url }}</p>
 
 <div class="warning">
-    <strong>Note:</strong> This invitation will expire in 7 days.
+    <strong>Atenção:</strong> Este convite expirará em 7 dias.
 </div>
 
-<p>If you have any questions, feel free to reach out to {{ inviter.get_full_name|default:inviter.email }} or our support team.</p>
+<p>Se você tiver alguma dúvida, entre em contato com {{ inviter.get_full_name|default:inviter.email }} ou nossa equipe de suporte.</p>
 
-<p>Best regards,<br>The {{ site_name }} Team</p>
+<p>Atenciosamente,<br>Equipe {{ site_name }}</p>
 {% endblock %}

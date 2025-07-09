@@ -57,12 +57,12 @@ class EmailService:
         context = {
             'user': user,
             'reset_url': reset_url,
-            'site_name': 'Finance Management',
-            'support_email': 'support@financemanagement.com'
+            'site_name': 'Caixa Digital',
+            'support_email': 'suporte@caixadigital.com.br'
         }
         
         return EmailService.send_email(
-            subject='Reset Your Password',
+            subject='Redefinir Sua Senha',
             template_name='password_reset',
             context=context,
             recipient_list=[user.email]
@@ -74,12 +74,12 @@ class EmailService:
         context = {
             'user': user,
             'verification_url': verification_url,
-            'site_name': 'Finance Management',
-            'support_email': 'support@financemanagement.com'
+            'site_name': 'Caixa Digital',
+            'support_email': 'suporte@caixadigital.com.br'
         }
         
         return EmailService.send_email(
-            subject='Verify Your Email Address',
+            subject='Verifique Seu Endereço de E-mail',
             template_name='email_verification',
             context=context,
             recipient_list=[user.email]
@@ -92,12 +92,12 @@ class EmailService:
             'inviter': inviter,
             'company': company,
             'invitation_url': invitation_url,
-            'site_name': 'Finance Management',
-            'support_email': 'support@financemanagement.com'
+            'site_name': 'Caixa Digital',
+            'support_email': 'suporte@caixadigital.com.br'
         }
         
         return EmailService.send_email(
-            subject=f'{inviter.get_full_name()} invited you to join {company.name}',
+            subject=f'{inviter.get_full_name()} convidou você para participar de {company.name}',
             template_name='company_invitation',
             context=context,
             recipient_list=[email]
@@ -110,12 +110,12 @@ class EmailService:
             'user': user,
             'report': report,
             'download_url': f"{settings.FRONTEND_URL}/reports/{report.id}/download",
-            'site_name': 'Finance Management',
-            'support_email': 'support@financemanagement.com'
+            'site_name': 'Caixa Digital',
+            'support_email': 'suporte@caixadigital.com.br'
         }
         
         return EmailService.send_email(
-            subject='Your Report is Ready',
+            subject='Seu Relatório está Pronto',
             template_name='report_ready',
             context=context,
             recipient_list=[user.email]
@@ -129,12 +129,12 @@ class EmailService:
             'bank_name': bank_name,
             'error_message': error_message,
             'reconnect_url': f"{settings.FRONTEND_URL}/accounts",
-            'site_name': 'Finance Management',
-            'support_email': 'support@financemanagement.com'
+            'site_name': 'Caixa Digital',
+            'support_email': 'suporte@caixadigital.com.br'
         }
         
         return EmailService.send_email(
-            subject=f'Issue with your {bank_name} connection',
+            subject=f'Problema com sua conexão {bank_name}',
             template_name='bank_connection_error',
             context=context,
             recipient_list=[user.email]
@@ -147,12 +147,12 @@ class EmailService:
             'user': user,
             'plan': plan,
             'manage_url': f"{settings.FRONTEND_URL}/settings/subscription",
-            'site_name': 'Finance Management',
-            'support_email': 'support@financemanagement.com'
+            'site_name': 'Caixa Digital',
+            'support_email': 'suporte@caixadigital.com.br'
         }
         
         return EmailService.send_email(
-            subject='Subscription Confirmed',
+            subject='Assinatura Confirmada',
             template_name='subscription_confirmation',
             context=context,
             recipient_list=[user.email]

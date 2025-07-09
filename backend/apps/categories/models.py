@@ -107,10 +107,10 @@ class AITrainingData(models.Model):
         _('verification source'),
         max_length=20,
         choices=[
-            ('manual', 'Manual Review'),
-            ('user_feedback', 'User Feedback'),
-            ('rule_based', 'Rule Based'),
-            ('ai_confident', 'AI High Confidence'),
+            ('manual', 'Revisão Manual'),
+            ('user_feedback', 'Feedback do Usuário'),
+            ('rule_based', 'Baseado em Regras'),
+            ('ai_confident', 'IA Alta Confiança'),
         ],
         default='manual'
     )
@@ -270,11 +270,11 @@ class CategorizationLog(models.Model):
         _('categorization method'),
         max_length=20,
         choices=[
-            ('ai', 'AI Prediction'),
-            ('rule', 'Rule Based'),
+            ('ai', 'Predição IA'),
+            ('rule', 'Baseado em Regras'),
             ('manual', 'Manual'),
-            ('bulk', 'Bulk Operation'),
-            ('recurring', 'Recurring Pattern'),
+            ('bulk', 'Operação em Massa'),
+            ('recurring', 'Padrão Recorrente'),
         ]
     )
     

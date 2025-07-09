@@ -102,11 +102,11 @@ ASGI_APPLICATION = 'core.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='caixa_digital'),
-        'USER': config('DB_USER', default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default='postgres'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
+        'NAME': os.environ.get('DB_NAME', config('DB_NAME', default='caixa_digital')),
+        'USER': os.environ.get('DB_USER', config('DB_USER', default='postgres')),
+        'PASSWORD': os.environ.get('DB_PASSWORD', config('DB_PASSWORD', default='postgres')),
+        'HOST': os.environ.get('DB_HOST', config('DB_HOST', default='localhost')),
+        'PORT': os.environ.get('DB_PORT', config('DB_PORT', default='5432')),
     }
 }
 
@@ -297,6 +297,14 @@ MERCADOPAGO_PUBLIC_KEY = config('MERCADOPAGO_PUBLIC_KEY', default='')
 
 # Security Configuration
 FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default='')
+
+# Celery Configuration
+CELERY_BROKER_URL = config('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'America/Sao_Paulo'
 
 # IP Whitelist for sensitive endpoints
 IP_WHITELIST = config('IP_WHITELIST', default='', cast=lambda x: x.split(',') if x else [])

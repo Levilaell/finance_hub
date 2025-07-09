@@ -16,9 +16,9 @@ class SubscriptionPlan(models.Model):
     Available subscription plans (Starter, Pro, Enterprise)
     """
     PLAN_TYPES = [
-        ('starter', 'Starter'),
-        ('pro', 'Pro'),
-        ('enterprise', 'Enterprise'),
+        ('starter', 'Inicial'),
+        ('pro', 'Profissional'),
+        ('enterprise', 'Empresarial'),
     ]
     
     name = models.CharField(_('plan name'), max_length=50)
@@ -121,11 +121,11 @@ class Company(models.Model):
         _('subscription status'),
         max_length=20,
         choices=[
-            ('trial', 'Trial'),
-            ('active', 'Active'),
-            ('past_due', 'Past Due'),
-            ('cancelled', 'Cancelled'),
-            ('suspended', 'Suspended'),
+            ('trial', 'Período de Teste'),
+            ('active', 'Ativa'),
+            ('past_due', 'Em Atraso'),
+            ('cancelled', 'Cancelada'),
+            ('suspended', 'Suspensa'),
         ],
         default='trial'
     )

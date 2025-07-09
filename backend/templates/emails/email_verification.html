@@ -1,24 +1,24 @@
 {% extends "emails/base.html" %}
 
-{% block title %}Verify Your Email{% endblock %}
+{% block title %}Verifique Seu E-mail{% endblock %}
 
 {% block content %}
-<h2>Welcome to {{ site_name }}, {{ user.first_name|default:"there" }}!</h2>
+<h2>Bem-vindo ao {{ site_name }}, {{ user.first_name|default:"você" }}!</h2>
 
-<p>Thank you for signing up. To complete your registration and access all features, please verify your email address.</p>
+<p>Obrigado por se cadastrar. Para concluir seu registro e acessar todos os recursos, por favor verifique seu endereço de e-mail.</p>
 
 <div style="text-align: center;">
-    <a href="{{ verification_url }}" class="button">Verify Email Address</a>
+    <a href="{{ verification_url }}" class="button">Verificar E-mail</a>
 </div>
 
-<p>Or copy and paste this link into your browser:</p>
+<p>Ou copie e cole este link em seu navegador:</p>
 <p style="word-break: break-all; background-color: #f4f4f4; padding: 10px; border-radius: 4px;">{{ verification_url }}</p>
 
 <div class="success">
-    <strong>Why verify?</strong> Email verification helps us ensure the security of your account and enables important notifications about your financial data.
+    <strong>Por que verificar?</strong> A verificação de e-mail nos ajuda a garantir a segurança da sua conta e habilita notificações importantes sobre seus dados financeiros.
 </div>
 
-<p>If you didn't create an account with us, please ignore this email.</p>
+<p>Se você não criou uma conta conosco, por favor ignore este e-mail.</p>
 
-<p>Best regards,<br>The {{ site_name }} Team</p>
+<p>Atenciosamente,<br>Equipe {{ site_name }}</p>
 {% endblock %}
