@@ -32,6 +32,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { RulesList } from '@/components/rules/rules-list';
+import { RuleDialog } from '@/components/rules/rule-dialog';
+import { CreateRuleRequest, rulesService } from '@/services/rules.service';
+import { analyticsService, SummaryMetrics } from '@/services/analytics.service';
+import { 
+  calculateTrialInfo, 
+  calculateBillingInfo, 
+  getSubscriptionStatusInfo, 
+  formatCurrency,
+  formatDate,
+  shouldShowUpgradePrompt 
+} from '@/utils/billing.utils';
+import { UpgradePlanDialog } from '@/components/billing/upgrade-plan-dialog';
+import { BillingHistoryDialog } from '@/components/billing/billing-history-dialog';
+import { PaymentMethodsDialog } from '@/components/billing/payment-methods-dialog';
 
 interface ProfileForm {
   first_name: string;
@@ -45,6 +60,11 @@ interface PasswordForm {
   confirm_password: string;
 }
 
+interface DeleteAccountForm {
+  password: string;
+  confirmation: string;
+}
+
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { user, updateUser } = useAuthStore();
@@ -56,17 +76,24 @@ export default function SettingsPage() {
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [backupCodesDialogOpen, setBackupCodesDialogOpen] = useState(false);
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
   
   // AI & Rules settings state
   const [aiEnabled, setAiEnabled] = useState(true);
   const [autoApplyHighConfidence, setAutoApplyHighConfidence] = useState(true);
   const [learningEnabled, setLearningEnabled] = useState(true);
+  const [createRuleDialogOpen, setCreateRuleDialogOpen] = useState(false);
   
   // Notification settings state
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [transactionAlerts, setTransactionAlerts] = useState(true);
   const [lowBalanceWarnings, setLowBalanceWarnings] = useState(true);
   const [monthlyReports, setMonthlyReports] = useState(true);
+
+  // Billing dialogs state
+  const [upgradePlanDialogOpen, setUpgradePlanDialogOpen] = useState(false);
+  const [billingHistoryDialogOpen, setBillingHistoryDialogOpen] = useState(false);
+  const [paymentMethodsDialogOpen, setPaymentMethodsDialogOpen] = useState(false);
 
   const profileForm = useForm<ProfileForm>({
     defaultValues: {
@@ -77,6 +104,15 @@ export default function SettingsPage() {
   });
 
   const passwordForm = useForm<PasswordForm>();
+  const deleteAccountForm = useForm<DeleteAccountForm>();
+
+  // Performance metrics query
+  const { data: performanceMetrics, isLoading: isLoadingMetrics } = useQuery({
+    queryKey: ['performance-metrics'],
+    queryFn: () => analyticsService.getSummaryMetrics(30),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
+  });
 
   const updateProfileMutation = useMutation({
     mutationFn: (data: Partial<User>) => authService.updateProfile(data),
@@ -152,6 +188,30 @@ export default function SettingsPage() {
     },
   });
 
+  const createRuleMutation = useMutation({
+    mutationFn: rulesService.createRule,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rules'] });
+      toast.success('Rule created successfully');
+      setCreateRuleDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Failed to create rule');
+    },
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: authService.deleteAccount,
+    onSuccess: () => {
+      toast.success('Conta deletada com sucesso');
+      // Redirect to login or home page
+      window.location.href = '/login';
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Falha ao deletar conta');
+    },
+  });
+
   const onProfileSubmit = (data: ProfileForm) => {
     updateProfileMutation.mutate(data);
   };
@@ -167,20 +227,38 @@ export default function SettingsPage() {
     });
   };
 
+  const handleCreateRule = async (data: CreateRuleRequest) => {
+    await createRuleMutation.mutateAsync(data);
+  };
+
+  const onDeleteAccountSubmit = (data: DeleteAccountForm) => {
+    deleteAccountMutation.mutate(data);
+  };
+
+  // Calculate billing information
+  const trialInfo = calculateTrialInfo(user?.company?.trial_ends_at || null);
+  const billingInfo = calculateBillingInfo(
+    user?.company?.next_billing_date || null,
+    user?.company?.subscription_start_date || null,
+    user?.company?.subscription_end_date || null
+  );
+  const subscriptionStatusInfo = getSubscriptionStatusInfo(user?.company?.subscription_status || 'trialing');
+  const showUpgradePrompt = shouldShowUpgradePrompt(user?.company?.subscription_status || 'trialing', trialInfo);
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-gray-600">Manage your account settings and preferences</p>
+        <h1 className="text-3xl font-bold">Configurações</h1>
+        <p className="text-gray-600">Gerencie suas configurações de conta e preferências</p>
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
         <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-          <TabsTrigger value="ai">AI & Rules</TabsTrigger>
-          <TabsTrigger value="billing">Billing</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="profile">Perfil</TabsTrigger>
+          <TabsTrigger value="security">Segurança</TabsTrigger>
+          <TabsTrigger value="ai">IA & Regras</TabsTrigger>
+          <TabsTrigger value="billing">Faturamento</TabsTrigger>
+          <TabsTrigger value="notifications">Notificações</TabsTrigger>
         </TabsList>
 
         {/* Profile Settings */}
@@ -439,20 +517,40 @@ export default function SettingsPage() {
 
                 <div>
                   <h3 className="font-medium mb-4">Performance Metrics</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Accuracy</p>
-                      <p className="text-2xl font-bold text-green-600">92%</p>
+                  {isLoadingMetrics ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="bg-gray-50 p-4 rounded-lg animate-pulse">
+                          <div className="h-4 bg-gray-300 rounded mb-2"></div>
+                          <div className="h-8 bg-gray-300 rounded"></div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Auto-categorized</p>
-                      <p className="text-2xl font-bold text-blue-600">1,234</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <p className="text-sm text-gray-600">Accuracy</p>
+                        <p className="text-2xl font-bold text-green-600">
+                          {performanceMetrics?.overall_accuracy 
+                            ? `${(performanceMetrics.overall_accuracy * 100).toFixed(1)}%` 
+                            : '0%'
+                          }
+                        </p>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <p className="text-sm text-gray-600">Auto-categorized</p>
+                        <p className="text-2xl font-bold text-blue-600">
+                          {performanceMetrics?.auto_categorized?.toLocaleString() || '0'}
+                        </p>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <p className="text-sm text-gray-600">Manual reviews</p>
+                        <p className="text-2xl font-bold text-orange-600">
+                          {performanceMetrics?.manual_reviews?.toLocaleString() || '0'}
+                        </p>
+                      </div>
                     </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Manual reviews</p>
-                      <p className="text-2xl font-bold text-orange-600">89</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
                 <div>
@@ -461,69 +559,12 @@ export default function SettingsPage() {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => {
-                        toast.info('Rule creation dialog will be implemented');
-                      }}
+                      onClick={() => setCreateRuleDialogOpen(true)}
                     >
                       Add Rule
                     </Button>
                   </div>
-                  <div className="space-y-3">
-                    <div className="border rounded-lg p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-medium">Contains "Uber" → Transportation</p>
-                          <p className="text-sm text-gray-600">
-                            Keyword match rule • Active
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => toast.info('Edit rule dialog will be implemented')}
-                          >
-                            Edit
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-red-600"
-                            onClick={() => toast.info('Delete rule confirmation will be implemented')}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="border rounded-lg p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-medium">Amount &gt; $500 → Large Expense</p>
-                          <p className="text-sm text-gray-600">
-                            Amount-based rule • Active
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => toast.info('Edit rule dialog will be implemented')}
-                          >
-                            Edit
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-red-600"
-                            onClick={() => toast.info('Delete rule confirmation will be implemented')}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <RulesList onCreateRule={() => setCreateRuleDialogOpen(true)} />
                 </div>
 
                 <div className="pt-4">
@@ -551,57 +592,235 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
+                {/* Current Plan Section */}
                 <div>
                   <h3 className="font-medium mb-2">Current Plan</h3>
                   <div className="border rounded-lg p-4">
                     <div className="flex justify-between items-center">
                       <div>
-                        <p className="font-medium">{user?.company?.subscription_plan?.name || 'Free Trial'}</p>
+                        <p className="font-medium">{user?.company?.subscription_plan?.name || 'Período de Teste'}</p>
                         <p className="text-sm text-gray-600">
-                          {user?.company?.subscription_plan?.price 
-                            ? `$${user.company.subscription_plan.price}/${user.company.subscription_plan.interval}`
-                            : 'No charge during trial period'
+                          {user?.company?.subscription_plan?.price_monthly 
+                            ? `${formatCurrency(user.company.subscription_plan.price_monthly)}/mês`
+                            : 'Sem cobrança durante o período de teste'
                           }
                         </p>
                       </div>
                       <div className="text-right">
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          user?.company?.subscription_status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : user?.company?.subscription_status === 'trialing'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {user?.company?.subscription_status}
+                        <span className={`px-2 py-1 text-xs rounded-full ${subscriptionStatusInfo.color}`}>
+                          {subscriptionStatusInfo.label}
                         </span>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {subscriptionStatusInfo.description}
+                        </p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {user?.company?.trial_ends_at && (
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <p className="text-sm text-blue-700">
-                      Your trial ends on {new Date(user.company.trial_ends_at).toLocaleDateString()} 
-                      ({Math.ceil((new Date(user.company.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days remaining).
-                      Upgrade to continue using all features.
-                    </p>
+                {/* Trial Information */}
+                {trialInfo.isActive && (
+                  <div className={`border p-4 rounded-lg ${
+                    trialInfo.isExpiringSoon 
+                      ? 'bg-orange-50 border-orange-200' 
+                      : 'bg-blue-50 border-blue-200'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className={`font-medium ${
+                          trialInfo.isExpiringSoon ? 'text-orange-800' : 'text-blue-800'
+                        }`}>
+                          {trialInfo.isExpiringSoon ? 'Período de Teste Expirando' : 'Período de Teste Ativo'}
+                        </p>
+                        <p className={`text-sm ${
+                          trialInfo.isExpiringSoon ? 'text-orange-700' : 'text-blue-700'
+                        }`}>
+                          Seu trial termina em {formatDate(trialInfo.endDate!)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-2xl font-bold ${
+                          trialInfo.isExpiringSoon ? 'text-orange-800' : 'text-blue-800'
+                        }`}>
+                          {trialInfo.daysRemaining}
+                        </p>
+                        <p className={`text-sm ${
+                          trialInfo.isExpiringSoon ? 'text-orange-600' : 'text-blue-600'
+                        }`}>
+                          {trialInfo.daysRemaining === 1 ? 'dia restante' : 'dias restantes'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                <div className="space-y-2">
+                {/* Expired Trial Warning */}
+                {trialInfo.isExpired && (
+                  <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-red-800">Período de Teste Expirado</p>
+                        <p className="text-sm text-red-700">
+                          Seu trial expirou em {formatDate(trialInfo.endDate!)}. Faça upgrade para continuar.
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-red-800">0</p>
+                        <p className="text-sm text-red-600">dias restantes</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Billing Information */}
+                <div>
+                  <h3 className="font-medium mb-3">Informações de Cobrança</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Next Billing Date */}
+                    {billingInfo.nextBillingDate && (
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <p className="text-sm text-gray-600">Próxima Cobrança</p>
+                        <p className="font-medium">
+                          {formatDate(billingInfo.nextBillingDate)}
+                        </p>
+                        {billingInfo.daysUntilNextBilling && billingInfo.daysUntilNextBilling > 0 && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            em {billingInfo.daysUntilNextBilling} {billingInfo.daysUntilNextBilling === 1 ? 'dia' : 'dias'}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Subscription Start Date */}
+                    {billingInfo.subscriptionStartDate && (
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <p className="text-sm text-gray-600">Assinatura Iniciada</p>
+                        <p className="font-medium">
+                          {formatDate(billingInfo.subscriptionStartDate)}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Plan Limits */}
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <p className="text-sm text-gray-600">Limite de Contas Bancárias</p>
+                      <p className="font-medium">
+                        {user?.company?.subscription_plan?.max_bank_accounts || 'Ilimitado'}
+                      </p>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <p className="text-sm text-gray-600">Limite de Usuários</p>
+                      <p className="font-medium">
+                        {user?.company?.subscription_plan?.max_users || 'Ilimitado'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Plan Features */}
+                {user?.company?.subscription_plan && (
+                  <div>
+                    <h3 className="font-medium mb-3">Recursos do Plano</h3>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <ul className="space-y-2">
+                        <li className="flex items-center text-sm text-gray-700">
+                          <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Até {user.company.subscription_plan.max_transactions} transações/mês
+                        </li>
+                        <li className="flex items-center text-sm text-gray-700">
+                          <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          {user.company.subscription_plan.max_bank_accounts} contas bancárias
+                        </li>
+                        <li className="flex items-center text-sm text-gray-700">
+                          <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          {user.company.subscription_plan.max_users} usuários
+                        </li>
+                        {user.company.subscription_plan.has_ai_categorization && (
+                          <li className="flex items-center text-sm text-gray-700">
+                            <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Categorização automática com IA
+                          </li>
+                        )}
+                        {user.company.subscription_plan.has_advanced_reports && (
+                          <li className="flex items-center text-sm text-gray-700">
+                            <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Relatórios avançados
+                          </li>
+                        )}
+                        {user.company.subscription_plan.has_api_access && (
+                          <li className="flex items-center text-sm text-gray-700">
+                            <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Acesso à API
+                          </li>
+                        )}
+                        {user.company.subscription_plan.has_accountant_access && (
+                          <li className="flex items-center text-sm text-gray-700">
+                            <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Acesso para contador
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {/* Upgrade Prompt */}
+                {showUpgradePrompt && (
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 p-4 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-blue-900">Hora de fazer upgrade!</p>
+                        <p className="text-sm text-blue-700">
+                          Seu período de teste {trialInfo.isExpired ? 'expirou' : 'está expirando'}. 
+                          Escolha um plano para continuar aproveitando todos os recursos.
+                        </p>
+                      </div>
+                      <Button 
+                        size="sm"
+                        onClick={() => setUpgradePlanDialogOpen(true)}
+                      >
+                        Fazer Upgrade
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Button 
                     className="w-full sm:w-auto"
-                    onClick={() => toast.info('Upgrade plan dialog will be implemented')}
+                    onClick={() => setUpgradePlanDialogOpen(true)}
                   >
-                    Upgrade Plan
+                    Fazer Upgrade
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="w-full sm:w-auto ml-0 sm:ml-2"
-                    onClick={() => toast.info('Billing history view will be implemented')}
+                    className="w-full sm:w-auto"
+                    onClick={() => setBillingHistoryDialogOpen(true)}
                   >
-                    View Billing History
+                    Histórico de Cobrança
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full sm:w-auto"
+                    onClick={() => setPaymentMethodsDialogOpen(true)}
+                  >
+                    Gerenciar Pagamentos
                   </Button>
                 </div>
               </div>
@@ -711,11 +930,7 @@ export default function SettingsPage() {
                 </div>
                 <Button 
                   variant="destructive"
-                  onClick={() => {
-                    if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-                      toast.error('Account deletion will be implemented');
-                    }
-                  }}
+                  onClick={() => setDeleteAccountDialogOpen(true)}
                 >
                   Delete Account
                 </Button>
@@ -814,7 +1029,88 @@ export default function SettingsPage() {
                 setBackupCodes([]);
               }}
             >
-              I've Saved My Codes
+              I&apos;ve Saved My Codes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Rule Dialog */}
+      <RuleDialog
+        open={createRuleDialogOpen}
+        onOpenChange={setCreateRuleDialogOpen}
+        onSave={handleCreateRule}
+      />
+
+      {/* Billing Dialogs */}
+      <UpgradePlanDialog
+        open={upgradePlanDialogOpen}
+        onOpenChange={setUpgradePlanDialogOpen}
+        currentPlan={user?.company?.subscription_plan}
+      />
+
+      <BillingHistoryDialog
+        open={billingHistoryDialogOpen}
+        onOpenChange={setBillingHistoryDialogOpen}
+      />
+
+      <PaymentMethodsDialog
+        open={paymentMethodsDialogOpen}
+        onOpenChange={setPaymentMethodsDialogOpen}
+      />
+
+      {/* Delete Account Dialog */}
+      <Dialog open={deleteAccountDialogOpen} onOpenChange={setDeleteAccountDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete Account</DialogTitle>
+            <DialogDescription>
+              This action will permanently delete your account and all associated data. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={deleteAccountForm.handleSubmit(onDeleteAccountSubmit)} className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="delete-password">Confirm your password</Label>
+              <Input
+                id="delete-password"
+                type="password"
+                placeholder="Enter your password"
+                {...deleteAccountForm.register('password', { required: true })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="delete-confirmation">
+                Type <strong>deletar</strong> to confirm
+              </Label>
+              <Input
+                id="delete-confirmation"
+                type="text"
+                placeholder="deletar"
+                {...deleteAccountForm.register('confirmation', { required: true })}
+              />
+            </div>
+            <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
+              <p className="text-sm text-red-800">
+                ⚠️ <strong>Warning:</strong> This will permanently delete your account, company data, transactions, categories, and all other associated information. This action cannot be undone.
+              </p>
+            </div>
+          </form>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteAccountDialogOpen(false);
+                deleteAccountForm.reset();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={deleteAccountForm.handleSubmit(onDeleteAccountSubmit)}
+              disabled={deleteAccountMutation.isPending}
+            >
+              {deleteAccountMutation.isPending ? <LoadingSpinner /> : 'Delete Account'}
             </Button>
           </DialogFooter>
         </DialogContent>

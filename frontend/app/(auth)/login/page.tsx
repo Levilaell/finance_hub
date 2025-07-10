@@ -37,10 +37,10 @@ export default function LoginPage() {
     onSuccess: (data) => {
       if (data.requires_2fa) {
         setShow2FA(true);
-        toast.success('Please enter your 2FA code');
+        toast.success('Por favor, insira seu código 2FA');
       } else {
         setAuth(data.user, data.tokens);
-        toast.success('Login successful!');
+        toast.success('Login realizado com sucesso!');
         router.push('/dashboard');
       }
     },
@@ -48,7 +48,7 @@ export default function LoginPage() {
       const errorMessage = error.response?.data?.detail || 
                           error.response?.data?.message || 
                           error.message || 
-                          'Invalid credentials';
+                          'Credenciais inválidas';
       toast.error(errorMessage);
     },
   });
@@ -66,7 +66,7 @@ export default function LoginPage() {
       router.push('/dashboard');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || error.response?.data?.detail || 'Invalid 2FA code');
+      toast.error(error.response?.data?.error || error.response?.data?.detail || 'Código 2FA inválido');
     },
   });
 
@@ -85,7 +85,7 @@ export default function LoginPage() {
   const handle2FASubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!twoFactorCode || twoFactorCode.length !== 6) {
-      toast.error('Please enter a valid 6-digit code');
+      toast.error('Por favor, insira um código válido de 6 dígitos');
       return;
     }
     verify2FAMutation.mutate();
@@ -95,16 +95,16 @@ export default function LoginPage() {
     return (
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Two-Factor Authentication</CardTitle>
+          <CardTitle>Autenticação de Dois Fatores</CardTitle>
           <CardDescription>
-            Enter the 6-digit code from your authenticator app
+            Insira o código de 6 dígitos do seu aplicativo autenticador
           </CardDescription>
         </CardHeader>
         <form onSubmit={handle2FASubmit}>
           <CardContent>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="2fa-code">Authentication Code</Label>
+                <Label htmlFor="2fa-code">Código de Autenticação</Label>
                 <Input
                   id="2fa-code"
                   type="text"
@@ -128,7 +128,7 @@ export default function LoginPage() {
               {verify2FAMutation.isPending ? (
                 <LoadingSpinner />
               ) : (
-                'Verify Code'
+                'Verificar Código'
               )}
             </Button>
             <Button
@@ -141,7 +141,7 @@ export default function LoginPage() {
                 setLoginCredentials(null);
               }}
             >
-              Back to Login
+              Voltar ao Login
             </Button>
           </CardFooter>
         </form>
@@ -152,25 +152,25 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle>Welcome Back</CardTitle>
+        <CardTitle>Bem-vindo de Volta</CardTitle>
         <CardDescription>
-          Sign in to your account to continue
+          Entre na sua conta para continuar
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleFormSubmit}>
         <CardContent>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">E-mail</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="name@example.com"
+                placeholder="nome@exemplo.com"
                 {...register('email', {
-                  required: 'Email is required',
+                  required: 'E-mail é obrigatório',
                   pattern: {
                     value: /\S+@\S+\.\S+/,
-                    message: 'Invalid email address',
+                    message: 'Endereço de e-mail inválido',
                   },
                 })}
                 autoComplete="email"
@@ -182,17 +182,17 @@ export default function LoginPage() {
               )}
             </div>
             <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Senha</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter your password"
+                  placeholder="Digite sua senha"
                   {...register('password', {
-                    required: 'Password is required',
+                    required: 'Senha é obrigatória',
                     minLength: {
                       value: 8,
-                      message: 'Password must be at least 8 characters',
+                      message: 'A senha deve ter pelo menos 8 caracteres',
                     },
                   })}
                   autoComplete="current-password"
@@ -220,7 +220,7 @@ export default function LoginPage() {
                 href="/forgot-password"
                 className="text-sm text-primary hover:underline"
               >
-                Forgot password?
+                Esqueceu a senha?
               </Link>
             </div>
           </div>
@@ -231,12 +231,12 @@ export default function LoginPage() {
             className="w-full"
             disabled={loginMutation.isPending}
           >
-            {loginMutation.isPending ? <LoadingSpinner /> : 'Sign In'}
+            {loginMutation.isPending ? <LoadingSpinner /> : 'Entrar'}
           </Button>
           <p className="text-sm text-center text-gray-600">
-            Don't have an account?{' '}
+            Não tem uma conta?{' '}
             <Link href="/register" className="text-primary hover:underline">
-              Sign up
+              Cadastre-se
             </Link>
           </p>
         </CardFooter>

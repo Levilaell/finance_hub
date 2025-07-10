@@ -158,3 +158,20 @@ class ChangePasswordSerializer(serializers.Serializer):
 class EmailVerificationSerializer(serializers.Serializer):
     """Email verification serializer"""
     token = serializers.CharField(required=True)
+
+
+class DeleteAccountSerializer(serializers.Serializer):
+    """Delete account serializer with password verification"""
+    password = serializers.CharField(required=True, write_only=True)
+    confirmation = serializers.CharField(required=True)
+    
+    def validate_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Senha incorreta.")
+        return value
+        
+    def validate_confirmation(self, value):
+        if value.lower() != 'deletar':
+            raise serializers.ValidationError("Digite 'deletar' para confirmar.")
+        return value

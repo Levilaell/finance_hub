@@ -1,5 +1,5 @@
-import { ApiResponse, PaginatedResponse } from '@/types';
-import { apiClient } from './api.client';
+import { PaginatedResponse } from '@/types';
+import { apiClient } from '@/lib/api-client';
 
 export interface CategoryRule {
   id: number;
@@ -66,44 +66,46 @@ export interface RuleSuggestionsResponse {
 class RulesService {
   private baseUrl = '/api/categories';
 
-  async getRules(): Promise<ApiResponse<CategoryRule[]>> {
-    const response = await apiClient.get(`${this.baseUrl}/rules/`);
-    return response.data;
+  async getRules(): Promise<CategoryRule[]> {
+    console.log('RulesService baseUrl:', this.baseUrl);
+    console.log('Full URL:', `${this.baseUrl}/rules/`);
+    const response = await apiClient.get<{ results?: CategoryRule[]; count?: number } | CategoryRule[]>(`${this.baseUrl}/rules/`);
+    // Handle both paginated and non-paginated responses
+    if (response && typeof response === 'object' && 'results' in response) {
+      return response.results || [];
+    }
+    return Array.isArray(response) ? response : [];
   }
 
-  async createRule(data: CreateRuleRequest): Promise<ApiResponse<CategoryRule>> {
-    const response = await apiClient.post(`${this.baseUrl}/rules/`, data);
-    return response.data;
+  async createRule(data: CreateRuleRequest): Promise<CategoryRule> {
+    console.log('createRule baseUrl:', this.baseUrl);
+    console.log('createRule Full URL:', `${this.baseUrl}/rules/`);
+    console.log('createRule data:', data);
+    return await apiClient.post(`${this.baseUrl}/rules/`, data);
   }
 
-  async updateRule(id: number, data: Partial<CreateRuleRequest>): Promise<ApiResponse<CategoryRule>> {
-    const response = await apiClient.put(`${this.baseUrl}/rules/${id}/`, data);
-    return response.data;
+  async updateRule(id: number, data: Partial<CreateRuleRequest>): Promise<CategoryRule> {
+    return await apiClient.put(`${this.baseUrl}/rules/${id}/`, data);
   }
 
-  async deleteRule(id: number): Promise<ApiResponse<void>> {
-    const response = await apiClient.delete(`${this.baseUrl}/rules/${id}/`);
-    return response.data;
+  async deleteRule(id: number): Promise<void> {
+    return await apiClient.delete(`${this.baseUrl}/rules/${id}/`);
   }
 
-  async testRule(id: number, limit: number = 100): Promise<ApiResponse<TestRuleResponse>> {
-    const response = await apiClient.post(`${this.baseUrl}/rules/${id}/test_rule/`, { limit });
-    return response.data;
+  async testRule(id: number, limit: number = 100): Promise<TestRuleResponse> {
+    return await apiClient.post(`${this.baseUrl}/rules/${id}/test_rule/`, { limit });
   }
 
-  async applyRuleToExisting(id: number, limit: number = 1000): Promise<ApiResponse<ApplyRuleResponse>> {
-    const response = await apiClient.post(`${this.baseUrl}/rules/${id}/apply_to_existing/`, { limit });
-    return response.data;
+  async applyRuleToExisting(id: number, limit: number = 1000): Promise<ApplyRuleResponse> {
+    return await apiClient.post(`${this.baseUrl}/rules/${id}/apply_to_existing/`, { limit });
   }
 
-  async getRuleSuggestions(): Promise<ApiResponse<RuleSuggestionsResponse>> {
-    const response = await apiClient.get(`${this.baseUrl}/rule-suggestions/`);
-    return response.data;
+  async getRuleSuggestions(): Promise<RuleSuggestionsResponse> {
+    return await apiClient.get(`${this.baseUrl}/rule-suggestions/`);
   }
 
-  async createRuleFromSuggestion(suggestion: RuleSuggestion): Promise<ApiResponse<{ rule_id: number; message: string }>> {
-    const response = await apiClient.post(`${this.baseUrl}/rule-suggestions/`, suggestion);
-    return response.data;
+  async createRuleFromSuggestion(suggestion: RuleSuggestion): Promise<{ rule_id: number; message: string }> {
+    return await apiClient.post(`${this.baseUrl}/rule-suggestions/`, suggestion);
   }
 
   // Helper methods for creating specific rule types

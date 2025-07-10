@@ -40,6 +40,7 @@ class CompanySerializer(serializers.ModelSerializer):
             'address_zipcode', 'monthly_revenue', 'employee_count',
             'subscription_plan', 'subscription_status', 'is_trial',
             'is_subscribed', 'trial_ends_at', 'next_billing_date',
+            'subscription_start_date', 'subscription_end_date',
             'logo', 'primary_color', 'currency', 'fiscal_year_start',
             'enable_ai_categorization', 'auto_categorize_threshold',
             'enable_notifications', 'enable_email_reports',
@@ -47,7 +48,8 @@ class CompanySerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'owner', 'subscription_status', 'trial_ends_at', 
-            'next_billing_date', 'created_at'
+            'next_billing_date', 'subscription_start_date', 
+            'subscription_end_date', 'created_at'
         ]
     
     def get_owner(self, obj):

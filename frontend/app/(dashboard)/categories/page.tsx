@@ -125,7 +125,7 @@ export default function CategoriesPage() {
   }
 
   if (error) {
-    return <ErrorMessage message="Failed to load categories" />;
+    return <ErrorMessage message="Falha ao carregar categorias" />;
   }
 
   const incomeCategories = categories?.filter(cat => cat.category_type === 'income') || [];
@@ -300,10 +300,10 @@ export default function CategoriesPage() {
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          Cancelar
         </Button>
         <Button type="submit">
-          {category ? 'Update' : 'Create'} Category
+          {category ? 'Atualizar' : 'Criar'} Categoria
         </Button>
       </DialogFooter>
     </form>
@@ -350,12 +350,12 @@ export default function CategoriesPage() {
           ) : (
             <EmptyState
               icon={TagIcon}
-              title="No categories"
-              description="Create your first category to start organizing transactions"
+              title="Nenhuma categoria"
+              description="Crie sua primeira categoria para começar a organizar as transações"
               action={
                 <Button onClick={() => setIsAddingCategory(true)}>
                   <PlusIcon className="h-4 w-4 mr-2" />
-                  Create Category
+                  Criar Categoria
                 </Button>
               }
             />
@@ -372,8 +372,8 @@ export default function CategoriesPage() {
           ) : (
             <EmptyState
               icon={ArrowTrendingUpIcon}
-              title="No income categories"
-              description="Create categories to track your income sources"
+              title="Nenhuma categoria de receita"
+              description="Crie categorias para rastrear suas fontes de receita"
             />
           )}
         </TabsContent>
@@ -388,8 +388,8 @@ export default function CategoriesPage() {
           ) : (
             <EmptyState
               icon={ArrowTrendingDownIcon}
-              title="No expense categories"
-              description="Create categories to track your expenses"
+              title="Nenhuma categoria de despesa"
+              description="Crie categorias para rastrear suas despesas"
             />
           )}
         </TabsContent>
@@ -399,7 +399,7 @@ export default function CategoriesPage() {
       <Dialog open={isAddingCategory} onOpenChange={setIsAddingCategory}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Create Category</DialogTitle>
+            <DialogTitle>Criar Categoria</DialogTitle>
             <DialogDescription>
               Add a new category to organize your transactions
             </DialogDescription>
@@ -420,9 +420,9 @@ export default function CategoriesPage() {
       <Dialog open={!!editingCategory} onOpenChange={() => setEditingCategory(null)}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Edit Category</DialogTitle>
+            <DialogTitle>Editar Categoria</DialogTitle>
             <DialogDescription>
-              Update category details
+              Atualizar detalhes da categoria
             </DialogDescription>
           </DialogHeader>
           {editingCategory && (
@@ -441,7 +441,7 @@ export default function CategoriesPage() {
       <Dialog open={!!selectedCategory} onOpenChange={() => setSelectedCategory(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Category</DialogTitle>
+            <DialogTitle>Excluir Categoria</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete "{selectedCategory?.name}"? 
               Transactions in this category will become uncategorized.
@@ -452,7 +452,7 @@ export default function CategoriesPage() {
               variant="outline"
               onClick={() => setSelectedCategory(null)}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button
               variant="destructive"
@@ -463,7 +463,7 @@ export default function CategoriesPage() {
               }}
               disabled={deleteCategoryMutation.isPending}
             >
-              {deleteCategoryMutation.isPending ? <LoadingSpinner /> : 'Delete Category'}
+              {deleteCategoryMutation.isPending ? <LoadingSpinner /> : 'Excluir Categoria'}
             </Button>
           </DialogFooter>
         </DialogContent>

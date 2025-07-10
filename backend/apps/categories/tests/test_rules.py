@@ -446,3 +446,224 @@ class CategoryRuleViewSetTests(TestCase):
         response = self.client.get(url)
         
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+    
+    def test_counterpart_rule(self):
+        """Test creating and applying counterpart-based rule"""
+        data = {
+            'name': 'Supermarket Rule',
+            'category': self.food_category.id,
+            'rule_type': 'counterpart',
+            'conditions': {
+                'counterparts': ['walmart', 'target', 'kroger'],
+                'match_type': 'exact'
+            },
+            'priority': 7,
+            'is_active': True
+        }
+        
+        response = self.client.post(self.url, data, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['rule_type'], 'counterpart')
+        self.assertEqual(len(response.data['conditions']['counterparts']), 3)
+    
+    def test_rule_match_count_increment(self):
+        """Test that match count is tracked correctly"""
+        rule = CategoryRule.objects.create(
+            company=self.company,
+            name='Count Rule',
+            category=self.food_category,
+            rule_type='keyword',
+            conditions={'keywords': ['test']},
+            match_count=0,
+            created_by=self.user
+        )
+        
+        # Simulate rule matches
+        rule.match_count += 5
+        rule.save()
+        
+        self.assertEqual(rule.match_count, 5)
+    
+    def test_rule_accuracy_tracking(self):
+        """Test that accuracy is tracked correctly"""
+        rule = CategoryRule.objects.create(
+            company=self.company,
+            name='Accuracy Rule',
+            category=self.food_category,
+            rule_type='keyword',
+            conditions={'keywords': ['accurate']},
+            accuracy_rate=0.85,
+            created_by=self.user
+        )
+        
+        self.assertEqual(rule.accuracy_rate, 0.85)
+    
+    def test_empty_conditions_validation(self):
+        """Test validation for empty conditions"""
+        data = {
+            'name': 'Empty Rule',
+            'category': self.food_category.id,
+            'rule_type': 'keyword',
+            'conditions': {},
+            'priority': 1,
+            'is_active': True
+        }
+        
+        response = self.client.post(self.url, data, format='json')
+        
+        # Rule should be created but may not work properly
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+    
+    def test_rule_serializer_fields(self):
+        """Test that all expected fields are returned in serializer"""
+        rule = CategoryRule.objects.create(
+            company=self.company,
+            name='Serializer Test Rule',
+            category=self.food_category,
+            rule_type='keyword',
+            conditions={'keywords': ['serialize']},
+            priority=3,
+            confidence_threshold=0.9,
+            is_active=True,
+            match_count=10,
+            accuracy_rate=0.95,
+            created_by=self.user
+        )
+        
+        url = reverse('categories:category-rule-detail', args=[rule.id])
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        expected_fields = [
+            'id', 'name', 'rule_type', 'conditions', 'category',
+            'category_name', 'priority', 'is_active', 'confidence_threshold',
+            'match_count', 'accuracy_rate', 'created_at', 'updated_at',
+            'created_by', 'created_by_name'
+        ]
+        
+        for field in expected_fields:
+            self.assertIn(field, response.data)
+        
+        self.assertEqual(response.data['category_name'], self.food_category.name)
+        self.assertEqual(response.data['created_by_name'], self.user.get_full_name())
+    
+    def test_bulk_rule_operations(self):
+        """Test creating multiple rules and bulk operations"""
+        rules_data = [
+            {
+                'name': 'Bulk Rule 1',
+                'category': self.food_category.id,
+                'rule_type': 'keyword',
+                'conditions': {'keywords': ['bulk1']},
+                'priority': 1
+            },
+            {
+                'name': 'Bulk Rule 2',
+                'category': self.transport_category.id,
+                'rule_type': 'keyword',
+                'conditions': {'keywords': ['bulk2']},
+                'priority': 2
+            }
+        ]
+        
+        created_rules = []
+        for rule_data in rules_data:
+            response = self.client.post(self.url, rule_data, format='json')
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            created_rules.append(response.data['id'])
+        
+        # Verify all rules exist
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        rule_ids = [r['id'] for r in response.data['results']]
+        for rule_id in created_rules:
+            self.assertIn(rule_id, rule_ids)
+    
+    def test_rule_confidence_threshold_validation(self):
+        """Test confidence threshold validation"""
+        # Test valid confidence threshold
+        data = {
+            'name': 'Confidence Rule',
+            'category': self.food_category.id,
+            'rule_type': 'keyword',
+            'conditions': {'keywords': ['confidence']},
+            'confidence_threshold': 0.75,
+            'priority': 1
+        }
+        
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['confidence_threshold'], 0.75)
+    
+    def test_rule_performance_metrics(self):
+        """Test that performance metrics are properly tracked and calculated"""
+        from apps.categories.models import CategoryPerformance
+        from apps.categories.services import AICategorizationService
+        from datetime import date, timedelta
+        
+        # Create rule
+        rule = CategoryRule.objects.create(
+            company=self.company,
+            name='Performance Rule',
+            category=self.food_category,
+            rule_type='keyword',
+            conditions={'keywords': ['performance']},
+            match_count=0,
+            accuracy_rate=0.0,
+            created_by=self.user
+        )
+        
+        # Create transaction that matches the rule
+        transaction = Transaction.objects.create(
+            bank_account=self.bank_account,
+            external_id='perf_test',
+            amount=-75.00,
+            description='Performance test transaction',
+            transaction_date=timezone.now(),
+            transaction_type='debit'
+        )
+        
+        # Apply rule using AI service (this should update performance metrics)
+        ai_service = AICategorizationService()
+        
+        # Mock AI categorization to return None so rule is used
+        with patch.object(ai_service, '_ai_categorize', return_value=None):
+            result = ai_service.categorize_transaction(transaction)
+        
+        # Verify rule was applied
+        self.assertEqual(result['method'], 'rule')
+        self.assertEqual(result['rule'], rule)
+        
+        # Check that performance metrics were created
+        period_start = date.today() - timedelta(days=30)
+        period_end = date.today()
+        
+        performance = CategoryPerformance.objects.filter(
+            company=self.company,
+            category=self.food_category,
+            period_start=period_start,
+            period_end=period_end
+        ).first()
+        
+        self.assertIsNotNone(performance)
+        self.assertEqual(performance.total_predictions, 1)
+        self.assertEqual(performance.correct_predictions, 1)
+        
+        # Test rule performance summary
+        summary = ai_service.get_rule_performance_summary(self.company)
+        self.assertEqual(summary['total_rules'], 1)
+        self.assertGreater(len(summary['rule_breakdown']), 0)
+        
+        rule_metrics = summary['rule_breakdown'][0]
+        self.assertEqual(rule_metrics['rule_name'], 'Performance Rule')
+        self.assertEqual(rule_metrics['category'], self.food_category.name)
+        
+        # Test performance metrics retrieval
+        metrics = ai_service.get_performance_metrics(self.company)
+        self.assertEqual(metrics['total_categories'], 1)
+        self.assertEqual(metrics['summary']['total_predictions'], 1)
+        self.assertEqual(metrics['summary']['correct_predictions'], 1)
+        self.assertEqual(metrics['summary']['overall_accuracy'], 1.0)

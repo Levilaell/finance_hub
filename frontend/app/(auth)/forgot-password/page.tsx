@@ -34,11 +34,11 @@ export default function ForgotPasswordPage() {
     },
     onSuccess: () => {
       setEmailSent(true);
-      toast.success('Password reset email sent!');
+      toast.success('E-mail de redefinição de senha enviado!');
     },
     onError: (error: any) => {
       toast.error(
-        error.response?.data?.detail || 'Failed to send reset email'
+        error.response?.data?.detail || 'Falha ao enviar e-mail de redefinição'
       );
     },
   });
@@ -54,24 +54,24 @@ export default function ForgotPasswordPage() {
           <div className="flex justify-center mb-4">
             <CheckCircleIcon className="h-16 w-16 text-green-500" />
           </div>
-          <CardTitle className="text-center">Check Your Email</CardTitle>
+          <CardTitle className="text-center">Verifique seu E-mail</CardTitle>
           <CardDescription className="text-center">
-            We've sent you a password reset link. Please check your email and
-            follow the instructions to reset your password.
+            Enviamos um link de redefinição de senha. Verifique seu e-mail e
+            siga as instruções para redefinir sua senha.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <p className="text-sm text-center text-gray-600">
-              The link will expire in 24 hours for security reasons.
+              O link expirará em 24 horas por questões de segurança.
             </p>
             <p className="text-sm text-center text-gray-600">
-              Didn't receive the email? Check your spam folder or{' '}
+              Não recebeu o e-mail? Verifique sua pasta de spam ou{' '}
               <button
                 onClick={() => setEmailSent(false)}
                 className="text-primary hover:underline"
               >
-                try again
+                tente novamente
               </button>
               .
             </p>
@@ -81,7 +81,7 @@ export default function ForgotPasswordPage() {
           <Link href="/login" className="w-full">
             <Button variant="outline" className="w-full">
               <ArrowLeftIcon className="h-4 w-4 mr-2" />
-              Back to Login
+              Voltar ao Login
             </Button>
           </Link>
         </CardFooter>
@@ -92,26 +92,26 @@ export default function ForgotPasswordPage() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle>Reset Your Password</CardTitle>
+        <CardTitle>Redefinir sua Senha</CardTitle>
         <CardDescription>
-          Enter your email address and we'll send you a link to reset your
-          password.
+          Digite seu endereço de e-mail e enviaremos um link para redefinir sua
+          senha.
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email">Endereço de E-mail</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="name@example.com"
+                placeholder="nome@exemplo.com"
                 {...register('email', {
-                  required: 'Email is required',
+                  required: 'E-mail é obrigatório',
                   pattern: {
                     value: /\S+@\S+\.\S+/,
-                    message: 'Invalid email address',
+                    message: 'Endereço de e-mail inválido',
                   },
                 })}
                 autoComplete="email"
@@ -134,13 +134,13 @@ export default function ForgotPasswordPage() {
             {forgotPasswordMutation.isPending ? (
               <LoadingSpinner />
             ) : (
-              'Send Reset Link'
+              'Enviar Link de Redefinição'
             )}
           </Button>
           <Link href="/login" className="w-full">
             <Button variant="ghost" className="w-full">
               <ArrowLeftIcon className="h-4 w-4 mr-2" />
-              Back to Login
+              Voltar ao Login
             </Button>
           </Link>
         </CardFooter>

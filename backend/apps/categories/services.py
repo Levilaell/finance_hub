@@ -16,7 +16,7 @@ from django.db.models import Q, Count
 from django.utils import timezone
 
 from .models import (AITrainingData, CategorizationLog, CategoryRule,
-                     CategorySuggestion)
+                     CategorySuggestion, CategoryPerformance)
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +28,11 @@ class AICategorizationService:
     """
     
     def __init__(self):
-        if not settings.OPENAI_API_KEY:
-            raise ValueError("OPENAI_API_KEY must be configured")
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        if not getattr(settings, 'OPENAI_API_KEY', None):
+            logger.warning("OPENAI_API_KEY not configured - AI categorization will be disabled")
+            self.client = None
+        else:
+            self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
         self.model_version = "gpt-4o-mini"
         self.confidence_threshold = 0.7
     
@@ -98,6 +100,9 @@ class AICategorizationService:
                 rule.match_count += 1
                 rule.save()
                 
+                # Update rule performance metrics
+                self._update_rule_performance_metrics(rule, transaction)
+                
                 return {
                     'category': rule.category,
                     'confidence': rule.confidence_threshold,
@@ -142,6 +147,10 @@ class AICategorizationService:
         """
         Use OpenAI API for transaction categorization
         """
+        if not self.client:
+            logger.debug("OpenAI client not available - skipping AI categorization")
+            return None
+            
         try:
             # Get available categories (system categories only)
             categories = TransactionCategory.objects.filter(
@@ -151,7 +160,7 @@ class AICategorizationService:
             category_list = [
                 f"- {cat.name}: {cat.keywords}" 
                 for cat in categories 
-                if cat.keywords
+                if getattr(cat, 'keywords', None)
             ]
             
             # Prepare prompt
@@ -313,6 +322,9 @@ class AICategorizationService:
             log.final_category = correct_category
             log.was_accepted = (log.suggested_category == correct_category)
             log.save()
+            
+        # Update performance metrics
+        self._update_performance_metrics(transaction, correct_category)
     
     def _extract_features(self, transaction: Transaction) -> Dict:
         """
@@ -344,6 +356,240 @@ class AICategorizationService:
             return 'high'
         else:
             return 'very_high'
+    
+    def _update_performance_metrics(self, transaction: Transaction, correct_category: TransactionCategory):
+        """
+        Update performance metrics for categorization
+        """
+        from datetime import date, timedelta
+        
+        company = transaction.bank_account.company
+        period_start = date.today() - timedelta(days=30)
+        period_end = date.today()
+        
+        # Get recent categorization log for this transaction
+        log = CategorizationLog.objects.filter(
+            transaction=transaction
+        ).order_by('-created_at').first()
+        
+        if not log:
+            return
+        
+        # Get or create performance metrics for this category and period
+        performance, created = CategoryPerformance.objects.get_or_create(
+            company=company,
+            category=correct_category,
+            period_start=period_start,
+            period_end=period_end,
+            defaults={
+                'total_predictions': 0,
+                'correct_predictions': 0,
+                'false_positives': 0,
+                'false_negatives': 0
+            }
+        )
+        
+        # Update metrics based on the categorization result
+        performance.total_predictions += 1
+        
+        if log.suggested_category == correct_category:
+            performance.correct_predictions += 1
+        else:
+            # Check if this was a false positive for the suggested category
+            if log.suggested_category:
+                fp_performance, _ = CategoryPerformance.objects.get_or_create(
+                    company=company,
+                    category=log.suggested_category,
+                    period_start=period_start,
+                    period_end=period_end,
+                    defaults={
+                        'total_predictions': 0,
+                        'correct_predictions': 0,
+                        'false_positives': 0,
+                        'false_negatives': 0
+                    }
+                )
+                fp_performance.false_positives += 1
+                fp_performance.update_metrics()
+            
+            # This is a false negative for the correct category
+            performance.false_negatives += 1
+        
+        # Recalculate metrics
+        performance.update_metrics()
+    
+    def get_performance_metrics(self, company, period_days: int = 30) -> Dict:
+        """
+        Get performance metrics for AI and Rules categorization
+        """
+        from datetime import date, timedelta
+        
+        period_start = date.today() - timedelta(days=period_days)
+        period_end = date.today()
+        
+        # Get all performance metrics for the period
+        metrics = CategoryPerformance.objects.filter(
+            company=company,
+            period_start=period_start,
+            period_end=period_end
+        ).order_by('category__name')
+        
+        if not metrics.exists():
+            return {
+                'total_categories': 0,
+                'average_accuracy': 0.0,
+                'average_precision': 0.0,
+                'average_recall': 0.0,
+                'average_f1_score': 0.0,
+                'category_breakdown': [],
+                'summary': {
+                    'total_predictions': 0,
+                    'correct_predictions': 0,
+                    'false_positives': 0,
+                    'false_negatives': 0
+                }
+            }
+        
+        # Calculate overall metrics
+        total_predictions = sum(m.total_predictions for m in metrics)
+        correct_predictions = sum(m.correct_predictions for m in metrics)
+        false_positives = sum(m.false_positives for m in metrics)
+        false_negatives = sum(m.false_negatives for m in metrics)
+        
+        # Calculate averages
+        avg_accuracy = sum(m.accuracy for m in metrics) / len(metrics)
+        avg_precision = sum(m.precision for m in metrics) / len(metrics)
+        avg_recall = sum(m.recall for m in metrics) / len(metrics)
+        avg_f1_score = sum(m.f1_score for m in metrics) / len(metrics)
+        
+        # Prepare category breakdown
+        category_breakdown = []
+        for metric in metrics:
+            category_breakdown.append({
+                'category': metric.category.name,
+                'category_slug': metric.category.slug,
+                'category_type': metric.category.category_type,
+                'total_predictions': metric.total_predictions,
+                'correct_predictions': metric.correct_predictions,
+                'false_positives': metric.false_positives,
+                'false_negatives': metric.false_negatives,
+                'accuracy': metric.accuracy,
+                'precision': metric.precision,
+                'recall': metric.recall,
+                'f1_score': metric.f1_score,
+                'needs_improvement': metric.accuracy < 0.7 and metric.total_predictions > 5
+            })
+        
+        return {
+            'total_categories': len(metrics),
+            'average_accuracy': avg_accuracy,
+            'average_precision': avg_precision,
+            'average_recall': avg_recall,
+            'average_f1_score': avg_f1_score,
+            'category_breakdown': category_breakdown,
+            'summary': {
+                'total_predictions': total_predictions,
+                'correct_predictions': correct_predictions,
+                'false_positives': false_positives,
+                'false_negatives': false_negatives,
+                'overall_accuracy': correct_predictions / total_predictions if total_predictions > 0 else 0.0
+            },
+            'period_days': period_days
+        }
+    
+    def _update_rule_performance_metrics(self, rule: CategoryRule, transaction: Transaction):
+        """
+        Update performance metrics for rule-based categorization
+        """
+        from datetime import date, timedelta
+        
+        company = transaction.bank_account.company
+        period_start = date.today() - timedelta(days=30)
+        period_end = date.today()
+        
+        # Get or create performance metrics for this rule's category and period
+        performance, created = CategoryPerformance.objects.get_or_create(
+            company=company,
+            category=rule.category,
+            period_start=period_start,
+            period_end=period_end,
+            defaults={
+                'total_predictions': 0,
+                'correct_predictions': 0,
+                'false_positives': 0,
+                'false_negatives': 0
+            }
+        )
+        
+        # Increment total predictions for rules
+        performance.total_predictions += 1
+        
+        # For rules, we assume they're correct initially
+        # This will be updated when user provides feedback
+        performance.correct_predictions += 1
+        
+        # Recalculate metrics
+        performance.update_metrics()
+    
+    def get_rule_performance_summary(self, company, period_days: int = 30) -> Dict:
+        """
+        Get performance summary for rule-based categorization
+        """
+        from datetime import date, timedelta
+        
+        period_start = date.today() - timedelta(days=period_days)
+        period_end = date.today()
+        
+        # Get all active rules
+        rules = CategoryRule.objects.filter(
+            company=company,
+            is_active=True
+        ).order_by('-priority')
+        
+        # Get categorization logs for rule-based categorizations
+        rule_logs = CategorizationLog.objects.filter(
+            transaction__bank_account__company=company,
+            method='rule',
+            created_at__date__gte=period_start,
+            created_at__date__lte=period_end
+        )
+        
+        total_rule_applications = rule_logs.count()
+        correct_rule_applications = rule_logs.filter(was_accepted=True).count()
+        
+        # Calculate rule accuracy
+        rule_accuracy = correct_rule_applications / total_rule_applications if total_rule_applications > 0 else 0.0
+        
+        # Get rule breakdown
+        rule_breakdown = []
+        for rule in rules:
+            rule_applications = rule_logs.filter(rule_used=rule)
+            rule_total = rule_applications.count()
+            rule_correct = rule_applications.filter(was_accepted=True).count()
+            rule_acc = rule_correct / rule_total if rule_total > 0 else 0.0
+            
+            rule_breakdown.append({
+                'rule_id': rule.id,
+                'rule_name': rule.name,
+                'rule_type': rule.rule_type,
+                'category': rule.category.name,
+                'total_applications': rule_total,
+                'correct_applications': rule_correct,
+                'accuracy': rule_acc,
+                'match_count': rule.match_count,
+                'priority': rule.priority,
+                'confidence_threshold': rule.confidence_threshold,
+                'needs_review': rule_acc < 0.7 and rule_total > 5
+            })
+        
+        return {
+            'total_rules': len(rules),
+            'total_rule_applications': total_rule_applications,
+            'correct_rule_applications': correct_rule_applications,
+            'rule_accuracy': rule_accuracy,
+            'rule_breakdown': rule_breakdown,
+            'period_days': period_days
+        }
 
 
 class RuleBasedCategorizationService:
@@ -454,7 +700,71 @@ class CategoryAnalyticsService:
    
    def calculate_accuracy_metrics(self, company, period_days: int = 30) -> Dict:
        """
-       Calculate categorization accuracy metrics
+       Calculate categorization accuracy metrics using CategoryPerformance models
+       """
+       from datetime import timedelta
+       
+       end_date = timezone.now().date()
+       start_date = end_date - timedelta(days=period_days)
+       
+       # Get performance metrics for the period
+       performance_metrics = CategoryPerformance.objects.filter(
+           company=company,
+           period_start__gte=start_date,
+           period_end__lte=end_date
+       )
+       
+       if not performance_metrics.exists():
+           # Fallback to log-based calculation if no performance metrics exist
+           return self._calculate_accuracy_from_logs(company, period_days)
+       
+       # Calculate overall metrics from performance data
+       total_predictions = sum(p.total_predictions for p in performance_metrics)
+       correct_predictions = sum(p.correct_predictions for p in performance_metrics)
+       false_positives = sum(p.false_positives for p in performance_metrics)
+       false_negatives = sum(p.false_negatives for p in performance_metrics)
+       
+       overall_accuracy = correct_predictions / total_predictions if total_predictions > 0 else 0.0
+       
+       # Calculate method-specific metrics from logs
+       logs = CategorizationLog.objects.filter(
+           transaction__bank_account__company=company,
+           created_at__date__gte=start_date,
+           created_at__date__lte=end_date
+       )
+       
+       method_stats = {}
+       for method in ['ai', 'rule', 'manual', 'default']:
+           method_logs = logs.filter(method=method)
+           method_total = method_logs.count()
+           method_correct = method_logs.filter(was_accepted=True).count()
+           
+           method_stats[method] = {
+               'total': method_total,
+               'correct': method_correct,
+               'accuracy': method_correct / method_total if method_total > 0 else 0.0
+           }
+       
+       return {
+           'total_categorizations': total_predictions,
+           'accuracy': overall_accuracy,
+           'ai_accuracy': method_stats['ai']['accuracy'],
+           'rule_accuracy': method_stats['rule']['accuracy'],
+           'method_breakdown': method_stats,
+           'performance_summary': {
+               'total_predictions': total_predictions,
+               'correct_predictions': correct_predictions,
+               'false_positives': false_positives,
+               'false_negatives': false_negatives,
+               'precision': correct_predictions / (correct_predictions + false_positives) if (correct_predictions + false_positives) > 0 else 0.0,
+               'recall': correct_predictions / (correct_predictions + false_negatives) if (correct_predictions + false_negatives) > 0 else 0.0
+           },
+           'period_days': period_days
+       }
+   
+   def _calculate_accuracy_from_logs(self, company, period_days: int = 30) -> Dict:
+       """
+       Fallback method to calculate accuracy from logs when no performance metrics exist
        """
        from datetime import timedelta
        
@@ -475,7 +785,15 @@ class CategoryAnalyticsService:
                'accuracy': 0.0,
                'ai_accuracy': 0.0,
                'rule_accuracy': 0.0,
-               'method_breakdown': {}
+               'method_breakdown': {},
+               'performance_summary': {
+                   'total_predictions': 0,
+                   'correct_predictions': 0,
+                   'false_positives': 0,
+                   'false_negatives': 0,
+                   'precision': 0.0,
+                   'recall': 0.0
+               }
            }
        
        # Calculate overall accuracy
@@ -501,6 +819,14 @@ class CategoryAnalyticsService:
            'ai_accuracy': method_stats['ai']['accuracy'],
            'rule_accuracy': method_stats['rule']['accuracy'],
            'method_breakdown': method_stats,
+           'performance_summary': {
+               'total_predictions': total_categorizations,
+               'correct_predictions': correct_categorizations,
+               'false_positives': 0,
+               'false_negatives': 0,
+               'precision': overall_accuracy,
+               'recall': overall_accuracy
+           },
            'period_days': period_days
        }
    

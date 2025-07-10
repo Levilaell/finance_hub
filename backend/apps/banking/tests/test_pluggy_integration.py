@@ -117,9 +117,23 @@ class PluggyViewsTestCase(APITestCase):
             email='test@example.com',
             password='testpass123'
         )
+        
+        # Create subscription plan first
+        from apps.companies.models import SubscriptionPlan
+        self.subscription_plan = SubscriptionPlan.objects.create(
+            name='Starter',
+            slug='starter',
+            plan_type='starter',
+            price_monthly=0.00,
+            price_yearly=0.00,
+            max_transactions=1000,
+            max_bank_accounts=3
+        )
+        
         self.company = Company.objects.create(
             name='Test Company',
-            owner=self.user
+            owner=self.user,
+            subscription_plan=self.subscription_plan
         )
         self.user.company = self.company
         self.user.save()
@@ -137,7 +151,7 @@ class PluggyViewsTestCase(APITestCase):
         refresh = RefreshToken.for_user(self.user)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
         
-    @patch('apps.banking.pluggy_views.PluggyClient')
+    @patch('apps.banking.pluggy_client.PluggyClient')
     def test_get_pluggy_banks(self, mock_client_class):
         """Test getting available banks from Pluggy"""
         # Mock client
@@ -166,7 +180,7 @@ class PluggyViewsTestCase(APITestCase):
         self.assertEqual(len(response.data['data']), 1)
         self.assertEqual(response.data['data'][0]['name'], 'Banco do Brasil')
         
-    @patch('apps.banking.pluggy_views.PluggyClient')
+    @patch('apps.banking.pluggy_client.PluggyClient')
     def test_create_connect_token(self, mock_client_class):
         """Test creating Pluggy Connect token"""
         # Mock client
@@ -186,7 +200,7 @@ class PluggyViewsTestCase(APITestCase):
         self.assertEqual(response.data['data']['connect_token'], 'connect-token-123')
         self.assertEqual(response.data['data']['status'], 'pluggy_connect_required')
         
-    @patch('apps.banking.pluggy_views.PluggyClient')
+    @patch('apps.banking.pluggy_client.PluggyClient')
     def test_handle_item_callback(self, mock_client_class):
         """Test handling Pluggy item callback"""
         # Mock client
@@ -326,9 +340,23 @@ class PluggyIntegrationTestCase(TransactionTestCase):
             email='test@example.com',
             password='testpass123'
         )
+        
+        # Create subscription plan first
+        from apps.companies.models import SubscriptionPlan
+        self.subscription_plan = SubscriptionPlan.objects.create(
+            name='Starter',
+            slug='starter',
+            plan_type='starter',
+            price_monthly=0.00,
+            price_yearly=0.00,
+            max_transactions=1000,
+            max_bank_accounts=3
+        )
+        
         self.company = Company.objects.create(
             name='Test Company',
-            owner=self.user
+            owner=self.user,
+            subscription_plan=self.subscription_plan
         )
         self.user.company = self.company
         self.user.save()
@@ -338,7 +366,7 @@ class PluggyIntegrationTestCase(TransactionTestCase):
         refresh = RefreshToken.for_user(self.user)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
         
-    @patch('apps.banking.pluggy_views.PluggyClient')
+    @patch('apps.banking.pluggy_client.PluggyClient')
     def test_complete_connection_flow(self, mock_client_class):
         """Test complete bank connection flow"""
         # Mock client

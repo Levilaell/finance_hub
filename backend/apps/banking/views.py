@@ -870,10 +870,10 @@ class ConnectBankAccountView(APIView):
             if use_pluggy and hasattr(settings, 'PLUGGY_CLIENT_ID'):
                 # Use Pluggy for real bank connection
                 from .pluggy_views import PluggyConnectTokenView
-                pluggy_view = PluggyConnectTokenView.as_view()
+                pluggy_view = PluggyConnectTokenView()
                 
                 # Return the Pluggy connect token response
-                return pluggy_view(request)
+                return pluggy_view.post(request)
             
             from .services import OpenBankingService
             open_banking = OpenBankingService()

@@ -55,6 +55,10 @@ class AuthService {
   }) {
     return apiClient.post("/api/auth/password-reset/confirm/", data);
   }
+
+  async deleteAccount(data: { password: string; confirmation: string }) {
+    return apiClient.post("/api/auth/delete-account/", data);
+  }
 }
 
 export const authService = new AuthService();

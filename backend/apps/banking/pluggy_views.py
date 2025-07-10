@@ -19,10 +19,10 @@ from .serializers import BankAccountSerializer, BankProviderSerializer
 logger = logging.getLogger(__name__)
 
 
-@method_decorator(ratelimit(key='user', rate='10/m', method='GET'), name='dispatch')
+@method_decorator(ratelimit(key='ip', rate='20/m', method='GET'), name='dispatch')
 class PluggyBankProvidersView(APIView):
     """Get available banks from Pluggy"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]  # Public endpoint for bank list
     
     def get(self, request):
         """Get list of banks supported by Pluggy"""

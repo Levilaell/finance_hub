@@ -8,12 +8,12 @@ export interface PluggyBank {
   id: number;
   name: string;
   code: string;
-  logo: string;
-  color: string;
-  country: string;
+  logo?: string;
+  color?: string;
+  primary_color?: string;
   health_status: 'ONLINE' | 'UNSTABLE' | 'OFFLINE';
-  supports_identity: boolean;
-  supports_payment_initiation: boolean;
+  supports_accounts?: boolean;
+  supports_transactions?: boolean;
 }
 
 export interface PluggyConnectToken {
@@ -43,8 +43,27 @@ class PluggyService {
    * Get available banks from Pluggy
    */
   async getSupportedBanks(): Promise<PluggyBank[]> {
-    const response = await apiClient.get('/api/banking/pluggy/banks/');
-    return (response as any).data.data;
+    try {
+      const response = await apiClient.get('/api/banking/pluggy/banks/');
+      
+      // Handle different response formats
+      if ((response as any).success && (response as any).data) {
+        // Pluggy format: { success: true, data: [...] }
+        return (response as any).data;
+      } else if (Array.isArray(response)) {
+        // Direct array format
+        return response;
+      } else if ((response as any).data && Array.isArray((response as any).data)) {
+        // Nested data format: { data: [...] }
+        return (response as any).data;
+      } else {
+        console.warn('Unexpected response format:', response);
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching banks from Pluggy:', error);
+      throw error;
+    }
   }
 
   /**

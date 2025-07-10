@@ -52,6 +52,9 @@ export interface Company {
   subscription_plan: SubscriptionPlan;
   subscription_status: "active" | "trialing" | "past_due" | "canceled" | "unpaid";
   trial_ends_at: string | null;
+  next_billing_date: string | null;
+  subscription_start_date: string | null;
+  subscription_end_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -59,12 +62,22 @@ export interface Company {
 export interface SubscriptionPlan {
   id: string;
   name: string;
-  price: number;
-  currency: string;
-  interval: "month" | "year";
-  features: string[];
-  max_users: number;
+  slug: string;
+  plan_type: string;
+  price_monthly: number;
+  price_yearly: number;
+  max_transactions: number;
   max_bank_accounts: number;
+  max_users: number;
+  has_ai_categorization: boolean;
+  has_advanced_reports: boolean;
+  has_api_access: boolean;
+  has_accountant_access: boolean;
+  // Legacy fields for backward compatibility
+  price?: number;
+  currency?: string;
+  interval?: "month" | "year";
+  features?: string[];
 }
 
 // Banking

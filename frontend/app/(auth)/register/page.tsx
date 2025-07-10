@@ -59,13 +59,13 @@ export default function RegisterPage() {
     },
     onSuccess: (data) => {
       setAuth(data.user, data.tokens);
-      toast.success('Registration successful!');
+      toast.success('Cadastro realizado com sucesso!');
       router.push('/dashboard');
     },
     onError: (error: any) => {
       const errorMessage = error.response?.data?.errors
         ? Object.values(error.response.data.errors).flat().join(', ')
-        : error.response?.data?.detail || 'Registration failed';
+        : error.response?.data?.detail || 'Falha no cadastro';
       toast.error(errorMessage);
     },
   });
@@ -78,19 +78,19 @@ export default function RegisterPage() {
   };
 
   const passwordRequirements = [
-    { regex: /.{8,}/, text: 'At least 8 characters' },
-    { regex: /[A-Z]/, text: 'One uppercase letter' },
-    { regex: /[a-z]/, text: 'One lowercase letter' },
-    { regex: /[0-9]/, text: 'One number' },
-    { regex: /[^A-Za-z0-9]/, text: 'One special character' },
+    { regex: /.{8,}/, text: 'Pelo menos 8 caracteres' },
+    { regex: /[A-Z]/, text: 'Uma letra maiúscula' },
+    { regex: /[a-z]/, text: 'Uma letra minúscula' },
+    { regex: /[0-9]/, text: 'Um número' },
+    { regex: /[^A-Za-z0-9]/, text: 'Um caractere especial' },
   ];
 
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle>Create an Account</CardTitle>
+        <CardTitle>Criar uma Conta</CardTitle>
         <CardDescription>
-          Start your free trial and manage your finances
+          Inicie seu período de avaliação gratuito e gerencie suas finanças
         </CardDescription>
         
         {/* Selected Plan Display */}
@@ -128,13 +128,13 @@ export default function RegisterPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstName">Nome</Label>
                 <Input
                   id="firstName"
                   type="text"
-                  placeholder="John"
+                  placeholder="João"
                   {...register('first_name', {
-                    required: 'First name is required',
+                    required: 'Nome é obrigatório',
                   })}
                   autoComplete="given-name"
                 />
@@ -145,13 +145,13 @@ export default function RegisterPage() {
                 )}
               </div>
               <div>
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="lastName">Sobrenome</Label>
                 <Input
                   id="lastName"
                   type="text"
-                  placeholder="Doe"
+                  placeholder="Silva"
                   {...register('last_name', {
-                    required: 'Last name is required',
+                    required: 'Sobrenome é obrigatório',
                   })}
                   autoComplete="family-name"
                 />
@@ -163,16 +163,16 @@ export default function RegisterPage() {
               </div>
             </div>
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">E-mail</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="name@example.com"
+                placeholder="nome@exemplo.com"
                 {...register('email', {
-                  required: 'Email is required',
+                  required: 'E-mail é obrigatório',
                   pattern: {
                     value: /\S+@\S+\.\S+/,
-                    message: 'Invalid email address',
+                    message: 'Endereço de e-mail inválido',
                   },
                 })}
                 autoComplete="email"
@@ -184,13 +184,13 @@ export default function RegisterPage() {
               )}
             </div>
             <div>
-              <Label htmlFor="companyName">Company Name</Label>
+              <Label htmlFor="companyName">Nome da Empresa</Label>
               <Input
                 id="companyName"
                 type="text"
-                placeholder="Acme Corp"
+                placeholder="Minha Empresa Ltda"
                 {...register('company_name', {
-                  required: 'Company name is required',
+                  required: 'Nome da empresa é obrigatório',
                 })}
                 autoComplete="organization"
               />
@@ -202,15 +202,15 @@ export default function RegisterPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="companyType">Company Type</Label>
+                <Label htmlFor="companyType">Tipo de Empresa</Label>
                 <select
                   id="companyType"
                   {...register('company_type', {
-                    required: 'Company type is required',
+                    required: 'Tipo de empresa é obrigatório',
                   })}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <option value="">Select type</option>
+                  <option value="">Selecione o tipo</option>
                   <option value="mei">MEI</option>
                   <option value="me">Microempresa</option>
                   <option value="epp">Empresa de Pequeno Porte</option>
@@ -225,15 +225,15 @@ export default function RegisterPage() {
                 )}
               </div>
               <div>
-                <Label htmlFor="businessSector">Business Sector</Label>
+                <Label htmlFor="businessSector">Setor de Atividade</Label>
                 <select
                   id="businessSector"
                   {...register('business_sector', {
-                    required: 'Business sector is required',
+                    required: 'Setor de atividade é obrigatório',
                   })}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <option value="">Select sector</option>
+                  <option value="">Selecione o setor</option>
                   <option value="commerce">Comércio</option>
                   <option value="services">Serviços</option>
                   <option value="industry">Indústria</option>
@@ -254,20 +254,20 @@ export default function RegisterPage() {
               </div>
             </div>
             <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Senha</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Create a strong password"
+                  placeholder="Crie uma senha forte"
                   {...register('password', {
-                    required: 'Password is required',
+                    required: 'Senha é obrigatória',
                     validate: (value) => {
                       const failedRequirements = passwordRequirements.filter(
                         (req) => !req.regex.test(value)
                       );
                       if (failedRequirements.length > 0) {
-                        return `Password must have: ${failedRequirements
+                        return `A senha deve ter: ${failedRequirements
                           .map((req) => req.text.toLowerCase())
                           .join(', ')}`;
                       }
@@ -316,16 +316,16 @@ export default function RegisterPage() {
               )}
             </div>
             <div>
-              <Label htmlFor="password2">Confirm Password</Label>
+              <Label htmlFor="password2">Confirmar Senha</Label>
               <div className="relative">
                 <Input
                   id="password2"
                   type={showConfirmPassword ? 'text' : 'password'}
-                  placeholder="Confirm your password"
+                  placeholder="Confirme sua senha"
                   {...register('password2', {
-                    required: 'Please confirm your password',
+                    required: 'Por favor, confirme sua senha',
                     validate: (value) =>
-                      value === password || 'Passwords do not match',
+                      value === password || 'As senhas não coincidem',
                   })}
                   autoComplete="new-password"
                 />
@@ -355,22 +355,22 @@ export default function RegisterPage() {
             className="w-full"
             disabled={registerMutation.isPending}
           >
-            {registerMutation.isPending ? <LoadingSpinner /> : 'Create Account'}
+            {registerMutation.isPending ? <LoadingSpinner /> : 'Criar Conta'}
           </Button>
           <p className="text-sm text-center text-gray-600">
-            By signing up, you agree to our{' '}
+            Ao se cadastrar, você concorda com nossos{' '}
             <Link href="#" className="text-primary hover:underline">
-              Terms of Service
+              Termos de Serviço
             </Link>{' '}
-            and{' '}
+            e{' '}
             <Link href="#" className="text-primary hover:underline">
-              Privacy Policy
+              Política de Privacidade
             </Link>
           </p>
           <p className="text-sm text-center text-gray-600">
-            Already have an account?{' '}
+            Já tem uma conta?{' '}
             <Link href="/login" className="text-primary hover:underline">
-              Sign in
+              Entrar
             </Link>
           </p>
         </CardFooter>

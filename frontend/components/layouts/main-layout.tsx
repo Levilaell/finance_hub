@@ -26,11 +26,11 @@ interface MainLayoutProps {
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Transactions", href: "/transactions", icon: Receipt },
-  { name: "Accounts", href: "/accounts", icon: Wallet },
-  { name: "Categories", href: "/categories", icon: Tags },
-  { name: "Reports", href: "/reports", icon: FileText },
-  { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Transações", href: "/transactions", icon: Receipt },
+  { name: "Contas", href: "/accounts", icon: Wallet },
+  { name: "Categorias", href: "/categories", icon: Tags },
+  { name: "Relatórios", href: "/reports", icon: FileText },
+  { name: "Configurações", href: "/settings", icon: Settings },
 ];
 
 export function MainLayout({ children }: MainLayoutProps) {
@@ -48,8 +48,8 @@ export function MainLayout({ children }: MainLayoutProps) {
   };
 
   const getUserFullName = () => {
-    if (!user || !_hasHydrated) return 'Loading...';
-    return `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'User';
+    if (!user || !_hasHydrated) return 'Carregando...';
+    return `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Usuário';
   };
 
   const getUserEmail = () => {
@@ -130,7 +130,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               onClick={handleLogout}
             >
               <LogOut className="mr-2 h-4 w-4" />
-              Logout
+              Sair
             </Button>
           </div>
         </div>
@@ -186,7 +186,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               onClick={handleLogout}
             >
               <LogOut className="mr-2 h-4 w-4" />
-              Logout
+              Sair
             </Button>
           </div>
         </div>
@@ -230,13 +230,13 @@ export function MainLayout({ children }: MainLayoutProps) {
                       className="block px-4 py-2 text-sm text-foreground hover:bg-accent"
                       onClick={() => setUserMenuOpen(false)}
                     >
-                      Settings
+                      Configurações
                     </Link>
                     <button
                       onClick={handleLogout}
                       className="block w-full px-4 py-2 text-left text-sm text-foreground hover:bg-accent"
                     >
-                      Logout
+                      Sair
                     </button>
                   </div>
                 </div>

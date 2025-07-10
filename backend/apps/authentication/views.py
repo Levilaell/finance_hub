@@ -19,6 +19,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .models import EmailVerification, PasswordReset
 from .serializers import (
     ChangePasswordSerializer,
+    DeleteAccountSerializer,
     EmailVerificationSerializer,
     LoginSerializer,
     PasswordResetConfirmSerializer,
@@ -471,3 +472,39 @@ class BackupCodesView(APIView):
             'backup_codes': backup_codes,  # Show plain codes only once
             'message': 'Novos códigos de backup gerados. Por favor, guarde-os com segurança.'
         })
+
+
+@method_decorator(ratelimit(key='user', rate='3/h', method='POST'), name='dispatch')
+class DeleteAccountView(APIView):
+    """Delete user account with password verification"""
+    permission_classes = [IsAuthenticated]
+    serializer_class = DeleteAccountSerializer
+    
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        
+        user = request.user
+        
+        # Additional safety check - ensure user is not a superuser
+        if user.is_superuser:
+            return Response({
+                'error': 'Contas de administrador não podem ser deletadas.'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Log the account deletion for audit purposes
+        print(f"Deleting account for user: {user.email} (ID: {user.id})")
+        
+        try:
+            # Delete user and all related data (CASCADE should handle this)
+            user.delete()
+            
+            return Response({
+                'message': 'Conta deletada com sucesso.'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"Error deleting user account {user.id}: {str(e)}")
+            return Response({
+                'error': 'Erro interno do servidor. Tente novamente mais tarde.'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

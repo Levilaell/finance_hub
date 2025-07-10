@@ -25,13 +25,19 @@ export function useBankProviders() {
         // Get banks from Pluggy
         const pluggyBanks = await pluggyService.getSupportedBanks();
         
+        // Validate response
+        if (!Array.isArray(pluggyBanks)) {
+          console.warn('Pluggy returned non-array:', pluggyBanks);
+          throw new Error('Invalid response format from Pluggy');
+        }
+        
         // Convert Pluggy format to our format
         const mappedProviders: BankProvider[] = pluggyBanks.map(bank => ({
-          id: bank.id,
-          name: bank.name,
-          code: bank.code,
+          id: bank.id || 0,
+          name: bank.name || 'Unknown Bank',
+          code: bank.code || String(bank.id),
           logo: bank.logo,
-          color: bank.color || '#000000',
+          color: bank.primary_color ? `#${bank.primary_color}` : (bank.color || '#000000'),
           is_open_banking: true, // All Pluggy banks support open banking
           supports_pix: true,
           supports_ted: true,

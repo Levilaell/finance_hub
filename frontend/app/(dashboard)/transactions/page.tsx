@@ -150,7 +150,7 @@ export default function TransactionsPage() {
       bankingService.updateTransaction(id, { category_id: categoryId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
-      toast.success('Category updated successfully');
+      toast.success('Categoria atualizada com sucesso');
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.detail || 'Failed to update category');
@@ -316,7 +316,7 @@ export default function TransactionsPage() {
             <SelectTrigger className="w-full h-8 text-sm">
               <div className="flex items-center w-full">
                 {transaction.ai_categorized && (
-                  <SparklesSolidIcon className="h-3 w-3 mr-1 text-purple-500" title="AI Categorized" />
+                  <SparklesSolidIcon className="h-3 w-3 mr-1 text-purple-500" title="Categorizada por IA" />
                 )}
                 {transaction.category_detail ? (
                   <>
@@ -439,7 +439,7 @@ export default function TransactionsPage() {
             className="md:hidden"
           >
             <FunnelIcon className="h-4 w-4 mr-2" />
-            Filters {Object.keys(filters).length > 0 && `(${Object.keys(filters).length})`}
+            Filtros {Object.keys(filters).length > 0 && `(${Object.keys(filters).length})`}
           </Button>
           
           <div className="flex gap-2">
@@ -531,7 +531,7 @@ export default function TransactionsPage() {
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
-              placeholder="Search transactions..."
+              placeholder="Buscar transações..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 w-full"
@@ -554,7 +554,7 @@ export default function TransactionsPage() {
               <PopoverTrigger asChild>
                 <Button variant="outline">
                   <FunnelIcon className="h-4 w-4 mr-2" />
-                  Filters {Object.keys(filters).length > 0 && `(${Object.keys(filters).length})`}
+                  Filtros {Object.keys(filters).length > 0 && `(${Object.keys(filters).length})`}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-80">
@@ -604,7 +604,7 @@ export default function TransactionsPage() {
                   }}
                 >
                   <SelectTrigger className="w-[180px] h-8">
-                    <SelectValue placeholder="Bulk categorize" />
+                    <SelectValue placeholder="Categorizar em lote" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
@@ -702,17 +702,17 @@ export default function TransactionsPage() {
       ) : (
         <EmptyState
           icon={BanknotesIcon}
-          title="No transactions found"
+          title="Nenhuma transação encontrada"
           description={searchTerm || Object.keys(filters).length > 0 
-            ? "Try adjusting your search or filters" 
-            : "Connect a bank account to start seeing your transactions"}
+            ? "Tente ajustar sua busca ou filtros" 
+            : "Conecte uma conta bancária para começar a ver suas transações"}
           action={
             searchTerm || Object.keys(filters).length > 0 ? (
               <Button onClick={() => {
                 setSearchTerm('');
                 setFilters({});
               }}>
-                Clear Filters
+                Limpar Filtros
               </Button>
             ) : (
               <HydrationBoundary>
@@ -742,7 +742,7 @@ export default function TransactionsPage() {
                 value={noteText}
                 onChange={(e) => setNoteText(e.target.value)}
                 className="w-full h-24 p-2 border rounded-md"
-                placeholder="Add a note..."
+                placeholder="Adicionar uma nota..."
               />
               <div className="flex justify-end gap-2 mt-4">
                 <Button
@@ -785,7 +785,7 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
           }
         >
           <SelectTrigger>
-            <SelectValue placeholder="All accounts" />
+            <SelectValue placeholder="Todas as contas" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All accounts</SelectItem>
@@ -807,7 +807,7 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
           }
         >
           <SelectTrigger>
-            <SelectValue placeholder="All categories" />
+            <SelectValue placeholder="Todas as categorias" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All categories</SelectItem>
@@ -839,7 +839,7 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
           }
         >
           <SelectTrigger>
-            <SelectValue placeholder="All types" />
+            <SelectValue placeholder="Todos os tipos" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All types</SelectItem>
@@ -916,7 +916,7 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
         className="w-full"
         onClick={() => setFilters({})}
       >
-        Clear Filters
+        Limpar Filtros
       </Button>
     </div>
   );
