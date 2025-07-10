@@ -128,8 +128,8 @@ export default function CategoriesPage() {
     return <ErrorMessage message="Failed to load categories" />;
   }
 
-  const incomeCategories = categories?.filter(cat => cat.type === 'income') || [];
-  const expenseCategories = categories?.filter(cat => cat.type === 'expense') || [];
+  const incomeCategories = categories?.filter(cat => cat.category_type === 'income') || [];
+  const expenseCategories = categories?.filter(cat => cat.category_type === 'expense') || [];
 
   const CategoryCard = ({ category }: { category: Category }) => {
     // Handle both array and paginated response
@@ -210,10 +210,10 @@ export default function CategoriesPage() {
         const formData = new FormData(e.currentTarget);
         onSubmit({
           name: formData.get('name') as string,
-          type: formData.get('type') as 'income' | 'expense',
+          category_type: formData.get('type') as 'income' | 'expense',
           color: selectedColor,
           icon: selectedIcon,
-          parent_id: formData.get('parent_id') as string || undefined,
+          parent: formData.get('parent_id') ? parseInt(formData.get('parent_id') as string) : undefined,
         });
       }}
     >
@@ -230,7 +230,7 @@ export default function CategoriesPage() {
         </div>
         <div>
           <Label htmlFor="type">Type</Label>
-          <Select name="type" defaultValue={category?.type || 'expense'}>
+          <Select name="type" defaultValue={category?.category_type || 'expense'}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -394,7 +394,12 @@ export default function CategoriesPage() {
             </DialogDescription>
           </DialogHeader>
           <CategoryForm
-            onSubmit={(data) => createCategoryMutation.mutate(data)}
+            onSubmit={(data) => {
+        // Reset the selected icon and color to default for next category
+        setSelectedIcon(ICONS[0]);
+        setSelectedColor(DEFAULT_COLORS[0]);
+        createCategoryMutation.mutate(data);
+      }}
             onCancel={() => setIsAddingCategory(false)}
           />
         </DialogContent>

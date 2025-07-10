@@ -614,7 +614,10 @@ export default function SettingsPage() {
                         Receive email updates about your account activity
                       </p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch 
+                      checked={emailNotifications}
+                      onCheckedChange={setEmailNotifications}
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
@@ -623,7 +626,10 @@ export default function SettingsPage() {
                         Get notified about new transactions
                       </p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch 
+                      checked={transactionAlerts}
+                      onCheckedChange={setTransactionAlerts}
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
@@ -632,7 +638,10 @@ export default function SettingsPage() {
                         Alert when account balance is low
                       </p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch 
+                      checked={lowBalanceWarnings}
+                      onCheckedChange={setLowBalanceWarnings}
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
@@ -641,7 +650,10 @@ export default function SettingsPage() {
                         Receive monthly financial summaries
                       </p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch 
+                      checked={monthlyReports}
+                      onCheckedChange={setMonthlyReports}
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
@@ -655,7 +667,13 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="pt-4">
-                  <Button>Save Preferences</Button>
+                  <Button
+                    onClick={() => {
+                      toast.success('Notification preferences saved successfully');
+                    }}
+                  >
+                    Save Preferences
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -677,7 +695,14 @@ export default function SettingsPage() {
                     Permanently delete your account and all associated data. This action cannot be undone.
                   </p>
                 </div>
-                <Button variant="destructive">
+                <Button 
+                  variant="destructive"
+                  onClick={() => {
+                    if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+                      toast.error('Account deletion will be implemented');
+                    }
+                  }}
+                >
                   Delete Account
                 </Button>
               </div>

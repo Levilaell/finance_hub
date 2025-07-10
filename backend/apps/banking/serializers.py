@@ -72,6 +72,7 @@ class TransactionCategorySerializer(serializers.ModelSerializer):
     full_name = serializers.ReadOnlyField()
     subcategories = serializers.SerializerMethodField()
     transaction_count = serializers.SerializerMethodField()
+    slug = serializers.SlugField(read_only=True)
     
     class Meta:
         model = TransactionCategory

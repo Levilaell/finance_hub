@@ -83,10 +83,16 @@ export default function NewTransactionPage() {
       
       if (response.ok) {
         const data = await response.json();
-        setCategories(data);
+        // Ensure data is an array. If it's paginated, extract the results
+        const categoriesData = Array.isArray(data) ? data : (data.results || []);
+        setCategories(categoriesData);
+      } else {
+        console.error('Failed to fetch categories:', response.status);
+        setCategories([]);
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
+      setCategories([]);
     }
   };
 

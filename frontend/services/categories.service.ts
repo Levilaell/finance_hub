@@ -66,7 +66,9 @@ class CategoriesService {
     categorized: number;
     errors: string[];
   }> {
-    return apiClient.post("/api/categories/rules/apply/", {
+    return apiClient.post("/api/categories/bulk/", {
+      operation: "categorize_uncategorized",
+      limit: transactionIds ? transactionIds.length : 100,
       transaction_ids: transactionIds,
     });
   }

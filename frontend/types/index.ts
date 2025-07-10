@@ -130,11 +130,16 @@ export interface BankTransaction {
 export interface Category {
   id: string;
   name: string;
-  type: "income" | "expense";
+  slug: string;
+  category_type: "income" | "expense";
   icon: string | null;
   color: string | null;
-  parent: string | null;
+  parent: number | null;
   is_system: boolean;
+  is_active: boolean;
+  full_name?: string;
+  subcategories?: Category[];
+  transaction_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -243,10 +248,10 @@ export interface BankAccountForm {
 
 export interface CategoryForm {
   name: string;
-  type: "income" | "expense";
+  category_type: "income" | "expense";
   icon?: string;
   color?: string;
-  parent_id?: string;
+  parent?: number;
 }
 
 export interface TransactionFilter {

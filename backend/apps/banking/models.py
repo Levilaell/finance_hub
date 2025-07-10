@@ -238,6 +238,19 @@ class TransactionCategory(models.Model):
         if self.parent:
             return f"{self.parent.name} > {self.name}"
         return self.name
+    
+    def save(self, *args, **kwargs):
+        """Auto-generate slug if not provided"""
+        if not self.slug:
+            from django.utils.text import slugify
+            base_slug = slugify(self.name)
+            slug = base_slug
+            counter = 1
+            while TransactionCategory.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
 
 
 class Transaction(models.Model):
