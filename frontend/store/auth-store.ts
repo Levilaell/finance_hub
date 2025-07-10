@@ -84,7 +84,7 @@ export const useAuthStore = create<AuthState>()(
       fetchUser: async () => {
         set({ isLoading: true });
         try {
-          const user = await apiClient.get<User>("/auth/profile/");
+          const user = await apiClient.get<User>("/api/auth/profile/");
           set({
             user,
             isAuthenticated: true,

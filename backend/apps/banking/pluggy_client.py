@@ -100,7 +100,17 @@ class PluggyClient:
                 raise PluggyAuthenticationError(f"Authentication failed: {response.text}")
             
             data = response.json()
-            self._access_token = data['accessToken']
+            
+            # Pluggy returns 'apiKey' instead of 'accessToken'
+            if 'apiKey' in data:
+                self._access_token = data['apiKey']
+            elif 'accessToken' in data:
+                self._access_token = data['accessToken']
+            else:
+                logger.error(f"No access token in response. Available keys: {list(data.keys())}")
+                raise PluggyAuthenticationError(f"Missing access token in response: {data}")
+            
+            logger.info("Successfully authenticated with Pluggy API")
             
             # Pluggy tokens typically expire in 2 hours
             self._token_expires_at = datetime.now() + timedelta(hours=2)

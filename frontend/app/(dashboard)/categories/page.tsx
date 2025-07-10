@@ -203,34 +203,44 @@ export default function CategoriesPage() {
     category?: Category;
     onSubmit: (data: CategoryForm) => void;
     onCancel: () => void;
-  }) => (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        const formData = new FormData(e.currentTarget);
-        onSubmit({
-          name: formData.get('name') as string,
-          category_type: formData.get('type') as 'income' | 'expense',
-          color: selectedColor,
-          icon: selectedIcon,
-          parent: formData.get('parent_id') ? parseInt(formData.get('parent_id') as string) : undefined,
-        });
-      }}
-    >
-      <div className="space-y-4 py-4">
-        <div>
-          <Label htmlFor="name">Category Name</Label>
-          <Input
-            id="name"
-            name="name"
-            defaultValue={category?.name}
-            placeholder="e.g., Groceries"
-            required
-          />
-        </div>
+  }) => {
+    const [formData, setFormData] = useState({
+      name: category?.name || '',
+      type: category?.category_type || 'expense',
+    });
+
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit({
+            name: formData.name,
+            category_type: formData.type as 'income' | 'expense',
+            color: selectedColor,
+            icon: selectedIcon,
+            parent: undefined,
+          });
+        }}
+      >
+        <div className="space-y-4 py-4">
+          <div>
+            <Label htmlFor="name">Category Name</Label>
+            <Input
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="e.g., Groceries"
+              required
+            />
+          </div>
         <div>
           <Label htmlFor="type">Type</Label>
-          <Select name="type" defaultValue={category?.category_type || 'expense'}>
+          <Select 
+            name="type" 
+            value={formData.type}
+            onValueChange={(value) => setFormData({ ...formData, type: value })}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -297,7 +307,8 @@ export default function CategoriesPage() {
         </Button>
       </DialogFooter>
     </form>
-  );
+    );
+  };
 
   return (
     <div className="space-y-6">

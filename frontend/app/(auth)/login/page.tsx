@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/auth-store';
-import type { LoginCredentials, LoginResponse, TwoFactorVerifyResponse } from '@/types';
+import type { LoginCredentials, LoginResponse } from '@/types';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 export default function LoginPage() {
@@ -22,6 +22,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [show2FA, setShow2FA] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [loginCredentials, setLoginCredentials] = useState<LoginCredentials | null>(null);
 
   const {
     register,
@@ -52,10 +53,12 @@ export default function LoginPage() {
     },
   });
 
-  const verify2FAMutation = useMutation<TwoFactorVerifyResponse, Error, void>({
+  const verify2FAMutation = useMutation<LoginResponse, Error, void>({
     mutationFn: async () => {
-      const response = await authService.verify2FA({ code: twoFactorCode });
-      return response;
+      if (!loginCredentials) {
+        throw new Error('No login credentials available');
+      }
+      return await authService.loginWith2FA(loginCredentials.email, loginCredentials.password, twoFactorCode);
     },
     onSuccess: (data) => {
       setAuth(data.user, data.tokens);
@@ -63,12 +66,13 @@ export default function LoginPage() {
       router.push('/dashboard');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Invalid 2FA code');
+      toast.error(error.response?.data?.error || error.response?.data?.detail || 'Invalid 2FA code');
     },
   });
 
   const onSubmit = (data: LoginCredentials) => {
     console.log('Form submitted with:', data);
+    setLoginCredentials(data); // Store credentials for 2FA
     loginMutation.mutate(data);
   };
 
@@ -134,6 +138,7 @@ export default function LoginPage() {
               onClick={() => {
                 setShow2FA(false);
                 setTwoFactorCode('');
+                setLoginCredentials(null);
               }}
             >
               Back to Login

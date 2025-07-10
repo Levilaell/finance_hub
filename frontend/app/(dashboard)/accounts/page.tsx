@@ -43,6 +43,7 @@ import { BankAccountForm } from '@/components/accounts/bank-account-form';
 import { useBankProviders } from '@/hooks/use-bank-providers';
 import { bankingService } from '@/services/banking.service';
 import { PluggyConnectHandler } from '@/components/banking/pluggy-connect-handler';
+import { PluggyInfoDialog } from '@/components/banking/pluggy-info-dialog';
 
 interface BankProvider {
   id: number;
@@ -76,13 +77,6 @@ export default function AccountsPage() {
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [editingAccount, setEditingAccount] = useState<any>(null);
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
-  const [showAccountForm, setShowAccountForm] = useState(false);
-  const [accountFormData, setAccountFormData] = useState({
-    agency: '',
-    account_number: '',
-    account_digit: '',
-    nickname: ''
-  });
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -100,79 +94,71 @@ export default function AccountsPage() {
 
   const handleConnectBank = async (provider: BankProvider) => {
     try {
-      // Store the bank code for use in the callback
-      localStorage.setItem('pending_bank_connection', provider.code);
-
-      // Check if user wants to use Pluggy (real connection)
-      const usePluggy = confirm('Deseja conectar com seu banco real usando o Pluggy?\n\nClique em "OK" para conexão real ou "Cancelar" para usar simulação.');
+      setIsAddingAccount(false); // Close the bank selection dialog
+      
+      // Always use Pluggy for real bank connections
+      toast.info('Iniciando conexão com seu banco...');
 
       // Use the banking service to initiate the connection
       const result = await bankingService.connectBankAccount({
         bank_code: provider.code,
-        use_pluggy: usePluggy
+        use_pluggy: true // Always use Pluggy
       });
 
       if (result.data?.status === 'pluggy_connect_required') {
         // Pluggy Connect flow
-        toast.info('Abrindo Pluggy Connect para conectar sua conta...');
-        
-        // Open Pluggy Connect widget
         const connectToken = result.data.connect_token;
         const connectUrl = result.data.connect_url;
         
         if (connectToken && connectUrl) {
-          // Create Pluggy Connect URL with token
-          const pluggyUrl = `${connectUrl}?connectToken=${connectToken}&updateItem=false`;
-          window.open(pluggyUrl, '_blank', 'width=500,height=700');
+          // Option 1: Open in a popup window
+          const width = 500;
+          const height = 700;
+          const left = (window.screen.width - width) / 2;
+          const top = (window.screen.height - height) / 2;
           
-          toast.success('Complete a conexão na janela do Pluggy');
+          const pluggyWindow = window.open(
+            `${connectUrl}?connectToken=${connectToken}`,
+            'PluggyConnect',
+            `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes`
+          );
+          
+          if (pluggyWindow) {
+            toast.success('Complete a conexão na janela do Pluggy');
+            
+            // Check if window is closed periodically
+            const checkInterval = setInterval(() => {
+              if (pluggyWindow.closed) {
+                clearInterval(checkInterval);
+                // Refresh accounts after window closes
+                setTimeout(() => {
+                  fetchAccounts();
+                }, 1000);
+              }
+            }, 1000);
+          } else {
+            // If popup was blocked, use redirect
+            toast.info('Redirecionando para o Pluggy...');
+            window.location.href = `${connectUrl}?connectToken=${connectToken}`;
+          }
+          
           return;
         }
       }
 
-      if (result.status === 'consent_required') {
-        // Real Open Banking flow - redirect to authorization URL
-        toast.info(`Redirecionando para autorização no ${provider.name}...`);
-        
-        // Store consent info for later use
-        if (result.consent_id) {
-          localStorage.setItem('consent_id', result.consent_id);
-        }
-        
-        // Redirect to bank's authorization page
-        if (result.authorization_url) {
-          window.location.href = result.authorization_url;
-        } else {
-          throw new Error('URL de autorização não disponível');
-        }
-      } else if (result.status === 'success') {
-        // Direct connection (fallback or test mode)
-        setIsAddingAccount(false);
-        setAccountFormData({ agency: '', account_number: '', account_digit: '', nickname: '' });
+      // Fallback for test mode
+      if (result.status === 'success') {
         setSelectedProvider(null);
         fetchAccounts();
-        
-        const balanceText = result.balance 
-          ? new Intl.NumberFormat('pt-BR', {
-              style: 'currency',
-              currency: 'BRL'
-            }).format(result.balance)
-          : '';
-        
-        toast.success(`${result.message}${balanceText ? ` Saldo: ${balanceText}` : ''}`);
+        toast.success(result.message || 'Conta conectada com sucesso!');
       } else {
         throw new Error(result.message || 'Erro ao iniciar conexão');
       }
     } catch (error: any) {
       console.error('Error connecting bank:', error);
-      
-      // Clean up stored data on error
-      localStorage.removeItem('pending_bank_connection');
-      localStorage.removeItem('consent_id');
-      
       toast.error(
         error.message || 
-        'Erro ao conectar com o banco. Verifique sua configuração de Open Banking.'
+        'Erro ao conectar com o banco. Tente novamente.'
       );
     }
   };
@@ -273,7 +259,6 @@ export default function AccountsPage() {
           toast.success('Conta conectada com sucesso!');
           fetchAccounts();
           setIsAddingAccount(false);
-          setShowAccountForm(false);
         }}
         onError={(error) => {
           toast.error(error);
@@ -436,6 +421,10 @@ export default function AccountsPage() {
           </DialogHeader>
           
           <div className="py-4">
+            {/* Info about Pluggy */}
+            <div className="mb-4">
+              <PluggyInfoDialog />
+            </div>
             {/* Search */}
             <div className="mb-4">
               <Input
@@ -538,8 +527,7 @@ export default function AccountsPage() {
             <Button 
               onClick={() => {
                 if (selectedProvider) {
-                  setIsAddingAccount(false);
-                  setShowAccountForm(true);
+                  handleConnectBank(selectedProvider);
                 }
               }}
               disabled={!selectedProvider}
@@ -595,93 +583,6 @@ export default function AccountsPage() {
         account={editingAccount}
       />
 
-      {/* Account Data Collection Form */}
-      <Dialog open={showAccountForm} onOpenChange={setShowAccountForm}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Conectar com {selectedProvider?.name}</DialogTitle>
-            <DialogDescription>
-              Para conectar com segurança, precisamos de algumas informações da sua conta
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="agency">Agência</Label>
-              <Input
-                id="agency"
-                placeholder="Ex: 0001"
-                value={accountFormData.agency}
-                onChange={(e) => setAccountFormData(prev => ({ ...prev, agency: e.target.value }))}
-              />
-            </div>
-            
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <Label htmlFor="account_number">Número da Conta</Label>
-                <Input
-                  id="account_number"
-                  placeholder="Ex: 12345"
-                  value={accountFormData.account_number}
-                  onChange={(e) => setAccountFormData(prev => ({ ...prev, account_number: e.target.value }))}
-                />
-              </div>
-              <div className="w-20">
-                <Label htmlFor="account_digit">Dígito</Label>
-                <Input
-                  id="account_digit"
-                  placeholder="6"
-                  maxLength={2}
-                  value={accountFormData.account_digit}
-                  onChange={(e) => setAccountFormData(prev => ({ ...prev, account_digit: e.target.value }))}
-                />
-              </div>
-            </div>
-            
-            <div>
-              <Label htmlFor="nickname">Apelido (opcional)</Label>
-              <Input
-                id="nickname"
-                placeholder="Ex: Conta Principal"
-                value={accountFormData.nickname}
-                onChange={(e) => setAccountFormData(prev => ({ ...prev, nickname: e.target.value }))}
-              />
-            </div>
-            
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <p className="text-sm text-blue-700">
-                🔒 Seus dados são criptografados e usados apenas para conectar com {selectedProvider?.name} via Open Banking.
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowAccountForm(false);
-                setAccountFormData({ agency: '', account_number: '', account_digit: '', nickname: '' });
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => {
-                if (selectedProvider && accountFormData.agency && accountFormData.account_number) {
-                  handleConnectBank(selectedProvider);
-                  setShowAccountForm(false);
-                } else {
-                  toast.error('Preencha agência e número da conta');
-                }
-              }}
-              disabled={!accountFormData.agency || !accountFormData.account_number}
-            >
-              <LinkIcon className="h-4 w-4 mr-2" />
-              Conectar Agora
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

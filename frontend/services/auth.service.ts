@@ -41,8 +41,8 @@ class AuthService {
     return apiClient.post("/api/auth/2fa/disable/", data);
   }
 
-  async verify2FA(data: { code: string }): Promise<TwoFactorVerifyResponse> {
-    return apiClient.post("/api/auth/2fa/verify/", data);
+  async loginWith2FA(email: string, password: string, two_fa_code: string): Promise<LoginResponse> {
+    return apiClient.login(email, password, two_fa_code);
   }
 
   async requestPasswordReset(email: string) {

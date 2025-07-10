@@ -54,6 +54,8 @@ export default function SettingsPage() {
   const [is2FADialogOpen, setIs2FADialogOpen] = useState(false);
   const [qrCode, setQrCode] = useState<string>('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [backupCodesDialogOpen, setBackupCodesDialogOpen] = useState(false);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
   
   // AI & Rules settings state
   const [aiEnabled, setAiEnabled] = useState(true);
@@ -113,28 +115,40 @@ export default function SettingsPage() {
   const enable2FAMutation = useMutation({
     mutationFn: (token: string) => authService.enable2FA(token),
     onSuccess: (data) => {
+      // Update user in store immediately
+      updateUser({ is_two_factor_enabled: true });
+      
+      // Invalidate queries to refresh from server
       queryClient.invalidateQueries({ queryKey: ['current-user'] });
+      
       setIs2FADialogOpen(false);
       setTwoFactorCode('');
       toast.success('Two-factor authentication enabled successfully');
+      
       // Show backup codes dialog
       if (data.backup_codes) {
-        alert(`Please save your backup codes:\n\n${data.backup_codes.join('\n')}\n\nThese codes will not be shown again!`);
+        setBackupCodes(data.backup_codes);
+        setBackupCodesDialogOpen(true);
       }
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Invalid verification code');
+      toast.error(error.response?.data?.error || 'Invalid verification code');
     },
   });
 
   const disable2FAMutation = useMutation({
     mutationFn: (password: string) => authService.disable2FA({ password }),
     onSuccess: () => {
+      // Update user in store immediately
+      updateUser({ is_two_factor_enabled: false });
+      
+      // Invalidate queries to refresh from server
       queryClient.invalidateQueries({ queryKey: ['current-user'] });
+      
       toast.success('Two-factor authentication disabled');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to disable 2FA');
+      toast.error(error.response?.data?.error || 'Failed to disable 2FA');
     },
   });
 
@@ -754,6 +768,53 @@ export default function SettingsPage() {
               disabled={enable2FAMutation.isPending || twoFactorCode.length !== 6}
             >
               {enable2FAMutation.isPending ? <LoadingSpinner /> : 'Verify & Enable'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Backup Codes Dialog */}
+      <Dialog open={backupCodesDialogOpen} onOpenChange={setBackupCodesDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Your Backup Codes</DialogTitle>
+            <DialogDescription>
+              Save these backup codes in a safe place. Each code can only be used once to access your account if you lose your authenticator device.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="grid grid-cols-2 gap-2 font-mono text-sm">
+                {backupCodes.map((code, index) => (
+                  <div key={index} className="p-2 bg-white rounded border text-center">
+                    {code}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                ⚠️ <strong>Important:</strong> These codes will not be shown again. Save them now!
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                navigator.clipboard.writeText(backupCodes.join('\n'));
+                toast.success('Backup codes copied to clipboard');
+              }}
+              variant="outline"
+            >
+              Copy Codes
+            </Button>
+            <Button
+              onClick={() => {
+                setBackupCodesDialogOpen(false);
+                setBackupCodes([]);
+              }}
+            >
+              I've Saved My Codes
             </Button>
           </DialogFooter>
         </DialogContent>

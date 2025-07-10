@@ -167,8 +167,13 @@ class ApiClient {
   }
 
   // Authentication methods
-  async login(email: string, password: string) {
-    const response = await this.client.post("/api/auth/login/", { email, password });
+  async login(email: string, password: string, two_fa_code?: string) {
+    const loginData: any = { email, password };
+    if (two_fa_code) {
+      loginData.two_fa_code = two_fa_code;
+    }
+    
+    const response = await this.client.post("/api/auth/login/", loginData);
     const { tokens } = response.data;
     if (tokens) {
       this.setAccessToken(tokens.access);
