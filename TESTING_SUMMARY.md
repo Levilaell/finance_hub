@@ -1,4 +1,4 @@
-# Testing Summary - Caixa Digital Backend
+# Testing Summary - CaixaHub Backend
 
 ## Test Coverage Summary
 

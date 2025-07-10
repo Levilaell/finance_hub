@@ -85,6 +85,35 @@ export default function AccountsPage() {
     }
 
     fetchAccounts();
+    
+    // Check if user is returning from Pluggy Connect
+    const returnUrl = sessionStorage.getItem('pluggy_return_url');
+    const providerName = sessionStorage.getItem('pluggy_provider');
+    
+    if (returnUrl && providerName) {
+      // Clear the stored values
+      sessionStorage.removeItem('pluggy_return_url');
+      sessionStorage.removeItem('pluggy_provider');
+      
+      // Check URL parameters for Pluggy response
+      const urlParams = new URLSearchParams(window.location.search);
+      const itemId = urlParams.get('itemId');
+      const error = urlParams.get('error');
+      
+      if (itemId) {
+        // Success - item was created
+        toast.success(`Conta ${providerName} conectada com sucesso!`);
+        
+        // Handle the callback to create bank accounts
+        handlePluggyCallback(itemId);
+      } else if (error) {
+        // Error occurred
+        toast.error(`Erro ao conectar ${providerName}: ${error}`);
+      }
+      
+      // Clean up URL parameters
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }, [isAuthenticated]);
 
   // Debug: log providers
@@ -110,37 +139,20 @@ export default function AccountsPage() {
         const connectToken = result.data.connect_token;
         const connectUrl = result.data.connect_url;
         
+        console.log('🔗 Connect token received:', connectToken?.substring(0, 50) + '...');
+        console.log('🔗 Full result:', result.data);
+        
         if (connectToken && connectUrl) {
-          // Option 1: Open in a popup window
-          const width = 500;
-          const height = 700;
-          const left = (window.screen.width - width) / 2;
-          const top = (window.screen.height - height) / 2;
+          // For now, use a simple redirect approach since SDK loading is having issues
+          // This will open Pluggy Connect in the same tab
+          toast.info('Redirecionando para o Pluggy Connect...');
           
-          const pluggyWindow = window.open(
-            `${connectUrl}?connectToken=${connectToken}`,
-            'PluggyConnect',
-            `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes`
-          );
+          // Store the current URL to return to after connection
+          sessionStorage.setItem('pluggy_return_url', window.location.href);
+          sessionStorage.setItem('pluggy_provider', provider.name);
           
-          if (pluggyWindow) {
-            toast.success('Complete a conexão na janela do Pluggy');
-            
-            // Check if window is closed periodically
-            const checkInterval = setInterval(() => {
-              if (pluggyWindow.closed) {
-                clearInterval(checkInterval);
-                // Refresh accounts after window closes
-                setTimeout(() => {
-                  fetchAccounts();
-                }, 1000);
-              }
-            }, 1000);
-          } else {
-            // If popup was blocked, use redirect
-            toast.info('Redirecionando para o Pluggy...');
-            window.location.href = `${connectUrl}?connectToken=${connectToken}`;
-          }
+          // Redirect to Pluggy Connect with the token
+          window.location.href = `${connectUrl}?connectToken=${connectToken}&includeSandbox=true`;
           
           return;
         }
@@ -200,6 +212,26 @@ export default function AccountsPage() {
     } catch (error: any) {
       console.error('Token refresh error:', error);
       toast.error(error.message || 'Erro ao atualizar token. Tente reconectar a conta.');
+    }
+  };
+
+  const handlePluggyCallback = async (itemId: string) => {
+    try {
+      // Call the backend to handle the Pluggy callback
+      const response = await bankingService.handlePluggyCallback(itemId);
+      
+      if (response.success) {
+        const accountsCreated = response.data?.accounts?.length || 0;
+        toast.success(`${accountsCreated} conta(s) adicionada(s) com sucesso!`);
+        
+        // Refresh accounts list
+        fetchAccounts();
+      } else {
+        throw new Error(response.message || 'Erro ao processar callback');
+      }
+    } catch (error: any) {
+      console.error('Pluggy callback error:', error);
+      toast.error('Erro ao finalizar conexão: ' + error.message);
     }
   };
 

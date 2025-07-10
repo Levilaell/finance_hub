@@ -22,7 +22,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <BanknotesIcon className="h-8 w-8 text-primary" />
-              <h1 className="text-2xl font-bold text-foreground">Caixa Digital</h1>
+              <h1 className="text-2xl font-bold text-foreground">CaixaHub</h1>
             </div>
             <div className="flex items-center space-x-4">
               <Link href="/pricing" className="text-muted-foreground hover:text-foreground">
@@ -269,7 +269,7 @@ export default function Home() {
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="flex items-center space-x-2">
               <BanknotesIcon className="h-6 w-6 text-primary" />
-              <span className="font-semibold">Caixa Digital</span>
+              <span className="font-semibold">CaixaHub</span>
             </div>
             <div className="flex space-x-6 text-sm text-muted-foreground">
               <Link href="/pricing" className="hover:text-foreground">
@@ -286,7 +286,7 @@ export default function Home() {
               </Link>
             </div>
             <div className="text-sm text-muted-foreground">
-              © 2024 Caixa Digital. Todos os direitos reservados.
+              © 2024 CaixaHub. Todos os direitos reservados.
             </div>
           </div>
         </div>

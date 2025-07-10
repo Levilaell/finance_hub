@@ -77,7 +77,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-card">
           <div className="flex h-16 items-center justify-between px-4">
             <Link href="/dashboard" className="flex items-center space-x-2">
-              <span className="text-xl font-bold">FinanceHub</span>
+              <span className="text-xl font-bold">CaixaHub</span>
             </Link>
             <Button
               variant="ghost"
@@ -141,7 +141,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <div className="flex flex-1 flex-col bg-card border-r">
           <div className="flex h-16 items-center px-4">
             <Link href="/dashboard" className="flex items-center space-x-2">
-              <span className="text-xl font-bold">FinanceHub</span>
+              <span className="text-xl font-bold">CaixaHub</span>
             </Link>
           </div>
           <nav className="flex-1 space-y-1 px-2 py-4">

@@ -267,21 +267,21 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <UserIcon className="h-5 w-5 mr-2" />
-                Profile Information
+                Informações do Perfil
               </CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="first_name">First Name</Label>
+                    <Label htmlFor="first_name">Nome</Label>
                     <Input
                       id="first_name"
                       {...profileForm.register('first_name', { required: true })}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="last_name">Last Name</Label>
+                    <Label htmlFor="last_name">Sobrenome</Label>
                     <Input
                       id="last_name"
                       {...profileForm.register('last_name', { required: true })}
@@ -304,7 +304,7 @@ export default function SettingsPage() {
                     {updateProfileMutation.isPending ? (
                       <LoadingSpinner />
                     ) : (
-                      'Update Profile'
+                      'Atualizar Perfil'
                     )}
                   </Button>
                 </div>
@@ -320,13 +320,13 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <KeyIcon className="h-5 w-5 mr-2" />
-                Change Password
+                Alterar Senha
               </CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
                 <div>
-                  <Label htmlFor="current_password">Current Password</Label>
+                  <Label htmlFor="current_password">Senha Atual</Label>
                   <div className="relative">
                     <Input
                       id="current_password"
@@ -347,7 +347,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="new_password">New Password</Label>
+                  <Label htmlFor="new_password">Nova Senha</Label>
                   <div className="relative">
                     <Input
                       id="new_password"
@@ -371,7 +371,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="confirm_password">Confirm New Password</Label>
+                  <Label htmlFor="confirm_password">Confirmar Nova Senha</Label>
                   <div className="relative">
                     <Input
                       id="confirm_password"
@@ -399,7 +399,7 @@ export default function SettingsPage() {
                     {changePasswordMutation.isPending ? (
                       <LoadingSpinner />
                     ) : (
-                      'Change Password'
+                      'Alterar Senha'
                     )}
                   </Button>
                 </div>
@@ -412,22 +412,22 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <ShieldCheckIcon className="h-5 w-5 mr-2" />
-                Two-Factor Authentication
+                Autenticação de Dois Fatores
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <p className="text-sm text-gray-600">
-                  Add an extra layer of security to your account by enabling two-factor authentication.
+                  Adicione uma camada extra de segurança à sua conta habilitando a autenticação de dois fatores.
                 </p>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">
-                      Two-Factor Authentication is {user?.is_two_factor_enabled ? 'enabled' : 'disabled'}
+                      A Autenticação de Dois Fatores está {user?.is_two_factor_enabled ? 'habilitada' : 'desabilitada'}
                     </p>
                     <p className="text-sm text-gray-600">
                       {user?.is_two_factor_enabled
-                        ? 'Your account is protected with 2FA'
+                        ? 'Sua conta está protegida com 2FA'
                         : 'Enable 2FA to secure your account'}
                     </p>
                   </div>
@@ -442,7 +442,7 @@ export default function SettingsPage() {
                       }}
                       disabled={disable2FAMutation.isPending}
                     >
-                      Disable 2FA
+                      Desabilitar 2FA
                     </Button>
                   ) : (
                     <Button
@@ -472,13 +472,13 @@ export default function SettingsPage() {
             <CardContent>
               <div className="space-y-6">
                 <div>
-                  <h3 className="font-medium mb-4">Automatic Categorization</h3>
+                  <h3 className="font-medium mb-4">Categorização Automática</h3>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">Enable AI Categorization</p>
+                        <p className="font-medium">Habilitar Categorização por IA</p>
                         <p className="text-sm text-gray-600">
-                          Automatically categorize transactions using AI
+                          Categorizar transações automaticamente usando IA
                         </p>
                       </div>
                       <Switch 
@@ -488,9 +488,9 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">Auto-apply high confidence suggestions</p>
+                        <p className="font-medium">Aplicar automaticamente sugestões de alta confiança</p>
                         <p className="text-sm text-gray-600">
-                          Automatically apply categories when AI confidence is above 90%
+                          Aplicar categorias automaticamente quando a confiança da IA estiver acima de 90%
                         </p>
                       </div>
                       <Switch 
@@ -501,9 +501,9 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">Learning from corrections</p>
+                        <p className="font-medium">Aprender com correções</p>
                         <p className="text-sm text-gray-600">
-                          Improve AI accuracy by learning from manual corrections
+                          Melhorar a precisão da IA aprendendo com correções manuais
                         </p>
                       </div>
                       <Switch 
@@ -516,7 +516,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div>
-                  <h3 className="font-medium mb-4">Performance Metrics</h3>
+                  <h3 className="font-medium mb-4">Métricas de Desempenho</h3>
                   {isLoadingMetrics ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {[1, 2, 3].map((i) => (
@@ -529,7 +529,7 @@ export default function SettingsPage() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="bg-gray-50 p-4 rounded-lg">
-                        <p className="text-sm text-gray-600">Accuracy</p>
+                        <p className="text-sm text-gray-600">Precisão</p>
                         <p className="text-2xl font-bold text-green-600">
                           {performanceMetrics?.overall_accuracy 
                             ? `${(performanceMetrics.overall_accuracy * 100).toFixed(1)}%` 
@@ -538,13 +538,13 @@ export default function SettingsPage() {
                         </p>
                       </div>
                       <div className="bg-gray-50 p-4 rounded-lg">
-                        <p className="text-sm text-gray-600">Auto-categorized</p>
+                        <p className="text-sm text-gray-600">Auto-categorizadas</p>
                         <p className="text-2xl font-bold text-blue-600">
                           {performanceMetrics?.auto_categorized?.toLocaleString() || '0'}
                         </p>
                       </div>
                       <div className="bg-gray-50 p-4 rounded-lg">
-                        <p className="text-sm text-gray-600">Manual reviews</p>
+                        <p className="text-sm text-gray-600">Revisões manuais</p>
                         <p className="text-2xl font-bold text-orange-600">
                           {performanceMetrics?.manual_reviews?.toLocaleString() || '0'}
                         </p>
@@ -555,13 +555,13 @@ export default function SettingsPage() {
 
                 <div>
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">Custom Rules</h3>
+                    <h3 className="font-medium">Regras Personalizadas</h3>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => setCreateRuleDialogOpen(true)}
                     >
-                      Add Rule
+                      Adicionar Regra
                     </Button>
                   </div>
                   <RulesList onCreateRule={() => setCreateRuleDialogOpen(true)} />
@@ -573,7 +573,7 @@ export default function SettingsPage() {
                       toast.success('AI settings saved successfully');
                     }}
                   >
-                    Save AI Settings
+                    Salvar Configurações de IA
                   </Button>
                 </div>
               </div>
@@ -587,14 +587,14 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <CreditCardIcon className="h-5 w-5 mr-2" />
-                Billing & Subscription
+                Faturamento e Assinatura
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
                 {/* Current Plan Section */}
                 <div>
-                  <h3 className="font-medium mb-2">Current Plan</h3>
+                  <h3 className="font-medium mb-2">Plano Atual</h3>
                   <div className="border rounded-lg p-4">
                     <div className="flex justify-between items-center">
                       <div>
@@ -834,7 +834,7 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <BellIcon className="h-5 w-5 mr-2" />
-                Notification Preferences
+                Preferências de Notificação
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -842,9 +842,9 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Email Notifications</p>
+                      <p className="font-medium">Notificações por E-mail</p>
                       <p className="text-sm text-gray-600">
-                        Receive email updates about your account activity
+                        Receba atualizações por e-mail sobre a atividade da sua conta
                       </p>
                     </div>
                     <Switch 
@@ -854,9 +854,9 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Transaction Alerts</p>
+                      <p className="font-medium">Alertas de Transação</p>
                       <p className="text-sm text-gray-600">
-                        Get notified about new transactions
+                        Seja notificado sobre novas transações
                       </p>
                     </div>
                     <Switch 
@@ -866,9 +866,9 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Low Balance Warnings</p>
+                      <p className="font-medium">Avisos de Saldo Baixo</p>
                       <p className="text-sm text-gray-600">
-                        Alert when account balance is low
+                        Alerte quando o saldo da conta estiver baixo
                       </p>
                     </div>
                     <Switch 
@@ -878,9 +878,9 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Monthly Reports</p>
+                      <p className="font-medium">Relatórios Mensais</p>
                       <p className="text-sm text-gray-600">
-                        Receive monthly financial summaries
+                        Receba resumos financeiros mensais
                       </p>
                     </div>
                     <Switch 
@@ -890,9 +890,9 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Security Alerts</p>
+                      <p className="font-medium">Alertas de Segurança</p>
                       <p className="text-sm text-gray-600">
-                        Important security and account notifications
+                        Notificações importantes de segurança e conta
                       </p>
                     </div>
                     <Switch defaultChecked disabled />
@@ -905,7 +905,7 @@ export default function SettingsPage() {
                       toast.success('Notification preferences saved successfully');
                     }}
                   >
-                    Save Preferences
+                    Salvar Preferências
                   </Button>
                 </div>
               </div>
@@ -917,22 +917,22 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center text-red-600">
                 <TrashIcon className="h-5 w-5 mr-2" />
-                Danger Zone
+                Zona de Perigo
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div>
-                  <p className="font-medium text-red-600">Delete Account</p>
+                  <p className="font-medium text-red-600">Excluir Conta</p>
                   <p className="text-sm text-gray-600">
-                    Permanently delete your account and all associated data. This action cannot be undone.
+                    Excluir permanentemente sua conta e todos os dados associados. Esta ação não pode ser desfeita.
                   </p>
                 </div>
                 <Button 
                   variant="destructive"
                   onClick={() => setDeleteAccountDialogOpen(true)}
                 >
-                  Delete Account
+                  Excluir Conta
                 </Button>
               </div>
             </CardContent>
@@ -1063,7 +1063,7 @@ export default function SettingsPage() {
       <Dialog open={deleteAccountDialogOpen} onOpenChange={setDeleteAccountDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle className="text-red-600">Delete Account</DialogTitle>
+            <DialogTitle className="text-red-600">Excluir Conta</DialogTitle>
             <DialogDescription>
               This action will permanently delete your account and all associated data. This cannot be undone.
             </DialogDescription>
@@ -1110,7 +1110,7 @@ export default function SettingsPage() {
               onClick={deleteAccountForm.handleSubmit(onDeleteAccountSubmit)}
               disabled={deleteAccountMutation.isPending}
             >
-              {deleteAccountMutation.isPending ? <LoadingSpinner /> : 'Delete Account'}
+              {deleteAccountMutation.isPending ? <LoadingSpinner /> : 'Excluir Conta'}
             </Button>
           </DialogFooter>
         </DialogContent>

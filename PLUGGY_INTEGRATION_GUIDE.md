@@ -1,6 +1,6 @@
 # Guia de Integração Pluggy
 
-Este documento descreve como configurar e testar a integração bancária com Pluggy no sistema Caixa Digital.
+Este documento descreve como configurar e testar a integração bancária com Pluggy no sistema CaixaHub.
 
 ## Configuração
 

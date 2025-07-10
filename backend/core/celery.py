@@ -1,5 +1,5 @@
 """
-Celery configuration for Caixa Digital
+Celery configuration for CaixaHub
 Handles asynchronous tasks and periodic jobs
 """
 import os
@@ -10,7 +10,7 @@ from django.conf import settings
 # Set the default Django settings module for the 'celery' program.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings.development')
 
-app = Celery('caixa_digital')
+app = Celery('caixahub')
 
 # Using a string here means the worker doesn't have to serialize
 # the configuration object to child processes.

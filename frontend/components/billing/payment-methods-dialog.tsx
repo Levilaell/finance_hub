@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { billingService, PaymentMethod } from '@/services/billing.service';
 import {
   Dialog,
   DialogContent,
@@ -24,16 +25,6 @@ import {
   StarIcon
 } from '@heroicons/react/24/outline';
 
-interface PaymentMethod {
-  id: string;
-  type: 'credit_card' | 'debit_card' | 'pix';
-  last4?: string;
-  brand?: string;
-  exp_month?: number;
-  exp_year?: number;
-  is_default: boolean;
-  created_at: string;
-}
 
 interface PaymentMethodsDialogProps {
   open: boolean;
@@ -55,88 +46,48 @@ export function PaymentMethodsDialog({
 
   const queryClient = useQueryClient();
 
-  // Mock data - substituir pela API real
-  const mockPaymentMethods: PaymentMethod[] = [
-    {
-      id: '1',
-      type: 'credit_card',
-      last4: '4532',
-      brand: 'visa',
-      exp_month: 12,
-      exp_year: 2025,
-      is_default: true,
-      created_at: '2023-06-15T10:30:00Z'
-    },
-    {
-      id: '2',
-      type: 'credit_card',
-      last4: '1234',
-      brand: 'mastercard',
-      exp_month: 8,
-      exp_year: 2024,
-      is_default: false,
-      created_at: '2023-03-20T14:15:00Z'
-    },
-    {
-      id: '3',
-      type: 'pix',
-      is_default: false,
-      created_at: '2023-05-10T09:45:00Z'
-    }
-  ];
-
-  // Simulate API calls
+  // Fetch real payment methods
   const { data: paymentMethods, isLoading } = useQuery({
     queryKey: ['payment-methods'],
     queryFn: async () => {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      return mockPaymentMethods;
+      const response = await billingService.getPaymentMethods();
+      return response || [];
     },
     enabled: open,
   });
 
   const addPaymentMethodMutation = useMutation({
-    mutationFn: async (data: any) => {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return { success: true };
-    },
+    mutationFn: billingService.addPaymentMethod,
     onSuccess: () => {
       toast.success('Método de pagamento adicionado com sucesso!');
       setShowAddForm(false);
       setNewCardData({ number: '', exp_month: '', exp_year: '', cvc: '', name: '' });
       queryClient.invalidateQueries({ queryKey: ['payment-methods'] });
     },
-    onError: () => {
-      toast.error('Erro ao adicionar método de pagamento');
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Erro ao adicionar método de pagamento');
     },
   });
 
   const deletePaymentMethodMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return { success: true };
-    },
+    mutationFn: billingService.deletePaymentMethod,
     onSuccess: () => {
       toast.success('Método de pagamento removido');
       queryClient.invalidateQueries({ queryKey: ['payment-methods'] });
     },
-    onError: () => {
-      toast.error('Erro ao remover método de pagamento');
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Erro ao remover método de pagamento');
     },
   });
 
   const setDefaultPaymentMethodMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return { success: true };
-    },
+    mutationFn: billingService.setDefaultPaymentMethod,
     onSuccess: () => {
       toast.success('Método de pagamento padrão atualizado');
       queryClient.invalidateQueries({ queryKey: ['payment-methods'] });
     },
-    onError: () => {
-      toast.error('Erro ao definir método padrão');
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Erro ao definir método padrão');
     },
   });
 
@@ -154,21 +105,21 @@ export function PaymentMethodsDialog({
   };
 
   const getPaymentMethodIcon = (method: PaymentMethod) => {
-    if (method.type === 'pix') {
+    if (method.payment_type === 'pix') {
       return '🔑';
     }
-    return getCardBrandIcon(method.brand);
+    return getCardBrandIcon(method.card_brand);
   };
 
   const getPaymentMethodTitle = (method: PaymentMethod) => {
-    if (method.type === 'pix') {
+    if (method.payment_type === 'pix') {
       return 'PIX';
     }
-    return `${method.brand?.toUpperCase()} •••• ${method.last4}`;
+    return `${method.card_brand?.toUpperCase()} •••• ${method.last_four}`;
   };
 
   const getPaymentMethodSubtitle = (method: PaymentMethod) => {
-    if (method.type === 'pix') {
+    if (method.payment_type === 'pix') {
       return 'Pagamento instantâneo';
     }
     return `Expira em ${method.exp_month?.toString().padStart(2, '0')}/${method.exp_year}`;
@@ -180,7 +131,14 @@ export function PaymentMethodsDialog({
       return;
     }
 
-    addPaymentMethodMutation.mutate(newCardData);
+    addPaymentMethodMutation.mutate({
+      payment_type: 'credit_card',
+      card_number: newCardData.number.replace(/\s/g, ''),
+      exp_month: parseInt(newCardData.exp_month),
+      exp_year: parseInt(newCardData.exp_year),
+      cvc: newCardData.cvc,
+      cardholder_name: newCardData.name,
+    });
   };
 
   const formatCardNumber = (value: string) => {

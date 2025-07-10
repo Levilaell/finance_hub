@@ -14,6 +14,7 @@ from .views import (
     CashFlowDataView,
     CategorySpendingView,
     IncomeVsExpensesView,
+    AIInsightsView,
 )
 
 app_name = 'reports'
@@ -38,4 +39,7 @@ urlpatterns = [
     path('dashboard/cash-flow/', CashFlowDataView.as_view(), name='cash-flow-data'),
     path('dashboard/category-spending/', CategorySpendingView.as_view(), name='category-spending'),
     path('dashboard/income-vs-expenses/', IncomeVsExpensesView.as_view(), name='income-vs-expenses'),
+    
+    # AI Insights
+    path('ai-insights/', AIInsightsView.as_view(), name='ai-insights'),
 ]

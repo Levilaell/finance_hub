@@ -126,11 +126,17 @@ class PluggyConnectTokenView(APIView):
             finally:
                 loop.close()
             
+            # Debug: log the token response format
+            logger.info(f"Pluggy connect token response: {token_data}")
+            
             # Return connect token data
+            # Pluggy returns 'accessToken' for connect tokens (different from auth tokens which use 'apiKey')
+            connect_token = token_data.get('accessToken') or token_data.get('apiKey')
+            
             return Response({
                 'success': True,
                 'data': {
-                    'connect_token': token_data.get('accessToken'),
+                    'connect_token': connect_token,
                     'connect_url': getattr(settings, 'PLUGGY_CONNECT_URL', 'https://connect.pluggy.ai'),
                     'status': 'pluggy_connect_required',
                     'message': 'Use o Pluggy Connect para conectar sua conta'

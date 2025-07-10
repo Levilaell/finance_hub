@@ -1,8 +1,8 @@
-# Comprehensive Testing Plan - Caixa Digital Finance Management System
+# Comprehensive Testing Plan - CaixaHub Finance Management System
 
 ## Project Overview
 
-This document outlines the complete testing strategy for Caixa Digital, a comprehensive finance management SaaS platform for Brazilian SMEs. The system includes 7 Django apps with complex financial, authentication, and business management functionality.
+This document outlines the complete testing strategy for CaixaHub, a comprehensive finance management SaaS platform for Brazilian SMEs. The system includes 7 Django apps with complex financial, authentication, and business management functionality.
 
 ## Current Test Status
 

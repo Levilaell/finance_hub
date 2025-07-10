@@ -157,8 +157,9 @@ class PluggyService {
       // Check if Pluggy SDK is loaded
       if (typeof window !== 'undefined' && (window as any).PluggyConnect) {
         const PluggyConnect = (window as any).PluggyConnect;
+        console.log('🔌 PluggyConnect SDK loaded successfully');
 
-        const connect = new PluggyConnect({
+        const connectConfig = {
           connectToken: options.connectToken,
           includeSandbox: options.includeSandbox || false,
           updateMode: options.updateMode || false,
@@ -166,9 +167,17 @@ class PluggyService {
           connectorTypes: options.connectorTypes || ['PERSONAL_BANK'],
           connectorIds: options.connectorIds,
           countries: options.countries || ['BR'],
+        };
+        
+        console.log('🔌 Creating PluggyConnect with config:', {
+          ...connectConfig,
+          connectToken: connectConfig.connectToken?.substring(0, 50) + '...'
         });
 
+        const connect = new PluggyConnect(connectConfig);
+
         // Mount the widget
+        console.log('🔌 Mounting widget to container:', containerId);
         connect.init(containerId);
 
         // Handle events
@@ -262,18 +271,25 @@ class PluggyService {
 
       // Create script element
       const script = document.createElement('script');
-      script.src = 'https://cdn.pluggy.ai/pluggy-connect/v3/pluggy-connect.js';
+      script.src = 'https://connect.pluggy.ai/js/pluggy-connect.js';
       script.async = true;
 
+      console.log('🔄 Loading Pluggy SDK from:', script.src);
+
       script.onload = () => {
+        console.log('✅ Pluggy SDK script loaded');
         if ((window as any).PluggyConnect) {
+          console.log('✅ PluggyConnect object available');
           resolve();
         } else {
+          console.error('❌ PluggyConnect object not found after script load');
           reject(new Error('Pluggy SDK failed to load'));
         }
       };
 
-      script.onerror = () => {
+      script.onerror = (error) => {
+        console.error('❌ Failed to load Pluggy SDK script:', error);
+        console.error('❌ Script src was:', script.src);
         reject(new Error('Failed to load Pluggy SDK'));
       };
 
@@ -286,6 +302,7 @@ class PluggyService {
    * Open Pluggy Connect in a modal
    */
   async openConnectModal(options: {
+    connectToken?: string;
     includeSandbox?: boolean;
     updateMode?: boolean;
     itemId?: string;
@@ -297,8 +314,12 @@ class PluggyService {
       // Load SDK if not already loaded
       await this.loadPluggySDK();
 
-      // Get connect token
-      const { connect_token } = await this.createConnectToken(options.itemId);
+      // Use provided token or get a new one
+      let connect_token = options.connectToken;
+      if (!connect_token) {
+        const tokenResponse = await this.createConnectToken(options.itemId);
+        connect_token = tokenResponse.connect_token;
+      }
 
       // Create modal container
       const modalId = 'pluggy-connect-modal';
@@ -336,7 +357,10 @@ class PluggyService {
       }
 
       // Initialize Pluggy Connect
-      await this.initializeConnect('pluggy-connect-container', {
+      const containerId = 'pluggy-connect-container';
+      console.log('🔧 Initializing Pluggy Connect with token:', connect_token?.substring(0, 50) + '...');
+      
+      await this.initializeConnect(containerId, {
         connectToken: connect_token,
         ...options,
       });

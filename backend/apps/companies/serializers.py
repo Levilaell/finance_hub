@@ -4,7 +4,7 @@ Companies app serializers
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import Company, CompanyUser, SubscriptionPlan
+from .models import Company, CompanyUser, SubscriptionPlan, PaymentMethod, PaymentHistory
 
 User = get_user_model()
 
@@ -136,3 +136,62 @@ class UpgradeSubscriptionSerializer(serializers.Serializer):
             return value
         except SubscriptionPlan.DoesNotExist:
             raise serializers.ValidationError("Invalid subscription plan.")
+
+
+class PaymentMethodSerializer(serializers.ModelSerializer):
+    """Payment method serializer"""
+    
+    class Meta:
+        model = PaymentMethod
+        fields = [
+            'id', 'payment_type', 'card_brand', 'last_four', 'exp_month', 
+            'exp_year', 'cardholder_name', 'is_default', 'is_active', 'created_at'
+        ]
+        read_only_fields = ['created_at']
+
+
+class AddPaymentMethodSerializer(serializers.Serializer):
+    """Add payment method serializer"""
+    payment_type = serializers.ChoiceField(choices=PaymentMethod.PAYMENT_TYPES)
+    
+    # Credit card fields
+    card_number = serializers.CharField(max_length=19, required=False)
+    exp_month = serializers.IntegerField(min_value=1, max_value=12, required=False)
+    exp_year = serializers.IntegerField(min_value=2024, max_value=2040, required=False)
+    cvc = serializers.CharField(max_length=4, required=False)
+    cardholder_name = serializers.CharField(max_length=200, required=False)
+    
+    def validate(self, data):
+        """Validate payment method data"""
+        if data['payment_type'] in ['credit_card', 'debit_card']:
+            required_fields = ['card_number', 'exp_month', 'exp_year', 'cvc', 'cardholder_name']
+            for field in required_fields:
+                if not data.get(field):
+                    raise serializers.ValidationError(f"{field} is required for card payments")
+        return data
+
+
+class PaymentHistorySerializer(serializers.ModelSerializer):
+    """Payment history serializer"""
+    payment_method_display = serializers.SerializerMethodField()
+    plan_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PaymentHistory
+        fields = [
+            'id', 'transaction_type', 'amount', 'currency', 'status', 
+            'description', 'invoice_number', 'invoice_url', 'transaction_date',
+            'due_date', 'paid_at', 'payment_method_display', 'plan_name', 'created_at'
+        ]
+    
+    def get_payment_method_display(self, obj):
+        """Get payment method display string"""
+        if obj.payment_method:
+            return str(obj.payment_method)
+        return "N/A"
+    
+    def get_plan_name(self, obj):
+        """Get subscription plan name"""
+        if obj.subscription_plan:
+            return obj.subscription_plan.name
+        return None

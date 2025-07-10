@@ -1,5 +1,5 @@
 """
-Django settings for Caixa Digital project.
+Django settings for CaixaHub project.
 Top-tier financial SaaS for Brazilian SMEs.
 """
 
@@ -351,7 +351,7 @@ EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@caixadigital.com.br')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@caixahub.com.br')
 
 # Sentry for error monitoring
 SENTRY_DSN = config('SENTRY_DSN', default='')

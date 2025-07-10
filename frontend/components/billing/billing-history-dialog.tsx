@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { billingService, BillingTransaction } from '@/services/billing.service';
 import {
   Dialog,
   DialogContent,
@@ -24,16 +25,6 @@ import {
   ArrowDownTrayIcon
 } from '@heroicons/react/24/outline';
 
-interface BillingTransaction {
-  id: string;
-  date: string;
-  description: string;
-  amount: number;
-  status: 'paid' | 'pending' | 'failed' | 'refunded';
-  payment_method: string;
-  invoice_url?: string;
-  plan_name?: string;
-}
 
 interface BillingHistoryDialogProps {
   open: boolean;
@@ -47,56 +38,15 @@ export function BillingHistoryDialog({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Mock data - substituir pela API real
-  const mockTransactions: BillingTransaction[] = [
-    {
-      id: '1',
-      date: '2024-01-15T10:30:00Z',
-      description: 'Assinatura mensal - Plano Profissional',
-      amount: 99.90,
-      status: 'paid',
-      payment_method: 'Cartão •••• 4532',
-      invoice_url: '#',
-      plan_name: 'Profissional'
-    },
-    {
-      id: '2',
-      date: '2023-12-15T10:30:00Z',
-      description: 'Assinatura mensal - Plano Profissional',
-      amount: 99.90,
-      status: 'paid',
-      payment_method: 'Cartão •••• 4532',
-      invoice_url: '#',
-      plan_name: 'Profissional'
-    },
-    {
-      id: '3',
-      date: '2023-11-15T10:30:00Z',
-      description: 'Upgrade para Plano Profissional',
-      amount: 79.90,
-      status: 'paid',
-      payment_method: 'PIX',
-      invoice_url: '#',
-      plan_name: 'Profissional'
-    },
-    {
-      id: '4',
-      date: '2023-10-15T10:30:00Z',
-      description: 'Assinatura mensal - Plano Starter',
-      amount: 49.90,
-      status: 'failed',
-      payment_method: 'Cartão •••• 1234',
-      plan_name: 'Starter'
-    }
-  ];
-
-  // Simulate API call
+  // Fetch real billing data
   const { data: transactions, isLoading } = useQuery({
-    queryKey: ['billing-history'],
+    queryKey: ['billing-history', statusFilter, searchTerm],
     queryFn: async () => {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return mockTransactions;
+      const response = await billingService.getPaymentHistory({
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        search: searchTerm || undefined,
+      });
+      return response || [];
     },
     enabled: open,
   });
@@ -123,17 +73,15 @@ export function BillingHistoryDialog({
     return statusMap[status as keyof typeof statusMap] || statusMap.pending;
   };
 
-  const filteredTransactions = transactions?.filter(transaction => {
-    const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transaction.plan_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || transaction.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  // Since filtering is now done server-side, we don't need client-side filtering
+  const filteredTransactions = transactions;
 
-  const handleDownloadInvoice = (transaction: BillingTransaction) => {
-    if (transaction.invoice_url) {
-      // Simulate download
-      window.open(transaction.invoice_url, '_blank');
+  const handleDownloadInvoice = async (transaction: BillingTransaction) => {
+    try {
+      const result = await billingService.downloadInvoice(transaction.id);
+      window.open(result.download_url, '_blank');
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
     }
   };
 
@@ -240,10 +188,10 @@ export function BillingHistoryDialog({
                                 <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
                                   <span className="flex items-center">
                                     <CalendarIcon className="h-4 w-4 mr-1" />
-                                    {formatDate(transaction.date)}
+                                    {formatDate(transaction.transaction_date)}
                                   </span>
                                   <span>
-                                    {transaction.payment_method}
+                                    {transaction.payment_method_display}
                                   </span>
                                 </div>
                               </div>

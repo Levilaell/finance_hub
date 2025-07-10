@@ -206,3 +206,131 @@ class CompanyUser(models.Model):
     
     def __str__(self):
         return f"{self.user.full_name} - {self.company.name} ({self.role})"
+
+
+class PaymentMethod(models.Model):
+    """
+    Payment methods for companies (credit cards, bank accounts, etc.)
+    """
+    PAYMENT_TYPES = [
+        ('credit_card', 'Cartão de Crédito'),
+        ('debit_card', 'Cartão de Débito'),
+        ('pix', 'PIX'),
+        ('bank_transfer', 'Transferência Bancária'),
+    ]
+    
+    CARD_BRANDS = [
+        ('visa', 'Visa'),
+        ('mastercard', 'Mastercard'),
+        ('amex', 'American Express'),
+        ('elo', 'Elo'),
+        ('dinners', 'Dinners Club'),
+        ('discover', 'Discover'),
+    ]
+    
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='payment_methods')
+    payment_type = models.CharField(_('payment type'), max_length=20, choices=PAYMENT_TYPES)
+    
+    # Credit/Debit card fields
+    card_brand = models.CharField(_('card brand'), max_length=20, choices=CARD_BRANDS, blank=True)
+    last_four = models.CharField(_('last four digits'), max_length=4, blank=True)
+    exp_month = models.IntegerField(_('expiry month'), blank=True, null=True)
+    exp_year = models.IntegerField(_('expiry year'), blank=True, null=True)
+    cardholder_name = models.CharField(_('cardholder name'), max_length=200, blank=True)
+    
+    # Gateway-specific fields
+    stripe_payment_method_id = models.CharField(_('Stripe payment method ID'), max_length=255, blank=True)
+    mercadopago_card_id = models.CharField(_('MercadoPago card ID'), max_length=255, blank=True)
+    
+    # Status
+    is_default = models.BooleanField(_('is default'), default=False)
+    is_active = models.BooleanField(_('is active'), default=True)
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    
+    class Meta:
+        db_table = 'payment_methods'
+        verbose_name = _('Payment Method')
+        verbose_name_plural = _('Payment Methods')
+        ordering = ['-is_default', '-created_at']
+    
+    def __str__(self):
+        if self.payment_type in ['credit_card', 'debit_card']:
+            return f"{self.card_brand} **** {self.last_four}"
+        return self.get_payment_type_display()
+    
+    def save(self, *args, **kwargs):
+        # Ensure only one default payment method per company
+        if self.is_default:
+            PaymentMethod.objects.filter(
+                company=self.company, 
+                is_default=True
+            ).update(is_default=False)
+        super().save(*args, **kwargs)
+
+
+class PaymentHistory(models.Model):
+    """
+    Payment history and invoices for companies
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pendente'),
+        ('paid', 'Pago'),
+        ('failed', 'Falhou'),
+        ('canceled', 'Cancelado'),
+        ('refunded', 'Reembolsado'),
+        ('partially_refunded', 'Parcialmente Reembolsado'),
+    ]
+    
+    TRANSACTION_TYPES = [
+        ('subscription', 'Assinatura'),
+        ('upgrade', 'Upgrade de Plano'),
+        ('refund', 'Reembolso'),
+        ('adjustment', 'Ajuste'),
+    ]
+    
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='payment_history')
+    payment_method = models.ForeignKey(PaymentMethod, on_delete=models.SET_NULL, null=True, blank=True)
+    subscription_plan = models.ForeignKey(SubscriptionPlan, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # Transaction details
+    transaction_type = models.CharField(_('transaction type'), max_length=20, choices=TRANSACTION_TYPES)
+    amount = models.DecimalField(_('amount'), max_digits=10, decimal_places=2)
+    currency = models.CharField(_('currency'), max_length=3, default='BRL')
+    status = models.CharField(_('status'), max_length=20, choices=STATUS_CHOICES)
+    description = models.TextField(_('description'))
+    
+    # Gateway transaction IDs
+    stripe_payment_intent_id = models.CharField(_('Stripe payment intent ID'), max_length=255, blank=True)
+    stripe_invoice_id = models.CharField(_('Stripe invoice ID'), max_length=255, blank=True)
+    mercadopago_payment_id = models.CharField(_('MercadoPago payment ID'), max_length=255, blank=True)
+    
+    # Invoice details
+    invoice_number = models.CharField(_('invoice number'), max_length=50, unique=True, blank=True)
+    invoice_url = models.URLField(_('invoice URL'), blank=True)
+    invoice_pdf_path = models.CharField(_('invoice PDF path'), max_length=500, blank=True)
+    
+    # Dates
+    transaction_date = models.DateTimeField(_('transaction date'))
+    due_date = models.DateField(_('due date'), blank=True, null=True)
+    paid_at = models.DateTimeField(_('paid at'), blank=True, null=True)
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    
+    class Meta:
+        db_table = 'payment_history'
+        verbose_name = _('Payment History')
+        verbose_name_plural = _('Payment History')
+        ordering = ['-transaction_date']
+    
+    def __str__(self):
+        return f"{self.company.name} - {self.description} - {self.get_status_display()}"
+    
+    def save(self, *args, **kwargs):
+        # Generate invoice number if not provided
+        if not self.invoice_number and self.status in ['paid', 'pending']:
+            from datetime import datetime
+            prefix = self.company.name[:3].upper()
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            self.invoice_number = f"{prefix}-{timestamp}"
+        super().save(*args, **kwargs)

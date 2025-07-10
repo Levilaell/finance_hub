@@ -1,4 +1,4 @@
-# Estrutura do Projeto Caixa Digital
+# Estrutura do Projeto CaixaHub
 
 ## 📁 Estrutura de Diretórios
 

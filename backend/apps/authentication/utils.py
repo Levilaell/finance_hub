@@ -36,7 +36,7 @@ def get_totp_uri(user, secret):
     """Generate TOTP URI for QR code"""
     return pyotp.totp.TOTP(secret).provisioning_uri(
         name=user.email,
-        issuer_name='Caixa Digital'
+        issuer_name='CaixaHub'
     )
 
 

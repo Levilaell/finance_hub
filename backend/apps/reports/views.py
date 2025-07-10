@@ -113,6 +113,32 @@ class ReportScheduleViewSet(viewsets.ModelViewSet):
             company=self.request.user.company
         )
     
+    def create(self, request, *args, **kwargs):
+        """Create a new scheduled report"""
+        from datetime import datetime, timedelta
+        
+        # Calculate next_run_at based on frequency
+        frequency = request.data.get('frequency', 'monthly')
+        now = timezone.now()
+        
+        if frequency == 'daily':
+            next_run = now + timedelta(days=1)
+        elif frequency == 'weekly':
+            next_run = now + timedelta(weeks=1)
+        elif frequency == 'monthly':
+            next_run = now + timedelta(days=30)
+        elif frequency == 'quarterly':
+            next_run = now + timedelta(days=90)
+        elif frequency == 'yearly':
+            next_run = now + timedelta(days=365)
+        else:
+            next_run = now + timedelta(days=30)
+        
+        # Add next_run_at to the request data
+        request.data['next_run_at'] = next_run.isoformat()
+        
+        return super().create(request, *args, **kwargs)
+    
     @action(detail=True, methods=['post'])
     def toggle_active(self, request, pk=None):
         """Toggle schedule active status"""
@@ -640,3 +666,163 @@ class IncomeVsExpensesView(APIView):
                 current_date = current_date.replace(month=current_date.month + 1)
         
         return Response(monthly_data)
+
+
+class AIInsightsView(APIView):
+    """AI-powered financial insights"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        company = request.user.company
+        accounts = BankAccount.objects.filter(company=company, is_active=True)
+        
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+        
+        if not start_date or not end_date:
+            return Response({'error': 'start_date and end_date are required'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get transactions for the period
+        transactions = Transaction.objects.filter(
+            bank_account__in=accounts,
+            transaction_date__gte=start_date,
+            transaction_date__lte=end_date
+        )
+        
+        # Calculate insights
+        insights = []
+        
+        # 1. Cash Flow Analysis
+        income = transactions.filter(
+            transaction_type__in=['credit', 'transfer_in', 'pix_in']
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        
+        expenses = transactions.filter(
+            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        
+        net_flow = income - abs(expenses)
+        
+        if net_flow > 0:
+            insights.append({
+                'type': 'success',
+                'title': 'Fluxo de Caixa Positivo',
+                'description': f'Você manteve um fluxo de caixa positivo de {net_flow:,.2f}',
+                'value': f'R$ {net_flow:,.2f}',
+                'trend': 'up'
+            })
+        else:
+            insights.append({
+                'type': 'warning',
+                'title': 'Fluxo de Caixa Negativo',
+                'description': f'Suas despesas superaram a receita em {abs(net_flow):,.2f}',
+                'value': f'R$ {abs(net_flow):,.2f}',
+                'trend': 'down'
+            })
+        
+        # 2. Top Spending Category
+        top_expense_category = transactions.filter(
+            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee'],
+            category__isnull=False
+        ).values('category__name').annotate(
+            total=Sum('amount'),
+            count=Count('id')
+        ).order_by('total').first()
+        
+        if top_expense_category:
+            total_expenses = abs(expenses)
+            percentage = (abs(top_expense_category['total']) / total_expenses * 100) if total_expenses > 0 else 0
+            insights.append({
+                'type': 'info',
+                'title': 'Maior Categoria de Gastos',
+                'description': f'{top_expense_category["category__name"]} representa {percentage:.1f}% dos gastos',
+                'value': f'R$ {abs(top_expense_category["total"]):,.2f}',
+            })
+        
+        # 3. Savings Rate
+        if income > 0:
+            savings_rate = (net_flow / income) * 100
+            insights.append({
+                'type': 'success' if savings_rate > 20 else 'warning' if savings_rate > 10 else 'danger',
+                'title': 'Taxa de Poupança',
+                'description': f'Você está poupando {savings_rate:.1f}% da sua renda',
+                'value': f'{savings_rate:.1f}%',
+                'trend': 'up' if savings_rate > 0 else 'down'
+            })
+        
+        # 4. Transaction Volume Insight
+        days_in_period = (end_date - start_date).days + 1
+        daily_transactions = transactions.count() / days_in_period if days_in_period > 0 else 0
+        
+        if daily_transactions > 15:
+            insights.append({
+                'type': 'info',
+                'title': 'Alto Volume de Transações',
+                'description': f'Você tem {daily_transactions:.1f} transações por dia em média',
+                'value': f'{daily_transactions:.1f}/dia'
+            })
+        
+        # 5. Predictions (simplified)
+        if days_in_period >= 30:
+            monthly_income = income / (days_in_period / 30)
+            monthly_expenses = abs(expenses) / (days_in_period / 30)
+            
+            predictions = {
+                'next_month_income': float(monthly_income),
+                'next_month_expenses': float(monthly_expenses),
+                'projected_savings': float(monthly_income - monthly_expenses)
+            }
+        else:
+            predictions = {
+                'next_month_income': float(income * 30 / days_in_period),
+                'next_month_expenses': float(abs(expenses) * 30 / days_in_period),
+                'projected_savings': float(net_flow * 30 / days_in_period)
+            }
+        
+        # 6. Recommendations
+        recommendations = []
+        
+        if income > 0:
+            savings_rate = (net_flow / income) * 100
+            if savings_rate < 10:
+                recommendations.append({
+                    'type': 'warning',
+                    'title': 'Aumente sua Taxa de Poupança',
+                    'description': 'Tente economizar pelo menos 10% da sua renda mensal'
+                })
+        
+        if daily_transactions > 20:
+            recommendations.append({
+                'type': 'info',
+                'title': 'Automatize a Categorização',
+                'description': 'Com muitas transações, considere usar regras automáticas'
+            })
+        
+        if top_expense_category:
+            total_expenses = abs(expenses)
+            percentage = (abs(top_expense_category['total']) / total_expenses * 100) if total_expenses > 0 else 0
+            if percentage > 40:
+                recommendations.append({
+                    'type': 'warning',
+                    'title': 'Diversifique seus Gastos',
+                    'description': f'Mais de 40% dos gastos estão em {top_expense_category["category__name"]}'
+                })
+        
+        return Response({
+            'insights': insights,
+            'predictions': predictions,
+            'recommendations': recommendations,
+            'period': {
+                'start_date': start_date,
+                'end_date': end_date,
+                'days': days_in_period
+            }
+        })

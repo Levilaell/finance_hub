@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Caixa Digital{% endblock %}</title>
+    <title>{% block title %}CaixaHub{% endblock %}</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -77,15 +77,15 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>{{ site_name|default:"Caixa Digital" }}</h1>
+            <h1>{{ site_name|default:"CaixaHub" }}</h1>
         </div>
         <div class="content">
             {% block content %}{% endblock %}
         </div>
         <div class="footer">
-            <p>Este e-mail foi enviado por {{ site_name|default:"Caixa Digital" }}</p>
-            <p>Precisa de ajuda? Entre em contato pelo <a href="mailto:{{ support_email|default:'suporte@caixadigital.com.br' }}">{{ support_email|default:"suporte@caixadigital.com.br" }}</a></p>
-            <p>&copy; {% now "Y" %} Caixa Digital. Todos os direitos reservados.</p>
+            <p>Este e-mail foi enviado por {{ site_name|default:"CaixaHub" }}</p>
+            <p>Precisa de ajuda? Entre em contato pelo <a href="mailto:{{ support_email|default:'suporte@caixahub.com.br' }}">{{ support_email|default:"suporte@caixahub.com.br" }}</a></p>
+            <p>&copy; {% now "Y" %} CaixaHub. Todos os direitos reservados.</p>
         </div>
     </div>
 </body>

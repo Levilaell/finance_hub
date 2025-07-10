@@ -1,5 +1,5 @@
 """
-Base settings for Caixa Digital project
+Base settings for CaixaHub project
 """
 import os
 from datetime import timedelta

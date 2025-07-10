@@ -37,7 +37,10 @@ export function UpgradePlanDialog({
   // Fetch available plans
   const { data: plans, isLoading: plansLoading } = useQuery({
     queryKey: ['available-plans'],
-    queryFn: subscriptionService.getAvailablePlans,
+    queryFn: async () => {
+      const response = await subscriptionService.getAvailablePlans();
+      return response || [];
+    },
     enabled: open,
   });
 

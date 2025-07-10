@@ -1,5 +1,5 @@
 """
-Caixa Digital URL Configuration
+CaixaHub URL Configuration
 """
 from django.conf import settings
 from django.conf.urls.static import static
@@ -14,7 +14,7 @@ from rest_framework import permissions
 def api_root(request):
     """API root endpoint"""
     return JsonResponse({
-        'message': 'Caixa Digital API',
+        'message': 'CaixaHub API',
         'version': '1.0',
         'status': 'running',
         'endpoints': {
@@ -32,11 +32,11 @@ def api_root(request):
 # API Documentation
 schema_view = get_schema_view(
     openapi.Info(
-        title="Caixa Digital API",
+        title="CaixaHub API",
         default_version='v1',
         description="API for financial management SaaS platform",
-        terms_of_service="https://www.caixadigital.com.br/terms/",
-        contact=openapi.Contact(email="api@caixadigital.com.br"),
+        terms_of_service="https://www.caixahub.com.br/terms/",
+        contact=openapi.Contact(email="api@caixahub.com.br"),
         license=openapi.License(name="Proprietary"),
     ),
     public=True,

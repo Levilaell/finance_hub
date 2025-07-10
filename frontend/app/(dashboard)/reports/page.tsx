@@ -65,9 +65,9 @@ import { bankingService } from '@/services/banking.service';
 import { categoriesService } from '@/services/categories.service';
 
 const REPORT_TYPES = [
-  { value: 'income_statement', label: 'DRE - Demonstração de Resultados', icon: DocumentChartBarIcon },
+  { value: 'profit_loss', label: 'DRE - Demonstração de Resultados', icon: DocumentChartBarIcon },
   { value: 'cash_flow', label: 'Fluxo de Caixa', icon: BanknotesIcon },
-  { value: 'balance_sheet', label: 'Balanço Patrimonial', icon: ChartBarIcon },
+  { value: 'monthly_summary', label: 'Resumo Mensal', icon: ChartBarIcon },
   { value: 'category_analysis', label: 'Análise por Categoria', icon: ChartPieIcon },
 ];
 
@@ -127,7 +127,7 @@ export default function ReportsPage() {
     });
   }, []);
   
-  const [reportType, setReportType] = useState<string>('income_statement');
+  const [reportType, setReportType] = useState<string>('profit_loss');
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
@@ -135,7 +135,18 @@ export default function ReportsPage() {
   const [scheduleFrequency, setScheduleFrequency] = useState('monthly');
   const [scheduleRecipients, setScheduleRecipients] = useState('');
   const [exportFormat, setExportFormat] = useState<'pdf' | 'excel'>('pdf');
-  const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
+  // AI Insights query
+  const { data: aiInsightsData } = useQuery({
+    queryKey: ['ai-insights', selectedPeriod],
+    queryFn: () => {
+      if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
+      return reportsService.getAIInsights({
+        start_date: selectedPeriod.start_date,
+        end_date: selectedPeriod.end_date
+      });
+    },
+    enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
+  });
 
   // Queries
   const { data: reports, isLoading, error } = useQuery({
@@ -189,86 +200,53 @@ export default function ReportsPage() {
     enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
   });
 
-  // Mock scheduled reports - initialize empty to avoid hydration issues
-  const [scheduledReports, setScheduledReports] = useState<ScheduledReport[]>([]);
+  // Scheduled reports query
+  const { data: scheduledReports, refetch: refetchScheduledReports } = useQuery({
+    queryKey: ['scheduledReports'],
+    queryFn: () => reportsService.getScheduledReports(),
+  });
 
-  // Set mock data on client-side after hydration
-  useEffect(() => {
-    const now = Date.now();
-    setScheduledReports([
-      {
-        id: '1',
-        name: 'Relatório Mensal de Despesas',
-        type: 'category_analysis',
-        frequency: 'monthly',
-        recipients: ['admin@example.com'],
-        nextRun: new Date(now + 7 * 24 * 60 * 60 * 1000),
-        lastRun: new Date(now - 30 * 24 * 60 * 60 * 1000),
-        active: true
-      }
-    ]);
-  }, []);
+  // Create scheduled report mutation
+  const createScheduledReportMutation = useMutation({
+    mutationFn: (data: any) => reportsService.createScheduledReport(data),
+    onSuccess: () => {
+      refetchScheduledReports();
+      toast.success('Agendamento criado com sucesso');
+    },
+    onError: (error: any) => {
+      console.error('Erro ao criar agendamento:', error);
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          JSON.stringify(error.response?.data) || 
+                          'Falha ao criar agendamento';
+      toast.error(errorMessage);
+    },
+  });
 
-  // Generate AI insights based on data
-  useEffect(() => {
-    if (cashFlowData && categorySpending && incomeVsExpenses) {
-      const insights: AIInsight[] = [];
-      
-      // Analyze cash flow trend
-      if (cashFlowData.length > 0) {
-        const lastBalance = cashFlowData[cashFlowData.length - 1].balance;
-        const firstBalance = cashFlowData[0].balance;
-        const trend = lastBalance > firstBalance ? 'up' : 'down';
-        
-        insights.push({
-          type: trend === 'up' ? 'success' : 'warning',
-          title: 'Tendência do Fluxo de Caixa',
-          description: `Seu saldo ${trend === 'up' ? 'aumentou' : 'diminuiu'} ${Math.abs(((lastBalance - firstBalance) / firstBalance) * 100).toFixed(1)}% no período`,
-          value: formatCurrency(Math.abs(lastBalance - firstBalance)),
-          trend
-        });
-      }
-      
-      // Find highest spending category
-      if (categorySpending.length > 0) {
-        const highestCategory = categorySpending.reduce((prev, current) => 
-          prev.amount > current.amount ? prev : current
-        );
-        
-        insights.push({
-          type: 'info',
-          title: 'Maior Categoria de Gastos',
-          description: `${highestCategory.category.name} representa ${highestCategory.percentage}% dos seus gastos`,
-          value: formatCurrency(highestCategory.amount)
-        });
-      }
-      
-      // Analyze income vs expenses
-      if (incomeVsExpenses.length > 0) {
-        const totalIncome = incomeVsExpenses.reduce((sum, item) => sum + item.income, 0);
-        const totalExpenses = incomeVsExpenses.reduce((sum, item) => sum + item.expenses, 0);
-        const savingsRate = ((totalIncome - totalExpenses) / totalIncome) * 100;
-        
-        insights.push({
-          type: savingsRate > 20 ? 'success' : savingsRate > 10 ? 'info' : 'warning',
-          title: 'Taxa de Poupança',
-          description: `Você está economizando ${savingsRate.toFixed(1)}% da sua renda`,
-          value: `${savingsRate.toFixed(1)}%`,
-          trend: savingsRate > 0 ? 'up' : 'down'
-        });
-      }
-      
-      // Add a prediction
-      insights.push({
-        type: 'info',
-        title: 'Previsão para Próximo Mês',
-        description: 'Com base nas tendências atuais, você deve manter um saldo positivo',
-        trend: 'stable'
-      });
-      
-      setAiInsights(insights);
-    }
-  }, [cashFlowData, categorySpending, incomeVsExpenses]);
+  // Toggle scheduled report mutation
+  const toggleScheduledReportMutation = useMutation({
+    mutationFn: (id: string) => reportsService.toggleScheduledReport(id),
+    onSuccess: () => {
+      refetchScheduledReports();
+      toast.success('Status do agendamento alterado');
+    },
+    onError: (error: any) => {
+      toast.error('Falha ao alterar status');
+    },
+  });
+
+  // Delete scheduled report mutation
+  const deleteScheduledReportMutation = useMutation({
+    mutationFn: (id: string) => reportsService.deleteScheduledReport(id),
+    onSuccess: () => {
+      refetchScheduledReports();
+      toast.success('Agendamento removido');
+    },
+    onError: (error: any) => {
+      toast.error('Falha ao remover agendamento');
+    },
+  });
+
 
   // Mutations
   const generateReportMutation = useMutation({
@@ -346,29 +324,30 @@ export default function ReportsPage() {
   };
 
   const handleScheduleReport = () => {
-    // Generate stable ID using crypto.randomUUID() if available, fallback to timestamp
-    const generateId = () => {
-      if (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) {
-        return window.crypto.randomUUID();
+    if (!scheduleName || !scheduleRecipients) {
+      toast.error('Nome e destinatários são obrigatórios');
+      return;
+    }
+
+    const scheduleData = {
+      report_type: reportType,
+      frequency: scheduleFrequency,
+      email_recipients: scheduleRecipients.split(',').map(email => email.trim()),
+      file_format: exportFormat,
+      parameters: {
+        name: scheduleName,
+        start_date: selectedPeriod.start_date?.toISOString().split('T')[0],
+        end_date: selectedPeriod.end_date?.toISOString().split('T')[0],
+        account_ids: selectedAccounts,
+        category_ids: selectedCategories,
       }
-      return Math.random().toString(36).substring(2) + Date.now().toString(36);
     };
 
-    const newSchedule: ScheduledReport = {
-      id: generateId(),
-      name: scheduleName,
-      type: reportType,
-      frequency: scheduleFrequency,
-      recipients: scheduleRecipients.split(',').map(email => email.trim()),
-      nextRun: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      active: true
-    };
-    
-    setScheduledReports([...scheduledReports, newSchedule]);
+    console.log('Sending schedule data:', scheduleData);
+    createScheduledReportMutation.mutate(scheduleData);
     setIsScheduleDialogOpen(false);
     setScheduleName('');
     setScheduleRecipients('');
-    toast.success('Agendamento criado com sucesso');
   };
 
   const getInsightIcon = (type: AIInsight['type']) => {
@@ -783,7 +762,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {scheduledReports.map((schedule) => (
+                {scheduledReports?.results?.map((schedule: any) => (
                   <div
                     key={schedule.id}
                     className="flex items-center justify-between p-4 border rounded-lg"
@@ -793,34 +772,31 @@ export default function ReportsPage() {
                         <ClockIcon className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <h3 className="font-medium">{schedule.name}</h3>
+                        <h3 className="font-medium">{schedule.parameters?.name || `${schedule.report_type} Report`}</h3>
                         <div className="flex items-center space-x-4 text-sm text-gray-600">
                           <span>{FREQUENCIES.find(f => f.value === schedule.frequency)?.label}</span>
                           <span className="flex items-center">
                             <EnvelopeIcon className="h-4 w-4 mr-1" />
-                            {schedule.recipients.join(', ')}
+                            {schedule.email_recipients?.join(', ')}
                           </span>
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
-                          Próxima execução: {formatDate(schedule.nextRun)}
+                          Próxima execução: {schedule.next_run_at ? formatDate(schedule.next_run_at) : 'Não definido'}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-4">
                       <Switch
-                        checked={schedule.active}
-                        onCheckedChange={(checked) => {
-                          setScheduledReports(scheduledReports.map(s =>
-                            s.id === schedule.id ? { ...s, active: checked } : s
-                          ));
+                        checked={schedule.is_active}
+                        onCheckedChange={() => {
+                          toggleScheduledReportMutation.mutate(schedule.id);
                         }}
                       />
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          setScheduledReports(scheduledReports.filter(s => s.id !== schedule.id));
-                          toast.success('Agendamento removido');
+                          deleteScheduledReportMutation.mutate(schedule.id);
                         }}
                       >
                         Remover
@@ -829,7 +805,7 @@ export default function ReportsPage() {
                   </div>
                 ))}
                 
-                {scheduledReports.length === 0 && (
+                {(!scheduledReports?.results || scheduledReports.results.length === 0) && (
                   <EmptyState
                     icon={ClockIcon}
                     title="Nenhum relatório agendado"
@@ -859,7 +835,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {aiInsights.map((insight, index) => {
+                {aiInsightsData?.insights?.map((insight: any, index: number) => {
                   const Icon = getInsightIcon(insight.type);
                   return (
                     <div
@@ -903,45 +879,60 @@ export default function ReportsPage() {
                 })}
                 
                 {/* Predictions Section */}
-                <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
-                  <h4 className="font-medium flex items-center mb-3">
-                    <TrendingUpIcon className="h-5 w-5 mr-2 text-purple-600" />
-                    Previsões para os Próximos 3 Meses
-                  </h4>
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <div className="bg-white p-3 rounded-lg">
-                      <div className="text-sm text-gray-600">Receita Prevista</div>
-                      <div className="text-xl font-bold text-green-600">+R$ 15.000</div>
-                    </div>
-                    <div className="bg-white p-3 rounded-lg">
-                      <div className="text-sm text-gray-600">Despesas Previstas</div>
-                      <div className="text-xl font-bold text-red-600">-R$ 12.000</div>
-                    </div>
-                    <div className="bg-white p-3 rounded-lg">
-                      <div className="text-sm text-gray-600">Economia Estimada</div>
-                      <div className="text-xl font-bold text-blue-600">R$ 3.000</div>
+                {aiInsightsData?.predictions && (
+                  <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+                    <h4 className="font-medium flex items-center mb-3">
+                      <TrendingUpIcon className="h-5 w-5 mr-2 text-purple-600" />
+                      Previsões para o Próximo Mês
+                    </h4>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-sm text-gray-600">Receita Prevista</div>
+                        <div className="text-xl font-bold text-green-600">
+                          {formatCurrency(aiInsightsData.predictions.next_month_income)}
+                        </div>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-sm text-gray-600">Despesas Previstas</div>
+                        <div className="text-xl font-bold text-red-600">
+                          {formatCurrency(aiInsightsData.predictions.next_month_expenses)}
+                        </div>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg">
+                        <div className="text-sm text-gray-600">Economia Estimada</div>
+                        <div className="text-xl font-bold text-blue-600">
+                          {formatCurrency(aiInsightsData.predictions.projected_savings)}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Recommendations */}
-                <div className="mt-6">
-                  <h4 className="font-medium mb-3">Recomendações Personalizadas</h4>
-                  <div className="space-y-2">
-                    <div className="flex items-start space-x-2">
-                      <CheckCircleIcon className="h-5 w-5 text-green-600 mt-0.5" />
-                      <p className="text-sm">Considere reduzir gastos com entretenimento em 15% para aumentar sua taxa de poupança</p>
-                    </div>
-                    <div className="flex items-start space-x-2">
-                      <CheckCircleIcon className="h-5 w-5 text-green-600 mt-0.5" />
-                      <p className="text-sm">Crie uma reserva de emergência equivalente a 6 meses de despesas</p>
-                    </div>
-                    <div className="flex items-start space-x-2">
-                      <CheckCircleIcon className="h-5 w-5 text-green-600 mt-0.5" />
-                      <p className="text-sm">Invista o excedente mensal em aplicações de renda fixa para objetivos de curto prazo</p>
+                {aiInsightsData?.recommendations && aiInsightsData.recommendations.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="font-medium mb-3">Recomendações Personalizadas</h4>
+                    <div className="space-y-2">
+                      {aiInsightsData.recommendations.map((rec: any, index: number) => (
+                        <div key={index} className="flex items-start space-x-2">
+                          <CheckCircleIcon className="h-5 w-5 text-green-600 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium">{rec.title}</p>
+                            <p className="text-sm text-gray-600">{rec.description}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
+                )}
+
+                {/* Loading/Empty State */}
+                {!aiInsightsData?.insights && (
+                  <div className="text-center py-8">
+                    <SparklesIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                    <p className="text-gray-500">Selecione um período para ver insights com IA</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

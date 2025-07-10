@@ -248,7 +248,7 @@ export default function CategoriesPage() {
               <SelectItem value="income">
                 <div className="flex items-center">
                   <ArrowTrendingUpIcon className="h-4 w-4 mr-2 text-green-600" />
-                  Income
+                  Receita
                 </div>
               </SelectItem>
               <SelectItem value="expense">
@@ -315,7 +315,7 @@ export default function CategoriesPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Categories</h1>
-          <p className="text-gray-600">Organize your transactions with categories</p>
+          <p className="text-gray-600">Organize suas transações com categorias</p>
         </div>
         <div className="flex space-x-2">
           <Button
@@ -324,20 +324,20 @@ export default function CategoriesPage() {
             disabled={autoCategorizeMutation.isPending}
           >
             <SparklesIcon className="h-4 w-4 mr-2" />
-            Auto-Categorize
+            Categorização Automática
           </Button>
           <Button onClick={() => setIsAddingCategory(true)}>
             <PlusIcon className="h-4 w-4 mr-2" />
-            Add Category
+            Adicionar Categoria
           </Button>
         </div>
       </div>
 
       <Tabs defaultValue="all" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="all">All Categories</TabsTrigger>
-          <TabsTrigger value="income">Income</TabsTrigger>
-          <TabsTrigger value="expense">Expenses</TabsTrigger>
+          <TabsTrigger value="all">Todas as Categorias</TabsTrigger>
+          <TabsTrigger value="income">Receitas</TabsTrigger>
+          <TabsTrigger value="expense">Despesas</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">

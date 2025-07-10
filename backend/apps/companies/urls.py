@@ -13,6 +13,10 @@ from .views import (
     CompanyUsersView,
     InviteUserView,
     RemoveUserView,
+    PaymentMethodsView,
+    PaymentMethodDetailView,
+    PaymentHistoryView,
+    InvoiceDownloadView,
 )
 
 # Import public views from public_views package
@@ -40,4 +44,10 @@ urlpatterns = [
     path('users/', CompanyUsersView.as_view(), name='company-users'),
     path('users/invite/', InviteUserView.as_view(), name='invite-user'),
     path('users/<int:user_id>/remove/', RemoveUserView.as_view(), name='remove-user'),
+    
+    # Billing and payment methods
+    path('billing/payment-methods/', PaymentMethodsView.as_view(), name='payment-methods'),
+    path('billing/payment-methods/<int:payment_method_id>/', PaymentMethodDetailView.as_view(), name='payment-method-detail'),
+    path('billing/history/', PaymentHistoryView.as_view(), name='payment-history'),
+    path('billing/invoices/<int:payment_id>/', InvoiceDownloadView.as_view(), name='invoice-download'),
 ]

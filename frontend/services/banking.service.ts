@@ -187,6 +187,19 @@ class BankingService {
     
     return response as any;
   }
+
+  async handlePluggyCallback(itemId: string): Promise<{
+    success: boolean;
+    data?: {
+      accounts: any[];
+      message: string;
+    };
+    message?: string;
+  }> {
+    return apiClient.post("/api/banking/pluggy/callback/", {
+      item_id: itemId
+    });
+  }
 }
 
 export const bankingService = new BankingService();

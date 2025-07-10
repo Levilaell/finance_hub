@@ -427,7 +427,7 @@ export default function TransactionsPage() {
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">Transactions</h1>
-          <p className="text-sm md:text-base text-gray-600">View and categorize your transactions</p>
+          <p className="text-sm md:text-base text-gray-600">Visualize e categorize suas transações</p>
         </div>
         
         {/* Mobile Actions */}
@@ -481,7 +481,7 @@ export default function TransactionsPage() {
           <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs md:text-sm text-gray-600">Income</p>
+                <p className="text-xs md:text-sm text-gray-600">Receitas</p>
                 <p className="text-lg md:text-2xl font-bold text-green-600">
                   {formatCurrency(totals.income)}
                 </p>
@@ -495,7 +495,7 @@ export default function TransactionsPage() {
           <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs md:text-sm text-gray-600">Expenses</p>
+                <p className="text-xs md:text-sm text-gray-600">Despesas</p>
                 <p className="text-lg md:text-2xl font-bold text-red-600">
                   {formatCurrency(totals.expenses)}
                 </p>
@@ -509,7 +509,7 @@ export default function TransactionsPage() {
           <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs md:text-sm text-gray-600">Balance</p>
+                <p className="text-xs md:text-sm text-gray-600">Saldo</p>
                 <p className={cn(
                   "text-lg md:text-2xl font-bold",
                   totals.balance >= 0 ? "text-green-600" : "text-red-600"
@@ -722,7 +722,7 @@ export default function TransactionsPage() {
                     window.location.href = '/accounts';
                   }
                 }}>
-                  Connect Bank Account
+                  Conectar Conta Bancária
                 </Button>
               </HydrationBoundary>
             )
@@ -843,7 +843,7 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All types</SelectItem>
-            <SelectItem value="credit">Income</SelectItem>
+            <SelectItem value="credit">Receita</SelectItem>
             <SelectItem value="debit">Expense</SelectItem>
           </SelectContent>
         </Select>

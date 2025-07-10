@@ -11,46 +11,48 @@ interface IncomeVsExpenseData {
 class ReportsService {
   // Reports
   async getReports(): Promise<PaginatedResponse<Report>> {
-    return apiClient.get<PaginatedResponse<Report>>("/api/reports/");
+    return apiClient.get<PaginatedResponse<Report>>("/api/reports/reports/");
   }
 
   async getReport(id: string): Promise<Report> {
-    return apiClient.get<Report>(`/api/reports/${id}/`);
+    return apiClient.get<Report>(`/api/reports/reports/${id}/`);
   }
 
   async createReport(data: {
-    name: string;
-    report_type: Report["report_type"];
-    frequency: Report["frequency"];
+    title: string;
+    report_type: string;
     parameters: ReportParameters;
   }): Promise<Report> {
-    return apiClient.post<Report>("/api/reports/", data);
+    return apiClient.post<Report>("/api/reports/reports/", data);
   }
 
   async updateReport(
     id: string,
     data: Partial<Report>
   ): Promise<Report> {
-    return apiClient.patch<Report>(`/api/reports/${id}/`, data);
+    return apiClient.patch<Report>(`/api/reports/reports/${id}/`, data);
   }
 
   async deleteReport(id: string): Promise<void> {
-    return apiClient.delete(`/api/reports/${id}/`);
+    return apiClient.delete(`/api/reports/reports/${id}/`);
   }
 
   async generateReport(type: string, parameters: ReportParameters): Promise<ReportResult> {
-    return apiClient.post<ReportResult>("/api/reports/generate/", {
+    return apiClient.post<ReportResult>("/api/reports/reports/", {
       report_type: type,
+      title: `${type} Report`,
+      period_start: parameters.start_date,
+      period_end: parameters.end_date,
       parameters
     });
   }
 
   async getReportResults(reportId: string): Promise<ReportResult[]> {
-    return apiClient.get<ReportResult[]>(`/api/reports/${reportId}/results/`);
+    return apiClient.get<ReportResult[]>(`/api/reports/reports/${reportId}/results/`);
   }
 
   async downloadReport(resultId: string): Promise<Blob> {
-    const response = await apiClient.get(`/api/reports/results/${resultId}/download/`, {
+    const response = await apiClient.get(`/api/reports/reports/${resultId}/download/`, {
       responseType: "blob",
     });
     return response as unknown as Blob;
@@ -101,6 +103,38 @@ class ReportsService {
   }
 
   // Analytics
+  // Scheduled Reports
+  async getScheduledReports(): Promise<any> {
+    return apiClient.get("/api/reports/schedules/");
+  }
+
+  async createScheduledReport(data: {
+    name: string;
+    report_type: string;
+    frequency: string;
+    email_recipients: string[];
+    file_format?: string;
+    parameters?: any;
+  }): Promise<any> {
+    return apiClient.post("/api/reports/schedules/", data);
+  }
+
+  async updateScheduledReport(id: string, data: any): Promise<any> {
+    return apiClient.patch(`/api/reports/schedules/${id}/`, data);
+  }
+
+  async deleteScheduledReport(id: string): Promise<void> {
+    return apiClient.delete(`/api/reports/schedules/${id}/`);
+  }
+
+  async toggleScheduledReport(id: string): Promise<any> {
+    return apiClient.post(`/api/reports/schedules/${id}/toggle_active/`);
+  }
+
+  async runScheduledReport(id: string): Promise<any> {
+    return apiClient.post(`/api/reports/schedules/${id}/run_now/`);
+  }
+
   async getIncomeStatement(params: {
     start_date: string;
     end_date: string;
@@ -122,6 +156,17 @@ class ReportsService {
     interval: "daily" | "weekly" | "monthly";
   }): Promise<any> {
     return apiClient.get("/api/reports/analytics/cash-flow/", params);
+  }
+
+  // AI Insights
+  async getAIInsights(params: {
+    start_date: Date;
+    end_date: Date;
+  }): Promise<any> {
+    return apiClient.get("/api/reports/ai-insights/", {
+      start_date: params.start_date.toISOString().split('T')[0],
+      end_date: params.end_date.toISOString().split('T')[0]
+    });
   }
 }
 
