@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from .models import (
     BankProvider, BankAccount, Transaction, TransactionCategory,
-    RecurringTransaction, Budget, FinancialGoal, BankSync, BankConnection
+    RecurringTransaction, Budget, FinancialGoal, BankSync
 )
 
 
@@ -60,7 +60,7 @@ class BankAccountAdmin(admin.ModelAdmin):
         }),
         ('Conexão Open Banking', {
             'fields': (
-                'external_account_id', 'pluggy_item_id',
+                'external_id', 'pluggy_item_id',
                 'token_expires_at', 'status'
             ),
             'classes': ('collapse',)
@@ -418,38 +418,3 @@ class RecurringTransactionAdmin(admin.ModelAdmin):
         return qs.select_related('bank_account__bank_provider', 'category')
 
 
-@admin.register(BankConnection)
-class BankConnectionAdmin(admin.ModelAdmin):
-    list_display = [
-        'institution', 'display_name', 'company',
-        'status', 'last_access_mode', 'connection_age_days',
-        'created_at'
-    ]
-    list_filter = ['status', 'institution', 'last_access_mode', 'created_at']
-    search_fields = ['display_name', 'institution', 'belvo_id', 'company__name']
-    date_hierarchy = 'created_at'
-    ordering = ['-created_at']
-    
-    fieldsets = (
-        ('Informações da Conexão', {
-            'fields': ('company', 'institution', 'display_name', 'belvo_id')
-        }),
-        ('Status', {
-            'fields': ('status', 'last_access_mode')
-        }),
-        ('Configurações', {
-            'fields': ('refresh_rate', 'credentials_stored', 'external_id')
-        }),
-        ('Timestamps Belvo', {
-            'fields': ('belvo_created_at', 'belvo_created_by')
-        }),
-        ('Metadados', {
-            'fields': ('metadata', 'created_by', 'created_at')
-        }),
-    )
-    
-    readonly_fields = ['id', 'belvo_id', 'created_at', 'belvo_created_at']
-    
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.select_related('company', 'created_by')

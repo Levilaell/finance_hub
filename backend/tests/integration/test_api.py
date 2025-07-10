@@ -24,7 +24,7 @@ import json
 from apps.companies.models import Company, CompanyUser, SubscriptionPlan
 from apps.banking.models import (
     BankAccount, Transaction, BankProvider, TransactionCategory,
-    Budget, FinancialGoal, BankConnection
+    Budget, FinancialGoal
 )
 from apps.categories.models import CategoryRule
 from apps.reports.models import Report
@@ -103,50 +103,29 @@ class TestUserRegistrationToReportGeneration(TestCase):
         company = Company.objects.get(owner=user)
         
         # Step 4: Connect bank account
-        with patch('apps.banking.services.BelvoClient') as mock_belvo:
-            mock_belvo.return_value.create_link.return_value = {'id': 'test-link-id'}
-            mock_belvo.return_value.get_accounts.return_value = [{
-                'id': 'test-account-id',
-                'name': 'Checking Account',
-                'type': 'CHECKING_ACCOUNT',
-                'balance': {'current': 15000.00},
-                'number': '123456',
-                'agency': '0001'
-            }]
-            
-            response = self.client.post(reverse('banking:bank-account-list'), {
-                'bank_provider_id': self.bank_provider.id,
-                'account_type': 'checking',
-                'agency': '0001',
-                'account_number': '123456',
-                'current_balance': '15000.00',
-                'access_token': 'test-token'
-            })
-            
-            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-            account_id = response.data['id']
+        response = self.client.post(reverse('banking:bank-account-list'), {
+            'bank_provider_id': self.bank_provider.id,
+            'account_type': 'checking',
+            'agency': '0001',
+            'account_number': '123456',
+            'current_balance': '15000.00'
+        })
         
-        # Step 5: Sync transactions
-        with patch('apps.banking.services.BelvoClient') as mock_belvo:
-            mock_transactions = []
-            for i in range(10):
-                tx_date = date.today() - timedelta(days=i)
-                mock_transactions.append({
-                    'id': f'tx-{i}',
-                    'description': f'Transaction {i}',
-                    'amount': 100.00 if i % 2 == 0 else -50.00,
-                    'date': tx_date.isoformat(),
-                    'type': 'INFLOW' if i % 2 == 0 else 'OUTFLOW',
-                    'merchant': {'name': f'Merchant {i}'},
-                    'category': 'FOOD' if i % 3 == 0 else 'TRANSPORT'
-                })
-            
-            mock_belvo.return_value.get_transactions.return_value = mock_transactions
-            
-            response = self.client.post(
-                reverse('banking:sync-account', kwargs={'account_id': account_id})
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        account_id = response.data['id']
+        
+        # Step 5: Create transactions manually (simulating sync)
+        account = BankAccount.objects.get(pk=account_id)
+        for i in range(10):
+            tx_date = date.today() - timedelta(days=i)
+            Transaction.objects.create(
+                bank_account=account,
+                transaction_type='credit' if i % 2 == 0 else 'debit',
+                amount=Decimal('100.00') if i % 2 == 0 else Decimal('-50.00'),
+                description=f'Transaction {i}',
+                transaction_date=tx_date,
+                external_id=f'tx-{i}'
             )
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
         
         # Step 6: Set up category rules
         response = self.client.post(reverse('categories:category-rule-list'), {

@@ -1,5 +1,5 @@
 """
-Performance tests for the Caixa Digital backend.
+Performance tests for the CaixaHub backend.
 
 Tests for:
 - Database query optimization (N+1 queries)

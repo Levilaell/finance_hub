@@ -1,5 +1,5 @@
 /**
- * Traduções em português brasileiro para o Caixa Digital
+ * Traduções em português brasileiro para o CaixaHub
  */
 
 export const translations = {

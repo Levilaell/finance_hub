@@ -11,11 +11,6 @@ from .pluggy_views import (
     PluggySyncAccountView, pluggy_webhook, PluggyDisconnectAccountView,
     PluggyAccountStatusView
 )
-try:
-    from . import belvo_views
-    BELVO_ENABLED = True
-except ImportError:
-    BELVO_ENABLED = False
 
 # Only import sandbox views in DEBUG mode
 if settings.DEBUG:
@@ -67,14 +62,3 @@ if settings.DEBUG:
         path('sandbox/<str:bank_code>/accounts/<str:account_id>/transactions/', sandbox_transactions_endpoint, name='sandbox-transactions'),
     ]
 
-# Add Belvo URLs if available
-if BELVO_ENABLED:
-    urlpatterns += [
-        # Belvo integration endpoints
-        path('belvo/institutions/', belvo_views.belvo_institutions, name='belvo-institutions'),
-        path('belvo/connections/', belvo_views.BelvoConnectionView.as_view(), name='belvo-connections'),
-        path('belvo/connections/<uuid:connection_id>/', belvo_views.BelvoConnectionView.as_view(), name='belvo-connection-detail'),
-        path('belvo/connections/<uuid:connection_id>/refresh/', belvo_views.belvo_refresh_connection, name='belvo-refresh'),
-        path('belvo/accounts/', belvo_views.BelvoAccountsView.as_view(), name='belvo-accounts'),
-        path('belvo/transactions/', belvo_views.BelvoTransactionsView.as_view(), name='belvo-transactions'),
-    ]

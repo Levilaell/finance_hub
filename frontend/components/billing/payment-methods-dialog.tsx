@@ -51,7 +51,15 @@ export function PaymentMethodsDialog({
     queryKey: ['payment-methods'],
     queryFn: async () => {
       const response = await billingService.getPaymentMethods();
-      return response || [];
+      // Ensure we always return an array
+      if (Array.isArray(response)) {
+        return response;
+      }
+      // If response is an object with data property, return the data
+      if (response && typeof response === 'object' && Array.isArray(response.data)) {
+        return response.data;
+      }
+      return [];
     },
     enabled: open,
   });

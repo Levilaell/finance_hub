@@ -57,8 +57,8 @@ class EmailService:
         context = {
             'user': user,
             'reset_url': reset_url,
-            'site_name': 'Caixa Digital',
-            'support_email': 'suporte@caixadigital.com.br'
+            'site_name': 'CaixaHub',
+            'support_email': 'suporte@caixahub.com.br'
         }
         
         return EmailService.send_email(
@@ -74,8 +74,8 @@ class EmailService:
         context = {
             'user': user,
             'verification_url': verification_url,
-            'site_name': 'Caixa Digital',
-            'support_email': 'suporte@caixadigital.com.br'
+            'site_name': 'CaixaHub',
+            'support_email': 'suporte@caixahub.com.br'
         }
         
         return EmailService.send_email(
@@ -92,8 +92,8 @@ class EmailService:
             'inviter': inviter,
             'company': company,
             'invitation_url': invitation_url,
-            'site_name': 'Caixa Digital',
-            'support_email': 'suporte@caixadigital.com.br'
+            'site_name': 'CaixaHub',
+            'support_email': 'suporte@caixahub.com.br'
         }
         
         return EmailService.send_email(
@@ -110,8 +110,8 @@ class EmailService:
             'user': user,
             'report': report,
             'download_url': f"{settings.FRONTEND_URL}/reports/{report.id}/download",
-            'site_name': 'Caixa Digital',
-            'support_email': 'suporte@caixadigital.com.br'
+            'site_name': 'CaixaHub',
+            'support_email': 'suporte@caixahub.com.br'
         }
         
         return EmailService.send_email(
@@ -129,8 +129,8 @@ class EmailService:
             'bank_name': bank_name,
             'error_message': error_message,
             'reconnect_url': f"{settings.FRONTEND_URL}/accounts",
-            'site_name': 'Caixa Digital',
-            'support_email': 'suporte@caixadigital.com.br'
+            'site_name': 'CaixaHub',
+            'support_email': 'suporte@caixahub.com.br'
         }
         
         return EmailService.send_email(
@@ -147,8 +147,8 @@ class EmailService:
             'user': user,
             'plan': plan,
             'manage_url': f"{settings.FRONTEND_URL}/settings/subscription",
-            'site_name': 'Caixa Digital',
-            'support_email': 'suporte@caixadigital.com.br'
+            'site_name': 'CaixaHub',
+            'support_email': 'suporte@caixahub.com.br'
         }
         
         return EmailService.send_email(

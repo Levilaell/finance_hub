@@ -245,7 +245,7 @@ def send_low_balance_alerts():
                Recomendamos que verifique sua situação financeira.
                
                Atenciosamente,
-               Equipe Caixa Digital
+               Equipe CaixaHub
                ''',
                from_email=settings.DEFAULT_FROM_EMAIL,
                recipient_list=[account.company.owner.email],

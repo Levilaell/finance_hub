@@ -1,5 +1,5 @@
 """
-Security tests for the Caixa Digital backend.
+Security tests for the CaixaHub backend.
 
 Tests for:
 - JWT token security

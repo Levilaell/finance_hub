@@ -7,7 +7,7 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import (BankAccount, BankConnection, BankProvider, BankSync, Budget, 
+from .models import (BankAccount, BankProvider, BankSync, Budget, 
                      FinancialGoal, RecurringTransaction, Transaction, TransactionCategory)
 
 
@@ -430,32 +430,3 @@ class EnhancedDashboardSerializer(serializers.Serializer):
     financial_insights = serializers.ListField()
 
 
-class BankConnectionSerializer(serializers.ModelSerializer):
-    """
-    Belvo bank connection serializer
-    """
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-    institution_display = serializers.CharField(source='get_institution_display', read_only=True)
-    connection_age_days = serializers.ReadOnlyField()
-    is_active = serializers.SerializerMethodField()
-    needs_token_renewal = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = BankConnection
-        fields = [
-            'id', 'belvo_id', 'institution', 'display_name', 'institution_display',
-            'status', 'last_access_mode', 'created_at', 'created_by_name',
-            'belvo_created_at', 'belvo_created_by', 'refresh_rate', 'external_id',
-            'credentials_stored', 'connection_age_days', 'is_active', 'needs_token_renewal',
-            'metadata'
-        ]
-        read_only_fields = [
-            'id', 'belvo_id', 'created_at', 'created_by_name', 'belvo_created_at',
-            'belvo_created_by', 'connection_age_days', 'is_active', 'needs_token_renewal'
-        ]
-    
-    def get_is_active(self, obj):
-        return obj.is_active()
-    
-    def get_needs_token_renewal(self, obj):
-        return obj.needs_token_renewal()

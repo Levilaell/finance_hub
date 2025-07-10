@@ -211,46 +211,26 @@ class TestCompleteUserJourney(TransactionTestCase):
         
         # Step 4: Connect Bank Account
         print("\n=== Step 4: Connect Bank Account ===")
-        with patch('apps.banking.belvo_client.BelvoClient') as mock_belvo:
-            # Mock Belvo responses
-            mock_belvo_instance = MagicMock()
-            mock_belvo.return_value = mock_belvo_instance
-            
-            mock_belvo_instance.create_link.return_value = {
-                'id': 'link_123',
-                'institution': 'itau',
-                'status': 'valid'
-            }
-            
-            mock_belvo_instance.get_accounts.return_value = [{
-                'id': 'acc_123',
-                'name': 'Conta Corrente',
-                'number': '12345-6',
-                'agency': '0001',
-                'balance': {'current': 50000.00},
-                'type': 'CHECKING_ACCOUNT'
-            }]
-            
-            # Connect to Itaú
-            response = self.client.post(reverse('banking:bank-account-list'), {
-                'bank_provider_id': self.bank_provider_itau.id,
-                'account_type': 'checking',
-                'agency': '0001',
-                'account_number': '12345-6',
-                'current_balance': '50000.00'
-            })
-            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-            
-            account_itau = BankAccount.objects.get(pk=response.data['id'])
-            account_itau.refresh_from_db()
-            
-            # Set up the account with proper tokens for sync
-            account_itau.access_token = 'belvo_token_123'
-            account_itau.refresh_token = 'refresh_token_123'
-            account_itau.external_account_id = 'acc_123'
-            account_itau.current_balance = Decimal('50000.00')
-            account_itau.save()
-            self.assertEqual(account_itau.current_balance, Decimal('50000.00'))
+        # Connect to Itaú
+        response = self.client.post(reverse('banking:bank-account-list'), {
+            'bank_provider_id': self.bank_provider_itau.id,
+            'account_type': 'checking',
+            'agency': '0001',
+            'account_number': '12345-6',
+            'current_balance': '50000.00'
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        account_itau = BankAccount.objects.get(pk=response.data['id'])
+        account_itau.refresh_from_db()
+        
+        # Set up the account with proper tokens for sync
+        account_itau.access_token = 'pluggy_token_123'
+        account_itau.refresh_token = 'refresh_token_123'
+        account_itau.external_account_id = 'acc_123'
+        account_itau.current_balance = Decimal('50000.00')
+        account_itau.save()
+        self.assertEqual(account_itau.current_balance, Decimal('50000.00'))
         
         # Step 5: Import Transactions
         print("\n=== Step 5: Import Transactions ===")

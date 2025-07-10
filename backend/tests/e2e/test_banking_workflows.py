@@ -14,7 +14,7 @@ from apps.authentication.models import User
 from apps.companies.models import Company, CompanyUser, SubscriptionPlan
 from apps.banking.models import (
     BankProvider, BankAccount, Transaction, TransactionCategory,
-    Budget, FinancialGoal, RecurringTransaction, BankConnection
+    Budget, FinancialGoal, RecurringTransaction
 )
 from apps.categories.models import CategoryRule, AITrainingData, CategorySuggestion
 from apps.notifications.models import Notification
@@ -139,33 +139,38 @@ class TestCompleteBankingWorkflow(TransactionTestCase):
             category_type='expense'
         )
     
-    @patch('apps.banking.belvo_client.BelvoClient')
     @patch('apps.banking.pluggy_client.PluggyClient')
-    def test_multi_bank_connection_and_sync(self, mock_pluggy, mock_belvo):
+    def test_multi_bank_connection_and_sync(self, mock_pluggy):
         """
         Test connecting multiple bank accounts and syncing transactions
         """
         print("\n=== Multi-Bank Connection Test ===")
         
-        # Step 1: Connect Itaú account via Belvo
-        print("\n--- Connecting Itaú via Belvo ---")
-        mock_belvo_instance = MagicMock()
-        mock_belvo.return_value = mock_belvo_instance
+        # Step 1: Connect Itaú account via Pluggy
+        print("\n--- Connecting Itaú via Pluggy ---")
+        mock_pluggy_instance = MagicMock()
+        mock_pluggy.return_value = mock_pluggy_instance
         
-        mock_belvo_instance.create_link.return_value = {
-            'id': 'belvo_link_itau',
-            'institution': 'itau',
-            'status': 'valid'
-        }
+        # Mock async methods for Itaú
+        async def mock_create_item_itau():
+            return {
+                'id': 'pluggy_item_itau',
+                'connector': {'name': 'Itaú'},
+                'status': 'UPDATED'
+            }
         
-        mock_belvo_instance.get_accounts.return_value = [{
-            'id': 'itau_acc_1',
-            'name': 'Conta Corrente Itaú',
-            'number': '12345-6',
-            'agency': '0001',
-            'balance': {'current': 100000.00},
-            'type': 'CHECKING_ACCOUNT'
-        }]
+        async def mock_get_accounts_itau():
+            return [{
+                'id': 'itau_acc_1',
+                'name': 'Conta Corrente Itaú',
+                'number': '12345-6',
+                'branch': '0001',
+                'balance': 100000.00,
+                'type': 'BANK'
+            }]
+        
+        mock_pluggy_instance.create_item = mock_create_item_itau
+        mock_pluggy_instance.get_accounts = mock_get_accounts_itau
         
         response = self.client.post(reverse('banking:bank-account-list'), {
             'bank_provider_id': self.providers['itau'].id,
@@ -173,25 +178,22 @@ class TestCompleteBankingWorkflow(TransactionTestCase):
             'agency': '0001',
             'account_number': '12345-6',
             'current_balance': '100000.00',
-            'access_token': 'belvo_token_itau'
+            'access_token': 'pluggy_token_itau'
         })
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         itau_account = BankAccount.objects.get(pk=response.data['id'])
         
         # Step 2: Connect Bradesco account via Pluggy
         print("\n--- Connecting Bradesco via Pluggy ---")
-        mock_pluggy_instance = MagicMock()
-        mock_pluggy.return_value = mock_pluggy_instance
-        
-        # Mock async methods
-        async def mock_create_item():
+        # Mock async methods for Bradesco
+        async def mock_create_item_bradesco():
             return {
                 'id': 'pluggy_item_bradesco',
                 'connector': {'name': 'Bradesco'},
                 'status': 'UPDATED'
             }
         
-        async def mock_get_accounts():
+        async def mock_get_accounts_bradesco():
             return [{
                 'id': 'bradesco_acc_1',
                 'name': 'Conta Corrente',
@@ -201,8 +203,8 @@ class TestCompleteBankingWorkflow(TransactionTestCase):
                 'type': 'BANK'
             }]
         
-        mock_pluggy_instance.create_item = mock_create_item
-        mock_pluggy_instance.get_accounts = mock_get_accounts
+        mock_pluggy_instance.create_item = mock_create_item_bradesco
+        mock_pluggy_instance.get_accounts = mock_get_accounts_bradesco
         
         response = self.client.post(reverse('banking:bank-account-list'), {
             'bank_provider_id': self.providers['bradesco'].id,
@@ -230,37 +232,40 @@ class TestCompleteBankingWorkflow(TransactionTestCase):
         # Step 4: Sync transactions from all accounts
         print("\n--- Syncing Transactions ---")
         
-        # Mock Itaú transactions
+        # Mock Itaú transactions via Pluggy
         today = date.today()
-        mock_belvo_instance.get_transactions.return_value = [
-            {
-                'id': 'itau_tx_1',
-                'account': 'itau_acc_1',
-                'date': today.isoformat(),
-                'description': 'Venda Cartão - Cliente XYZ',
-                'amount': 5000.00,
-                'type': 'INFLOW',
-                'status': 'PROCESSED'
-            },
-            {
-                'id': 'itau_tx_2',
-                'account': 'itau_acc_1',
-                'date': (today - timedelta(days=1)).isoformat(),
-                'description': 'Pagamento Fornecedor ABC',
-                'amount': -3000.00,
-                'type': 'OUTFLOW',
-                'status': 'PROCESSED'
-            },
-            {
-                'id': 'itau_tx_3',
-                'account': 'itau_acc_1',
-                'date': (today - timedelta(days=2)).isoformat(),
-                'description': 'DAS - Simples Nacional',
-                'amount': -1200.00,
-                'type': 'OUTFLOW',
-                'status': 'PROCESSED'
-            }
-        ]
+        async def mock_get_transactions_itau():
+            return [
+                {
+                    'id': 'itau_tx_1',
+                    'accountId': 'itau_acc_1',
+                    'date': today.isoformat(),
+                    'description': 'Venda Cartão - Cliente XYZ',
+                    'amount': 5000.00,
+                    'type': 'CREDIT',
+                    'status': 'POSTED'
+                },
+                {
+                    'id': 'itau_tx_2',
+                    'accountId': 'itau_acc_1',
+                    'date': (today - timedelta(days=1)).isoformat(),
+                    'description': 'Pagamento Fornecedor ABC',
+                    'amount': -3000.00,
+                    'type': 'DEBIT',
+                    'status': 'POSTED'
+                },
+                {
+                    'id': 'itau_tx_3',
+                    'accountId': 'itau_acc_1',
+                    'date': (today - timedelta(days=2)).isoformat(),
+                    'description': 'DAS - Simples Nacional',
+                    'amount': -1200.00,
+                    'type': 'DEBIT',
+                    'status': 'POSTED'
+                }
+            ]
+        
+        mock_pluggy_instance.get_transactions = mock_get_transactions_itau
         
         response = self.client.post(
             reverse('banking:sync-account', kwargs={'account_id': itau_account.id})
@@ -545,8 +550,8 @@ class TestBankConnectionFailureRecovery(TransactionTestCase):
         refresh = RefreshToken.for_user(self.user)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {str(refresh.access_token)}')
     
-    @patch('apps.banking.belvo_client.BelvoClient')
-    def test_bank_connection_failure_and_retry(self, mock_belvo):
+    @patch('apps.banking.pluggy_client.PluggyClient')
+    def test_bank_connection_failure_and_retry(self, mock_pluggy):
         """
         Test handling of bank connection failures and retry logic
         """
@@ -554,10 +559,14 @@ class TestBankConnectionFailureRecovery(TransactionTestCase):
         
         # Step 1: Initial connection attempt fails
         print("\n--- Initial Connection Failure ---")
-        mock_belvo_instance = MagicMock()
-        mock_belvo.return_value = mock_belvo_instance
+        mock_pluggy_instance = MagicMock()
+        mock_pluggy.return_value = mock_pluggy_instance
         
-        mock_belvo_instance.create_link.side_effect = Exception("Connection timeout")
+        # Mock async method that fails
+        async def mock_create_item_fail():
+            raise Exception("Connection timeout")
+        
+        mock_pluggy_instance.create_item = mock_create_item_fail
         
         response = self.client.post(reverse('banking:bank-account-list'), {
             'bank_provider_id': self.bank_provider.id,
@@ -572,18 +581,23 @@ class TestBankConnectionFailureRecovery(TransactionTestCase):
         
         # Step 2: Retry with success
         print("\n--- Retry Connection ---")
-        mock_belvo_instance.create_link.side_effect = None
-        mock_belvo_instance.create_link.return_value = {
-            'id': 'link_123',
-            'status': 'valid'
-        }
+        # Mock successful async methods
+        async def mock_create_item_success():
+            return {
+                'id': 'item_123',
+                'status': 'UPDATED'
+            }
         
-        mock_belvo_instance.get_accounts.return_value = [{
-            'id': 'acc_123',
-            'number': '12345',
-            'agency': '0001',
-            'balance': {'current': 1000.00}
-        }]
+        async def mock_get_accounts_success():
+            return [{
+                'id': 'acc_123',
+                'number': '12345',
+                'branch': '0001',
+                'balance': 1000.00
+            }]
+        
+        mock_pluggy_instance.create_item = mock_create_item_success
+        mock_pluggy_instance.get_accounts = mock_get_accounts_success
         
         response = self.client.post(reverse('banking:bank-account-list'), {
             'bank_provider_id': self.bank_provider.id,
@@ -600,7 +614,10 @@ class TestBankConnectionFailureRecovery(TransactionTestCase):
         account = BankAccount.objects.get(pk=response.data['id'])
         
         # First sync fails
-        mock_belvo_instance.get_transactions.side_effect = Exception("API rate limit")
+        async def mock_get_transactions_fail():
+            raise Exception("API rate limit")
+        
+        mock_pluggy_instance.get_transactions = mock_get_transactions_fail
         
         response = self.client.post(
             reverse('banking:sync-account', kwargs={'account_id': account.id})
@@ -613,14 +630,16 @@ class TestBankConnectionFailureRecovery(TransactionTestCase):
         self.assertIn(account.last_sync_status, ['failed', 'error', None])
         
         # Retry sync successfully
-        mock_belvo_instance.get_transactions.side_effect = None
-        mock_belvo_instance.get_transactions.return_value = [{
-            'id': 'tx_1',
-            'date': date.today().isoformat(),
-            'description': 'Test transaction',
-            'amount': 100.00,
-            'type': 'INFLOW'
-        }]
+        async def mock_get_transactions_success():
+            return [{
+                'id': 'tx_1',
+                'date': date.today().isoformat(),
+                'description': 'Test transaction',
+                'amount': 100.00,
+                'type': 'CREDIT'
+            }]
+        
+        mock_pluggy_instance.get_transactions = mock_get_transactions_success
         
         response = self.client.post(
             reverse('banking:sync-account', kwargs={'account_id': account.id})

@@ -97,6 +97,7 @@ class ReportSchedule(models.Model):
     )
     
     # Schedule configuration
+    name = models.CharField(_('name'), max_length=200, blank=True)
     report_type = models.CharField(_('report type'), max_length=20, choices=Report.REPORT_TYPES)
     frequency = models.CharField(_('frequency'), max_length=20, choices=FREQUENCY_CHOICES)
     

@@ -16,8 +16,8 @@ OPEN_BANKING_CONFIG = {
     'SIGNING_KEY_PATH': '/app/certificates/signing_key.pem',
     
     # URLs de callback para produção
-    'REDIRECT_URI': 'https://api.financehub.com.br/banking/callback',
-    'NOTIFICATION_URI': 'https://api.financehub.com.br/banking/notifications',
+    'REDIRECT_URI': 'https://api.caixahub.com.br/banking/callback',
+    'NOTIFICATION_URI': 'https://api.caixahub.com.br/banking/notifications',
     
     # Configurações de segurança
     'JWT_ALGORITHM': 'PS256',
@@ -57,7 +57,7 @@ BRAZILIAN_BANKS_CONFIG = {
         'authorization_endpoint': 'https://proxy.api.prebanco.com.br/auth/oauth/v2/authorize',
         'token_endpoint': 'https://proxy.api.prebanco.com.br/auth/oauth/v2/token',
         'accounts_endpoint': 'https://proxy.api.prebanco.com.br/open-banking/accounts/v1',
-        'logo': 'https://cdn.financehub.com.br/banks/bradesco.png'
+        'logo': 'https://cdn.caixahub.com.br/banks/bradesco.png'
     },
     'itau': {
         'name': 'Itaú Unibanco',
@@ -66,7 +66,7 @@ BRAZILIAN_BANKS_CONFIG = {
         'authorization_endpoint': 'https://sts.itau.com.br/api/oauth/oauth20/authorize',
         'token_endpoint': 'https://sts.itau.com.br/api/oauth/oauth20/token',
         'accounts_endpoint': 'https://secure.api.itau/open-banking/accounts/v1',
-        'logo': 'https://cdn.financehub.com.br/banks/itau.png'
+        'logo': 'https://cdn.caixahub.com.br/banks/itau.png'
     },
     'santander': {
         'name': 'Santander Brasil',
@@ -75,7 +75,7 @@ BRAZILIAN_BANKS_CONFIG = {
         'authorization_endpoint': 'https://obauth.santander.com.br/oauth2/authorize',
         'token_endpoint': 'https://obauth.santander.com.br/oauth2/token',
         'accounts_endpoint': 'https://trust-open.api.santander.com.br/bank/sb/gw/open-banking/v1/accounts',
-        'logo': 'https://cdn.financehub.com.br/banks/santander.png'
+        'logo': 'https://cdn.caixahub.com.br/banks/santander.png'
     },
     'bb': {
         'name': 'Banco do Brasil',
@@ -84,7 +84,7 @@ BRAZILIAN_BANKS_CONFIG = {
         'authorization_endpoint': 'https://oauth.bb.com.br/oauth/authorize',
         'token_endpoint': 'https://oauth.bb.com.br/oauth/token',
         'accounts_endpoint': 'https://api.bb.com.br/open-banking/accounts/v1',
-        'logo': 'https://cdn.financehub.com.br/banks/bb.png'
+        'logo': 'https://cdn.caixahub.com.br/banks/bb.png'
     },
     'caixa': {
         'name': 'Caixa Econômica Federal',
@@ -93,7 +93,7 @@ BRAZILIAN_BANKS_CONFIG = {
         'authorization_endpoint': 'https://apisec.caixa.gov.br/oauth2/authorize',
         'token_endpoint': 'https://apisec.caixa.gov.br/oauth2/token',
         'accounts_endpoint': 'https://api.caixa.gov.br/open-banking/accounts/v1',
-        'logo': 'https://cdn.financehub.com.br/banks/caixa.png'
+        'logo': 'https://cdn.caixahub.com.br/banks/caixa.png'
     },
     'nubank': {
         'name': 'Nu Pagamentos S.A.',
@@ -102,7 +102,7 @@ BRAZILIAN_BANKS_CONFIG = {
         'authorization_endpoint': 'https://prod-s0-webapp-proxy.nubank.com.br/api/oauth/authorize',
         'token_endpoint': 'https://prod-s0-webapp-proxy.nubank.com.br/api/oauth/token',
         'accounts_endpoint': 'https://prod-s0-webapp-proxy.nubank.com.br/api/open-banking/accounts/v1',
-        'logo': 'https://cdn.financehub.com.br/banks/nubank.png'
+        'logo': 'https://cdn.caixahub.com.br/banks/nubank.png'
     },
     'inter': {
         'name': 'Banco Inter',
@@ -111,7 +111,7 @@ BRAZILIAN_BANKS_CONFIG = {
         'authorization_endpoint': 'https://cdpj.partners.bancointer.com.br/oauth/v2/authorize',
         'token_endpoint': 'https://cdpj.partners.bancointer.com.br/oauth/v2/token',
         'accounts_endpoint': 'https://cdpj.partners.bancointer.com.br/open-banking/accounts/v1',
-        'logo': 'https://cdn.financehub.com.br/banks/inter.png'
+        'logo': 'https://cdn.caixahub.com.br/banks/inter.png'
     },
     'c6bank': {
         'name': 'C6 Bank',
@@ -120,7 +120,7 @@ BRAZILIAN_BANKS_CONFIG = {
         'authorization_endpoint': 'https://auth.c6bank.com.br/auth/realms/ob/protocol/openid-connect/auth',
         'token_endpoint': 'https://auth.c6bank.com.br/auth/realms/ob/protocol/openid-connect/token',
         'accounts_endpoint': 'https://ob.c6bank.com.br/open-banking/accounts/v1',
-        'logo': 'https://cdn.financehub.com.br/banks/c6bank.png'
+        'logo': 'https://cdn.caixahub.com.br/banks/c6bank.png'
     },
     'original': {
         'name': 'Banco Original',
@@ -129,7 +129,7 @@ BRAZILIAN_BANKS_CONFIG = {
         'authorization_endpoint': 'https://ob.original.com.br/auth/oauth2/authorize',
         'token_endpoint': 'https://ob.original.com.br/auth/oauth2/token',
         'accounts_endpoint': 'https://ob.original.com.br/open-banking/accounts/v1',
-        'logo': 'https://cdn.financehub.com.br/banks/original.png'
+        'logo': 'https://cdn.caixahub.com.br/banks/original.png'
     },
     'btg': {
         'name': 'BTG Pactual',
@@ -138,7 +138,7 @@ BRAZILIAN_BANKS_CONFIG = {
         'authorization_endpoint': 'https://auth.btgpactual.com/auth/realms/openbanking/protocol/openid-connect/auth',
         'token_endpoint': 'https://auth.btgpactual.com/auth/realms/openbanking/protocol/openid-connect/token',
         'accounts_endpoint': 'https://api.btgpactual.com/open-banking/accounts/v1',
-        'logo': 'https://cdn.financehub.com.br/banks/btg.png'
+        'logo': 'https://cdn.caixahub.com.br/banks/btg.png'
     }
 }
 

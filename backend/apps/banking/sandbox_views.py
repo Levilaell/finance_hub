@@ -94,7 +94,7 @@ def sandbox_authorization_endpoint(request, bank_code):
             </form>
             
             <p style="text-align: center; margin-top: 20px; font-size: 12px; color: #666;">
-                O aplicativo FinanceHub está solicitando acesso às suas informações bancárias.
+                O aplicativo CaixaHub está solicitando acesso às suas informações bancárias.
                 <br>Dados serão acessados de forma segura e criptografada.
             </p>
         </div>

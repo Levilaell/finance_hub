@@ -267,13 +267,7 @@ CSRF_TRUSTED_ORIGINS = [
 # OpenAI API
 OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
 
-# Belvo API Configuration
-# Belvo provides unified API for Latin American bank connections
-BELVO_SECRET_ID = config('BELVO_SECRET_ID', default='')
-BELVO_SECRET_PASSWORD = config('BELVO_SECRET_PASSWORD', default='')
-BELVO_BASE_URL = config('BELVO_BASE_URL', default='https://sandbox.belvo.com')
-
-# Pluggy API Configuration (Deprecated - migrating to Belvo)
+# Pluggy API Configuration
 # Pluggy provides unified API for Brazilian bank connections
 PLUGGY_CLIENT_ID = config('PLUGGY_CLIENT_ID', default='')
 PLUGGY_CLIENT_SECRET = config('PLUGGY_CLIENT_SECRET', default='')

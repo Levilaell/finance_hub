@@ -330,12 +330,12 @@ export default function ReportsPage() {
     }
 
     const scheduleData = {
+      name: scheduleName,
       report_type: reportType,
       frequency: scheduleFrequency,
       email_recipients: scheduleRecipients.split(',').map(email => email.trim()),
       file_format: exportFormat,
       parameters: {
-        name: scheduleName,
         start_date: selectedPeriod.start_date?.toISOString().split('T')[0],
         end_date: selectedPeriod.end_date?.toISOString().split('T')[0],
         account_ids: selectedAccounts,
@@ -772,7 +772,7 @@ export default function ReportsPage() {
                         <ClockIcon className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <h3 className="font-medium">{schedule.parameters?.name || `${schedule.report_type} Report`}</h3>
+                        <h3 className="font-medium">{schedule.name || `${schedule.report_type} Report`}</h3>
                         <div className="flex items-center space-x-4 text-sm text-gray-600">
                           <span>{FREQUENCIES.find(f => f.value === schedule.frequency)?.label}</span>
                           <span className="flex items-center">

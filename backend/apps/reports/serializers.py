@@ -37,7 +37,7 @@ class ReportScheduleSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReportSchedule
         fields = [
-            'id', 'report_type', 'frequency', 'send_email', 'email_recipients',
+            'id', 'name', 'report_type', 'frequency', 'send_email', 'email_recipients',
             'file_format', 'is_active', 'next_run_at', 'last_run_at',
             'parameters', 'filters', 'created_at', 'created_by_name'
         ]

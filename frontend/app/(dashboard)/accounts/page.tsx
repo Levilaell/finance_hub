@@ -42,7 +42,7 @@ import { toast } from 'sonner';
 import { BankAccountForm } from '@/components/accounts/bank-account-form';
 import { useBankProviders } from '@/hooks/use-bank-providers';
 import { bankingService } from '@/services/banking.service';
-import { PluggyConnectHandler } from '@/components/banking/pluggy-connect-handler';
+import { PluggyConnectWidget } from '@/components/banking/pluggy-connect-widget';
 import { PluggyInfoDialog } from '@/components/banking/pluggy-info-dialog';
 
 interface BankProvider {
@@ -77,6 +77,8 @@ export default function AccountsPage() {
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [editingAccount, setEditingAccount] = useState<any>(null);
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
+  const [pluggyConnectToken, setPluggyConnectToken] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -87,31 +89,32 @@ export default function AccountsPage() {
     fetchAccounts();
     
     // Check if user is returning from Pluggy Connect
-    const returnUrl = sessionStorage.getItem('pluggy_return_url');
     const providerName = sessionStorage.getItem('pluggy_provider');
     
-    if (returnUrl && providerName) {
-      // Clear the stored values
-      sessionStorage.removeItem('pluggy_return_url');
+    // Check URL parameters for Pluggy response
+    const urlParams = new URLSearchParams(window.location.search);
+    const itemId = urlParams.get('itemId');
+    const error = urlParams.get('error');
+    const status = urlParams.get('status');
+    
+    if (itemId && status === 'success') {
+      // Success - item was created
+      const provider = providerName || 'Banco';
+      toast.success(`Conta ${provider} conectada com sucesso!`);
+      
+      // Handle the callback to create bank accounts
+      handlePluggyCallback(itemId);
+      
+      // Clear the stored values and URL parameters
       sessionStorage.removeItem('pluggy_provider');
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (error && status === 'error') {
+      // Error occurred
+      const provider = providerName || 'Banco';
+      toast.error(`Erro ao conectar ${provider}: ${error}`);
       
-      // Check URL parameters for Pluggy response
-      const urlParams = new URLSearchParams(window.location.search);
-      const itemId = urlParams.get('itemId');
-      const error = urlParams.get('error');
-      
-      if (itemId) {
-        // Success - item was created
-        toast.success(`Conta ${providerName} conectada com sucesso!`);
-        
-        // Handle the callback to create bank accounts
-        handlePluggyCallback(itemId);
-      } else if (error) {
-        // Error occurred
-        toast.error(`Erro ao conectar ${providerName}: ${error}`);
-      }
-      
-      // Clean up URL parameters
+      // Clear the stored values and URL parameters
+      sessionStorage.removeItem('pluggy_provider');
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, [isAuthenticated]);
@@ -142,17 +145,12 @@ export default function AccountsPage() {
         console.log('🔗 Connect token received:', connectToken?.substring(0, 50) + '...');
         console.log('🔗 Full result:', result.data);
         
-        if (connectToken && connectUrl) {
-          // For now, use a simple redirect approach since SDK loading is having issues
-          // This will open Pluggy Connect in the same tab
-          toast.info('Redirecionando para o Pluggy Connect...');
-          
-          // Store the current URL to return to after connection
-          sessionStorage.setItem('pluggy_return_url', window.location.href);
-          sessionStorage.setItem('pluggy_provider', provider.name);
-          
-          // Redirect to Pluggy Connect with the token
-          window.location.href = `${connectUrl}?connectToken=${connectToken}&includeSandbox=true`;
+        if (connectToken) {
+          // Use the Pluggy Connect widget
+          setPluggyConnectToken(connectToken);
+          setIsConnecting(true);
+          setIsAddingAccount(false); // Close the bank selection dialog
+          toast.info('Abrindo Pluggy Connect...');
           
           return;
         }
@@ -285,17 +283,39 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Pluggy Connect Handler */}
-      <PluggyConnectHandler 
-        onSuccess={() => {
-          toast.success('Conta conectada com sucesso!');
-          fetchAccounts();
-          setIsAddingAccount(false);
-        }}
-        onError={(error) => {
-          toast.error(error);
-        }}
-      />
+      {/* Pluggy Connect Widget */}
+      {pluggyConnectToken && isConnecting && (
+        <PluggyConnectWidget
+          connectToken={pluggyConnectToken}
+          onSuccess={async (itemData) => {
+            console.log('Pluggy Connect success:', itemData);
+            const itemId = itemData?.item?.id;
+            
+            if (itemId) {
+              // Handle the callback to create bank accounts
+              await handlePluggyCallback(itemId);
+            }
+            
+            // Reset states
+            setPluggyConnectToken(null);
+            setIsConnecting(false);
+            setSelectedProvider(null);
+          }}
+          onError={(error) => {
+            console.error('Pluggy Connect error:', error);
+            toast.error(`Erro na conexão: ${error.message || 'Erro desconhecido'}`);
+            
+            // Reset states
+            setPluggyConnectToken(null);
+            setIsConnecting(false);
+          }}
+          onClose={() => {
+            // Reset states if user closes without completing
+            setPluggyConnectToken(null);
+            setIsConnecting(false);
+          }}
+        />
+      )}
       
       {/* Header */}
       <div className="flex justify-between items-center">

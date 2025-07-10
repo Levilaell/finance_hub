@@ -81,11 +81,6 @@ OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
 OPEN_BANKING_CLIENT_ID = config('OPEN_BANKING_CLIENT_ID', default='mock-client-id')
 OPEN_BANKING_CLIENT_SECRET = config('OPEN_BANKING_CLIENT_SECRET', default='mock-client-secret')
 
-# Belvo API Settings (Sandbox)
-BELVO_BASE_URL = config('BELVO_BASE_URL', default='https://sandbox.belvo.com')
-BELVO_SECRET_ID = config('BELVO_SECRET_ID', default='test-secret-id')
-BELVO_SECRET_PASSWORD = config('BELVO_SECRET_PASSWORD', default='test-secret-password')
-
 # Pluggy API Settings (Sandbox)
 PLUGGY_BASE_URL = config('PLUGGY_BASE_URL', default='https://api.pluggy.ai')
 PLUGGY_CLIENT_ID = config('PLUGGY_CLIENT_ID', default='test-client-id')

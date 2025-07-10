@@ -1,9 +1,9 @@
 #!/bin/bash
-# Quick start script for Caixa Digital development environment
+# Quick start script for CaixaHub development environment
 
 set -e
 
-echo "🚀 Iniciando configuração do Caixa Digital..."
+echo "🚀 Iniciando configuração do CaixaHub..."
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -71,13 +71,13 @@ echo -e "${YELLOW}👤 Criando superusuário...${NC}"
 docker-compose exec backend python manage.py shell -c "
 from django.contrib.auth import get_user_model
 User = get_user_model()
-if not User.objects.filter(email='admin@caixadigital.com.br').exists():
+if not User.objects.filter(email='admin@caixahub.com.br').exists():
     User.objects.create_superuser(
-        username='admin@caixadigital.com.br',
-        email='admin@caixadigital.com.br',
+        username='admin@caixahub.com.br',
+        email='admin@caixahub.com.br',
         password='admin123',
         first_name='Admin',
-        last_name='Caixa Digital'
+        last_name='CaixaHub'
     )
     print('Superusuário criado com sucesso')
 else:
@@ -100,8 +100,8 @@ echo -e "   ${GREEN}pgAdmin:${NC} http://localhost:5050"
 echo -e "   ${GREEN}Redis Commander:${NC} http://localhost:8081"
 
 echo -e "\n📧 Credenciais padrão:"
-echo -e "   ${GREEN}Admin:${NC} admin@caixadigital.com.br / admin123"
-echo -e "   ${GREEN}pgAdmin:${NC} admin@caixadigital.com.br / admin"
+echo -e "   ${GREEN}Admin:${NC} admin@caixahub.com.br / admin123"
+echo -e "   ${GREEN}pgAdmin:${NC} admin@caixahub.com.br / admin"
 
 echo -e "\n📝 Comandos úteis:"
 echo -e "   ${YELLOW}Ver logs:${NC} docker-compose logs -f"
@@ -110,4 +110,4 @@ echo -e "   ${YELLOW}Reiniciar:${NC} docker-compose restart"
 echo -e "   ${YELLOW}Shell Django:${NC} docker-compose exec backend python manage.py shell"
 echo -e "   ${YELLOW}Criar migrações:${NC} docker-compose exec backend python manage.py makemigrations"
 
-echo -e "\n${GREEN}🎉 Caixa Digital está pronto para uso!${NC}"
+echo -e "\n${GREEN}🎉 CaixaHub está pronto para uso!${NC}"

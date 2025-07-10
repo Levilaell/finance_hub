@@ -1,4 +1,4 @@
-# Makefile for Caixa Digital
+# Makefile for CaixaHub
 
 .PHONY: help build up down restart logs shell migrate test clean
 
@@ -10,7 +10,7 @@ NC := \033[0m
 
 # Default target
 help:
-	@echo "$(GREEN)Caixa Digital - Comandos disponíveis:$(NC)"
+	@echo "$(GREEN)CaixaHub - Comandos disponíveis:$(NC)"
 	@echo "  $(YELLOW)make build$(NC)        - Constrói os containers Docker"
 	@echo "  $(YELLOW)make up$(NC)           - Inicia os containers"
 	@echo "  $(YELLOW)make down$(NC)         - Para os containers"

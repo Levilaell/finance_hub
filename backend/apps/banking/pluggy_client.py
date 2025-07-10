@@ -54,7 +54,7 @@ class PluggyClient:
             timeout=30.0,
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
             headers={
-                'User-Agent': 'FinanceHub/1.0 Pluggy-Integration',
+                'User-Agent': 'CaixaHub/1.0 Pluggy-Integration',
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
             }
@@ -124,7 +124,7 @@ class PluggyClient:
     def _get_headers(self, include_auth: bool = True) -> Dict[str, str]:
         """Get headers for API requests"""
         headers = {
-            'User-Agent': 'FinanceHub/1.0 Pluggy-Integration',
+            'User-Agent': 'CaixaHub/1.0 Pluggy-Integration',
             'Accept': 'application/json',
             'Content-Type': 'application/json',
         }

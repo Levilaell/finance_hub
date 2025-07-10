@@ -79,7 +79,7 @@ class BankAccount(models.Model):
     account_digit = models.CharField(_('account digit'), max_length=2, blank=True)
     
     # Open Banking integration
-    external_account_id = models.CharField(_('external account ID'), max_length=100, blank=True)
+    external_id = models.CharField(_('external account ID'), max_length=100, blank=True)
     pluggy_item_id = models.CharField(_('Pluggy item ID'), max_length=255, blank=True, null=True)
     
     # Encrypted token storage
@@ -124,7 +124,7 @@ class BankAccount(models.Model):
         unique_together = ('company', 'bank_provider', 'agency', 'account_number', 'account_type')
         indexes = [
             models.Index(fields=['company', 'status']),
-            models.Index(fields=['bank_provider', 'external_account_id']),
+            models.Index(fields=['bank_provider', 'external_id']),
             models.Index(fields=['last_sync_at']),
         ]
     
@@ -186,6 +186,21 @@ class BankAccount(models.Model):
         if self.nickname:
             return f"{self.nickname} ({self.bank_provider.name})"
         return f"{self.bank_provider.name} - {self.masked_account}"
+    
+    def to_dict(self):
+        """Convert to dictionary for API responses"""
+        return {
+            'id': self.id,
+            'bank_name': self.bank_provider.name,
+            'account_type': self.account_type,
+            'account_number': self.masked_account,
+            'current_balance': float(self.current_balance),
+            'available_balance': float(self.available_balance),
+            'currency': 'BRL',
+            'status': self.status,
+            'last_sync_at': self.last_sync_at.isoformat() if self.last_sync_at else None,
+            'display_name': self.display_name,
+        }
 
 
 class TransactionCategory(models.Model):
@@ -790,134 +805,3 @@ class BankSync(models.Model):
         return None
 
 
-class BankConnection(models.Model):
-    """
-    Belvo bank connection management
-    Manages connections to financial institutions via Belvo API
-    """
-    CONNECTION_STATUS_CHOICES = [
-        ('valid', _('Valid')),
-        ('invalid', _('Invalid')),
-        ('unconfirmed', _('Unconfirmed')),
-        ('token_renewal_required', _('Token Renewal Required')),
-    ]
-    
-    LAST_ACCESS_MODE_CHOICES = [
-        ('single', _('Single')),
-        ('recurrent', _('Recurrent')),
-    ]
-    
-    # Unique identifier
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    
-    # Belvo connection data
-    belvo_id = models.CharField(_('Belvo ID'), max_length=100, unique=True)
-    institution = models.CharField(_('Institution'), max_length=100)
-    display_name = models.CharField(_('Display Name'), max_length=255, blank=True)
-    
-    # Company association
-    company = models.ForeignKey(
-        'companies.Company',
-        on_delete=models.CASCADE,
-        related_name='bank_connections',
-        verbose_name=_('Company')
-    )
-    
-    # Connection status
-    status = models.CharField(
-        _('Status'), 
-        max_length=30, 
-        choices=CONNECTION_STATUS_CHOICES,
-        default='unconfirmed'
-    )
-    
-    # Access configuration
-    last_access_mode = models.CharField(
-        _('Last Access Mode'),
-        max_length=20,
-        choices=LAST_ACCESS_MODE_CHOICES,
-        default='single'
-    )
-    
-    # Timestamps
-    created_at = models.DateTimeField(_('Created At'), auto_now_add=True)
-    created_by = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='created_bank_connections',
-        verbose_name=_('Created By')
-    )
-    
-    # Belvo timestamps
-    belvo_created_at = models.DateTimeField(_('Belvo Created At'), null=True, blank=True)
-    belvo_created_by = models.CharField(_('Belvo Created By'), max_length=100, blank=True)
-    
-    # Refresh token for renewed access
-    refresh_rate = models.IntegerField(_('Refresh Rate'), default=86400)  # 24 hours
-    
-    # External ID (for reference)
-    external_id = models.CharField(_('External ID'), max_length=100, blank=True)
-    
-    # Credentials storage (encrypted)
-    credentials_stored = models.BooleanField(_('Credentials Stored'), default=False)
-    
-    # Metadata
-    metadata = models.JSONField(_('Metadata'), default=dict, blank=True)
-    
-    class Meta:
-        db_table = 'bank_connections'
-        verbose_name = _('Bank Connection')
-        verbose_name_plural = _('Bank Connections')
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['company', 'status']),
-            models.Index(fields=['belvo_id']),
-            models.Index(fields=['institution']),
-        ]
-    
-    def __str__(self):
-        return f"{self.institution} - {self.display_name or 'Unnamed'} ({self.status})"
-    
-    def is_active(self):
-        """Check if connection is active and valid"""
-        return self.status == 'valid'
-    
-    def needs_token_renewal(self):
-        """Check if connection needs token renewal"""
-        return self.status == 'token_renewal_required'
-    
-    def get_institution_display(self):
-        """Get formatted institution name"""
-        return self.display_name or self.institution
-    
-    @property
-    def connection_age_days(self):
-        """Calculate connection age in days"""
-        from django.utils import timezone
-        if self.belvo_created_at:
-            return (timezone.now() - self.belvo_created_at).days
-        return (timezone.now() - self.created_at).days
-    
-    def update_status(self, new_status, save=True):
-        """Update connection status with validation"""
-        if new_status in dict(self.CONNECTION_STATUS_CHOICES):
-            self.status = new_status
-            if save:
-                self.save(update_fields=['status'])
-            return True
-        return False
-    
-    def to_dict(self):
-        """Convert to dictionary for API responses"""
-        return {
-            'id': str(self.id),
-            'belvo_id': self.belvo_id,
-            'institution': self.institution,
-            'display_name': self.display_name,
-            'status': self.status,
-            'last_access_mode': self.last_access_mode,
-            'created_at': self.created_at.isoformat(),
-            'connection_age_days': self.connection_age_days,
-            'is_active': self.is_active(),
-            'needs_token_renewal': self.needs_token_renewal(),
-        }

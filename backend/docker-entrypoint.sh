@@ -37,7 +37,7 @@ if not User.objects.filter(email='$SUPERUSER_EMAIL').exists():
         email='$SUPERUSER_EMAIL',
         password='$SUPERUSER_PASSWORD',
         first_name='Admin',
-        last_name='Caixa Digital'
+        last_name='CaixaHub'
     )
     print('Superuser created successfully')
 else:

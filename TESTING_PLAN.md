@@ -956,4 +956,4 @@ python manage.py test tests.performance
 python manage.py test tests.security
 ```
 
-This comprehensive testing plan ensures robust, secure, and high-performance operation of the Caixa Digital finance management platform.
+This comprehensive testing plan ensures robust, secure, and high-performance operation of the CaixaHub finance management platform.
