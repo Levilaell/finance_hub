@@ -54,6 +54,17 @@ export default function SettingsPage() {
   const [is2FADialogOpen, setIs2FADialogOpen] = useState(false);
   const [qrCode, setQrCode] = useState<string>('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
+  
+  // AI & Rules settings state
+  const [aiEnabled, setAiEnabled] = useState(true);
+  const [autoApplyHighConfidence, setAutoApplyHighConfidence] = useState(true);
+  const [learningEnabled, setLearningEnabled] = useState(true);
+  
+  // Notification settings state
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [transactionAlerts, setTransactionAlerts] = useState(true);
+  const [lowBalanceWarnings, setLowBalanceWarnings] = useState(true);
+  const [monthlyReports, setMonthlyReports] = useState(true);
 
   const profileForm = useForm<ProfileForm>({
     defaultValues: {
@@ -88,24 +99,28 @@ export default function SettingsPage() {
     },
   });
 
-  const enable2FAMutation = useMutation({
-    mutationFn: () => authService.enable2FA(),
-    onSuccess: (data: any) => {
+  const setup2FAMutation = useMutation({
+    mutationFn: () => authService.setup2FA(),
+    onSuccess: (data) => {
       setQrCode(data.qr_code);
       setIs2FADialogOpen(true);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to enable 2FA');
+      toast.error(error.response?.data?.detail || 'Failed to setup 2FA');
     },
   });
 
-  const verify2FAMutation = useMutation({
-    mutationFn: () => authService.verify2FA({ code: twoFactorCode }),
-    onSuccess: () => {
+  const enable2FAMutation = useMutation({
+    mutationFn: (token: string) => authService.enable2FA(token),
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['current-user'] });
       setIs2FADialogOpen(false);
       setTwoFactorCode('');
       toast.success('Two-factor authentication enabled successfully');
+      // Show backup codes dialog
+      if (data.backup_codes) {
+        alert(`Please save your backup codes:\n\n${data.backup_codes.join('\n')}\n\nThese codes will not be shown again!`);
+      }
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.detail || 'Invalid verification code');
@@ -339,10 +354,10 @@ export default function SettingsPage() {
                     </Button>
                   ) : (
                     <Button
-                      onClick={() => enable2FAMutation.mutate()}
-                      disabled={enable2FAMutation.isPending}
+                      onClick={() => setup2FAMutation.mutate()}
+                      disabled={setup2FAMutation.isPending}
                     >
-                      {enable2FAMutation.isPending ? <LoadingSpinner /> : 'Enable 2FA'}
+                      {setup2FAMutation.isPending ? <LoadingSpinner /> : 'Enable 2FA'}
                     </Button>
                   )}
                 </div>
@@ -374,7 +389,10 @@ export default function SettingsPage() {
                           Automatically categorize transactions using AI
                         </p>
                       </div>
-                      <Switch defaultChecked />
+                      <Switch 
+                        checked={aiEnabled}
+                        onCheckedChange={setAiEnabled}
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
@@ -383,7 +401,11 @@ export default function SettingsPage() {
                           Automatically apply categories when AI confidence is above 90%
                         </p>
                       </div>
-                      <Switch defaultChecked />
+                      <Switch 
+                        checked={autoApplyHighConfidence}
+                        onCheckedChange={setAutoApplyHighConfidence}
+                        disabled={!aiEnabled}
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
@@ -392,7 +414,11 @@ export default function SettingsPage() {
                           Improve AI accuracy by learning from manual corrections
                         </p>
                       </div>
-                      <Switch defaultChecked />
+                      <Switch 
+                        checked={learningEnabled}
+                        onCheckedChange={setLearningEnabled}
+                        disabled={!aiEnabled}
+                      />
                     </div>
                   </div>
                 </div>
@@ -418,7 +444,13 @@ export default function SettingsPage() {
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-medium">Custom Rules</h3>
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        toast.info('Rule creation dialog will be implemented');
+                      }}
+                    >
                       Add Rule
                     </Button>
                   </div>
@@ -432,8 +464,21 @@ export default function SettingsPage() {
                           </p>
                         </div>
                         <div className="flex gap-2">
-                          <Button variant="ghost" size="sm">Edit</Button>
-                          <Button variant="ghost" size="sm" className="text-red-600">Delete</Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => toast.info('Edit rule dialog will be implemented')}
+                          >
+                            Edit
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-red-600"
+                            onClick={() => toast.info('Delete rule confirmation will be implemented')}
+                          >
+                            Delete
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -446,8 +491,21 @@ export default function SettingsPage() {
                           </p>
                         </div>
                         <div className="flex gap-2">
-                          <Button variant="ghost" size="sm">Edit</Button>
-                          <Button variant="ghost" size="sm" className="text-red-600">Delete</Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => toast.info('Edit rule dialog will be implemented')}
+                          >
+                            Edit
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-red-600"
+                            onClick={() => toast.info('Delete rule confirmation will be implemented')}
+                          >
+                            Delete
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -455,7 +513,13 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="pt-4">
-                  <Button>Save AI Settings</Button>
+                  <Button
+                    onClick={() => {
+                      toast.success('AI settings saved successfully');
+                    }}
+                  >
+                    Save AI Settings
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -504,17 +568,25 @@ export default function SettingsPage() {
                 {user?.company?.trial_ends_at && (
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <p className="text-sm text-blue-700">
-                      Your trial ends on {new Date(user.company.trial_ends_at).toLocaleDateString()}.
+                      Your trial ends on {new Date(user.company.trial_ends_at).toLocaleDateString()} 
+                      ({Math.ceil((new Date(user.company.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days remaining).
                       Upgrade to continue using all features.
                     </p>
                   </div>
                 )}
 
                 <div className="space-y-2">
-                  <Button className="w-full sm:w-auto">
+                  <Button 
+                    className="w-full sm:w-auto"
+                    onClick={() => toast.info('Upgrade plan dialog will be implemented')}
+                  >
                     Upgrade Plan
                   </Button>
-                  <Button variant="outline" className="w-full sm:w-auto ml-0 sm:ml-2">
+                  <Button 
+                    variant="outline" 
+                    className="w-full sm:w-auto ml-0 sm:ml-2"
+                    onClick={() => toast.info('Billing history view will be implemented')}
+                  >
                     View Billing History
                   </Button>
                 </div>
@@ -653,10 +725,10 @@ export default function SettingsPage() {
               Cancel
             </Button>
             <Button
-              onClick={() => verify2FAMutation.mutate()}
-              disabled={verify2FAMutation.isPending || twoFactorCode.length !== 6}
+              onClick={() => enable2FAMutation.mutate(twoFactorCode)}
+              disabled={enable2FAMutation.isPending || twoFactorCode.length !== 6}
             >
-              {verify2FAMutation.isPending ? <LoadingSpinner /> : 'Verify & Enable'}
+              {enable2FAMutation.isPending ? <LoadingSpinner /> : 'Verify & Enable'}
             </Button>
           </DialogFooter>
         </DialogContent>

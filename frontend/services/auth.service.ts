@@ -29,8 +29,12 @@ class AuthService {
     return apiClient.post("/api/auth/change-password/", data);
   }
 
-  async enable2FA() {
-    return apiClient.post("/api/auth/2fa/enable/");
+  async setup2FA() {
+    return apiClient.get<{ qr_code: string; backup_codes_count: number; setup_complete: boolean }>("/api/auth/2fa/setup/");
+  }
+
+  async enable2FA(token: string) {
+    return apiClient.post<{ message: string; backup_codes: string[] }>("/api/auth/2fa/enable/", { token });
   }
 
   async disable2FA(data: { password: string }) {

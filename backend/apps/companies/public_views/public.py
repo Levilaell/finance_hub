@@ -4,8 +4,8 @@ Public views for subscription plans (no authentication required)
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
 
-from apps.companies.models import SubscriptionPlan
-from apps.companies.serializers import SubscriptionPlanSerializer
+from ..models import SubscriptionPlan
+from ..serializers import SubscriptionPlanSerializer
 
 
 class PublicSubscriptionPlansView(generics.ListAPIView):

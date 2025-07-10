@@ -75,13 +75,13 @@
 #### APIs de Pagamento
 ```bash
 # Stripe - Para processar pagamentos dos planos
-STRIPE_PUBLISHABLE_KEY=pk_live_xxx  # ❌ Falta obter
-STRIPE_SECRET_KEY=sk_live_xxx       # ❌ Falta obter
-STRIPE_WEBHOOK_SECRET=whsec_xxx     # ❌ Falta configurar
+STRIPE_PUBLISHABLE_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
 
 # MercadoPago - Alternativa para o mercado brasileiro
-MERCADOPAGO_PUBLIC_KEY=APP_USR_xxx  # ❌ Falta obter
-MERCADOPAGO_ACCESS_TOKEN=APP_USR_xxx # ❌ Falta obter
+MERCADOPAGO_PUBLIC_KEY=
+MERCADOPAGO_ACCESS_TOKEN=
 
 # ⚠️ IMPORTANTE: Configurar produtos no Stripe/MercadoPago:
 # - Grátis: R$ 0/mês (sem cobrança)
@@ -98,9 +98,11 @@ BELVO_SECRET_PASSWORD=xxx    # ❌ Falta conta de produção
 BELVO_WEBHOOK_TOKEN=xxx      # ❌ Falta configurar
 
 # Pluggy
-PLUGGY_CLIENT_ID=xxx         # ❌ Falta conta de produção
-PLUGGY_CLIENT_SECRET=xxx     # ❌ Falta conta de produção
-PLUGGY_WEBHOOK_TOKEN=xxx     # ❌ Falta configurar
+PLUGGY_CLIENT_ID=
+
+PLUGGY_CLIENT_SECRET=
+
+PLUGGY_WEBHOOK_TOKEN=     # ❌ Falta configurar
 ```
 
 #### APIs de IA

@@ -3,6 +3,7 @@ Companies app URLs
 """
 from django.urls import path
 
+# Import main views from views.py
 from .views import (
     CompanyDetailView,
     CompanyUpdateView,
@@ -13,7 +14,9 @@ from .views import (
     InviteUserView,
     RemoveUserView,
 )
-from .views.public import PublicSubscriptionPlansView
+
+# Import public views from public_views package
+from .public_views.public import PublicSubscriptionPlansView
 
 app_name = 'companies'
 
