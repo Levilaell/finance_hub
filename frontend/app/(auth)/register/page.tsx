@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -11,20 +11,37 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { Badge } from '@/components/ui/badge';
 import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/auth-store';
 import { RegisterData } from '@/types';
-import { EyeIcon, EyeSlashIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon, CheckIcon, SparklesIcon } from '@heroicons/react/24/outline';
 
 interface RegisterFormData extends RegisterData {
-  // All fields are already in RegisterData now
+  selected_plan?: string;
 }
+
+const planInfo: Record<string, { name: string; price: string; badge?: string }> = {
+  free: { name: 'Grátis', price: 'R$ 0/mês' },
+  starter: { name: 'Starter', price: 'R$ 49/mês' },
+  professional: { name: 'Profissional', price: 'R$ 149/mês', badge: 'Mais Popular' },
+  enterprise: { name: 'Empresarial', price: 'R$ 449/mês' },
+};
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setAuth } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<string>('free');
+
+  useEffect(() => {
+    const plan = searchParams.get('plan');
+    if (plan && planInfo[plan]) {
+      setSelectedPlan(plan);
+    }
+  }, [searchParams]);
 
   const {
     register,
@@ -54,7 +71,10 @@ export default function RegisterPage() {
   });
 
   const onSubmit = (data: RegisterFormData) => {
-    registerMutation.mutate(data);
+    registerMutation.mutate({
+      ...data,
+      selected_plan: selectedPlan,
+    });
   };
 
   const passwordRequirements = [
@@ -72,6 +92,36 @@ export default function RegisterPage() {
         <CardDescription>
           Start your free trial and manage your finances
         </CardDescription>
+        
+        {/* Selected Plan Display */}
+        <div className="mt-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Plano selecionado:</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="font-semibold">{planInfo[selectedPlan].name}</span>
+                {planInfo[selectedPlan].badge && (
+                  <Badge variant="secondary" className="text-xs">
+                    {planInfo[selectedPlan].badge}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                {planInfo[selectedPlan].price}
+                {selectedPlan !== 'free' && ' - 14 dias grátis'}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/pricing?from=register')}
+              className="text-primary"
+            >
+              Mudar plano
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent>

@@ -13,10 +13,14 @@ from .views import (
     InviteUserView,
     RemoveUserView,
 )
+from .views.public import PublicSubscriptionPlansView
 
 app_name = 'companies'
 
 urlpatterns = [
+    # Public endpoints (no auth required)
+    path('public/plans/', PublicSubscriptionPlansView.as_view(), name='public-subscription-plans'),
+    
     # Default company profile (same as profile/)
     path('', CompanyDetailView.as_view(), name='company-index'),
     

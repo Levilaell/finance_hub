@@ -34,12 +34,13 @@ class RegisterSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(required=True)
     company_type = serializers.CharField(required=True)
     business_sector = serializers.CharField(required=True)
+    selected_plan = serializers.CharField(required=False, default='free')
     
     class Meta:
         model = User
         fields = (
             'email', 'password', 'password2', 'first_name', 'last_name',
-            'phone', 'company_name', 'company_type', 'business_sector'
+            'phone', 'company_name', 'company_type', 'business_sector', 'selected_plan'
         )
         
     def validate(self, attrs):
@@ -51,6 +52,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         company_name = validated_data.pop('company_name')
         company_type = validated_data.pop('company_type')
         business_sector = validated_data.pop('business_sector')
+        selected_plan_slug = validated_data.pop('selected_plan', 'free')
         validated_data.pop('password2')
         
         # Create user
@@ -59,18 +61,25 @@ class RegisterSerializer(serializers.ModelSerializer):
             **validated_data
         )
         
-        # Create company with trial subscription
-        trial_plan = SubscriptionPlan.objects.filter(plan_type='starter').first()
-        if not trial_plan:
-            trial_plan = SubscriptionPlan.objects.first()
+        # Get selected plan or fallback to free plan
+        selected_plan = SubscriptionPlan.objects.filter(slug=selected_plan_slug).first()
+        if not selected_plan:
+            # If selected plan not found, try to get free plan
+            selected_plan = SubscriptionPlan.objects.filter(slug='free').first()
+            if not selected_plan:
+                # If no free plan, get any available plan
+                selected_plan = SubscriptionPlan.objects.first()
+        
+        # Determine subscription status based on plan
+        subscription_status = 'active' if selected_plan_slug == 'free' else 'trial'
             
         Company.objects.create(
             owner=user,
             name=company_name,
             company_type=company_type,
             business_sector=business_sector,
-            subscription_plan=trial_plan,
-            subscription_status='trial'
+            subscription_plan=selected_plan,
+            subscription_status=subscription_status
         )
         
         return user
