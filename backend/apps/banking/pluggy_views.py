@@ -413,8 +413,7 @@ class PluggySyncAccountView(APIView):
             try:
                 account = BankAccount.objects.get(
                     id=account_id,
-                    company=company,
-                    status='active'
+                    company=company
                 )
             except BankAccount.DoesNotExist:
                 return Response({
@@ -422,17 +421,23 @@ class PluggySyncAccountView(APIView):
                     'error': 'Account not found'
                 }, status=status.HTTP_404_NOT_FOUND)
 
-            # Use Celery for async sync (recommended)
-            # from .tasks import sync_bank_account
-            # sync_bank_account.delay(account_id)
+            # Check if account has external_id (is Pluggy account)
+            if not account.external_id:
+                return Response({
+                    'success': False,
+                    'error': 'This account is not connected via Pluggy'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            logger.info(f"🔄 Starting manual sync for account {account_id}")
             
-            # For now, use sync service directly
+            # Use the corrected sync service
             from .pluggy_sync_service import pluggy_sync_service
             import asyncio
             
             async def sync_account():
                 return await pluggy_sync_service.sync_account_transactions(account)
             
+            # Run async sync
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
@@ -442,24 +447,32 @@ class PluggySyncAccountView(APIView):
             
             sandbox_mode = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
             
-            return Response({
-                'success': True,
-                'data': {
-                    'message': 'Account synchronization completed',
-                    'transactions_synced': result.get('transactions', 0),
-                    'status': result.get('status'),
-                    'sandbox_mode': sandbox_mode
-                }
-            })
+            logger.info(f"✅ Sync completed for account {account_id}: {result}")
+            
+            if result.get('status') == 'success':
+                return Response({
+                    'success': True,
+                    'data': {
+                        'message': f'Sincronização concluída com sucesso',
+                        'transactions_synced': result.get('transactions', 0),
+                        'status': result.get('status'),
+                        'sandbox_mode': sandbox_mode
+                    }
+                })
+            else:
+                return Response({
+                    'success': False,
+                    'error': f"Sync failed: {result.get('error', 'Unknown error')}",
+                    'details': result
+                }, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
-            logger.error(f"Error syncing Pluggy account {account_id}: {e}")
+            logger.error(f"❌ Error syncing Pluggy account {account_id}: {e}", exc_info=True)
             return Response({
                 'success': False,
                 'error': 'Sync failed',
                 'details': str(e) if settings.DEBUG else None
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])

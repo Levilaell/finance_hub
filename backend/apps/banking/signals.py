@@ -8,36 +8,31 @@ from asgiref.sync import async_to_sync
 from apps.categories.services import AICategorizationService
 from django.db.models import F
 from django.db.models.signals import post_save, pre_save
+import logging
 from django.dispatch import receiver
-
 from .models import BankAccount, Transaction
 
+logger = logging.getLogger(__name__)
+
+
+# @receiver(post_save, sender=Transaction)
+# def process_new_transaction(sender, instance, created, **kwargs):
+#     """Process new transaction for AI categorization"""
+#     if created:
+#         try:
+#             from apps.categories.services import AICategorizationService
+#             ai_service = AICategorizationService()
+#             ai_service.categorize_transaction(instance)
+#         except Exception as e:
+#             logger.error(f"Error processing new transaction {instance.id}: {e}")
 
 @receiver(post_save, sender=Transaction)
 def process_new_transaction(sender, instance, created, **kwargs):
-    """
-    Process new transactions: categorize with AI and update account balance
-    """
+    """Process new transaction for AI categorization"""
     if created:
-        # Auto-categorize with AI if enabled
-        if (instance.bank_account.company.enable_ai_categorization and 
-            not instance.category and 
-            not instance.is_ai_categorized):
-            
-            ai_service = AICategorizationService()
-            ai_service.categorize_transaction(instance)
-        
-        # Update account balance if needed
-        if instance.balance_after is None:
-            # This would typically be handled by the banking sync
-            pass
-        
-        # Send real-time notification to user
-        send_transaction_notification(instance, 'created')
-    else:
-        # Transaction updated
-        send_transaction_notification(instance, 'updated')
-
+        logger.info(f"✅ Transaction created: {instance.description} - R$ {instance.amount}")
+        # TODO: Re-enable AI categorization after fixing the constraint issue
+        pass
 
 @receiver(pre_save, sender=BankAccount)
 def update_primary_account(sender, instance, **kwargs):

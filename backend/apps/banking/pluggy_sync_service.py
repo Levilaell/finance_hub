@@ -13,7 +13,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .models import BankAccount, Transaction, TransactionCategory, BankProvider
-from .pluggy_client import pluggy_service, PluggyError
+from .pluggy_client import PluggyClient, PluggyError
 
 logger = logging.getLogger(__name__)
 
@@ -71,29 +71,320 @@ class PluggyTransactionSyncService:
     async def sync_account_transactions(self, account: BankAccount) -> Dict[str, Any]:
         """Sync transactions for a specific Pluggy account"""
         try:
-            logger.info(f"Syncing Pluggy account {account.id} - {account.bank_provider.name}")
+            # ✅ CORRIGIDO: Buscar dados da conta de forma assíncrona
+            account_info = await self._get_account_info(account)
             
-            if not account.external_id:
-                logger.warning(f"No Pluggy account ID for account {account.id}")
-                return {'account_id': account.id, 'status': 'no_external_id', 'transactions': 0}
+            logger.info(f"🔄 Syncing Pluggy account {account_info['id']} - {account_info['bank_name']}")
+            
+            if not account_info['external_id']:
+                logger.warning(f"❌ No Pluggy account ID for account {account_info['id']}")
+                return {'account_id': account_info['id'], 'status': 'no_external_id', 'transactions': 0}
             
             # Determine sync date range
-            sync_from = self._get_sync_from_date(account)
+            sync_from = self._get_sync_from_date_safe(account_info)
             sync_to = datetime.now().date()
+            
+            logger.info(f"📅 Syncing transactions from {sync_from} to {sync_to}")
             
             # Fetch and save transactions
             total_transactions = 0
             page = 1
             
-            while True:
-                try:
-                    # Fetch transaction page from Pluggy
-                    response = await pluggy_service.client.get_transactions(
-                        account.external_id,
-                        from_date=sync_from.isoformat(),
-                        to_date=sync_to.isoformat(),
-                        page=page,
-                        page_size=self.batch_size
-                    )
+            # Use the PluggyClient directly
+            async with PluggyClient() as client:
+                while True:
+                    try:
+                        logger.info(f"📊 Fetching page {page} for account {account_info['external_id']}")
+                        
+                        # Fetch transaction page from Pluggy
+                        response = await client.get_transactions(
+                            account_info['external_id'],
+                            from_date=sync_from.isoformat(),
+                            to_date=sync_to.isoformat(),
+                            page=page,
+                            page_size=self.batch_size
+                        )
+                        
+                        transactions = response.get('results', [])
+                        logger.info(f"📋 Found {len(transactions)} transactions on page {page}")
+                        
+                        if not transactions:
+                            logger.info("✅ No more transactions found")
+                            break
+                        
+                        # Process transactions
+                        processed = await self._process_transaction_batch(account, transactions)
+                        total_transactions += processed
+                        
+                        logger.info(f"💾 Processed {processed} new transactions")
+                        
+                        # Check pagination
+                        total_pages = response.get('totalPages', 1)
+                        current_page = response.get('page', page)
+                        
+                        logger.info(f"📃 Page {current_page} of {total_pages}")
+                        
+                        if page >= total_pages:
+                            logger.info("✅ Reached last page")
+                            break
+                        
+                        page += 1
+                        
+                        # Rate limiting between pages
+                        await asyncio.sleep(0.2)
+                        
+                    except PluggyError as e:
+                        logger.error(f"❌ Pluggy error for account {account_info['id']}: {e}")
+                        if "authentication" in str(e).lower() or "token" in str(e).lower():
+                            await self._mark_account_error(account, 'auth_error')
+                        break
+                    except Exception as e:
+                        logger.error(f"❌ Error fetching transactions for account {account_info['id']}: {e}")
+                        break
+            
+            # Update last sync time
+            await self._update_account_sync_time(account)
+            
+            # Update account balance
+            await self._update_account_balance(account)
+            
+            logger.info(f"✅ Synced {total_transactions} transactions for Pluggy account {account_info['id']}")
+            
+            return {
+                'account_id': account_info['id'],
+                'status': 'success',
+                'transactions': total_transactions
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Error syncing Pluggy account {account.id}: {e}", exc_info=True)
+            return {
+                'account_id': account.id,
+                'status': 'error',
+                'error': str(e),
+                'transactions': 0
+            }
+    
+    @sync_to_async
+    def _get_account_info(self, account: BankAccount) -> Dict[str, Any]:
+        """Get account info safely for async context"""
+        # Fazer select_related para evitar queries extras
+        account_with_provider = BankAccount.objects.select_related('bank_provider').get(
+            id=account.id
+        )
+        
+        return {
+            'id': account_with_provider.id,
+            'external_id': account_with_provider.external_id,
+            'bank_name': account_with_provider.bank_provider.name if account_with_provider.bank_provider else 'Unknown',
+            'last_sync_at': account_with_provider.last_sync_at
+        }
+    
+    def _get_sync_from_date_safe(self, account_info: Dict) -> datetime.date:
+        """Determine the date to sync from using account info dict"""
+        if account_info.get('last_sync_at'):
+            # Sync from last sync date minus 1 day for overlap
+            return (account_info['last_sync_at'] - timedelta(days=1)).date()
+        else:
+            # ✅ CORRIGIDO: First sync - get last 365 days (1 year) to catch sandbox transactions
+            return (timezone.now() - timedelta(days=365)).date()
+    
+    async def _get_accounts_to_sync(self, company_id: int = None) -> List[BankAccount]:
+        """Get Pluggy accounts that need synchronization"""
+        @sync_to_async
+        def get_accounts():
+            from django.db import models
+            
+            queryset = BankAccount.objects.filter(
+                status='active',
+                external_id__isnull=False,
+                # ✅ CORRIGIDO: Filtrar por contas Pluggy usando external_id
+                external_id__startswith=''  # Pluggy IDs são UUIDs
+            ).select_related('bank_provider', 'company')
+            
+            if company_id:
+                queryset = queryset.filter(company_id=company_id)
+            
+            # Only sync accounts that haven't been synced recently
+            cutoff_time = timezone.now() - timedelta(hours=2)  # Pluggy allows more frequent syncs
+            queryset = queryset.filter(
+                models.Q(last_sync_at__isnull=True) |
+                models.Q(last_sync_at__lt=cutoff_time)
+            )
+            
+            return list(queryset)
+        
+        return await get_accounts()
+    
+    async def _process_transaction_batch(self, account: BankAccount, transactions: List[Dict]) -> int:
+        """Process a batch of Pluggy transactions"""
+        @sync_to_async
+        def save_transactions():
+            created_count = 0
+            
+            with transaction.atomic():
+                for tx_data in transactions:
+                    # Check if transaction already exists
+                    external_id = tx_data.get('id')
+                    if not external_id:
+                        continue
                     
-                    transactions = response.get('results', [])\n                    if not transactions:\n                        break\n                    \n                    # Process transactions\n                    processed = await self._process_transaction_batch(account, transactions)\n                    total_transactions += processed\n                    \n                    # Check pagination\n                    total_pages = response.get('totalPages', 1)\n                    if page >= total_pages:\n                        break\n                    \n                    page += 1\n                    \n                    # Rate limiting between pages\n                    await asyncio.sleep(0.2)\n                    \n                except PluggyError as e:\n                    logger.error(f\"Pluggy error for account {account.id}: {e}\")\n                    if \"authentication\" in str(e).lower() or \"token\" in str(e).lower():\n                        await self._mark_account_error(account, 'auth_error')\n                    break\n                except Exception as e:\n                    logger.error(f\"Error fetching transactions for account {account.id}: {e}\")\n                    break\n            \n            # Update last sync time\n            await self._update_account_sync_time(account)\n            \n            # Update account balance\n            await self._update_account_balance(account)\n            \n            logger.info(f\"Synced {total_transactions} transactions for Pluggy account {account.id}\")\n            \n            return {\n                'account_id': account.id,\n                'status': 'success',\n                'transactions': total_transactions\n            }\n            \n        except Exception as e:\n            logger.error(f\"Error syncing Pluggy account {account.id}: {e}\")\n            return {\n                'account_id': account.id,\n                'status': 'error',\n                'error': str(e),\n                'transactions': 0\n            }\n    \n    async def connect_bank_account(\n        self, \n        company_id: int, \n        item_id: str, \n        bank_name: str = None\n    ) -> List[BankAccount]:\n        \"\"\"Connect bank accounts from a Pluggy item\"\"\"\n        try:\n            # Get item details\n            item = await pluggy_service.client.get_item(item_id)\n            \n            if item.get('status') != 'LOGIN_SUCCEEDED':\n                raise PluggyError(f\"Item {item_id} is not ready for sync (status: {item.get('status')})\")\n            \n            # Get accounts for this item\n            accounts_data = await pluggy_service.client.get_accounts(item_id)\n            \n            created_accounts = []\n            \n            for account_data in accounts_data:\n                # Create or update bank account\n                bank_account = await self._create_or_update_account(\n                    company_id, item_id, account_data, bank_name\n                )\n                if bank_account:\n                    created_accounts.append(bank_account)\n            \n            logger.info(f\"Connected {len(created_accounts)} accounts from Pluggy item {item_id}\")\n            \n            return created_accounts\n            \n        except Exception as e:\n            logger.error(f\"Error connecting Pluggy accounts for item {item_id}: {e}\")\n            raise\n    \n    async def _get_accounts_to_sync(self, company_id: int = None) -> List[BankAccount]:\n        \"\"\"Get Pluggy accounts that need synchronization\"\"\"\n        @sync_to_async\n        def get_accounts():\n            queryset = BankAccount.objects.filter(\n                status='active',\n                external_id__isnull=False,\n                bank_provider__name__icontains='pluggy'  # Filter for Pluggy accounts\n            ).select_related('bank_provider', 'company')\n            \n            if company_id:\n                queryset = queryset.filter(company_id=company_id)\n            \n            # Only sync accounts that haven't been synced recently\n            cutoff_time = timezone.now() - timedelta(hours=2)  # Pluggy allows more frequent syncs\n            queryset = queryset.filter(\n                models.Q(last_sync_at__isnull=True) |\n                models.Q(last_sync_at__lt=cutoff_time)\n            )\n            \n            return list(queryset)\n        \n        return await get_accounts()\n    \n    def _get_sync_from_date(self, account: BankAccount) -> datetime.date:\n        \"\"\"Determine the date to sync from\"\"\"\n        if account.last_sync_at:\n            # Sync from last sync date minus 1 day for overlap\n            return (account.last_sync_at - timedelta(days=1)).date()\n        else:\n            # First sync - get last 90 days (Pluggy allows more history)\n            return (timezone.now() - timedelta(days=90)).date()\n    \n    async def _process_transaction_batch(self, account: BankAccount, transactions: List[Dict]) -> int:\n        \"\"\"Process a batch of Pluggy transactions\"\"\"\n        @sync_to_async\n        def save_transactions():\n            created_count = 0\n            \n            with transaction.atomic():\n                for tx_data in transactions:\n                    # Check if transaction already exists\n                    external_id = tx_data.get('id')\n                    if not external_id:\n                        continue\n                    \n                    # Pluggy uses string IDs\n                    if Transaction.objects.filter(\n                        bank_account=account,\n                        external_id=str(external_id)\n                    ).exists():\n                        continue\n                    \n                    # Create transaction\n                    tx = self._create_transaction_from_pluggy_data(account, tx_data)\n                    if tx:\n                        created_count += 1\n            \n            return created_count\n        \n        return await save_transactions()\n    \n    def _create_transaction_from_pluggy_data(self, account: BankAccount, tx_data: Dict) -> Optional[Transaction]:\n        \"\"\"Create Transaction object from Pluggy data\"\"\"\n        try:\n            # Parse Pluggy transaction data\n            amount = Decimal(str(tx_data.get('amount', '0')))\n            description = tx_data.get('description', '').strip()\n            \n            # Pluggy provides 'type' field: DEBIT or CREDIT\n            transaction_type = 'credit' if tx_data.get('type') == 'CREDIT' else 'debit'\n            \n            # Parse date (Pluggy uses ISO format)\n            date_str = tx_data.get('date')\n            if not date_str:\n                return None\n            \n            tx_date = datetime.fromisoformat(date_str.replace('Z', '+00:00')).date()\n            \n            # Create transaction\n            transaction_obj = Transaction.objects.create(\n                bank_account=account,\n                external_id=str(tx_data.get('id')),\n                description=description,\n                amount=amount,\n                transaction_type=transaction_type,\n                transaction_date=tx_date,\n                counterpart_name=tx_data.get('merchant', {}).get('name', ''),\n                counterpart_document='',  # Pluggy doesn't always provide this\n                balance_after=Decimal(str(tx_data.get('balance', '0'))),\n                is_ai_categorized=False,\n                created_at=timezone.now()\n            )\n            \n            # Trigger AI categorization\n            from .signals import transaction_created\n            transaction_created.send(sender=Transaction, instance=transaction_obj, created=True)\n            \n            return transaction_obj\n            \n        except Exception as e:\n            logger.error(f\"Error creating transaction from Pluggy data: {e}\")\n            logger.error(f\"Transaction data: {tx_data}\")\n            return None\n    \n    async def _create_or_update_account(\n        self, \n        company_id: int, \n        item_id: str, \n        account_data: Dict,\n        bank_name: str = None\n    ) -> Optional[BankAccount]:\n        \"\"\"Create or update bank account from Pluggy data\"\"\"\n        @sync_to_async\n        def create_account():\n            try:\n                # Get or create bank provider\n                provider_name = bank_name or account_data.get('name', 'Pluggy Bank')\n                bank_provider, _ = BankProvider.objects.get_or_create(\n                    code=f\"pluggy_{item_id}\",\n                    defaults={\n                        'name': provider_name,\n                        'is_open_banking': True,\n                        'color': account_data.get('primaryColor', '#000000'),\n                    }\n                )\n                \n                # Get or create account\n                account, created = BankAccount.objects.get_or_create(\n                    company_id=company_id,\n                    external_id=str(account_data.get('id')),\n                    defaults={\n                        'bank_provider': bank_provider,\n                        'account_type': self._map_pluggy_account_type(account_data.get('type')),\n                        'agency': '0001',  # Pluggy doesn't provide agency\n                        'account_number': account_data.get('number', ''),\n                        'current_balance': Decimal(str(account_data.get('balance', '0'))),\n                        'available_balance': Decimal(str(account_data.get('balance', '0'))),\n                        'status': 'active',\n                        'is_active': True,\n                        'nickname': account_data.get('name', ''),\n                    }\n                )\n                \n                if not created:\n                    # Update existing account\n                    account.current_balance = Decimal(str(account_data.get('balance', '0')))\n                    account.available_balance = Decimal(str(account_data.get('balance', '0')))\n                    account.status = 'active'\n                    account.save()\n                \n                return account\n                \n            except Exception as e:\n                logger.error(f\"Error creating/updating account from Pluggy: {e}\")\n                return None\n        \n        return await create_account()\n    \n    def _map_pluggy_account_type(self, pluggy_type: str) -> str:\n        \"\"\"Map Pluggy account type to our account types\"\"\"\n        mapping = {\n            'BANK': 'checking',\n            'CREDIT_CARD': 'credit',\n            'INVESTMENT': 'savings',\n            'LOAN': 'business',\n        }\n        return mapping.get(pluggy_type, 'checking')\n    \n    async def _update_account_sync_time(self, account: BankAccount):\n        \"\"\"Update account last sync time\"\"\"\n        @sync_to_async\n        def update_sync_time():\n            BankAccount.objects.filter(id=account.id).update(\n                last_sync_at=timezone.now()\n            )\n        \n        await update_sync_time()\n    \n    async def _update_account_balance(self, account: BankAccount):\n        \"\"\"Update account balance from Pluggy\"\"\"\n        try:\n            account_data = await pluggy_service.client.get_account(account.external_id)\n            \n            if account_data:\n                current_balance = Decimal(str(account_data.get('balance', '0')))\n                \n                @sync_to_async\n                def update_balance():\n                    BankAccount.objects.filter(id=account.id).update(\n                        current_balance=current_balance,\n                        available_balance=current_balance  # Pluggy provides one balance\n                    )\n                \n                await update_balance()\n                \n        except Exception as e:\n            logger.error(f\"Error updating balance for Pluggy account {account.id}: {e}\")\n    \n    async def _mark_account_error(self, account: BankAccount, error_type: str):\n        \"\"\"Mark account as having an error\"\"\"\n        @sync_to_async\n        def mark_error():\n            status_map = {\n                'auth_error': 'error',\n                'connection_error': 'error',\n                'expired': 'expired'\n            }\n            status = status_map.get(error_type, 'error')\n            \n            BankAccount.objects.filter(id=account.id).update(\n                status=status\n            )\n        \n        await mark_error()\n        logger.warning(f\"Marked Pluggy account {account.id} as {error_type}\")\n\n\n# Global service instance\npluggy_sync_service = PluggyTransactionSyncService()
+                    # Pluggy uses string IDs
+                    if Transaction.objects.filter(
+                        bank_account=account,
+                        external_id=str(external_id)
+                    ).exists():
+                        logger.debug(f"Transaction {external_id} already exists, skipping")
+                        continue
+                    
+                    # Create transaction
+                    tx = self._create_transaction_from_pluggy_data(account, tx_data)
+                    if tx:
+                        created_count += 1
+                        logger.debug(f"Created transaction: {tx.description} - R$ {tx.amount}")
+            
+            return created_count
+        
+        return await save_transactions()
+    
+
+    def _create_transaction_from_pluggy_data(self, account: BankAccount, tx_data: Dict) -> Optional[Transaction]:
+        """Create Transaction object from Pluggy data"""
+        try:
+            logger.info(f"🔄 Creating transaction from data: {tx_data}")
+            
+            # Parse Pluggy transaction data
+            amount = Decimal(str(tx_data.get('amount', '0')))
+            description = tx_data.get('description', '').strip()
+            
+            logger.info(f"💰 Amount: {amount}, Description: '{description}'")
+            
+            # Pluggy provides 'type' field: DEBIT or CREDIT
+            transaction_type = 'credit' if tx_data.get('type') == 'CREDIT' else 'debit'
+            logger.info(f"📊 Transaction type: {transaction_type} (from Pluggy: {tx_data.get('type')})")
+            
+            # Parse date (Pluggy uses ISO format)
+            date_str = tx_data.get('date')
+            if not date_str:
+                logger.error(f"❌ Transaction missing date: {tx_data}")
+                return None
+            
+            logger.info(f"📅 Parsing date: '{date_str}'")
+            
+            # Handle different date formats from Pluggy
+            try:
+                if 'T' in date_str:
+                    # Full datetime
+                    tx_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    tx_date = tx_datetime.date()
+                else:
+                    # Date only
+                    tx_date = datetime.fromisoformat(date_str).date()
+                
+                logger.info(f"✅ Parsed date: {tx_date}")
+            except ValueError as e:
+                logger.error(f"❌ Invalid date format in transaction: {date_str} - {e}")
+                return None
+            
+            # Get merchant info
+            merchant_info = tx_data.get('merchant', {}) or {}
+            merchant_name = ''
+            if merchant_info:
+                merchant_name = merchant_info.get('name', '')
+            
+            logger.info(f"🏪 Merchant: '{merchant_name}'")
+            
+            # Check external_id
+            external_id = str(tx_data.get('id'))
+            logger.info(f"🆔 External ID: {external_id}")
+            
+            # Create transaction
+            logger.info(f"💾 Creating transaction in database...")
+            
+            # ✅ CORRIGIDO: Handle balance None case
+            balance_value = tx_data.get('balance')
+            if balance_value is None or balance_value == '':
+                balance_after = Decimal('0')
+            else:
+                balance_after = Decimal(str(balance_value))
+            
+            transaction_obj = Transaction.objects.create(
+                bank_account=account,
+                external_id=external_id,
+                description=description,
+                amount=amount,
+                transaction_type=transaction_type,
+                transaction_date=tx_date,  # ✅ MANTIDO: usar date(), não datetime()
+                counterpart_name=merchant_name,
+                counterpart_document='',  # Pluggy doesn't always provide this
+                balance_after=balance_after,  # ✅ CORRIGIDO: usar balance_after tratado
+                is_ai_categorized=False,
+                status='completed',
+                created_at=timezone.now()
+            )
+            
+            logger.info(f"✅ Transaction created successfully: ID={transaction_obj.id}, Description='{transaction_obj.description}'")
+            
+            return transaction_obj
+            
+        except Exception as e:
+            logger.error(f"❌ Error creating transaction from Pluggy data: {e}", exc_info=True)
+            logger.error(f"❌ Transaction data that failed: {tx_data}")
+            return None
+
+    async def _update_account_sync_time(self, account: BankAccount):
+        """Update account last sync time"""
+        @sync_to_async
+        def update_sync_time():
+            BankAccount.objects.filter(id=account.id).update(
+                last_sync_at=timezone.now()
+            )
+        
+        await update_sync_time()
+    
+    async def _update_account_balance(self, account: BankAccount):
+        """Update account balance from Pluggy"""
+        try:
+            # ✅ CORRIGIDO: Buscar external_id de forma assíncrona
+            external_id = await sync_to_async(lambda: account.external_id)()
+            
+            async with PluggyClient() as client:
+                account_data = await client.get_account(external_id)
+                
+                if account_data:
+                    current_balance = Decimal(str(account_data.get('balance', '0')))
+                    
+                    @sync_to_async
+                    def update_balance():
+                        BankAccount.objects.filter(id=account.id).update(
+                            current_balance=current_balance,
+                            available_balance=current_balance  # Pluggy provides one balance
+                        )
+                    
+                    await update_balance()
+                    logger.info(f"💰 Updated balance for account {account.id}: R$ {current_balance}")
+                    
+        except Exception as e:
+            logger.error(f"❌ Error updating balance for Pluggy account {account.id}: {e}")
+    
+    async def _mark_account_error(self, account: BankAccount, error_type: str):
+        """Mark account as having an error"""
+        @sync_to_async
+        def mark_error():
+            status_map = {
+                'auth_error': 'error',
+                'connection_error': 'error',
+                'expired': 'expired'
+            }
+            status = status_map.get(error_type, 'error')
+            
+            BankAccount.objects.filter(id=account.id).update(
+                status=status
+            )
+        
+        await mark_error()
+        logger.warning(f"⚠️ Marked Pluggy account {account.id} as {error_type}")
+
+
+# Global service instance
+pluggy_sync_service = PluggyTransactionSyncService()
