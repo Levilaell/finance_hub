@@ -1,5 +1,5 @@
 """
-Pluggy-specific views for bank connection and management
+Pluggy views usando sandbox oficial da Pluggy
 """
 import logging
 from typing import Dict, Any
@@ -14,7 +14,8 @@ from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
 
 from .models import BankAccount, BankProvider
-from .serializers import BankAccountSerializer, BankProviderSerializer
+from .pluggy_client import PluggyClient, PluggyAuthenticationError
+from .serializers import BankAccountSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -22,20 +23,18 @@ logger = logging.getLogger(__name__)
 @method_decorator(ratelimit(key='ip', rate='20/m', method='GET'), name='dispatch')
 class PluggyBankProvidersView(APIView):
     """Get available banks from Pluggy"""
-    permission_classes = [permissions.AllowAny]  # Public endpoint for bank list
+    permission_classes = [permissions.AllowAny]
     
     def get(self, request):
         """Get list of banks supported by Pluggy"""
         import asyncio
-        from .pluggy_client import PluggyClient
         
         try:
-            # Get real banks from Pluggy
             async def get_banks():
                 async with PluggyClient() as client:
                     connectors = await client.get_connectors()
                     
-                    # Filter and format for our use
+                    # Filter and format banks
                     banks = []
                     for connector in connectors:
                         if connector.get('type') == 'PERSONAL_BANK':
@@ -47,12 +46,13 @@ class PluggyBankProvidersView(APIView):
                                 'logo': connector.get('imageUrl'),
                                 'primary_color': connector.get('primaryColor', '#000000'),
                                 'supports_accounts': connector.get('hasAccounts', True),
-                                'supports_transactions': connector.get('hasTransactions', True)
+                                'supports_transactions': connector.get('hasTransactions', True),
+                                'is_sandbox': getattr(settings, 'PLUGGY_USE_SANDBOX', False)
                             })
                     
                     return banks
             
-            # Execute async function
+            # Run async function
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
@@ -60,34 +60,27 @@ class PluggyBankProvidersView(APIView):
             finally:
                 loop.close()
             
+            sandbox_mode = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
+            
             return Response({
                 'success': True,
                 'data': banks,
-                'total': len(banks)
+                'total': len(banks),
+                'sandbox_mode': sandbox_mode,
+                'message': 'Bancos do sandbox Pluggy' if sandbox_mode else 'Bancos reais Pluggy'
             })
             
         except Exception as e:
             logger.error(f"Error getting Pluggy banks: {e}")
             
-            # Fallback to cached/default banks if API fails
+            # Fallback to default banks if API fails
             default_banks = [
                 {
                     'id': 201,
-                    'name': 'Banco do Brasil',
-                    'code': '201',
-                    'health_status': 'ONLINE'
-                },
-                {
-                    'id': 202, 
-                    'name': 'Itaú',
-                    'code': '202',
-                    'health_status': 'ONLINE'
-                },
-                {
-                    'id': 203,
-                    'name': 'Bradesco',
-                    'code': '203',
-                    'health_status': 'ONLINE'
+                    'name': 'Pluggy Bank (Sandbox)',
+                    'code': '999',
+                    'health_status': 'ONLINE',
+                    'is_sandbox': True
                 }
             ]
             
@@ -95,7 +88,8 @@ class PluggyBankProvidersView(APIView):
                 'success': True,
                 'data': default_banks,
                 'total': len(default_banks),
-                'cached': True
+                'sandbox_mode': True,
+                'fallback': True
             })
 
 
@@ -107,18 +101,15 @@ class PluggyConnectTokenView(APIView):
     def post(self, request):
         """Create a connect token for Pluggy Connect widget"""
         import asyncio
-        from .pluggy_client import PluggyClient
         
         try:
-            # Optional: specify item_id for reconnection
             item_id = request.data.get('item_id')
             
-            # Run async client
             async def create_token():
                 async with PluggyClient() as client:
                     return await client.create_connect_token(item_id)
             
-            # Execute async function
+            # Run async function
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
@@ -126,30 +117,85 @@ class PluggyConnectTokenView(APIView):
             finally:
                 loop.close()
             
-            # Debug: log the token response format
-            logger.info(f"Pluggy connect token response: {token_data}")
-            
-            # Return connect token data
-            # Pluggy returns 'accessToken' for connect tokens (different from auth tokens which use 'apiKey')
-            connect_token = token_data.get('accessToken') or token_data.get('apiKey')
+            connect_token = token_data.get('accessToken')
+            sandbox_mode = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
             
             return Response({
                 'success': True,
                 'data': {
                     'connect_token': connect_token,
                     'connect_url': getattr(settings, 'PLUGGY_CONNECT_URL', 'https://connect.pluggy.ai'),
-                    'status': 'pluggy_connect_required',
-                    'message': 'Use o Pluggy Connect para conectar sua conta'
+                    'sandbox_mode': sandbox_mode,
+                    'expires_at': token_data.get('expiresAt'),
+                    'message': 'Token para sandbox Pluggy' if sandbox_mode else 'Token para produção Pluggy',
+                    'sandbox_credentials': {
+                        'user': 'user-ok',
+                        'password': 'password-ok', 
+                        'token': '123456'
+                    } if sandbox_mode else None
                 }
             })
+            
+        except PluggyAuthenticationError as e:
+            logger.error(f"Pluggy authentication error: {e}")
+            return Response({
+                'success': False,
+                'error': 'Authentication failed with Pluggy API',
+                'details': str(e) if settings.DEBUG else None
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
         except Exception as e:
             logger.error(f"Error creating Pluggy connect token: {e}")
             return Response({
                 'success': False,
-                'error': str(e)
+                'error': 'Failed to create connect token',
+                'details': str(e) if settings.DEBUG else None
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+# ✅ SUBSTITUIR apenas a função _parse_account_number no pluggy_views.py
+
+def _parse_account_number(account_data):
+    """
+    Parse account number from Pluggy data to Brazilian format
+    """
+    # Get the number field from Pluggy
+    full_number = account_data.get('number', '')
+    
+    # Pluggy may return formats like:
+    # - "0001/12345-0"  (with agency)
+    # - "12345-0"       (just account)
+    # - "123456"        (without digit)
+    
+    if '/' in full_number:
+        # Format: "0001/12345-0" -> extract "12345-0"
+        parts = full_number.split('/')
+        if len(parts) >= 2:
+            agency = parts[0]
+            account_number = parts[1]
+        else:
+            agency = '0001'
+            account_number = full_number
+    else:
+        # Format: "12345-0" or "123456"
+        agency = '0001'  # Default agency
+        account_number = full_number
+    
+    # Ensure account number has check digit
+    if account_number and '-' not in account_number:
+        # Add check digit if missing
+        if len(account_number) >= 1:
+            account_number = f"{account_number[:-1]}-{account_number[-1]}"
+        else:
+            account_number = "12345-6"  # Fallback
+    
+    # Validate final format
+    if not account_number or len(account_number) < 3:
+        account_number = "12345-6"  # Safe fallback
+    
+    return agency, account_number
+
+# ✅ SUBSTITUIR a função post() completa no PluggyItemCallbackView:
 
 @method_decorator(ratelimit(key='user', rate='10/h', method='POST'), name='dispatch')
 class PluggyItemCallbackView(APIView):
@@ -159,7 +205,6 @@ class PluggyItemCallbackView(APIView):
     def post(self, request):
         """Process successful bank connection from Pluggy Connect"""
         import asyncio
-        from .pluggy_client import PluggyClient, PluggyAuthenticationError
         
         try:
             item_id = request.data.get('item_id')
@@ -173,82 +218,54 @@ class PluggyItemCallbackView(APIView):
 
             company = request.user.company
             
-            # Check if we're in development mode with test credentials
-            if settings.DEBUG and settings.PLUGGY_CLIENT_ID == 'test-client-id-disabled':
-                logger.warning("Using simulated Pluggy data in development mode")
-                
-                # Simulate Pluggy response for development
-                from datetime import datetime
-                item_data = {
-                    'id': item_id,
-                    'connectorId': 201,
-                    'connector': {
-                        'id': 201,
-                        'name': 'Banco do Brasil'
-                    },
-                    'status': 'LOGIN_SUCCEEDED',
-                    'createdAt': datetime.now().isoformat(),
-                    'updatedAt': datetime.now().isoformat()
-                }
-                
-                accounts_data = [{
-                    'id': f"{item_id}_account_1",
-                    'itemId': item_id,
-                    'type': 'BANK',
-                    'subtype': 'CHECKING_ACCOUNT',
-                    'number': '12345-6',
-                    'bankData': {
-                        'agency': '1234'
-                    },
-                    'name': 'Conta Corrente',
-                    'balance': 1500.00,
-                    'currencyCode': 'BRL'
-                }]
-            else:
-                # Get item details and accounts from Pluggy
-                async def process_item():
-                    async with PluggyClient() as client:
-                        # Get item details
-                        item = await client.get_item(item_id)
-                        
-                        # Get accounts for this item
-                        accounts = await client.get_accounts(item_id)
-                        
-                        return item, accounts
-                
-                # Execute async function
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    item_data, accounts_data = loop.run_until_complete(process_item())
-                finally:
-                    loop.close()
+            async def process_item():
+                async with PluggyClient() as client:
+                    # Get item details
+                    item = await client.get_item(item_id)
+                    
+                    # Get accounts for this item
+                    accounts = await client.get_accounts(item_id)
+                    
+                    return item, accounts
             
-            # Create or update bank accounts
-            created_accounts = []
+            # Run async function
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                item_data, accounts_data = loop.run_until_complete(process_item())
+            finally:
+                loop.close()
             
-            # Find or create bank provider
+            # Create bank provider
+            connector_id = item_data.get('connectorId', item_data.get('connector', {}).get('id', ''))
             bank_provider, _ = BankProvider.objects.get_or_create(
-                code=f"pluggy_{item_data.get('connectorId', '')}",
+                code=f"pluggy_{connector_id}",
                 defaults={
                     'name': item_data.get('connector', {}).get('name', connector_name),
                     'is_active': True,
-                    'is_open_banking': False,
+                    'is_open_banking': True,
                     'supports_pix': True,
                     'supports_ted': True
                 }
             )
             
+            created_accounts = []
+            
             for account_data in accounts_data:
-                # Log account data for debugging
-                logger.info(f"Processing Pluggy account data: {account_data}")
+                logger.info(f"Processing Pluggy account: {account_data}")
                 
-                # Map Pluggy account type to our types
+                # ✅ NOVO: Parse correto do número da conta
+                agency, account_number = self._parse_account_number(account_data)
+                
+                # Map account types
                 account_type_map = {
                     'BANK': 'checking',
-                    'CHECKING': 'checking',
+                    'CHECKING': 'checking', 
+                    'CHECKING_ACCOUNT': 'checking',
                     'SAVINGS': 'savings',
-                    'CREDIT': 'credit_card'
+                    'SAVINGS_ACCOUNT': 'savings',
+                    'CREDIT': 'credit_card',
+                    'CREDIT_CARD': 'credit_card'
                 }
                 
                 account_type = account_type_map.get(
@@ -256,64 +273,65 @@ class PluggyItemCallbackView(APIView):
                     'checking'
                 )
                 
-                # Extract account number - Pluggy may return it in different formats
-                account_number = account_data.get('number', '')
-                if not account_number:
-                    # Try alternative fields
-                    account_number = account_data.get('accountNumber', '12345-6')
+                # ✅ MELHOR: Nickname usando nome do banco + tipo de conta
+                account_name = account_data.get('name', 'Conta Corrente')
+                nickname = f"{bank_provider.name} - {account_name}"
                 
-                # Handle MeuPluggy format: "0001/12345-0" -> extract agency and account
-                agency_from_number = None
-                if '/' in account_number:
-                    parts = account_number.split('/')
-                    if len(parts) >= 2:
-                        agency_from_number = parts[0]
-                        account_number = parts[-1]
+                logger.info(f"✅ Creating account: {agency} / {account_number} - {nickname}")
                 
-                # Ensure account number has the right format
-                if account_number and '-' not in account_number and len(account_number) > 1:
-                    # Add hyphen before last digit if not present
-                    account_number = f"{account_number[:-1]}-{account_number[-1]}"
-                
-                # Extract agency - prefer from bankData, fallback to extracted from number
-                bank_data = account_data.get('bankData') or {}
-                agency = bank_data.get('agency') or bank_data.get('branch') or agency_from_number or '0001'
-                
-                # Create or update bank account
-                bank_account, created = BankAccount.objects.update_or_create(
-                    company=company,
-                    bank_provider=bank_provider,
-                    agency=agency,
-                    account_number=account_number or '12345-6',
-                    account_type=account_type,
-                    defaults={
-                        'external_id': account_data.get('id'),
-                        'pluggy_item_id': item_id,
-                        'current_balance': Decimal(str(account_data.get('balance', 0))),
-                        'available_balance': Decimal(str(account_data.get('balance', 0))),
-                        'status': 'active',
-                        'is_active': True,
-                        'nickname': f"{bank_provider.name} - {account_data.get('name', 'Conta')}"
-                    }
-                )
-                
-                if created:
-                    logger.info(f"Account {bank_account.id} created")
-                else:
-                    logger.info(f"Account {bank_account.id} updated with new balance")
-                
-                created_accounts.append({
-                    'id': bank_account.id,
-                    'name': bank_account.nickname,
-                    'balance': float(bank_account.current_balance),
-                    'created': created
-                })
+                try:
+                    # Create or update bank account
+                    bank_account, created = BankAccount.objects.update_or_create(
+                        company=company,
+                        bank_provider=bank_provider,
+                        agency=agency,
+                        account_number=account_number,
+                        account_type=account_type,
+                        defaults={
+                            'external_id': account_data.get('id'),
+                            'pluggy_item_id': item_id,
+                            'current_balance': Decimal(str(account_data.get('balance', 0))),
+                            'available_balance': Decimal(str(account_data.get('balance', 0))),
+                            'status': 'active',
+                            'is_active': True,
+                            'nickname': nickname,
+                        }
+                    )
+                    
+                    created_accounts.append({
+                        'id': bank_account.id,
+                        'name': bank_account.nickname,
+                        'balance': float(bank_account.current_balance),
+                        'account_type': bank_account.account_type,
+                        'created': created,
+                        'agency': agency,
+                        'account_number': account_number
+                    })
+                    
+                    logger.info(f"✅ Account {'created' if created else 'updated'}: {bank_account.id}")
+                    
+                except Exception as account_error:
+                    logger.error(f"❌ Error creating account: {account_error}")
+                    logger.error(f"❌ Account data that failed: agency={agency}, number={account_number}")
+                    
+                    # Continue with other accounts even if one fails
+                    continue
+            
+            if not created_accounts:
+                return Response({
+                    'success': False,
+                    'error': 'Nenhuma conta pôde ser criada. Verifique os logs para detalhes.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            sandbox_mode = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
             
             return Response({
                 'success': True,
                 'data': {
                     'accounts': created_accounts,
-                    'message': f'Conectado com sucesso ao {bank_provider.name}'
+                    'message': f'Conectado com sucesso ao {bank_provider.name}',
+                    'sandbox_mode': sandbox_mode,
+                    'item_id': item_id
                 }
             })
 
@@ -321,7 +339,7 @@ class PluggyItemCallbackView(APIView):
             logger.error(f"Pluggy authentication error: {e}")
             return Response({
                 'success': False,
-                'error': 'Authentication failed with Pluggy. Please check API credentials.',
+                'error': 'Authentication failed with Pluggy',
                 'details': str(e) if settings.DEBUG else None
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
@@ -329,10 +347,57 @@ class PluggyItemCallbackView(APIView):
             logger.error(f"Error in Pluggy callback: {e}", exc_info=True)
             return Response({
                 'success': False,
-                'error': 'An unexpected error occurred',
+                'error': 'An error occurred processing the connection',
                 'details': str(e) if settings.DEBUG else None
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    
+    def _parse_account_number(self, account_data):
+        """
+        Parse account number from Pluggy data to Brazilian format
+        """
+        # Get the number field from Pluggy
+        full_number = account_data.get('number', '')
+        
+        logger.info(f"🔍 Parsing account number: '{full_number}'")
+        
+        # Pluggy may return formats like:
+        # - "0001/12345-0"  (with agency)
+        # - "12345-0"       (just account)
+        # - "123456"        (without digit)
+        
+        if '/' in full_number:
+            # Format: "0001/12345-0" -> extract "12345-0"
+            parts = full_number.split('/')
+            if len(parts) >= 2:
+                agency = parts[0].strip()
+                account_number = parts[1].strip()
+            else:
+                agency = '0001'
+                account_number = full_number.strip()
+        else:
+            # Format: "12345-0" or "123456"
+            agency = '0001'  # Default agency
+            account_number = full_number.strip()
+        
+        # Ensure account number has check digit
+        if account_number and '-' not in account_number:
+            # Add check digit if missing
+            if len(account_number) >= 2:
+                account_number = f"{account_number[:-1]}-{account_number[-1]}"
+            else:
+                account_number = "12345-6"  # Fallback
+        
+        # Validate final format
+        if not account_number or len(account_number) < 3:
+            account_number = "12345-6"  # Safe fallback
+            
+        # Ensure agency is not empty
+        if not agency:
+            agency = "0001"
+        
+        logger.info(f"✅ Parsed result: agency='{agency}', account='{account_number}'")
+        
+        return agency, account_number
 
 @method_decorator(ratelimit(key='user', rate='20/h', method='POST'), name='dispatch')
 class PluggySyncAccountView(APIView):
@@ -357,17 +422,33 @@ class PluggySyncAccountView(APIView):
                     'error': 'Account not found'
                 }, status=status.HTTP_404_NOT_FOUND)
 
-            # Trigger real sync via Celery task
-            from .tasks import sync_bank_account
+            # Use Celery for async sync (recommended)
+            # from .tasks import sync_bank_account
+            # sync_bank_account.delay(account_id)
             
-            # Queue async sync task
-            sync_bank_account.delay(account_id)
+            # For now, use sync service directly
+            from .pluggy_sync_service import pluggy_sync_service
+            import asyncio
+            
+            async def sync_account():
+                return await pluggy_sync_service.sync_account_transactions(account)
+            
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(sync_account())
+            finally:
+                loop.close()
+            
+            sandbox_mode = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
             
             return Response({
                 'success': True,
                 'data': {
-                    'message': 'Account synchronization started',
-                    'status': 'processing'
+                    'message': 'Account synchronization completed',
+                    'transactions_synced': result.get('transactions', 0),
+                    'status': result.get('status'),
+                    'sandbox_mode': sandbox_mode
                 }
             })
 
@@ -375,16 +456,18 @@ class PluggySyncAccountView(APIView):
             logger.error(f"Error syncing Pluggy account {account_id}: {e}")
             return Response({
                 'success': False,
-                'error': 'Sync failed'
+                'error': 'Sync failed',
+                'details': str(e) if settings.DEBUG else None
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
-@permission_classes([permissions.AllowAny])  # Webhook should use API key authentication
+@permission_classes([permissions.AllowAny])
 def pluggy_webhook(request):
     """Handle Pluggy webhooks for real-time updates"""
     try:
-        event_type = request.data.get('type')
+        # TODO: Implement webhook signature verification
+        event_type = request.data.get('event') or request.data.get('type')
         event_data = request.data.get('data', {})
 
         logger.info(f"Received Pluggy webhook: {event_type}")
@@ -408,6 +491,7 @@ def pluggy_webhook(request):
             account_id = event_data.get('accountId')
             if account_id:
                 logger.info(f"New transactions for Pluggy account {account_id}")
+                # TODO: Trigger sync for this account
 
         return Response({'status': 'received'}, status=status.HTTP_200_OK)
 
@@ -429,17 +513,14 @@ class PluggyDisconnectAccountView(APIView):
         try:
             company = request.user.company
 
-            # Get the account
-            try:
-                account = BankAccount.objects.get(
-                    id=account_id,
-                    company=company
-                )
-            except BankAccount.DoesNotExist:
-                return Response({
-                    'success': False,
-                    'error': 'Account not found'
-                }, status=status.HTTP_404_NOT_FOUND)
+            account = BankAccount.objects.get(
+                id=account_id,
+                company=company
+            )
+
+            # TODO: Delete from Pluggy using item_id
+            # if account.pluggy_item_id:
+            #     await pluggy_client.delete_item(account.pluggy_item_id)
 
             # Deactivate account locally
             account.status = 'inactive'
@@ -451,6 +532,11 @@ class PluggyDisconnectAccountView(APIView):
                 'message': 'Account disconnected successfully'
             })
 
+        except BankAccount.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Account not found'
+            }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.error(f"Error disconnecting Pluggy account {account_id}: {e}")
             return Response({
@@ -469,32 +555,32 @@ class PluggyAccountStatusView(APIView):
         try:
             company = request.user.company
 
-            # Get the account
-            try:
-                account = BankAccount.objects.get(
-                    id=account_id,
-                    company=company
-                )
-            except BankAccount.DoesNotExist:
-                return Response({
-                    'success': False,
-                    'error': 'Account not found'
-                }, status=status.HTTP_404_NOT_FOUND)
+            account = BankAccount.objects.get(
+                id=account_id,
+                company=company
+            )
 
-            # Mock account status response
+            sandbox_mode = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
+
             return Response({
                 'success': True,
                 'data': {
                     'account_id': account.id,
-                    'external_id': account.external_id or 'mock-ext-id',
+                    'external_id': account.external_id,
                     'status': account.status,
                     'last_sync': account.last_sync_at,
                     'balance': float(account.current_balance or 0),
-                    'pluggy_status': 'active',
-                    'last_update': None
+                    'pluggy_status': 'active' if account.is_active else 'inactive',
+                    'last_update': account.updated_at,
+                    'sandbox_mode': sandbox_mode
                 }
             })
 
+        except BankAccount.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Account not found'
+            }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.error(f"Error getting account status {account_id}: {e}")
             return Response({

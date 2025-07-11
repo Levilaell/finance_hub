@@ -140,6 +140,10 @@ class PluggyClient:
             await self._ensure_authenticated()
             
             params = {'country': country}
+
+            if getattr(settings, 'PLUGGY_USE_SANDBOX', False):
+                params['sandbox'] = True
+                
             response = await self.client.get(
                 f"{self.base_url}/connectors",
                 params=params,

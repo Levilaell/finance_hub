@@ -85,6 +85,7 @@ OPEN_BANKING_CLIENT_SECRET = config('OPEN_BANKING_CLIENT_SECRET', default='mock-
 PLUGGY_BASE_URL = config('PLUGGY_BASE_URL', default='https://api.pluggy.ai')
 PLUGGY_CLIENT_ID = config('PLUGGY_CLIENT_ID', default='test-client-id')
 PLUGGY_CLIENT_SECRET = config('PLUGGY_CLIENT_SECRET', default='test-client-secret')
+PLUGGY_USE_SANDBOX = config('PLUGGY_USE_SANDBOX', default=True, cast=bool)
 
 # Channels - In-memory for development
 CHANNEL_LAYERS = {

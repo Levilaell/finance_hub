@@ -79,9 +79,9 @@ class BankAccountAdmin(admin.ModelAdmin):
     def current_balance_display(self, obj):
         color = 'green' if obj.current_balance >= 0 else 'red'
         return format_html(
-            '<span style="color: {};">R$ {:,.2f}</span>',
+            '<span style="color: {};">R$ {}</span>',
             color,
-            obj.current_balance
+            '{:,.2f}'.format(obj.current_balance)
         )
     current_balance_display.short_description = 'Saldo'
     

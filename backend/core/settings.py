@@ -273,6 +273,7 @@ PLUGGY_CLIENT_ID = config('PLUGGY_CLIENT_ID', default='')
 PLUGGY_CLIENT_SECRET = config('PLUGGY_CLIENT_SECRET', default='')
 PLUGGY_BASE_URL = config('PLUGGY_BASE_URL', default='https://api.pluggy.ai')
 PLUGGY_WEBHOOK_URL = config('PLUGGY_WEBHOOK_URL', default='')
+PLUGGY_USE_SANDBOX = config('PLUGGY_USE_SANDBOX', default=False, cast=bool)
 
 # Pluggy Connect Widget configuration
 PLUGGY_CONNECT_URL = config('PLUGGY_CONNECT_URL', default='https://connect.pluggy.ai')
