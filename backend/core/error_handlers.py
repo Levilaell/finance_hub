@@ -3,9 +3,11 @@ Comprehensive error handling for production
 """
 import logging
 import traceback
+import uuid
 from typing import Dict, Any, Optional
 
 from django.conf import settings
+from django.utils import timezone
 from django.core.exceptions import ValidationError, PermissionDenied
 from django.http import Http404
 from rest_framework import status
@@ -35,7 +37,7 @@ class InsufficientFundsError(FinanceAppError):
     default_code = 'insufficient_funds'
 
 
-class BankConnectionError(FinanceAppError):
+class BankAccountConnectionError(FinanceAppError):
     """Bank connection/integration error"""
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     default_detail = 'Unable to connect to bank service.'

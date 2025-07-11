@@ -262,13 +262,13 @@ class QuickReportsView(APIView):
         elif report_id == 'quarterly':
             period_end = today
             period_start = today - timedelta(days=90)
-            report_type = 'quarterly'
+            report_type = 'quarterly_report'
             title = f'Relatório Trimestral - {period_start.strftime("%b")} a {period_end.strftime("%b %Y")}'
             
         elif report_id == 'year_to_date':
             period_start = today.replace(month=1, day=1)
             period_end = today
-            report_type = 'annual'
+            report_type = 'annual_report'
             title = f'Acumulado {today.year}'
             
         elif report_id == 'cash_flow_30':

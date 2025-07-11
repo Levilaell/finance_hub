@@ -123,7 +123,7 @@ class TransactionCategoryAdmin(admin.ModelAdmin):
     )
     
     def icon_display(self, obj):
-        return format_html('{}', obj.icon)
+        return obj.icon or ''
     icon_display.short_description = 'Ícone'
     
     def color_display(self, obj):

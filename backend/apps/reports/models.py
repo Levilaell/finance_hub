@@ -50,7 +50,7 @@ class Report(models.Model):
     filters = models.JSONField(_('filters'), default=dict)
     
     # Generated files
-    file_format = models.CharField(_('file format'), max_length=10, choices=FILE_FORMATS)
+    file_format = models.CharField(_('file format'), max_length=10, choices=FILE_FORMATS, default='pdf')
     file = models.FileField(_('report file'), upload_to='reports/%Y/%m/', blank=True, null=True)
     file_size = models.IntegerField(_('file size'), default=0)
     

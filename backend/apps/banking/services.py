@@ -543,7 +543,7 @@ class OpenBankingService:
             
             # Get account details
             account_response = requests.get(
-                f"{endpoints['accounts_endpoint']}/accounts/{bank_account.external_account_id}",
+                f"{endpoints['accounts_endpoint']}/accounts/{bank_account.external_id}",
                 headers=headers,
                 cert=(self.cert_path, self.key_path) if self.cert_path else None,
                 verify=self.ca_cert_path if self.ca_cert_path else True,
@@ -555,7 +555,7 @@ class OpenBankingService:
             
             # Get balance information
             balance_response = requests.get(
-                f"{endpoints['accounts_endpoint']}/accounts/{bank_account.external_account_id}/balances",
+                f"{endpoints['accounts_endpoint']}/accounts/{bank_account.external_id}/balances",
                 headers=headers,
                 cert=(self.cert_path, self.key_path) if self.cert_path else None,
                 verify=self.ca_cert_path if self.ca_cert_path else True,
@@ -625,7 +625,7 @@ class OpenBankingService:
                 params['page'] = page
                 
                 response = requests.get(
-                    f"{endpoints['accounts_endpoint']}/accounts/{bank_account.external_account_id}/transactions",
+                    f"{endpoints['accounts_endpoint']}/accounts/{bank_account.external_id}/transactions",
                     headers=headers,
                     params=params,
                     cert=(self.cert_path, self.key_path) if self.cert_path else None,

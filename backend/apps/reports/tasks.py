@@ -18,8 +18,8 @@ def generate_report_task(report_id):
         from .models import Report
         report = Report.objects.get(id=report_id)
         
-        # Update status to processing
-        report.status = 'processing'
+        # Mark report as being processed
+        report.is_generated = False
         report.save()
         
         # Generate actual report
@@ -31,37 +31,22 @@ def generate_report_task(report_id):
         generator = ReportGenerator(report.company)
         
         # Generate report based on type
-        if report.report_type == 'transaction_report':
-            buffer = generator.generate_transaction_report(
-                start_date=report.period_start,
-                end_date=report.period_end,
-                format=report.format or 'pdf',
-                filters=report.parameters
-            )
-            filename = f"transaction_report_{report.period_start}_{report.period_end}.{report.format or 'pdf'}"
-        
-        elif report.report_type == 'account_statement':
-            account_id = report.parameters.get('account_id')
-            if not account_id:
-                raise ValueError("Account ID required for statement generation")
-            
-            buffer = generator.generate_account_statement(
-                account_id=account_id,
-                start_date=report.period_start,
-                end_date=report.period_end,
-                format=report.format or 'pdf'
-            )
-            filename = f"statement_account_{account_id}_{report.period_start}_{report.period_end}.{report.format or 'pdf'}"
-        
-        else:
-            raise ValueError(f"Unknown report type: {report.report_type}")
+        # For now, all report types will use the transaction report generator
+        # In the future, we can add specific generators for each report type
+        buffer = generator.generate_transaction_report(
+            start_date=report.period_start,
+            end_date=report.period_end,
+            format=report.file_format or 'pdf',
+            filters=report.parameters
+        )
+        filename = f"{report.report_type}_{report.period_start}_{report.period_end}.{report.file_format or 'pdf'}"
         
         # Save file
         report.file.save(filename, ContentFile(buffer.getvalue()))
         
         # Update report as completed
-        report.status = 'completed'
-        report.completed_at = timezone.now()
+        report.is_generated = True
+        report.generation_time = int((timezone.now() - report.created_at).total_seconds())
         report.file_size = buffer.tell()
         report.save()
         
@@ -77,7 +62,7 @@ def generate_report_task(report_id):
         # Update report as failed
         try:
             report = Report.objects.get(id=report_id)
-            report.status = 'failed'
+            report.is_generated = False
             report.error_message = str(e)
             report.save()
         except:
@@ -99,7 +84,7 @@ def process_scheduled_reports():
     
     for schedule in schedules:
         # Check if schedule is due
-        if schedule.is_due():
+        if schedule.next_run_at and schedule.next_run_at <= now:
             logger.info(f"Processing scheduled report: {schedule.name}")
             
             # Calculate date range based on frequency
@@ -122,16 +107,25 @@ def process_scheduled_reports():
                 title=f"{schedule.name} - {now.strftime('%Y-%m-%d')}",
                 period_start=period_start,
                 period_end=period_end,
-                created_by=schedule.created_by,
-                status='pending'
+                created_by=schedule.created_by
             )
             
             # Queue report generation
             generate_report_task.delay(report.id)
             
             # Update schedule
-            schedule.last_run_date = now
-            schedule.run_count += 1
+            schedule.last_run_at = now
+            # Calculate next run time based on frequency
+            if schedule.frequency == 'daily':
+                schedule.next_run_at = now + timedelta(days=1)
+            elif schedule.frequency == 'weekly':
+                schedule.next_run_at = now + timedelta(days=7)
+            elif schedule.frequency == 'monthly':
+                schedule.next_run_at = now + timedelta(days=30)
+            elif schedule.frequency == 'quarterly':
+                schedule.next_run_at = now + timedelta(days=90)
+            elif schedule.frequency == 'yearly':
+                schedule.next_run_at = now + timedelta(days=365)
             schedule.save()
             
             logger.info(f"Scheduled report queued: {report.id}")
@@ -150,7 +144,7 @@ def cleanup_old_reports():
     
     old_reports = Report.objects.filter(
         created_at__lt=cutoff_date,
-        status='completed'
+        is_generated=True
     )
     
     count = old_reports.count()

@@ -24,8 +24,7 @@ from reportlab.graphics.charts.barcharts import VerticalBarChart
 # Excel generation
 import xlsxwriter
 
-from apps.banking.models import Transaction, BankAccount
-from apps.categories.models import Category
+from apps.banking.models import Transaction, BankAccount, TransactionCategory
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +66,7 @@ class ReportGenerator:
         
         # Get transactions
         transactions = Transaction.objects.filter(
-            company=self.company,
+            bank_account__company=self.company,
             transaction_date__gte=start_date,
             transaction_date__lte=end_date
         )

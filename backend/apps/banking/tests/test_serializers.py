@@ -3,12 +3,12 @@ Test banking app serializers
 Tests for all banking app serializers
 """
 from apps.banking.models import (
-    BankAccount, BankConnection, BankProvider, BankSync, 
+    BankAccount, BankProvider, BankSync, 
     Budget, FinancialGoal, RecurringTransaction, Transaction, 
     TransactionCategory
 )
 from apps.banking.serializers import (
-    BankAccountSerializer, BankConnectionSerializer, BankProviderSerializer,
+    BankAccountSerializer, BankProviderSerializer,
     BankSyncSerializer, BudgetSerializer, CategoryAnalysisSerializer,
     CashFlowSerializer, ComparativeAnalysisSerializer, DashboardSerializer,
     EnhancedDashboardSerializer, ExpenseTrendSerializer, FinancialGoalSerializer,
@@ -919,90 +919,3 @@ class TestDashboardSerializers(TestCase):
         self.assertEqual(validated_data['variance_percentage'], 11.11)
         self.assertEqual(validated_data['trend'], 'up')
 
-
-class TestBankConnectionSerializer(TestCase):
-    """Test BankConnectionSerializer"""
-    
-    def setUp(self):
-        # Create basic setup
-        self.plan = SubscriptionPlan.objects.create(
-            name='Test Plan',
-            slug='test-plan',
-            plan_type='pro',
-            price_monthly=99.90,
-            price_yearly=999.00
-        )
-        
-        self.user = User.objects.create_user(
-            username='testuser',
-            email='test@example.com',
-            password='testpass123',
-            first_name='Test',
-            last_name='User'
-        )
-        
-        self.company = Company.objects.create(
-            name='Test Company',
-            cnpj='11222333000181',
-            owner=self.user,
-            subscription_plan=self.plan,
-            enable_ai_categorization=False
-        )
-        
-        # Create bank connection
-        self.connection = BankConnection.objects.create(
-            company=self.company,
-            belvo_id='test-belvo-id-123',
-            institution='banco_do_brasil',
-            status='valid',
-            last_access_mode='single',
-            created_by=self.user,
-            belvo_created_at=timezone.now(),
-            belvo_created_by='test@example.com',
-            refresh_rate=21600,  # 6 hours in seconds
-            external_id='ext-123',
-            credentials_stored=True,  # Boolean field
-            metadata={'test': 'data'}
-        )
-    
-    def test_serialization(self):
-        """Test serializing bank connection"""
-        serializer = BankConnectionSerializer(self.connection)
-        data = serializer.data
-        
-        self.assertEqual(data['belvo_id'], 'test-belvo-id-123')
-        self.assertEqual(data['institution'], 'banco_do_brasil')
-        self.assertEqual(data['status'], 'valid')
-        self.assertEqual(data['last_access_mode'], 'single')
-        self.assertEqual(data['created_by_name'], 'Test User')
-        self.assertEqual(data['institution_display'], 'banco_do_brasil')  # No display name set
-        self.assertEqual(data['refresh_rate'], 21600)  # Seconds
-        self.assertEqual(data['external_id'], 'ext-123')
-        self.assertTrue(data['is_active'])
-        self.assertFalse(data['needs_token_renewal'])
-        self.assertEqual(data['metadata'], {'test': 'data'})
-        
-        # Check computed fields
-        self.assertIsNotNone(data['connection_age_days'])
-        self.assertGreaterEqual(data['connection_age_days'], 0)
-    
-    def test_needs_token_renewal(self):
-        """Test needs_token_renewal method"""
-        # Set status to token_renewal_required
-        self.connection.status = 'token_renewal_required'
-        self.connection.save()
-        
-        serializer = BankConnectionSerializer(self.connection)
-        data = serializer.data
-        
-        self.assertTrue(data['needs_token_renewal'])
-    
-    def test_inactive_connection(self):
-        """Test inactive connection"""
-        self.connection.status = 'invalid'
-        self.connection.save()
-        
-        serializer = BankConnectionSerializer(self.connection)
-        data = serializer.data
-        
-        self.assertFalse(data['is_active'])

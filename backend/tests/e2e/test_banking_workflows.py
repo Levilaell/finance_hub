@@ -502,9 +502,9 @@ class TestCompleteBankingWorkflow(TransactionTestCase):
         print(f"Goals: {FinancialGoal.objects.filter(company=self.company).count()}")
 
 
-class TestBankConnectionFailureRecovery(TransactionTestCase):
+class TestBankAccountFailureRecovery(TransactionTestCase):
     """
-    Test bank connection failures and recovery workflows
+    Test bank account connection failures and recovery workflows
     """
     
     def setUp(self):

@@ -58,7 +58,7 @@ class BankingServicesTestCase(TestCase):
             account_type='checking',
             agency='1234',
             account_number='567890',
-            external_account_id='ext_123456',
+            external_id='ext_123456',
             access_token='mock_token'
         )
 

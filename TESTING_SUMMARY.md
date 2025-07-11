@@ -10,7 +10,7 @@
 
 ### Banking App ✅ COMPLETE (250+ tests)
 - Comprehensive test coverage for all models, views, serializers, and integrations
-- Open Banking integration tests for Belvo and Pluggy
+- Open Banking integration tests for Pluggy
 
 ### Companies App ✅ COMPLETE (98 tests)
 - Full test coverage for multi-tenant functionality
@@ -43,10 +43,9 @@
 6. **Percentage Type Issues**: Fixed Decimal vs float comparison issues in analytics tests
 
 ### Banking App
-1. **Belvo Integration**: Fixed to use GET requests instead of POST for accounts/transactions
-2. **Pluggy Async Methods**: Simplified tests due to async method returns
-3. **Transaction Duplicates**: Adjusted test expectations (no unique constraint on external_id)
-4. **Budget/Goal Calculations**: Fixed Decimal type issues
+1. **Pluggy Async Methods**: Simplified tests due to async method returns
+2. **Transaction Duplicates**: Adjusted test expectations (no unique constraint on external_id)
+3. **Budget/Goal Calculations**: Fixed Decimal type issues
 
 ### Categories App
 1. **AI Categorization Signal**: Disabled AI categorization on test companies to prevent API calls
@@ -136,12 +135,11 @@ coverage report
   - Report error handling and recovery
 
 ### E2E Test Fixes Applied
-1. **BelvoClient Import**: Fixed import path from services to belvo_client
-2. **PluggyClient Import**: Fixed import path from services to pluggy_client
-3. **Authentication Tokens**: Fixed response structure for JWT tokens
-4. **URL Names**: Fixed various URL names (verify_email, invite-user, subscription-upgrade)
-5. **SubscriptionPlan**: Added required price_yearly field
-6. **User Tokens**: Replaced user.tokens() with RefreshToken.for_user()
+1. **PluggyClient Import**: Fixed import path from services to pluggy_client
+2. **Authentication Tokens**: Fixed response structure for JWT tokens
+3. **URL Names**: Fixed various URL names (verify_email, invite-user, subscription-upgrade)
+4. **SubscriptionPlan**: Added required price_yearly field
+5. **User Tokens**: Replaced user.tokens() with RefreshToken.for_user()
 
 ## Test Statistics
 
@@ -164,7 +162,7 @@ coverage report
 ## Notes
 
 - All tests use Django's TestCase for database isolation
-- Proper use of mocking for external services (OpenAI, Belvo, Pluggy)
+- Proper use of mocking for external services (OpenAI, Pluggy)
 - Multi-tenant data isolation properly tested
 - Authentication and permissions tested throughout
 - Comprehensive edge case coverage

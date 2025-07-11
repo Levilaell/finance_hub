@@ -159,7 +159,7 @@ class PluggyItemCallbackView(APIView):
     def post(self, request):
         """Process successful bank connection from Pluggy Connect"""
         import asyncio
-        from .pluggy_client import PluggyClient
+        from .pluggy_client import PluggyClient, PluggyAuthenticationError
         
         try:
             item_id = request.data.get('item_id')
@@ -173,24 +173,56 @@ class PluggyItemCallbackView(APIView):
 
             company = request.user.company
             
-            # Get item details and accounts from Pluggy
-            async def process_item():
-                async with PluggyClient() as client:
-                    # Get item details
-                    item = await client.get_item(item_id)
-                    
-                    # Get accounts for this item
-                    accounts = await client.get_accounts(item_id)
-                    
-                    return item, accounts
-            
-            # Execute async function
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                item_data, accounts_data = loop.run_until_complete(process_item())
-            finally:
-                loop.close()
+            # Check if we're in development mode with test credentials
+            if settings.DEBUG and settings.PLUGGY_CLIENT_ID == 'test-client-id-disabled':
+                logger.warning("Using simulated Pluggy data in development mode")
+                
+                # Simulate Pluggy response for development
+                from datetime import datetime
+                item_data = {
+                    'id': item_id,
+                    'connectorId': 201,
+                    'connector': {
+                        'id': 201,
+                        'name': 'Banco do Brasil'
+                    },
+                    'status': 'LOGIN_SUCCEEDED',
+                    'createdAt': datetime.now().isoformat(),
+                    'updatedAt': datetime.now().isoformat()
+                }
+                
+                accounts_data = [{
+                    'id': f"{item_id}_account_1",
+                    'itemId': item_id,
+                    'type': 'BANK',
+                    'subtype': 'CHECKING_ACCOUNT',
+                    'number': '12345-6',
+                    'bankData': {
+                        'agency': '1234'
+                    },
+                    'name': 'Conta Corrente',
+                    'balance': 1500.00,
+                    'currencyCode': 'BRL'
+                }]
+            else:
+                # Get item details and accounts from Pluggy
+                async def process_item():
+                    async with PluggyClient() as client:
+                        # Get item details
+                        item = await client.get_item(item_id)
+                        
+                        # Get accounts for this item
+                        accounts = await client.get_accounts(item_id)
+                        
+                        return item, accounts
+                
+                # Execute async function
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    item_data, accounts_data = loop.run_until_complete(process_item())
+                finally:
+                    loop.close()
             
             # Create or update bank accounts
             created_accounts = []
@@ -208,6 +240,9 @@ class PluggyItemCallbackView(APIView):
             )
             
             for account_data in accounts_data:
+                # Log account data for debugging
+                logger.info(f"Processing Pluggy account data: {account_data}")
+                
                 # Map Pluggy account type to our types
                 account_type_map = {
                     'BANK': 'checking',
@@ -221,30 +256,58 @@ class PluggyItemCallbackView(APIView):
                     'checking'
                 )
                 
-                # Create bank account
-                bank_account = BankAccount.objects.create(
+                # Extract account number - Pluggy may return it in different formats
+                account_number = account_data.get('number', '')
+                if not account_number:
+                    # Try alternative fields
+                    account_number = account_data.get('accountNumber', '12345-6')
+                
+                # Handle MeuPluggy format: "0001/12345-0" -> extract agency and account
+                agency_from_number = None
+                if '/' in account_number:
+                    parts = account_number.split('/')
+                    if len(parts) >= 2:
+                        agency_from_number = parts[0]
+                        account_number = parts[-1]
+                
+                # Ensure account number has the right format
+                if account_number and '-' not in account_number and len(account_number) > 1:
+                    # Add hyphen before last digit if not present
+                    account_number = f"{account_number[:-1]}-{account_number[-1]}"
+                
+                # Extract agency - prefer from bankData, fallback to extracted from number
+                bank_data = account_data.get('bankData') or {}
+                agency = bank_data.get('agency') or bank_data.get('branch') or agency_from_number or '0001'
+                
+                # Create or update bank account
+                bank_account, created = BankAccount.objects.update_or_create(
                     company=company,
                     bank_provider=bank_provider,
-                    external_account_id=account_data.get('id'),
-                    pluggy_item_id=item_id,
+                    agency=agency,
+                    account_number=account_number or '12345-6',
                     account_type=account_type,
-                    account_number=account_data.get('number', ''),
-                    agency=account_data.get('agency', ''),
-                    current_balance=Decimal(str(account_data.get('balance', 0))),
-                    available_balance=Decimal(str(account_data.get('balance', 0))),
-                    status='active',
-                    is_active=True,
-                    nickname=f"{bank_provider.name} - {account_data.get('name', 'Conta')}"
+                    defaults={
+                        'external_id': account_data.get('id'),
+                        'pluggy_item_id': item_id,
+                        'current_balance': Decimal(str(account_data.get('balance', 0))),
+                        'available_balance': Decimal(str(account_data.get('balance', 0))),
+                        'status': 'active',
+                        'is_active': True,
+                        'nickname': f"{bank_provider.name} - {account_data.get('name', 'Conta')}"
+                    }
                 )
+                
+                if created:
+                    logger.info(f"Account {bank_account.id} created")
+                else:
+                    logger.info(f"Account {bank_account.id} updated with new balance")
                 
                 created_accounts.append({
                     'id': bank_account.id,
                     'name': bank_account.nickname,
-                    'balance': float(bank_account.current_balance)
+                    'balance': float(bank_account.current_balance),
+                    'created': created
                 })
-                
-                # Initial sync will be handled later via scheduled tasks
-                logger.info(f"Account {bank_account.id} created, sync will be handled by background tasks")
             
             return Response({
                 'success': True,
@@ -254,11 +317,20 @@ class PluggyItemCallbackView(APIView):
                 }
             })
 
-        except Exception as e:
-            logger.error(f"Error in Pluggy callback: {e}")
+        except PluggyAuthenticationError as e:
+            logger.error(f"Pluggy authentication error: {e}")
             return Response({
                 'success': False,
-                'error': 'An unexpected error occurred'
+                'error': 'Authentication failed with Pluggy. Please check API credentials.',
+                'details': str(e) if settings.DEBUG else None
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        except Exception as e:
+            logger.error(f"Error in Pluggy callback: {e}", exc_info=True)
+            return Response({
+                'success': False,
+                'error': 'An unexpected error occurred',
+                'details': str(e) if settings.DEBUG else None
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -414,7 +486,7 @@ class PluggyAccountStatusView(APIView):
                 'success': True,
                 'data': {
                     'account_id': account.id,
-                    'external_id': account.external_account_id or 'mock-ext-id',
+                    'external_id': account.external_id or 'mock-ext-id',
                     'status': account.status,
                     'last_sync': account.last_sync_at,
                     'balance': float(account.current_balance or 0),

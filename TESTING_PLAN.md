@@ -19,7 +19,7 @@ This document outlines the complete testing strategy for CaixaHub, a comprehensi
 ### Completed Test Files:
 1. **`test_models.py`** - Complete model testing (9 models, 50+ tests)
    - BankProvider, BankAccount, TransactionCategory, Transaction
-   - RecurringTransaction, Budget, FinancialGoal, BankSync, BankConnection
+   - RecurringTransaction, Budget, FinancialGoal, BankSync
    - Brazilian banking validation, company isolation, financial calculations
 
 2. **`test_viewsets.py`** - Complete ViewSet testing (6 ViewSets, 80+ tests)
@@ -167,13 +167,6 @@ This document outlines the complete testing strategy for CaixaHub, a comprehensi
 - [x] Test timestamp accuracy
 - [x] Test sync statistics tracking
 
-### BankConnection Model Tests
-- [x] Test connection creation
-- [x] Test Belvo ID uniqueness
-- [x] Test connection status management
-- [x] Test Belvo integration fields
-- [x] Test connection age calculations
-- [x] Test status update methods
 
 ## 1.2 Banking ViewSets Tests ✅ COMPLETED
 **File**: `backend/apps/banking/tests/test_viewsets.py`
@@ -272,14 +265,11 @@ This document outlines the complete testing strategy for CaixaHub, a comprehensi
 **File**: `backend/apps/banking/tests/test_integration.py`
 
 ### Open Banking Integration Tests
-- [x] Test Belvo Client (create_link, get_accounts, get_transactions)
 - [x] Test Pluggy Client (async methods existence verification)
 - [x] Test BankSync functionality (sync logs, transaction creation)
-- [x] Test BankConnection model (status management, age calculation)
 - [x] Test duplicate transaction handling
 - [x] Test API mocking for external services
 - [x] Test error handling (mocked responses)
-- [x] Test connection status methods
 
 ## 1.6 Banking Serializers Tests ✅ COMPLETED
 **File**: `backend/apps/banking/tests/test_serializers.py`
@@ -320,7 +310,6 @@ This document outlines the complete testing strategy for CaixaHub, a comprehensi
 ### Additional Serializers Tests
 - [x] Test BudgetSerializer (CRUD operations)
 - [x] Test FinancialGoalSerializer (progress calculations)
-- [x] Test BankConnectionSerializer (Belvo integration)
 - [x] Test RecurringTransactionSerializer
 
 ---

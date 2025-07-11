@@ -21,7 +21,7 @@ from apps.banking.services import BankingSyncService
 User = get_user_model()
 
 
-class BankConnectionFlowTestCase(APITestCase):
+class BankAccountConnectFlowTestCase(APITestCase):
     """Test complete bank connection flow from UI perspective"""
     
     def setUp(self):
@@ -134,14 +134,14 @@ class BankConnectionFlowTestCase(APITestCase):
         self.assertEqual(accounts.count(), 2)
         
         # Check first account
-        acc1 = accounts.get(external_account_id='acc-001')
+        acc1 = accounts.get(external_id='acc-001')
         self.assertEqual(acc1.account_type, 'checking')
         self.assertEqual(acc1.account_number, '12345')
         self.assertEqual(acc1.current_balance, Decimal('2500.50'))
         self.assertEqual(acc1.pluggy_item_id, 'item-abc123')
         
         # Check second account
-        acc2 = accounts.get(external_account_id='acc-002')
+        acc2 = accounts.get(external_id='acc-002')
         self.assertEqual(acc2.account_type, 'savings')
         self.assertEqual(acc2.account_number, '54321')
         self.assertEqual(acc2.current_balance, Decimal('5000.00'))
@@ -197,7 +197,7 @@ class BankConnectionFlowTestCase(APITestCase):
             account_number='12345',
             agency='0001',
             pluggy_item_id='item-123',
-            external_account_id='acc-123',
+            external_id='acc-123',
             current_balance=Decimal('1000.00'),
             status='active'
         )
@@ -293,7 +293,7 @@ class BankSyncIntegrationTestCase(TransactionTestCase):
             account_number='12345',
             agency='0001',
             pluggy_item_id='item-123',
-            external_account_id='acc-123',
+            external_id='acc-123',
             status='active'
         )
         

@@ -227,7 +227,7 @@ class TestCompleteUserJourney(TransactionTestCase):
         # Set up the account with proper tokens for sync
         account_itau.access_token = 'pluggy_token_123'
         account_itau.refresh_token = 'refresh_token_123'
-        account_itau.external_account_id = 'acc_123'
+        account_itau.external_id = 'acc_123'
         account_itau.current_balance = Decimal('50000.00')
         account_itau.save()
         self.assertEqual(account_itau.current_balance, Decimal('50000.00'))

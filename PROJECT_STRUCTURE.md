@@ -7,7 +7,7 @@ finance_management/
 ├── backend/                    # API Django REST Framework
 │   ├── apps/                  # Aplicações Django
 │   │   ├── authentication/    # Autenticação JWT + 2FA
-│   │   ├── banking/          # Integração bancária (Belvo/Pluggy)
+│   │   ├── banking/          # Integração bancária (Pluggy)
 │   │   ├── categories/       # Categorização de transações
 │   │   ├── companies/        # Multi-tenancy
 │   │   ├── notifications/    # Notificações e WebSocket
@@ -47,7 +47,6 @@ finance_management/
 │   ├── services/          # Serviços de API
 │   │   ├── auth.service.ts
 │   │   ├── banking.service.ts
-│   │   ├── belvo.service.ts
 │   │   ├── categories.service.ts
 │   │   ├── dashboard.service.ts
 │   │   ├── notifications.service.ts
@@ -94,7 +93,7 @@ finance_management/
 #### Backend (95%)
 - Sistema de autenticação completo (JWT + 2FA)
 - Multi-tenancy com isolamento de dados
-- Integração com Belvo e Pluggy
+- Integração com Pluggy
 - Categorização automática (regras + IA)
 - Sistema de notificações em tempo real
 - Geração de relatórios
@@ -111,7 +110,7 @@ finance_management/
 ### ⏳ Pendente (10%)
 
 #### Configurações de Produção
-- API keys de produção (Stripe, MercadoPago, Belvo, Pluggy)
+- API keys de produção (Stripe, MercadoPago, Pluggy)
 - Configuração de domínio e SSL
 - Setup de servidores de produção
 - Configuração de backups automáticos
@@ -196,8 +195,6 @@ FIELD_ENCRYPTION_KEY=your-encryption-key
 
 # APIs
 OPENAI_API_KEY=sk-xxx
-BELVO_SECRET_ID=xxx
-BELVO_SECRET_PASSWORD=xxx
 PLUGGY_CLIENT_ID=xxx
 PLUGGY_CLIENT_SECRET=xxx
 
@@ -214,7 +211,6 @@ MERCADOPAGO_ACCESS_TOKEN=xxx
 ### Frontend (.env.local)
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_BELVO_PUBLIC_KEY=xxx
 NEXT_PUBLIC_PLUGGY_CONNECT_TOKEN=xxx
 ```
 

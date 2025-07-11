@@ -21,8 +21,7 @@ from apps.banking.models import (
     RecurringTransaction,
     Budget,
     FinancialGoal,
-    BankSync,
-    BankConnection
+    BankSync
 )
 from apps.companies.models import Company, SubscriptionPlan
 
@@ -146,7 +145,7 @@ class BankAccountModelTest(BankingModelsTestCase):
             'agency': '1234',
             'account_number': '567890',
             'account_digit': '1',
-            'external_account_id': 'ext_123',
+            'external_id': 'ext_123',
             'status': 'active',
             'current_balance': Decimal('1000.00'),
             'available_balance': Decimal('950.00'),
@@ -730,93 +729,3 @@ class BankSyncModelTest(BankingModelsTestCase):
         self.assertIsNone(sync.duration)
 
 
-class BankConnectionModelTest(BankingModelsTestCase):
-    """Test BankConnection model functionality"""
-    
-    def test_connection_creation(self):
-        """Test creating a bank connection"""
-        connection_data = {
-            'belvo_id': 'belvo_123456',
-            'institution': 'test_bank',
-            'display_name': 'Test Bank Connection',
-            'company': self.company,
-            'status': 'valid',
-            'last_access_mode': 'recurrent',
-            'created_by': self.user,
-            'belvo_created_at': timezone.now(),
-            'belvo_created_by': 'api_user',
-            'external_id': 'ext_123',
-            'credentials_stored': True,
-            'metadata': {'test': 'data'}
-        }
-        connection = BankConnection.objects.create(**connection_data)
-        
-        self.assertEqual(connection.belvo_id, 'belvo_123456')
-        self.assertEqual(connection.institution, 'test_bank')
-        self.assertEqual(connection.company, self.company)
-        self.assertEqual(connection.status, 'valid')
-        self.assertTrue(isinstance(connection.id, uuid.UUID))
-    
-    def test_connection_string_representation(self):
-        """Test string representation of connection"""
-        connection = BankConnection.objects.create(
-            belvo_id='belvo_123',
-            institution='test_bank',
-            display_name='Test Bank',
-            company=self.company,
-            created_by=self.user
-        )
-        expected = f"{connection.institution} - {connection.display_name} ({connection.status})"
-        self.assertEqual(str(connection), expected)
-    
-    def test_is_active_method(self):
-        """Test is_active method"""
-        connection = BankConnection.objects.create(
-            belvo_id='belvo_123',
-            institution='test_bank',
-            company=self.company,
-            created_by=self.user
-        )
-        
-        # Valid status
-        connection.status = 'valid'
-        self.assertTrue(connection.is_active())
-        
-        # Invalid status
-        connection.status = 'invalid'
-        self.assertFalse(connection.is_active())
-    
-    def test_needs_token_renewal_method(self):
-        """Test needs_token_renewal method"""
-        connection = BankConnection.objects.create(
-            belvo_id='belvo_123',
-            institution='test_bank',
-            company=self.company,
-            created_by=self.user
-        )
-        
-        # Token renewal required
-        connection.status = 'token_renewal_required'
-        self.assertTrue(connection.needs_token_renewal())
-        
-        # Valid status
-        connection.status = 'valid'
-        self.assertFalse(connection.needs_token_renewal())
-    
-    def test_belvo_id_uniqueness(self):
-        """Test that belvo_id must be unique"""
-        BankConnection.objects.create(
-            belvo_id='unique_belvo_123',
-            institution='test_bank',
-            company=self.company,
-            created_by=self.user
-        )
-        
-        # Try to create another connection with same belvo_id
-        with self.assertRaises(IntegrityError):
-            BankConnection.objects.create(
-                belvo_id='unique_belvo_123',
-                institution='another_bank',
-                company=self.company,
-                created_by=self.user
-            )

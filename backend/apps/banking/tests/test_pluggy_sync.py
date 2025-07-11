@@ -47,7 +47,7 @@ class PluggySyncServiceTestCase(TestCase):
             account_number='12345',
             agency='0001',
             pluggy_item_id='item-123',
-            external_account_id='account-123',
+            external_id='account-123',
             status='active',
             current_balance=Decimal('1000.00')
         )

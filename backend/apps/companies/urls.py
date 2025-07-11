@@ -19,8 +19,8 @@ from .views import (
     InvoiceDownloadView,
 )
 
-# Import public views from public_views package
-from .public_views.public import PublicSubscriptionPlansView
+# Import public views from views_package
+from .views_package.public import PublicSubscriptionPlansView
 
 app_name = 'companies'
 

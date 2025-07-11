@@ -242,7 +242,7 @@ class PluggyViewsTestCase(APITestCase):
         self.assertEqual(len(response.data['data']['accounts']), 1)
         
         # Check database
-        account = BankAccount.objects.get(external_account_id='account-123')
+        account = BankAccount.objects.get(external_id='account-123')
         self.assertEqual(account.pluggy_item_id, 'item-123')
         self.assertEqual(account.account_number, '12345')
         self.assertEqual(account.agency, '0001')
@@ -259,7 +259,7 @@ class PluggyViewsTestCase(APITestCase):
             account_number='12345',
             agency='0001',
             pluggy_item_id='item-123',
-            external_account_id='account-123',
+            external_id='account-123',
             status='active'
         )
         
@@ -312,7 +312,7 @@ class PluggyViewsTestCase(APITestCase):
             account_type='checking',
             account_number='12345',
             agency='0001',
-            external_account_id='account-123',
+            external_id='account-123',
             current_balance=Decimal('1500.00'),
             status='active',
             last_sync_at=timezone.now()
@@ -429,7 +429,7 @@ class PluggyIntegrationTestCase(TransactionTestCase):
         
         account = accounts.first()
         self.assertEqual(account.pluggy_item_id, 'item-123')
-        self.assertEqual(account.external_account_id, 'account-123')
+        self.assertEqual(account.external_id, 'account-123')
         self.assertEqual(account.current_balance, Decimal('2500.00'))
         self.assertEqual(account.status, 'active')
 

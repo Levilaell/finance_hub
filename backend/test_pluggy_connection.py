@@ -97,7 +97,7 @@ async def test_sync_service():
             'account_type': 'checking',
             'agency': '0001',
             'pluggy_item_id': 'test-item-123',
-            'external_account_id': 'test-acc-123',
+            'external_id': 'test-acc-123',
             'current_balance': Decimal('1000.00'),
             'status': 'active'
         }

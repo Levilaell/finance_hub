@@ -670,16 +670,13 @@ class TestRealTimeDataUpdates(TestCase):
         refresh = RefreshToken.for_user(self.user1)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {str(refresh.access_token)}')
         
-        with patch('apps.banking.services.BelvoClient') as mock_belvo:
-            mock_belvo.return_value.get_transactions.return_value = []
-            
-            response = self.client.post(
-                reverse('banking:sync-account', kwargs={'account_id': account.id})
-            )
-            
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
-            
-            # In real implementation, sync progress would be broadcast
+        response = self.client.post(
+            reverse('banking:sync-account', kwargs={'account_id': account.id})
+        )
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # In real implementation, sync progress would be broadcast
 
 
 class TestCompleteWorkflow(TestCase):

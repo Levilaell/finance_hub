@@ -54,6 +54,7 @@ class BankAccount(models.Model):
         ('savings', 'Conta Poupança'),
         ('business', 'Conta Empresarial'),
         ('digital', 'Conta Digital'),
+        ('credit_card', 'Cartão de Crédito'),
     ]
     
     STATUS_CHOICES = [
