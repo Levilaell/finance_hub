@@ -2,12 +2,16 @@
 Reports app views
 Financial reporting and analytics
 """
-from datetime import datetime, timedelta
+import logging
 from decimal import Decimal
-from django.utils import timezone
-from django.db.models import Count, Q, Sum, Avg
+from typing import Dict, Any, List
+from datetime import datetime, timedelta
+
+from django.core.cache import cache
+from django.db.models import Count, Q, Sum, Avg, Max, Min
 from django.http import FileResponse, Http404
 from django.utils import timezone
+
 from rest_framework import generics, permissions, status, viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -22,6 +26,10 @@ from .serializers import (
     ReportTemplateSerializer,
 )
 from .tasks import generate_report_task
+from .ai_service import enhanced_ai_service
+from .ai_tasks import generate_company_ai_insights
+
+logger = logging.getLogger(__name__)
 
 
 class ReportViewSet(viewsets.ModelViewSet):
@@ -685,155 +693,355 @@ class IncomeVsExpensesView(APIView):
 
 
 
+
+
+
+
 class AIInsightsView(APIView):
-    """AI-powered financial insights using OpenAI"""
+    """Enhanced AI-powered financial insights with caching and real-time updates"""
     permission_classes = [permissions.IsAuthenticated]
     
     def get(self, request):
+        """Get AI insights with optional real-time generation"""
         try:
             company = request.user.company
-            accounts = BankAccount.objects.filter(company=company, is_active=True)
             
+            # Check subscription
+            if not self._check_ai_access(company):
+                return Response({
+                    'error': 'AI insights not available in your plan',
+                    'upgrade_required': True
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Get parameters
             start_date = request.GET.get('start_date')
             end_date = request.GET.get('end_date')
+            force_refresh = request.GET.get('force_refresh', 'false').lower() == 'true'
+            insight_type = request.GET.get('type', 'comprehensive')  # comprehensive, quick, custom
             
+            # Validate dates
             if not start_date or not end_date:
+                # Try to get cached latest insights
+                cached_insights = self._get_cached_insights(company.id)
+                if cached_insights:
+                    return Response(cached_insights)
+                
                 return Response({'error': 'start_date and end_date are required'}, 
                               status=status.HTTP_400_BAD_REQUEST)
             
             try:
                 start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
                 end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-            except ValueError as e:
-                logger.error(f"Date parsing error: {e}")
+            except ValueError:
                 return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, 
                               status=status.HTTP_400_BAD_REQUEST)
             
-            # Define system cutoff date
-            SYSTEM_CUTOFF_DATE = datetime(2025, 1, 31).date()
+            # Check for future dates
+            if start_date > timezone.now().date():
+                return self._future_period_response(start_date, end_date)
             
-            # Check if period is after system cutoff
-            if start_date > SYSTEM_CUTOFF_DATE:
-                return self._empty_insights_response(start_date, end_date, 
-                    "Não há dados disponíveis para este período")
-            
-            # Adjust end_date if beyond system cutoff
-            original_end_date = end_date
-            if end_date > SYSTEM_CUTOFF_DATE:
-                end_date = SYSTEM_CUTOFF_DATE
+            # Get accounts
+            accounts = BankAccount.objects.filter(company=company, is_active=True)
+            if not accounts.exists():
+                return self._no_accounts_response()
             
             # Get transactions
-            try:
-                start_datetime = timezone.make_aware(
-                    datetime.combine(start_date, datetime.min.time()),
-                    timezone.get_current_timezone()
-                )
-                end_datetime = timezone.make_aware(
-                    datetime.combine(end_date, datetime.max.time()),
-                    timezone.get_current_timezone()
-                )
-                
-                transactions = Transaction.objects.filter(
-                    bank_account__in=accounts,
-                    transaction_date__gte=start_datetime,
-                    transaction_date__lte=end_datetime
-                )
-            except Exception as e:
-                logger.error(f"Error with timezone-aware query: {e}")
-                # Fallback to date-based query
-                transactions = Transaction.objects.filter(
-                    bank_account__in=accounts,
-                    transaction_date__date__gte=start_date,
-                    transaction_date__date__lte=end_date
-                )
+            transactions = self._get_transactions(accounts, start_date, end_date)
             
-            # If no transactions, return empty response
             if not transactions.exists():
-                return self._empty_insights_response(start_date, original_end_date, 
-                    "Não foram encontradas transações neste período")
+                return self._no_transactions_response(start_date, end_date)
             
-            # Calculate financial metrics
-            financial_data = self._calculate_financial_metrics(transactions, start_date, end_date)
+            # Generate or get cached insights
+            cache_key = f"ai_insights_{company.id}_{start_date}_{end_date}_{insight_type}"
             
-            # Generate AI insights
-            ai_response = ai_insights_service.generate_insights(
-                financial_data,
+            if not force_refresh:
+                cached = cache.get(cache_key)
+                if cached:
+                    logger.info(f"Returning cached insights for company {company.id}")
+                    cached['from_cache'] = True
+                    return Response(cached)
+            
+            # Calculate comprehensive financial metrics
+            financial_data = self._calculate_comprehensive_metrics(
+                transactions, start_date, end_date, company
+            )
+            
+            # Generate AI insights based on type
+            if insight_type == 'quick':
+                insights = self._generate_quick_insights(financial_data)
+            elif insight_type == 'custom':
+                custom_params = request.GET.get('custom_params', {})
+                insights = self._generate_custom_insights(financial_data, custom_params)
+            else:
+                insights = enhanced_ai_service.generate_insights(
+                    financial_data,
+                    company_name=company.name,
+                    force_refresh=force_refresh
+                )
+            
+            # Add interactive elements
+            insights = self._add_interactive_elements(insights, company)
+            
+            # Cache the result
+            cache.set(cache_key, insights, 86400)  # 24 hours
+            
+            # Queue background analysis for patterns
+            if force_refresh:
+                from .ai_tasks import analyze_deeper_patterns
+                analyze_deeper_patterns.delay(company.id, financial_data)
+            
+            return Response(insights)
+            
+        except Exception as e:
+            logger.error(f"Error in AIInsightsView: {e}", exc_info=True)
+            return Response({
+                'error': 'An error occurred while generating insights',
+                'details': str(e) if settings.DEBUG else None
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['post'])
+    def ask_ai(self, request):
+        """Allow users to ask specific questions to AI"""
+        try:
+            company = request.user.company
+            question = request.data.get('question')
+            context = request.data.get('context', {})
+            
+            if not question:
+                return Response({'error': 'Question is required'}, 
+                              status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get recent financial data for context
+            end_date = timezone.now().date()
+            start_date = end_date - timedelta(days=30)
+            
+            accounts = BankAccount.objects.filter(company=company, is_active=True)
+            transactions = self._get_transactions(accounts, start_date, end_date)
+            
+            financial_data = self._calculate_comprehensive_metrics(
+                transactions, start_date, end_date, company
+            )
+            
+            # Ask AI
+            response = enhanced_ai_service.ask_financial_question(
+                question=question,
+                financial_data=financial_data,
+                context=context,
                 company_name=company.name
             )
             
-            # Add period information
-            ai_response['period'] = {
-                'start_date': start_date,
-                'end_date': original_end_date,
-                'days': (original_end_date - start_date).days + 1,
-                'adjusted_end_date': end_date if original_end_date != end_date else None
-            }
-            
-            # Add note if period was adjusted
-            if original_end_date != end_date and ai_response.get('insights'):
-                ai_response['insights'].insert(0, {
-                    'type': 'info',
-                    'title': 'Período Ajustado',
-                    'description': f'Dados disponíveis até {end_date.strftime("%d/%m/%Y")}',
-                    'value': 'Info'
-                })
-            
-            return Response(ai_response)
+            return Response(response)
             
         except Exception as e:
-            logger.error(f"Unexpected error in AIInsightsView: {e}", exc_info=True)
+            logger.error(f"Error in ask_ai: {e}")
             return Response({
-                'error': 'An unexpected error occurred while generating insights'
+                'error': 'Failed to process your question'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    def _calculate_financial_metrics(self, transactions, start_date, end_date):
-        """Calculate financial metrics for AI analysis"""
+    @action(detail=False, methods=['get'])
+    def insights_history(self, request):
+        """Get historical insights and trends"""
+        try:
+            company = request.user.company
+            period = request.GET.get('period', '30')  # days
+            
+            # Get historical insights from cache
+            insights_history = []
+            
+            for i in range(0, int(period), 7):  # Weekly intervals
+                date = timezone.now().date() - timedelta(days=i)
+                cache_key = f"ai_insights_summary_{company.id}_{date}"
+                summary = cache.get(cache_key)
+                
+                if summary:
+                    insights_history.append({
+                        'date': date,
+                        'health_score': summary.get('health_score', 0),
+                        'key_metrics': summary.get('key_metrics', {}),
+                        'top_insight': summary.get('top_insight', '')
+                    })
+            
+            return Response({
+                'history': insights_history,
+                'trends': self._analyze_historical_trends(insights_history)
+            })
+            
+        except Exception as e:
+            logger.error(f"Error getting insights history: {e}")
+            return Response({
+                'error': 'Failed to retrieve insights history'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _check_ai_access(self, company) -> bool:
+        """Check if company has access to AI features"""
+        # Check subscription plan
+        if hasattr(company, 'subscription_plan'):
+            return company.subscription_plan.enable_ai_insights
+        return True  # Default to true for now
+    
+    def _get_cached_insights(self, company_id: int) -> Dict[str, Any]:
+        """Get latest cached insights for company"""
+        cache_key = f"ai_insights_latest_{company_id}"
+        return cache.get(cache_key)
+    
+    def _get_transactions(self, accounts, start_date, end_date):
+        """Get transactions with proper timezone handling"""
+        try:
+            start_datetime = timezone.make_aware(
+                datetime.combine(start_date, datetime.min.time())
+            )
+            end_datetime = timezone.make_aware(
+                datetime.combine(end_date, datetime.max.time())
+            )
+            
+            return Transaction.objects.filter(
+                bank_account__in=accounts,
+                transaction_date__gte=start_datetime,
+                transaction_date__lte=end_datetime
+            ).select_related('category', 'bank_account')
+            
+        except Exception:
+            # Fallback to date-based query
+            return Transaction.objects.filter(
+                bank_account__in=accounts,
+                transaction_date__date__gte=start_date,
+                transaction_date__date__lte=end_date
+            ).select_related('category', 'bank_account')
+    
+    def _calculate_comprehensive_metrics(self, transactions, start_date, end_date, company):
+        """Calculate comprehensive financial metrics with additional insights"""
         
         # Basic metrics
+        basic_metrics = self._calculate_basic_metrics(transactions, start_date, end_date)
+        
+        # Advanced metrics
+        advanced_metrics = {
+            'customer_metrics': self._calculate_customer_metrics(transactions),
+            'cash_flow_patterns': self._analyze_cash_flow_patterns(transactions),
+            'expense_trends': self._analyze_expense_trends(transactions),
+            'revenue_quality': self._assess_revenue_quality(transactions),
+            'operational_efficiency': self._calculate_operational_efficiency(transactions),
+            'financial_ratios': self._calculate_financial_ratios(basic_metrics),
+            'benchmark_comparison': self._get_benchmark_comparison(company, basic_metrics)
+        }
+        
+        # Combine all metrics
+        return {
+            **basic_metrics,
+            **advanced_metrics,
+            'company_context': {
+                'name': company.name,
+                'industry': getattr(company, 'industry', 'general'),
+                'size': getattr(company, 'size', 'small'),
+                'age_months': self._calculate_company_age(company)
+            }
+        }
+    
+    def _calculate_basic_metrics(self, transactions, start_date, end_date):
+        """Calculate basic financial metrics"""
+        # Income and expenses
+        income_types = ['credit', 'transfer_in', 'pix_in']
+        expense_types = ['debit', 'transfer_out', 'pix_out', 'fee']
+        
         income = transactions.filter(
-            transaction_type__in=['credit', 'transfer_in', 'pix_in']
+            transaction_type__in=income_types
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
         
         expenses = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+            transaction_type__in=expense_types
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
         
-        net_flow = income - abs(expenses)
-        
         # Category breakdown
-        category_data = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee'],
-            category__isnull=False
-        ).values('category__name').annotate(
-            total=Sum('amount'),
-            count=Count('id')
-        ).order_by('total')
+        category_data = self._get_category_breakdown(transactions, expense_types)
         
-        # Format category data
-        total_categorized_expenses = sum(abs(item['total']) for item in category_data)
-        top_categories = []
-        
-        for item in category_data[:10]:  # Top 10 categories
-            amount = abs(item['total'])
-            percentage = (amount / total_categorized_expenses * 100) if total_categorized_expenses > 0 else 0
-            top_categories.append({
-                'name': item['category__name'],
-                'amount': float(amount),
-                'percentage': round(percentage, 1),
-                'count': item['count']
-            })
-        
-        # Transaction patterns
-        days_in_period = (end_date - start_date).days + 1
+        # Transaction volume metrics
+        daily_transactions = transactions.values('transaction_date__date').annotate(
+            count=Count('id'),
+            total=Sum('amount')
+        )
         
         # Weekly patterns
+        weekly_patterns = self._calculate_weekly_patterns(
+            transactions, start_date, end_date
+        )
+        
+        # Largest transactions
+        largest_income = transactions.filter(
+            transaction_type__in=income_types
+        ).order_by('-amount').first()
+        
+        largest_expense = transactions.filter(
+            transaction_type__in=expense_types
+        ).order_by('amount').first()
+        
+        return {
+            'income': float(income),
+            'expenses': float(abs(expenses)),
+            'net_flow': float(income - abs(expenses)),
+            'transaction_count': transactions.count(),
+            'period_days': (end_date - start_date).days + 1,
+            'top_expense_categories': category_data,
+            'weekly_patterns': weekly_patterns,
+            'daily_transaction_data': list(daily_transactions),
+            'largest_income': {
+                'amount': float(largest_income.amount) if largest_income else 0,
+                'description': largest_income.description if largest_income else '',
+                'date': largest_income.transaction_date if largest_income else None
+            },
+            'largest_expense': {
+                'amount': float(abs(largest_expense.amount)) if largest_expense else 0,
+                'description': largest_expense.description if largest_expense else '',
+                'date': largest_expense.transaction_date if largest_expense else None
+            }
+        }
+    
+    def _get_category_breakdown(self, transactions, expense_types):
+        """Get detailed category breakdown"""
+        category_data = transactions.filter(
+            transaction_type__in=expense_types,
+            category__isnull=False
+        ).values(
+            'category__name', 
+            'category__icon',
+            'category__slug'
+        ).annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+            avg_amount=Avg('amount'),
+            max_amount=Max('amount'),
+            min_amount=Min('amount')
+        ).order_by('total')
+        
+        # Calculate percentages and format
+        total_expenses = sum(abs(item['total']) for item in category_data)
+        
+        formatted_categories = []
+        for item in category_data:
+            amount = abs(item['total'])
+            formatted_categories.append({
+                'name': item['category__name'],
+                'icon': item['category__icon'],
+                'slug': item['category__slug'],
+                'amount': float(amount),
+                'percentage': round((amount / total_expenses * 100), 1) if total_expenses > 0 else 0,
+                'count': item['count'],
+                'avg_amount': float(abs(item['avg_amount'])),
+                'max_amount': float(abs(item['max_amount'])),
+                'min_amount': float(abs(item['min_amount']))
+            })
+        
+        return formatted_categories
+    
+    def _calculate_weekly_patterns(self, transactions, start_date, end_date):
+        """Calculate detailed weekly patterns"""
         weekly_data = []
-        for i in range(0, days_in_period, 7):
-            week_start = start_date + timedelta(days=i)
-            week_end = min(week_start + timedelta(days=6), end_date)
+        current_date = start_date
+        
+        while current_date <= end_date:
+            week_end = min(current_date + timedelta(days=6), end_date)
             
             week_transactions = transactions.filter(
-                transaction_date__date__gte=week_start,
+                transaction_date__date__gte=current_date,
                 transaction_date__date__lte=week_end
             )
             
@@ -845,70 +1053,624 @@ class AIInsightsView(APIView):
                 transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
             ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
             
+            # Daily breakdown
+            daily_data = []
+            for i in range((week_end - current_date).days + 1):
+                day = current_date + timedelta(days=i)
+                day_trans = week_transactions.filter(transaction_date__date=day)
+                
+                day_income = day_trans.filter(
+                    transaction_type__in=['credit', 'transfer_in', 'pix_in']
+                ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+                
+                day_expenses = day_trans.filter(
+                    transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+                ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+                
+                daily_data.append({
+                    'date': day,
+                    'income': float(day_income),
+                    'expenses': float(abs(day_expenses)),
+                    'net': float(day_income - abs(day_expenses)),
+                    'transaction_count': day_trans.count()
+                })
+            
             weekly_data.append({
-                'week_start': week_start,
+                'week_start': current_date,
                 'week_end': week_end,
                 'income': float(week_income),
                 'expenses': float(abs(week_expenses)),
-                'net': float(week_income - abs(week_expenses))
+                'net': float(week_income - abs(week_expenses)),
+                'transaction_count': week_transactions.count(),
+                'daily_breakdown': daily_data
+            })
+            
+            current_date = week_end + timedelta(days=1)
+        
+        return weekly_data
+    
+    def _calculate_customer_metrics(self, transactions):
+        """Calculate customer-related metrics"""
+        income_transactions = transactions.filter(
+            transaction_type__in=['credit', 'transfer_in', 'pix_in'],
+            counterpart_name__isnull=False
+        )
+        
+        customer_data = income_transactions.values('counterpart_name').annotate(
+            total_revenue=Sum('amount'),
+            transaction_count=Count('id'),
+            avg_transaction=Avg('amount'),
+            first_transaction=Min('transaction_date'),
+            last_transaction=Max('transaction_date')
+        ).order_by('-total_revenue')
+        
+        total_revenue = sum(c['total_revenue'] for c in customer_data)
+        
+        # Top customers analysis
+        top_customers = []
+        for customer in customer_data[:10]:
+            top_customers.append({
+                'name': customer['counterpart_name'],
+                'revenue': float(customer['total_revenue']),
+                'percentage': float(customer['total_revenue'] / total_revenue * 100) if total_revenue > 0 else 0,
+                'transactions': customer['transaction_count'],
+                'avg_transaction': float(customer['avg_transaction']),
+                'days_active': (customer['last_transaction'] - customer['first_transaction']).days
             })
         
-        # Top transactions
-        largest_income = transactions.filter(
-            transaction_type__in=['credit', 'transfer_in', 'pix_in']
-        ).order_by('-amount').first()
-        
-        largest_expense = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
-        ).order_by('amount').first()
+        # Customer concentration risk
+        top_3_revenue = sum(c['revenue'] for c in top_customers[:3])
+        concentration_risk = (top_3_revenue / float(total_revenue) * 100) if total_revenue > 0 else 0
         
         return {
-            'income': float(income),
-            'expenses': float(abs(expenses)),
-            'net_flow': float(net_flow),
-            'transaction_count': transactions.count(),
-            'period_days': days_in_period,
-            'top_expense_categories': top_categories,
-            'weekly_patterns': weekly_data,
-            'largest_income': {
-                'amount': float(largest_income.amount) if largest_income else 0,
-                'description': largest_income.description if largest_income else ''
-            },
-            'largest_expense': {
-                'amount': float(abs(largest_expense.amount)) if largest_expense else 0,
-                'description': largest_expense.description if largest_expense else ''
-            },
-            'daily_avg_transactions': transactions.count() / days_in_period if days_in_period > 0 else 0,
-            'savings_rate': (net_flow / income * 100) if income > 0 else 0
+            'total_customers': customer_data.count(),
+            'top_customers': top_customers,
+            'customer_concentration_risk': concentration_risk,
+            'average_customer_value': float(total_revenue / customer_data.count()) if customer_data.count() > 0 else 0,
+            'customer_retention_rate': self._calculate_retention_rate(customer_data)
         }
     
-    def _empty_insights_response(self, start_date, end_date, message):
-        """Return empty insights response with appropriate message"""
+    def _calculate_retention_rate(self, customer_data):
+        """Calculate customer retention rate"""
+        # Simplified: customers who transacted in both first and last 30% of period
+        if not customer_data:
+            return 0
+        
+        total_customers = customer_data.count()
+        retained_customers = sum(
+            1 for c in customer_data 
+            if (c['last_transaction'] - c['first_transaction']).days > 30
+        )
+        
+        return (retained_customers / total_customers * 100) if total_customers > 0 else 0
+    
+    def _analyze_cash_flow_patterns(self, transactions):
+        """Analyze cash flow patterns"""
+        # Group by day of week
+        day_of_week_data = transactions.values(
+            'transaction_date__week_day'
+        ).annotate(
+            income=Sum('amount', filter=Q(transaction_type__in=['credit', 'transfer_in', 'pix_in'])),
+            expenses=Sum('amount', filter=Q(transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']))
+        ).order_by('transaction_date__week_day')
+        
+        # Group by day of month
+        day_of_month_data = transactions.extra(
+            select={'day': 'EXTRACT(day FROM transaction_date)'}
+        ).values('day').annotate(
+            income=Sum('amount', filter=Q(transaction_type__in=['credit', 'transfer_in', 'pix_in'])),
+            expenses=Sum('amount', filter=Q(transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']))
+        )
+        
+        # Find best and worst days
+        best_day = max(day_of_week_data, key=lambda x: (x['income'] or 0) - abs(x['expenses'] or 0))
+        worst_day = min(day_of_week_data, key=lambda x: (x['income'] or 0) - abs(x['expenses'] or 0))
+        
+        return {
+            'by_day_of_week': list(day_of_week_data),
+            'by_day_of_month': list(day_of_month_data),
+            'best_day_of_week': best_day['transaction_date__week_day'] if best_day else None,
+            'worst_day_of_week': worst_day['transaction_date__week_day'] if worst_day else None,
+            'income_concentration': self._calculate_income_concentration(day_of_month_data),
+            'expense_concentration': self._calculate_expense_concentration(day_of_month_data)
+        }
+    
+    def _calculate_income_concentration(self, day_data):
+        """Calculate how concentrated income is on specific days"""
+        total_income = sum(d['income'] or 0 for d in day_data)
+        if total_income == 0:
+            return 0
+        
+        # Calculate Gini coefficient for income distribution
+        sorted_income = sorted([d['income'] or 0 for d in day_data])
+        n = len(sorted_income)
+        index = range(1, n + 1)
+        
+        return (2 * sum(index[i] * sorted_income[i] for i in range(n))) / (n * sum(sorted_income)) - (n + 1) / n
+    
+    def _calculate_expense_concentration(self, day_data):
+        """Calculate how concentrated expenses are on specific days"""
+        total_expenses = sum(abs(d['expenses'] or 0) for d in day_data)
+        if total_expenses == 0:
+            return 0
+        
+        # Similar to income concentration
+        sorted_expenses = sorted([abs(d['expenses'] or 0) for d in day_data])
+        n = len(sorted_expenses)
+        index = range(1, n + 1)
+        
+        return (2 * sum(index[i] * sorted_expenses[i] for i in range(n))) / (n * sum(sorted_expenses)) - (n + 1) / n
+    
+    def _analyze_expense_trends(self, transactions):
+        """Analyze expense trends over time"""
+        expense_transactions = transactions.filter(
+            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+        )
+        
+        # Monthly trend
+        monthly_expenses = expense_transactions.extra(
+            select={'month': "TO_CHAR(transaction_date, 'YYYY-MM')"}
+        ).values('month').annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+            avg=Avg('amount')
+        ).order_by('month')
+        
+        # Category trends
+        category_trends = {}
+        for category in expense_transactions.values('category__name').distinct():
+            if category['category__name']:
+                trend_data = expense_transactions.filter(
+                    category__name=category['category__name']
+                ).extra(
+                    select={'month': "TO_CHAR(transaction_date, 'YYYY-MM')"}
+                ).values('month').annotate(
+                    total=Sum('amount')
+                ).order_by('month')
+                
+                category_trends[category['category__name']] = list(trend_data)
+        
+        return {
+            'monthly_trend': list(monthly_expenses),
+            'category_trends': category_trends,
+            'growth_rate': self._calculate_expense_growth_rate(monthly_expenses),
+            'volatility': self._calculate_expense_volatility(monthly_expenses)
+        }
+    
+    def _calculate_expense_growth_rate(self, monthly_data):
+        """Calculate average monthly expense growth rate"""
+        if len(monthly_data) < 2:
+            return 0
+        
+        growth_rates = []
+        for i in range(1, len(monthly_data)):
+            if monthly_data[i-1]['total'] != 0:
+                growth = (monthly_data[i]['total'] - monthly_data[i-1]['total']) / abs(monthly_data[i-1]['total']) * 100
+                growth_rates.append(growth)
+        
+        return sum(growth_rates) / len(growth_rates) if growth_rates else 0
+    
+    def _calculate_expense_volatility(self, monthly_data):
+        """Calculate expense volatility (standard deviation / mean)"""
+        if not monthly_data:
+            return 0
+        
+        expenses = [abs(m['total']) for m in monthly_data]
+        mean = sum(expenses) / len(expenses)
+        
+        if mean == 0:
+            return 0
+        
+        variance = sum((x - mean) ** 2 for x in expenses) / len(expenses)
+        std_dev = variance ** 0.5
+        
+        return (std_dev / mean) * 100
+    
+    def _assess_revenue_quality(self, transactions):
+        """Assess the quality and sustainability of revenue"""
+        income_transactions = transactions.filter(
+            transaction_type__in=['credit', 'transfer_in', 'pix_in']
+        )
+        
+        # Recurring vs one-time
+        recurring_keywords = ['mensalidade', 'assinatura', 'recorrente', 'mensal']
+        recurring_revenue = income_transactions.filter(
+            description__iregex='|'.join(recurring_keywords)
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        total_revenue = income_transactions.aggregate(total=Sum('amount'))['total'] or 0
+        
+        # Revenue predictability score
+        daily_revenue = income_transactions.values('transaction_date__date').annotate(
+            total=Sum('amount')
+        )
+        
+        revenue_volatility = self._calculate_revenue_volatility(daily_revenue)
+        predictability_score = 100 - min(revenue_volatility, 100)
+        
+        return {
+            'total_revenue': float(total_revenue),
+            'recurring_revenue': float(recurring_revenue),
+            'recurring_percentage': float(recurring_revenue / total_revenue * 100) if total_revenue > 0 else 0,
+            'predictability_score': predictability_score,
+            'revenue_sources': self._identify_revenue_sources(income_transactions),
+            'seasonality_index': self._calculate_seasonality_index(income_transactions)
+        }
+    
+    def _calculate_revenue_volatility(self, daily_revenue):
+        """Calculate revenue volatility"""
+        if not daily_revenue:
+            return 0
+        
+        revenues = [d['total'] for d in daily_revenue]
+        mean = sum(revenues) / len(revenues)
+        
+        if mean == 0:
+            return 100
+        
+        variance = sum((r - mean) ** 2 for r in revenues) / len(revenues)
+        std_dev = variance ** 0.5
+        
+        return (std_dev / mean) * 100
+    
+    def _identify_revenue_sources(self, income_transactions):
+        """Identify and categorize revenue sources"""
+        sources = income_transactions.values('description').annotate(
+            total=Sum('amount'),
+            count=Count('id')
+        ).order_by('-total')[:20]
+        
+        categorized_sources = {
+            'sales': 0,
+            'services': 0,
+            'subscriptions': 0,
+            'other': 0
+        }
+        
+        for source in sources:
+            desc_lower = source['description'].lower()
+            if any(word in desc_lower for word in ['venda', 'produto', 'pedido']):
+                categorized_sources['sales'] += source['total']
+            elif any(word in desc_lower for word in ['serviço', 'consultoria', 'projeto']):
+                categorized_sources['services'] += source['total']
+            elif any(word in desc_lower for word in ['assinatura', 'mensalidade', 'recorrente']):
+                categorized_sources['subscriptions'] += source['total']
+            else:
+                categorized_sources['other'] += source['total']
+        
+        return {k: float(v) for k, v in categorized_sources.items()}
+    
+    def _calculate_seasonality_index(self, income_transactions):
+        """Calculate seasonality index (0-100, higher = more seasonal)"""
+        # Group by month
+        monthly_data = income_transactions.extra(
+            select={'month': 'EXTRACT(month FROM transaction_date)'}
+        ).values('month').annotate(
+            total=Sum('amount')
+        )
+        
+        if len(monthly_data) < 3:
+            return 0
+        
+        # Calculate coefficient of variation
+        revenues = [m['total'] for m in monthly_data]
+        mean = sum(revenues) / len(revenues)
+        
+        if mean == 0:
+            return 0
+        
+        variance = sum((r - mean) ** 2 for r in revenues) / len(revenues)
+        std_dev = variance ** 0.5
+        cv = (std_dev / mean) * 100
+        
+        # Convert to 0-100 scale
+        return min(cv, 100)
+    
+    def _calculate_operational_efficiency(self, transactions):
+        """Calculate operational efficiency metrics"""
+        # Operating expense ratio
+        operating_expenses = transactions.filter(
+            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee'],
+            category__slug__in=['salaries', 'rent', 'utilities', 'supplies', 'admin']
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        total_revenue = transactions.filter(
+            transaction_type__in=['credit', 'transfer_in', 'pix_in']
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        # Cost per transaction
+        total_costs = abs(transactions.filter(
+            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+        ).aggregate(total=Sum('amount'))['total'] or 0)
+        
+        revenue_transactions = transactions.filter(
+            transaction_type__in=['credit', 'transfer_in', 'pix_in']
+        ).count()
+        
+        return {
+            'operating_expense_ratio': float(abs(operating_expenses) / total_revenue * 100) if total_revenue > 0 else 0,
+            'cost_per_transaction': float(total_costs / revenue_transactions) if revenue_transactions > 0 else 0,
+            'efficiency_score': self._calculate_efficiency_score(operating_expenses, total_revenue),
+            'automation_potential': self._assess_automation_potential(transactions)
+        }
+    
+    def _calculate_efficiency_score(self, operating_expenses, total_revenue):
+        """Calculate efficiency score (0-100)"""
+        if total_revenue == 0:
+            return 0
+        
+        ratio = abs(operating_expenses) / total_revenue
+        
+        # Lower ratio = higher efficiency
+        if ratio < 0.3:
+            return 90
+        elif ratio < 0.5:
+            return 70
+        elif ratio < 0.7:
+            return 50
+        else:
+            return 30
+    
+    def _assess_automation_potential(self, transactions):
+        """Assess potential for automation based on transaction patterns"""
+        # Recurring transactions
+        recurring_expenses = transactions.filter(
+            transaction_type__in=['debit', 'transfer_out'],
+            description__iregex='mensalidade|assinatura|aluguel|salário'
+        ).count()
+        
+        total_expenses = transactions.filter(
+            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+        ).count()
+        
+        automation_score = (recurring_expenses / total_expenses * 100) if total_expenses > 0 else 0
+        
+        return {
+            'score': automation_score,
+            'recurring_transactions': recurring_expenses,
+            'potential_savings': automation_score * 0.1  # 10% time savings per automated transaction
+        }
+    
+    def _calculate_financial_ratios(self, basic_metrics):
+        """Calculate key financial ratios"""
+        income = basic_metrics['income']
+        expenses = basic_metrics['expenses']
+        net_flow = basic_metrics['net_flow']
+        
+        return {
+            'profit_margin': (net_flow / income * 100) if income > 0 else 0,
+            'expense_ratio': (expenses / income * 100) if income > 0 else 0,
+            'liquidity_ratio': income / expenses if expenses > 0 else 0,
+            'burn_rate': expenses / basic_metrics['period_days'] if basic_metrics['period_days'] > 0 else 0,
+            'runway_months': (income / (expenses / basic_metrics['period_days'] * 30)) if expenses > 0 else 0
+        }
+    
+    def _get_benchmark_comparison(self, company, basic_metrics):
+        """Compare metrics against industry benchmarks"""
+        # This would ideally pull from a benchmark database
+        # For now, using hardcoded values
+        industry_benchmarks = {
+            'general': {
+                'profit_margin': 15,
+                'expense_ratio': 85,
+                'growth_rate': 10
+            },
+            'retail': {
+                'profit_margin': 10,
+                'expense_ratio': 90,
+                'growth_rate': 8
+            },
+            'services': {
+                'profit_margin': 20,
+                'expense_ratio': 80,
+                'growth_rate': 15
+            }
+        }
+        
+        industry = getattr(company, 'industry', 'general')
+        benchmarks = industry_benchmarks.get(industry, industry_benchmarks['general'])
+        
+        profit_margin = (basic_metrics['net_flow'] / basic_metrics['income'] * 100) if basic_metrics['income'] > 0 else 0
+        
+        return {
+            'industry': industry,
+            'profit_margin_vs_industry': profit_margin - benchmarks['profit_margin'],
+            'performance_percentile': self._calculate_performance_percentile(profit_margin, benchmarks['profit_margin'])
+        }
+    
+    def _calculate_performance_percentile(self, actual, benchmark):
+        """Calculate performance percentile compared to benchmark"""
+        if benchmark == 0:
+            return 50
+        
+        ratio = actual / benchmark
+        
+        if ratio >= 1.5:
+            return 90
+        elif ratio >= 1.2:
+            return 75
+        elif ratio >= 1.0:
+            return 60
+        elif ratio >= 0.8:
+            return 40
+        else:
+            return 25
+    
+    def _calculate_company_age(self, company):
+        """Calculate company age in months"""
+        if hasattr(company, 'created_at'):
+            return (timezone.now() - company.created_at).days // 30
+        return 12  # Default
+    
+    def _generate_quick_insights(self, financial_data):
+        """Generate quick insights without full AI processing"""
+        insights = []
+        
+        # Quick cash flow insight
+        if financial_data['net_flow'] > 0:
+            insights.append({
+                'type': 'success',
+                'title': 'Fluxo de Caixa Positivo',
+                'description': f"Lucro de R$ {financial_data['net_flow']:,.2f}",
+                'value': f"R$ {financial_data['net_flow']:,.2f}",
+                'trend': 'up'
+            })
+        else:
+            insights.append({
+                'type': 'danger',
+                'title': 'Atenção ao Fluxo de Caixa',
+                'description': f"Déficit de R$ {abs(financial_data['net_flow']):,.2f}",
+                'value': f"-R$ {abs(financial_data['net_flow']):,.2f}",
+                'trend': 'down'
+            })
+        
+        # Top expense category
+        if financial_data['top_expense_categories']:
+            top_cat = financial_data['top_expense_categories'][0]
+            insights.append({
+                'type': 'info',
+                'title': f"Maior Gasto: {top_cat['name']}",
+                'description': f"{top_cat['percentage']:.1f}% das despesas",
+                'value': f"R$ {top_cat['amount']:,.2f}"
+            })
+        
+        return {
+            'insights': insights,
+            'predictions': {
+                'next_month_income': financial_data['income'],
+                'next_month_expenses': financial_data['expenses'],
+                'projected_savings': financial_data['net_flow']
+            },
+            'recommendations': [],
+            'quick_mode': True
+        }
+    
+    def _generate_custom_insights(self, financial_data, custom_params):
+        """Generate custom insights based on specific parameters"""
+        # This would be expanded based on custom requirements
+        return enhanced_ai_service.generate_insights(
+            financial_data,
+            company_name=financial_data.get('company_context', {}).get('name', 'Empresa'),
+            force_refresh=True
+        )
+    
+    def _add_interactive_elements(self, insights, company):
+        """Add interactive elements to insights"""
+        # Add action buttons for recommendations
+        for rec in insights.get('recommendations', []):
+            if rec.get('type') == 'cost_reduction':
+                rec['action_button'] = {
+                    'label': 'Ver Detalhes',
+                    'url': f'/categories?focus={rec.get("category_slug", "")}'
+                }
+            elif rec.get('type') == 'revenue_growth':
+                rec['action_button'] = {
+                    'label': 'Criar Campanha',
+                    'url': '/marketing/campaigns/new'
+                }
+        
+        # Add drill-down links for insights
+        for insight in insights.get('insights', []):
+            if 'category' in insight.get('title', '').lower():
+                insight['drill_down'] = {
+                    'label': 'Analisar Categoria',
+                    'url': '/reports?type=category_analysis'
+                }
+        
+        return insights
+    
+    def _future_period_response(self, start_date, end_date):
+        """Response for future period requests"""
         return Response({
             'insights': [
                 {
                     'type': 'info',
-                    'title': 'Dados Indisponíveis',
-                    'description': message,
-                    'value': 'N/A',
+                    'title': 'Período Futuro',
+                    'description': 'Não é possível gerar insights para períodos futuros',
+                    'value': 'N/A'
                 }
             ],
             'predictions': {
-                'next_month_income': 0,
-                'next_month_expenses': 0,
-                'projected_savings': 0
+                'message': 'Use períodos passados para ver previsões futuras'
             },
+            'recommendations': [],
+            'period': {
+                'start_date': start_date,
+                'end_date': end_date
+            }
+        })
+    
+    def _no_accounts_response(self):
+        """Response when no accounts are connected"""
+        return Response({
+            'insights': [
+                {
+                    'type': 'warning',
+                    'title': 'Nenhuma Conta Conectada',
+                    'description': 'Conecte suas contas bancárias para começar a receber insights',
+                    'value': 'Configurar',
+                    'action_button': {
+                        'label': 'Conectar Conta',
+                        'url': '/banking/accounts/connect'
+                    }
+                }
+            ],
             'recommendations': [
                 {
+                    'type': 'setup',
+                    'title': 'Conecte sua Primeira Conta',
+                    'description': 'Em menos de 5 minutos, conecte sua conta e comece a receber insights automáticos',
+                    'priority': 'high'
+                }
+            ]
+        })
+    
+    def _no_transactions_response(self, start_date, end_date):
+        """Response when no transactions found"""
+        return Response({
+            'insights': [
+                {
                     'type': 'info',
-                    'title': 'Conecte suas Contas',
-                    'description': 'Conecte suas contas bancárias para começar a receber insights com IA'
+                    'title': 'Sem Transações no Período',
+                    'description': 'Não foram encontradas transações para análise',
+                    'value': '0 transações'
+                }
+            ],
+            'predictions': {},
+            'recommendations': [
+                {
+                    'type': 'action',
+                    'title': 'Verifique suas Contas',
+                    'description': 'Certifique-se de que suas contas estão sincronizadas corretamente'
                 }
             ],
             'period': {
                 'start_date': start_date,
-                'end_date': end_date,
-                'days': (end_date - start_date).days + 1
-            },
-            'ai_generated': False
+                'end_date': end_date
+            }
         })
+    
+    def _analyze_historical_trends(self, insights_history):
+        """Analyze trends from historical insights"""
+        if not insights_history:
+            return {}
+        
+        health_scores = [h['health_score'] for h in insights_history]
+        
+        return {
+            'health_trend': 'improving' if health_scores[-1] > health_scores[0] else 'declining',
+            'average_health': sum(health_scores) / len(health_scores),
+            'volatility': self._calculate_score_volatility(health_scores)
+        }
+    
+    def _calculate_score_volatility(self, scores):
+        """Calculate volatility of scores"""
+        if len(scores) < 2:
+            return 0
+        
+        mean = sum(scores) / len(scores)
+        variance = sum((s - mean) ** 2 for s in scores) / len(scores)
+        
+        return variance ** 0.5
+    
+    

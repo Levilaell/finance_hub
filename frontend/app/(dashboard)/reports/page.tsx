@@ -821,6 +821,7 @@ export default function ReportsPage() {
           </Card>
         </TabsContent>
 
+
         {/* AI Insights Tab */}
         <TabsContent value="insights" className="space-y-6">
           <Card>
@@ -835,18 +836,44 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {/* Loading State */}
+                {!aiInsightsData && selectedPeriod.start_date && selectedPeriod.end_date && (
+                  <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                    <div className="relative">
+                      <SparklesIcon className="h-16 w-16 text-purple-600 animate-pulse" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <LoadingSpinner className="h-8 w-8" />
+                      </div>
+                    </div>
+                    <div className="text-center space-y-2">
+                      <p className="text-lg font-medium text-gray-900">Analisando seus dados com IA...</p>
+                      <p className="text-sm text-gray-600">Isso pode levar alguns segundos</p>
+                      <div className="flex items-center justify-center space-x-2 text-xs text-gray-500">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                          <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        </div>
+                        <span>Processando com OpenAI GPT</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Insights Content */}
                 {aiInsightsData?.insights?.map((insight: any, index: number) => {
                   const Icon = getInsightIcon(insight.type);
                   return (
                     <div
                       key={index}
                       className={cn(
-                        "p-4 border rounded-lg",
+                        "p-4 border rounded-lg transition-all duration-300 animate-in fade-in slide-in-from-bottom-2",
                         insight.type === 'success' && "border-green-200 bg-green-50",
                         insight.type === 'warning' && "border-yellow-200 bg-yellow-50",
                         insight.type === 'info' && "border-blue-200 bg-blue-50",
                         insight.type === 'danger' && "border-red-200 bg-red-50"
                       )}
+                      style={{ animationDelay: `${index * 100}ms` }}
                     >
                       <div className="flex items-start space-x-3">
                         <Icon className={cn(
@@ -880,7 +907,7 @@ export default function ReportsPage() {
                 
                 {/* Predictions Section */}
                 {aiInsightsData?.predictions && (
-                  <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+                  <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200 animate-in fade-in slide-in-from-bottom-3">
                     <h4 className="font-medium flex items-center mb-3">
                       <TrendingUpIcon className="h-5 w-5 mr-2 text-purple-600" />
                       Previsões para o Próximo Mês
@@ -910,11 +937,15 @@ export default function ReportsPage() {
 
                 {/* Recommendations */}
                 {aiInsightsData?.recommendations && aiInsightsData.recommendations.length > 0 && (
-                  <div className="mt-6">
+                  <div className="mt-6 animate-in fade-in slide-in-from-bottom-4">
                     <h4 className="font-medium mb-3">Recomendações Personalizadas</h4>
                     <div className="space-y-2">
                       {aiInsightsData.recommendations.map((rec: any, index: number) => (
-                        <div key={index} className="flex items-start space-x-2">
+                        <div 
+                          key={index} 
+                          className="flex items-start space-x-2 animate-in fade-in slide-in-from-left-2"
+                          style={{ animationDelay: `${index * 100 + 400}ms` }}
+                        >
                           <CheckCircleIcon className="h-5 w-5 text-green-600 mt-0.5" />
                           <div>
                             <p className="text-sm font-medium">{rec.title}</p>
@@ -926,17 +957,28 @@ export default function ReportsPage() {
                   </div>
                 )}
 
-                {/* Loading/Empty State */}
-                {!aiInsightsData?.insights && (
+                {/* Empty State - No Period Selected */}
+                {!aiInsightsData && (!selectedPeriod.start_date || !selectedPeriod.end_date) && (
                   <div className="text-center py-8">
                     <SparklesIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
                     <p className="text-gray-500">Selecione um período para ver insights com IA</p>
+                  </div>
+                )}
+
+                {/* AI Badge */}
+                {aiInsightsData?.ai_generated && (
+                  <div className="mt-6 flex items-center justify-center">
+                    <div className="inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 rounded-full text-sm">
+                      <SparklesIcon className="h-4 w-4 text-purple-600" />
+                      <span className="text-purple-700 font-medium">Powered by OpenAI GPT</span>
+                    </div>
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
+        
       </Tabs>
 
       {/* Schedule Dialog */}
