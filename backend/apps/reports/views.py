@@ -801,10 +801,10 @@ class AIInsightsView(APIView):
             # Cache the result
             cache.set(cache_key, insights, 86400)  # 24 hours
             
-            # Queue background analysis for patterns
-            if force_refresh:
-                from .ai_tasks import analyze_deeper_patterns
-                analyze_deeper_patterns.delay(company.id, financial_data)
+            # Queue background analysis for patterns (commented out for now)
+            # if force_refresh:
+            #     from .ai_tasks import analyze_deeper_patterns
+            #     analyze_deeper_patterns.delay(company.id, financial_data)
             
             return Response(insights)
             

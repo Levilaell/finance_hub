@@ -15,7 +15,7 @@ import hashlib
 from celery.schedules import crontab
 from typing import Dict, List, Any, Optional, Tuple
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from collections import defaultdict
 import re
 from dotenv import load_dotenv
@@ -26,9 +26,33 @@ from django.utils import timezone
 from openai import OpenAI
 import numpy as np
 
-load_dotenv()
-
+load_dotenv(override=True)
 logger = logging.getLogger(__name__)
+
+
+# Debug: Log API key status
+api_key = os.getenv('OPENAI_API_KEY')
+if api_key:
+    logger.info(f"OpenAI API Key loaded successfully (starts with: {api_key[:10]}...)")
+    print(f"DEBUG: OpenAI API Key loaded successfully (starts with: {api_key[:10]}...)")
+else:
+    logger.error("OpenAI API Key NOT FOUND in environment variables")
+    print("DEBUG: OpenAI API Key NOT FOUND")
+
+# Also check Django settings
+try:
+    from django.conf import settings
+    settings_key = getattr(settings, 'OPENAI_API_KEY', None)
+    if settings_key:
+        logger.info(f"OpenAI API Key found in Django settings")
+        print(f"DEBUG: API Key in Django settings: {settings_key[:10]}...")
+    else:
+        logger.warning("OpenAI API Key not in Django settings")
+        print("DEBUG: API Key NOT in Django settings")
+except Exception as e:
+    logger.error(f"Error checking Django settings: {e}")
+    print(f"DEBUG: Error checking Django settings: {e}")
+
 
 # Versão do cache para invalidação automática em updates
 CACHE_VERSION = "v2.0"
@@ -183,7 +207,19 @@ class EnhancedAIInsightsService:
     
     def _sanitize_for_ai(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Remove sensitive information before sending to AI"""
-        sanitized = json.loads(json.dumps(data))  # Deep copy
+        # Convert Decimals to float for JSON serialization
+        import json
+        
+        def decimal_default(obj):
+            if isinstance(obj, Decimal):
+                return float(obj)
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            if isinstance(obj, date):
+                return obj.isoformat()
+            raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+            
+        sanitized = json.loads(json.dumps(data, default=decimal_default))  # Deep copy with Decimal handling
         
         # Remove specific account numbers, names, etc
         sensitive_fields = ['account_number', 'cpf', 'cnpj', 'api_key', 'password']

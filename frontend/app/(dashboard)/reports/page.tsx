@@ -303,15 +303,6 @@ const InsightCard: React.FC<{ insight: AIInsight; index: number }> = ({ insight,
               {insight.value}
             </div>
           )}
-          {insight.actionable && (
-            <Button 
-              variant="link" 
-              size="sm" 
-              className="mt-2 p-0 h-auto text-xs"
-            >
-              Tomar Ação →
-            </Button>
-          )}
         </div>
       </div>
     </div>
