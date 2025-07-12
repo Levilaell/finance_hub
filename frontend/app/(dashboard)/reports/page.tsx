@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,8 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
   ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon
+  ArrowTrendingDownIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import {
   Select,
@@ -82,11 +83,28 @@ const FREQUENCIES = [
 const QUICK_PERIODS = [
   { id: 'current_month', label: 'Mês Atual', icon: CalendarIcon },
   { id: 'last_month', label: 'Mês Anterior', icon: CalendarIcon },
-  { id: 'quarter', label: 'Trimestre', icon: ChartBarIcon },
-  { id: 'year', label: 'Ano Atual', icon: TrendingUpIcon },
+  { id: 'quarterly', label: 'Trimestre', icon: ChartBarIcon },
+  { id: 'year_to_date', label: 'Ano Atual', icon: TrendingUpIcon },
 ];
 
 const CHART_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
+
+// Types
+interface ReportData {
+  id: string;
+  title: string;
+  report_type: string;
+  period_start: string;
+  period_end: string;
+  file_format: string;
+  is_generated: boolean;
+  created_at: string;
+  created_by_name?: string;
+  file?: string;
+  file_size?: number;
+  generation_time?: number;
+  error_message?: string;
+}
 
 interface AIInsight {
   type: 'success' | 'warning' | 'info' | 'danger';
@@ -99,18 +117,7 @@ interface AIInsight {
   category?: string;
 }
 
-interface ScheduledReport {
-  id: string;
-  name: string;
-  type: string;
-  frequency: string;
-  recipients: string[];
-  nextRun: Date;
-  lastRun?: Date;
-  active: boolean;
-}
-
-// Error Boundary Component
+// Components
 const AIInsightsErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [hasError, setHasError] = useState(false);
 
@@ -144,7 +151,6 @@ const AIInsightsErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ chil
   return <>{children}</>;
 };
 
-// Score Card Component
 const ScoreCard: React.FC<{ 
   title: string; 
   score: number; 
@@ -207,7 +213,6 @@ const ScoreCard: React.FC<{
   );
 };
 
-// Confidence Indicator Component
 const ConfidenceIndicator: React.FC<{ level: 'high' | 'medium' | 'low' }> = ({ level }) => {
   const configs = {
     high: { color: 'text-green-600', bars: 3, label: 'Alta Confiança' },
@@ -235,7 +240,6 @@ const ConfidenceIndicator: React.FC<{ level: 'high' | 'medium' | 'low' }> = ({ l
   );
 };
 
-// Insight Card Component
 const InsightCard: React.FC<{ insight: AIInsight; index: number }> = ({ insight, index }) => {
   const getInsightIcon = (type: AIInsight['type']) => {
     switch (type) {
@@ -309,7 +313,6 @@ const InsightCard: React.FC<{ insight: AIInsight; index: number }> = ({ insight,
   );
 };
 
-// Categorized Insights Component
 const CategorizedInsights: React.FC<{ insights: AIInsight[] }> = ({ insights }) => {
   const categorized = insights.reduce((acc, insight) => {
     const category = insight.category || 'general';
@@ -344,7 +347,6 @@ const CategorizedInsights: React.FC<{ insights: AIInsight[] }> = ({ insights }) 
   );
 };
 
-// Executive Summary Component
 const ExecutiveSummary: React.FC<{ summary: any }> = ({ summary }) => {
   const statusColors = {
     excellent: 'bg-green-100 text-green-800 border-green-300',
@@ -390,8 +392,96 @@ const ExecutiveSummary: React.FC<{ summary: any }> = ({ summary }) => {
   );
 };
 
+const ScheduledReportCard = ({ schedule, onToggle, onDelete, onRunNow }: { 
+  schedule: any;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  onRunNow: (id: string) => void;
+}) => {
+  const getNextRunLabel = (nextRunAt: string) => {
+    if (!nextRunAt) return 'Não agendado';
+    
+    const nextRun = new Date(nextRunAt);
+    const now = new Date();
+    const diffHours = (nextRun.getTime() - now.getTime()) / (1000 * 60 * 60);
+    
+    if (diffHours < 0) return 'Atrasado';
+    if (diffHours < 24) return `Em ${Math.round(diffHours)} horas`;
+    if (diffHours < 168) return `Em ${Math.round(diffHours / 24)} dias`;
+    
+    return formatDate(nextRunAt);
+  };
+  
+  return (
+    <div className="flex items-center justify-between p-4 border rounded-lg hover:shadow-md transition-shadow">
+      <div className="flex items-center space-x-4">
+        <div className={cn(
+          "p-2 rounded-lg",
+          schedule.is_active ? "bg-primary/10" : "bg-gray-100"
+        )}>
+          <ClockIcon className={cn(
+            "h-5 w-5",
+            schedule.is_active ? "text-primary" : "text-gray-400"
+          )} />
+        </div>
+        <div>
+          <h3 className="font-medium flex items-center">
+            {schedule.name || `${schedule.report_type} Report`}
+            {!schedule.is_active && (
+              <span className="ml-2 text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded">
+                Inativo
+              </span>
+            )}
+          </h3>
+          <div className="flex items-center space-x-4 text-sm text-gray-600">
+            <span>{FREQUENCIES.find(f => f.value === schedule.frequency)?.label}</span>
+            <span className="flex items-center">
+              <EnvelopeIcon className="h-4 w-4 mr-1" />
+              {schedule.email_recipients?.length || 0} destinatário(s)
+            </span>
+            {schedule.file_format && (
+              <span className="uppercase text-xs bg-gray-100 px-2 py-0.5 rounded">
+                {schedule.file_format}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
+            <span>Próxima execução: {getNextRunLabel(schedule.next_run_at)}</span>
+            {schedule.last_run_at && (
+              <span>Última execução: {formatDate(schedule.last_run_at)}</span>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center space-x-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onRunNow(schedule.id)}
+          disabled={!schedule.is_active}
+        >
+          <PlayIcon className="h-4 w-4" />
+        </Button>
+        <Switch
+          checked={schedule.is_active}
+          onCheckedChange={() => onToggle(schedule.id)}
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onDelete(schedule.id)}
+        >
+          <XMarkIcon className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 export default function ReportsPage() {
-  // Initialize with null to avoid hydration issues
+  const queryClient = useQueryClient();
+  
+  // State
   const [selectedPeriod, setSelectedPeriod] = useState<{
     start_date: Date | null;
     end_date: Date | null;
@@ -399,16 +489,6 @@ export default function ReportsPage() {
     start_date: null,
     end_date: null,
   });
-
-  // Set dates on client-side after hydration
-  useEffect(() => {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    setSelectedPeriod({
-      start_date: startOfMonth,
-      end_date: now,
-    });
-  }, []);
   
   const [reportType, setReportType] = useState<string>('profit_loss');
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
@@ -419,23 +499,18 @@ export default function ReportsPage() {
   const [scheduleRecipients, setScheduleRecipients] = useState('');
   const [exportFormat, setExportFormat] = useState<'pdf' | 'excel'>('pdf');
 
-  // AI Insights query
-  const { data: aiInsightsData, isLoading: aiInsightsLoading, error: aiInsightsError } = useQuery({
-    queryKey: ['ai-insights', selectedPeriod],
-    queryFn: () => {
-      if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
-      return reportsService.getAIInsights({
-        start_date: selectedPeriod.start_date,
-        end_date: selectedPeriod.end_date
-      });
-    },
-    enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
-    retry: 2,
-    retryDelay: 1000,
-  });
+  // Set dates on client-side after hydration
+  useEffect(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    setSelectedPeriod({
+      start_date: startOfMonth,
+      end_date: now,
+    });
+  }, []);
 
   // Queries
-  const { data: reports, isLoading, error } = useQuery({
+  const { data: reports, isLoading, error, refetch: refetchReports } = useQuery({
     queryKey: ['reports'],
     queryFn: () => reportsService.getReports(),
   });
@@ -486,13 +561,59 @@ export default function ReportsPage() {
     enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
   });
 
-  // Scheduled reports query
   const { data: scheduledReports, refetch: refetchScheduledReports } = useQuery({
     queryKey: ['scheduledReports'],
     queryFn: () => reportsService.getScheduledReports(),
   });
 
-  // Create scheduled report mutation
+  const { data: aiInsightsData, isLoading: aiInsightsLoading, error: aiInsightsError } = useQuery({
+    queryKey: ['ai-insights', selectedPeriod],
+    queryFn: () => {
+      if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
+      return reportsService.getAIInsights({
+        start_date: selectedPeriod.start_date,
+        end_date: selectedPeriod.end_date
+      });
+    },
+    enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
+    retry: 2,
+    retryDelay: 1000,
+  });
+
+  // Mutations
+  const generateReportMutation = useMutation({
+    mutationFn: (params: { type: string; parameters: ReportParameters; format: 'pdf' | 'excel' }) =>
+      reportsService.generateReport(params.type, params.parameters, params.format),
+    onSuccess: (data) => {
+      toast.success('Relatório está sendo gerado. Você será notificado quando estiver pronto.');
+      refetchReports();
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Falha ao gerar relatório');
+    },
+  });
+
+  const downloadReportMutation = useMutation({
+    mutationFn: (reportId: string) => reportsService.downloadReport(reportId),
+    onSuccess: (data, reportId) => {
+      const report = reports?.results?.find((r: ReportData) => r.id === reportId);
+      if (typeof window !== 'undefined') {
+        const url = window.URL.createObjectURL(new Blob([data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${report?.title || 'report'}_${new Date().toISOString().split('T')[0]}.${report?.file_format || 'pdf'}`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        toast.success('Download iniciado');
+      }
+    },
+    onError: (error: any) => {
+      toast.error('Falha ao baixar relatório');
+    },
+  });
+
   const createScheduledReportMutation = useMutation({
     mutationFn: (data: any) => reportsService.createScheduledReport(data),
     onSuccess: () => {
@@ -504,15 +625,14 @@ export default function ReportsPage() {
     },
     onError: (error: any) => {
       console.error('Erro ao criar agendamento:', error);
-      const errorMessage = error.response?.data?.detail || 
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.detail || 
                           error.response?.data?.message || 
-                          JSON.stringify(error.response?.data) || 
                           'Falha ao criar agendamento';
       toast.error(errorMessage);
     },
   });
 
-  // Toggle scheduled report mutation
   const toggleScheduledReportMutation = useMutation({
     mutationFn: (id: string) => reportsService.toggleScheduledReport(id),
     onSuccess: () => {
@@ -524,7 +644,6 @@ export default function ReportsPage() {
     },
   });
 
-  // Delete scheduled report mutation
   const deleteScheduledReportMutation = useMutation({
     mutationFn: (id: string) => reportsService.deleteScheduledReport(id),
     onSuccess: () => {
@@ -536,37 +655,14 @@ export default function ReportsPage() {
     },
   });
 
-  // Mutations
-  const generateReportMutation = useMutation({
-    mutationFn: (params: { type: string; parameters: ReportParameters; format: 'pdf' | 'excel' }) =>
-      reportsService.generateReport(params.type, params.parameters),
+  const runScheduledReportNowMutation = useMutation({
+    mutationFn: (id: string) => reportsService.runScheduledReportNow(id),
     onSuccess: (data) => {
-      toast.success('Relatório gerado com sucesso');
-      if (data.file_url && typeof window !== 'undefined') {
-        window.open(data.file_url, '_blank');
-      }
+      toast.success(data.message || 'Relatório sendo gerado');
+      refetchReports();
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Falha ao gerar relatório');
-    },
-  });
-
-  const downloadReportMutation = useMutation({
-    mutationFn: (reportId: string) => reportsService.downloadReport(reportId),
-    onSuccess: (data, reportId) => {
-      if (typeof window !== 'undefined') {
-        const url = window.URL.createObjectURL(new Blob([data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `report_${reportId}_${new Date().toISOString()}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-      }
-    },
-    onError: (error: any) => {
-      toast.error('Falha ao baixar relatório');
+      toast.error(error.response?.data?.error || 'Falha ao executar relatório');
     },
   });
 
@@ -584,11 +680,11 @@ export default function ReportsPage() {
         start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         end = new Date(now.getFullYear(), now.getMonth(), 0);
         break;
-      case 'quarter':
+      case 'quarterly':
         const quarter = Math.floor(now.getMonth() / 3);
         start = new Date(now.getFullYear(), quarter * 3, 1);
         break;
-      case 'year':
+      case 'year_to_date':
         start = new Date(now.getFullYear(), 0, 1);
         break;
       default:
@@ -599,53 +695,77 @@ export default function ReportsPage() {
   }, []);
 
   const handleGenerateReport = useCallback(() => {
-    if (!selectedPeriod.start_date || !selectedPeriod.end_date) return;
+    if (!selectedPeriod.start_date || !selectedPeriod.end_date) {
+      toast.error('Por favor, selecione um período');
+      return;
+    }
     
     const parameters: ReportParameters = {
       start_date: selectedPeriod.start_date.toISOString().split('T')[0],
       end_date: selectedPeriod.end_date.toISOString().split('T')[0],
       account_ids: selectedAccounts,
       category_ids: selectedCategories,
+      title: `${REPORT_TYPES.find(t => t.value === reportType)?.label} - ${formatDate(selectedPeriod.start_date)} a ${formatDate(selectedPeriod.end_date)}`,
+      file_format: exportFormat,
     };
 
-    generateReportMutation.mutate({ type: reportType, parameters, format: exportFormat });
+    generateReportMutation.mutate({ 
+      type: reportType, 
+      parameters, 
+      format: exportFormat 
+    });
   }, [selectedPeriod, selectedAccounts, selectedCategories, reportType, exportFormat, generateReportMutation]);
 
   const handleScheduleReport = useCallback(() => {
-    if (!scheduleName || !scheduleRecipients) {
-      toast.error('Nome e destinatários são obrigatórios');
+    // Validações
+    if (!scheduleName.trim()) {
+      toast.error('Por favor, insira um nome para o agendamento');
+      return;
+    }
+    
+    if (!scheduleRecipients.trim()) {
+      toast.error('Por favor, insira pelo menos um email de destinatário');
+      return;
+    }
+    
+    // Validar emails
+    const emails = scheduleRecipients.split(',').map(email => email.trim());
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidEmails = emails.filter(email => !emailRegex.test(email));
+    
+    if (invalidEmails.length > 0) {
+      toast.error(`Emails inválidos: ${invalidEmails.join(', ')}`);
       return;
     }
 
     const scheduleData = {
-      name: scheduleName,
+      name: scheduleName.trim(),
       report_type: reportType,
       frequency: scheduleFrequency,
-      email_recipients: scheduleRecipients.split(',').map(email => email.trim()),
+      email_recipients: emails,
       file_format: exportFormat,
+      send_email: true,
       parameters: {
-        start_date: selectedPeriod.start_date?.toISOString().split('T')[0],
-        end_date: selectedPeriod.end_date?.toISOString().split('T')[0],
         account_ids: selectedAccounts,
         category_ids: selectedCategories,
-      }
+      },
+      filters: {}
     };
 
     createScheduledReportMutation.mutate(scheduleData);
-  }, [scheduleName, scheduleRecipients, reportType, scheduleFrequency, exportFormat, selectedPeriod, selectedAccounts, selectedCategories, createScheduledReportMutation]);
+  }, [scheduleName, scheduleRecipients, reportType, scheduleFrequency, exportFormat, selectedAccounts, selectedCategories, createScheduledReportMutation]);
 
-  const getInsightIcon = (type: AIInsight['type']) => {
-    switch (type) {
-      case 'success':
-        return CheckCircleIcon;
-      case 'warning':
-        return ExclamationTriangleIcon;
-      case 'info':
-        return LightBulbIcon;
-      case 'danger':
-        return ExclamationTriangleIcon;
+  const handleRunScheduledReport = useCallback((scheduleId: string) => {
+    if (confirm('Deseja executar este relatório agora?')) {
+      runScheduledReportNowMutation.mutate(scheduleId);
     }
-  };
+  }, [runScheduledReportNowMutation]);
+
+  const handleDeleteScheduledReport = useCallback((scheduleId: string) => {
+    if (confirm('Tem certeza que deseja remover este agendamento?')) {
+      deleteScheduledReportMutation.mutate(scheduleId);
+    }
+  }, [deleteScheduledReportMutation]);
 
   if (isLoading) {
     return (
@@ -987,7 +1107,7 @@ export default function ReportsPage() {
             <CardContent>
               {reports?.results && reports.results.length > 0 ? (
                 <div className="space-y-4">
-                  {reports.results.map((report) => (
+                  {reports.results.map((report: ReportData) => (
                     <div
                       key={report.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
@@ -997,31 +1117,56 @@ export default function ReportsPage() {
                           <DocumentChartBarIcon className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                          <h3 className="font-medium">{report.name}</h3>
+                          <h3 className="font-medium">{report.title}</h3>
                           <div className="flex items-center space-x-4 text-sm text-gray-600">
                             <span className="flex items-center">
                               <CalendarIcon className="h-4 w-4 mr-1" />
-                              {report.frequency}
+                              {formatDate(report.period_start)} - {formatDate(report.period_end)}
                             </span>
-                            {report.last_generated && (
-                              <span className="flex items-center">
+                            <span className="flex items-center">
+                              <ClockIcon className="h-4 w-4 mr-1" />
+                              Criado {formatDate(report.created_at)}
+                            </span>
+                            {report.is_generated ? (
+                              <span className="flex items-center text-green-600">
+                                <CheckCircleIcon className="h-4 w-4 mr-1" />
+                                Pronto
+                              </span>
+                            ) : report.error_message ? (
+                              <span className="flex items-center text-red-600">
+                                <ExclamationTriangleIcon className="h-4 w-4 mr-1" />
+                                Erro
+                              </span>
+                            ) : (
+                              <span className="flex items-center text-yellow-600">
                                 <ClockIcon className="h-4 w-4 mr-1" />
-                                Gerado {formatDate(report.last_generated)}
+                                Processando
                               </span>
                             )}
                           </div>
+                          {report.error_message && (
+                            <p className="text-sm text-red-600 mt-1">{report.error_message}</p>
+                          )}
                         </div>
                       </div>
                       <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => downloadReportMutation.mutate(report.id)}
-                          disabled={downloadReportMutation.isPending}
-                        >
-                          <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
-                          Baixar
-                        </Button>
+                        {report.is_generated && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => downloadReportMutation.mutate(report.id)}
+                            disabled={downloadReportMutation.isPending}
+                          >
+                            <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
+                            Baixar
+                          </Button>
+                        )}
+                        {!report.is_generated && !report.error_message && (
+                          <Button variant="outline" size="sm" disabled>
+                            <LoadingSpinner className="h-4 w-4 mr-1" />
+                            Gerando...
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1047,46 +1192,13 @@ export default function ReportsPage() {
             <CardContent>
               <div className="space-y-4">
                 {scheduledReports?.results?.map((schedule: any) => (
-                  <div
+                  <ScheduledReportCard
                     key={schedule.id}
-                    className="flex items-center justify-between p-4 border rounded-lg"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="p-2 bg-primary/10 rounded-lg">
-                        <ClockIcon className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium">{schedule.name || `${schedule.report_type} Report`}</h3>
-                        <div className="flex items-center space-x-4 text-sm text-gray-600">
-                          <span>{FREQUENCIES.find(f => f.value === schedule.frequency)?.label}</span>
-                          <span className="flex items-center">
-                            <EnvelopeIcon className="h-4 w-4 mr-1" />
-                            {schedule.email_recipients?.join(', ')}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          Próxima execução: {schedule.next_run_at ? formatDate(schedule.next_run_at) : 'Não definido'}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <Switch
-                        checked={schedule.is_active}
-                        onCheckedChange={() => {
-                          toggleScheduledReportMutation.mutate(schedule.id);
-                        }}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          deleteScheduledReportMutation.mutate(schedule.id);
-                        }}
-                      >
-                        Remover
-                      </Button>
-                    </div>
-                  </div>
+                    schedule={schedule}
+                    onToggle={toggleScheduledReportMutation.mutate}
+                    onDelete={handleDeleteScheduledReport}
+                    onRunNow={handleRunScheduledReport}
+                  />
                 ))}
                 
                 {(!scheduledReports?.results || scheduledReports.results.length === 0) && (
@@ -1385,6 +1497,21 @@ export default function ReportsPage() {
               />
             </div>
             <div>
+              <Label>Tipo de Relatório</Label>
+              <Select value={reportType} onValueChange={setReportType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {REPORT_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>Frequência</Label>
               <Select value={scheduleFrequency} onValueChange={setScheduleFrequency}>
                 <SelectTrigger>
@@ -1400,6 +1527,18 @@ export default function ReportsPage() {
               </Select>
             </div>
             <div>
+              <Label>Formato do Arquivo</Label>
+              <Select value={exportFormat} onValueChange={(value: 'pdf' | 'excel') => setExportFormat(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pdf">PDF</SelectItem>
+                  <SelectItem value="excel">Excel</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>Destinatários (emails separados por vírgula)</Label>
               <Input
                 value={scheduleRecipients}
@@ -1407,12 +1546,20 @@ export default function ReportsPage() {
                 placeholder="email1@example.com, email2@example.com"
               />
             </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setIsScheduleDialogOpen(false)}>
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button variant="outline" onClick={() => {
+                setIsScheduleDialogOpen(false);
+                setScheduleName('');
+                setScheduleRecipients('');
+              }}>
                 Cancelar
               </Button>
-              <Button onClick={handleScheduleReport}>
-                Criar Agendamento
+              <Button onClick={handleScheduleReport} disabled={createScheduledReportMutation.isPending}>
+                {createScheduledReportMutation.isPending ? (
+                  <LoadingSpinner />
+                ) : (
+                  'Criar Agendamento'
+                )}
               </Button>
             </div>
           </div>

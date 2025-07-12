@@ -1,173 +1,303 @@
-import apiClient from "@/lib/api-client";
-import { Report, ReportResult, ReportParameters, DashboardStats, CashFlowData, CategorySpending, PaginatedResponse } from "@/types";
+// frontend/services/reports.service.ts
 
-interface IncomeVsExpenseData {
-  month: string;
-  income: number;
-  expenses: number;
-  profit: number;
+import { api } from '@/lib/api';
+import { 
+  Report, 
+  ReportParameters, 
+  ScheduledReport,
+  AIInsights 
+} from '@/types';
+
+export interface GenerateReportParams {
+  type: string;
+  parameters: ReportParameters & {
+    title?: string;
+    file_format?: string;
+  };
+  format: 'pdf' | 'excel';
 }
 
-class ReportsService {
-  // Reports
-  async getReports(): Promise<PaginatedResponse<Report>> {
-    return apiClient.get<PaginatedResponse<Report>>("/api/reports/reports/");
-  }
+export interface CreateScheduledReportData {
+  name: string;
+  report_type: string;
+  frequency: string;
+  email_recipients: string[];
+  file_format: string;
+  send_email?: boolean;
+  parameters?: Record<string, any>;
+  filters?: Record<string, any>;
+}
 
-  async getReport(id: string): Promise<Report> {
-    return apiClient.get<Report>(`/api/reports/reports/${id}/`);
-  }
+export const reportsService = {
+  // Get all reports
+  async getReports(params?: { 
+    page?: number; 
+    limit?: number;
+    report_type?: string;
+    is_generated?: boolean;
+  }) {
+    const response = await api.get('/reports/reports/', { params });
+    return response.data;
+  },
 
-  async createReport(data: {
-    title: string;
-    report_type: string;
-    parameters: ReportParameters;
-  }): Promise<Report> {
-    return apiClient.post<Report>("/api/reports/reports/", data);
-  }
-
-  async updateReport(
-    id: string,
-    data: Partial<Report>
-  ): Promise<Report> {
-    return apiClient.patch<Report>(`/api/reports/reports/${id}/`, data);
-  }
-
-  async deleteReport(id: string): Promise<void> {
-    return apiClient.delete(`/api/reports/reports/${id}/`);
-  }
-
-  async generateReport(type: string, parameters: ReportParameters): Promise<ReportResult> {
-    return apiClient.post<ReportResult>("/api/reports/reports/", {
+  // Generate a new report with enhanced parameters
+  async generateReport(type: string, parameters: ReportParameters, format: 'pdf' | 'excel' = 'pdf') {
+    const response = await api.post('/reports/reports/', {
       report_type: type,
-      title: `${type} Report`,
-      period_start: parameters.start_date,
-      period_end: parameters.end_date,
-      parameters
+      ...parameters,
+      file_format: format,
     });
-  }
+    return response.data;
+  },
 
-  async getReportResults(reportId: string): Promise<ReportResult[]> {
-    return apiClient.get<ReportResult[]>(`/api/reports/reports/${reportId}/results/`);
-  }
-
-  async downloadReport(resultId: string): Promise<Blob> {
-    const response = await apiClient.get(`/api/reports/reports/${resultId}/download/`, {
-      responseType: "blob",
+  // Download report file
+  async downloadReport(reportId: string) {
+    const response = await api.get(`/reports/reports/${reportId}/download/`, {
+      responseType: 'blob',
     });
-    return response as unknown as Blob;
-  }
+    return response.data;
+  },
 
-  // Dashboard
-  async getDashboardStats(): Promise<DashboardStats> {
-    return apiClient.get<DashboardStats>("/api/reports/dashboard/stats/");
-  }
+  // Get report summary with statistics
+  async getReportSummary() {
+    const response = await api.get('/reports/reports/summary/');
+    return response.data;
+  },
+
+  // Scheduled Reports
+  async getScheduledReports(params?: {
+    is_active?: boolean;
+    report_type?: string;
+    frequency?: string;
+  }) {
+    const response = await api.get('/reports/schedules/', { params });
+    return response.data;
+  },
+
+  async createScheduledReport(data: CreateScheduledReportData) {
+    const response = await api.post('/reports/schedules/', data);
+    return response.data;
+  },
+
+  async updateScheduledReport(id: string, data: Partial<CreateScheduledReportData>) {
+    const response = await api.patch(`/reports/schedules/${id}/`, data);
+    return response.data;
+  },
+
+  async toggleScheduledReport(id: string) {
+    const response = await api.post(`/reports/schedules/${id}/toggle_active/`);
+    return response.data;
+  },
+
+  async runScheduledReportNow(id: string) {
+    const response = await api.post(`/reports/schedules/${id}/run_now/`);
+    return response.data;
+  },
+
+  async deleteScheduledReport(id: string) {
+    const response = await api.delete(`/reports/schedules/${id}/`);
+    return response.data;
+  },
+
+  // Quick Reports
+  async getQuickReports() {
+    const response = await api.get('/reports/quick/');
+    return response.data;
+  },
+
+  async generateQuickReport(reportId: string) {
+    const response = await api.post('/reports/quick/', { report_id: reportId });
+    return response.data;
+  },
+
+  // Analytics
+  async getAnalytics(period: number = 30) {
+    const response = await api.get('/reports/analytics/', {
+      params: { period }
+    });
+    return response.data;
+  },
+
+  // Dashboard data
+  async getDashboardStats() {
+    const response = await api.get('/reports/dashboard/stats/');
+    return response.data;
+  },
 
   async getCashFlowData(params: {
     start_date: Date;
     end_date: Date;
-  }): Promise<CashFlowData[]> {
-    return apiClient.get<CashFlowData[]>("/api/reports/dashboard/cash-flow/", {
-      start_date: params.start_date.toISOString().split('T')[0],
-      end_date: params.end_date.toISOString().split('T')[0]
+  }) {
+    const response = await api.get('/reports/dashboard/cash-flow/', {
+      params: {
+        start_date: params.start_date.toISOString().split('T')[0],
+        end_date: params.end_date.toISOString().split('T')[0],
+      }
     });
-  }
+    return response.data;
+  },
 
   async getCategorySpending(params: {
     start_date: Date;
     end_date: Date;
-  }): Promise<CategorySpending[]> {
-    return apiClient.get<CategorySpending[]>("/api/reports/dashboard/category-spending/", {
-      start_date: params.start_date.toISOString().split('T')[0],
-      end_date: params.end_date.toISOString().split('T')[0],
-      type: 'expense'
+    type?: 'expense' | 'income';
+  }) {
+    const response = await api.get('/reports/dashboard/category-spending/', {
+      params: {
+        start_date: params.start_date.toISOString().split('T')[0],
+        end_date: params.end_date.toISOString().split('T')[0],
+        type: params.type || 'expense',
+      }
     });
-  }
+    return response.data;
+  },
 
   async getIncomeVsExpenses(params: {
     start_date: Date;
     end_date: Date;
-  }): Promise<IncomeVsExpenseData[]> {
-    const data = await apiClient.get<any[]>("/api/reports/dashboard/income-vs-expenses/", {
-      start_date: params.start_date.toISOString().split('T')[0],
-      end_date: params.end_date.toISOString().split('T')[0]
+  }) {
+    const response = await api.get('/reports/dashboard/income-vs-expenses/', {
+      params: {
+        start_date: params.start_date.toISOString().split('T')[0],
+        end_date: params.end_date.toISOString().split('T')[0],
+      }
     });
-    
-    // Transform data to include profit calculation
-    return data.map(item => ({
-      month: item.month,
-      income: item.income || 0,
-      expenses: item.expenses || 0,
-      profit: (item.income || 0) - (item.expenses || 0)
-    }));
-  }
+    return response.data;
+  },
 
-  // Analytics
-  // Scheduled Reports
-  async getScheduledReports(): Promise<any> {
-    return apiClient.get("/api/reports/schedules/");
-  }
-
-  async createScheduledReport(data: {
-    name: string;
-    report_type: string;
-    frequency: string;
-    email_recipients: string[];
-    file_format?: string;
-    parameters?: any;
-  }): Promise<any> {
-    return apiClient.post("/api/reports/schedules/", data);
-  }
-
-  async updateScheduledReport(id: string, data: any): Promise<any> {
-    return apiClient.patch(`/api/reports/schedules/${id}/`, data);
-  }
-
-  async deleteScheduledReport(id: string): Promise<void> {
-    return apiClient.delete(`/api/reports/schedules/${id}/`);
-  }
-
-  async toggleScheduledReport(id: string): Promise<any> {
-    return apiClient.post(`/api/reports/schedules/${id}/toggle_active/`);
-  }
-
-  async runScheduledReport(id: string): Promise<any> {
-    return apiClient.post(`/api/reports/schedules/${id}/run_now/`);
-  }
-
-  async getIncomeStatement(params: {
-    start_date: string;
-    end_date: string;
-    comparison_period?: "previous_period" | "previous_year";
-  }): Promise<any> {
-    return apiClient.get("/api/reports/analytics/income-statement/", params);
-  }
-
-  async getBalanceSheet(params: {
-    as_of_date: string;
-    comparison_date?: string;
-  }): Promise<any> {
-    return apiClient.get("/api/reports/analytics/balance-sheet/", params);
-  }
-
-  async getCashFlow(params: {
-    start_date: string;
-    end_date: string;
-    interval: "daily" | "weekly" | "monthly";
-  }): Promise<any> {
-    return apiClient.get("/api/reports/analytics/cash-flow/", params);
-  }
-
-  // AI Insights
+  // AI Insights with enhanced error handling
   async getAIInsights(params: {
     start_date: Date;
     end_date: Date;
-  }): Promise<any> {
-    return apiClient.get("/api/reports/ai-insights/", {
-      start_date: params.start_date.toISOString().split('T')[0],
-      end_date: params.end_date.toISOString().split('T')[0]
-    });
-  }
-}
+    force_refresh?: boolean;
+    type?: 'comprehensive' | 'quick' | 'custom';
+  }): Promise<AIInsights> {
+    try {
+      const response = await api.get('/reports/ai-insights/', {
+        params: {
+          start_date: params.start_date.toISOString().split('T')[0],
+          end_date: params.end_date.toISOString().split('T')[0],
+          force_refresh: params.force_refresh || false,
+          type: params.type || 'comprehensive',
+        },
+        timeout: 30000, // 30 seconds timeout for AI processing
+      });
+      return response.data;
+    } catch (error: any) {
+      // Se falhar, retornar insights básicos
+      if (error.response?.status === 403) {
+        throw new Error('AI insights not available in your plan');
+      }
+      
+      // Log do erro mas não falhar completamente
+      console.error('AI Insights error:', error);
+      
+      // Retornar estrutura básica para não quebrar a UI
+      return {
+        insights: [],
+        predictions: {},
+        recommendations: [],
+        key_metrics: {
+          health_score: 0,
+          efficiency_score: 0,
+          growth_potential: 0,
+        },
+        ai_generated: false,
+        fallback_mode: true,
+        error: error.message,
+      };
+    }
+  },
 
-export const reportsService = new ReportsService();
+  // Ask AI questions
+  async askAI(question: string, context?: Record<string, any>) {
+    const response = await api.post('/reports/ai-insights/ask_ai/', {
+      question,
+      context: context || {},
+    });
+    return response.data;
+  },
+
+  // Get AI insights history
+  async getAIInsightsHistory(period: number = 30) {
+    const response = await api.get('/reports/ai-insights/insights_history/', {
+      params: { period }
+    });
+    return response.data;
+  },
+
+  // Report templates
+  async getReportTemplates() {
+    const response = await api.get('/reports/templates/');
+    return response.data;
+  },
+
+  async createReportTemplate(data: {
+    name: string;
+    description?: string;
+    report_type: string;
+    template_config: Record<string, any>;
+    charts?: any[];
+    default_parameters?: Record<string, any>;
+    default_filters?: Record<string, any>;
+    is_public?: boolean;
+  }) {
+    const response = await api.post('/reports/templates/', data);
+    return response.data;
+  },
+
+  // Utility function to validate report parameters
+  validateReportParameters(params: ReportParameters): string[] {
+    const errors: string[] = [];
+    
+    if (!params.start_date) {
+      errors.push('Data inicial é obrigatória');
+    }
+    
+    if (!params.end_date) {
+      errors.push('Data final é obrigatória');
+    }
+    
+    if (params.start_date && params.end_date) {
+      const start = new Date(params.start_date);
+      const end = new Date(params.end_date);
+      
+      if (start > end) {
+        errors.push('Data inicial deve ser anterior à data final');
+      }
+      
+      if (end > new Date()) {
+        errors.push('Data final não pode ser no futuro');
+      }
+    }
+    
+    return errors;
+  },
+
+  // Format report data for export
+  formatReportData(data: any[], format: 'csv' | 'json'): string | object {
+    if (format === 'json') {
+      return JSON.stringify(data, null, 2);
+    }
+    
+    // CSV format
+    if (data.length === 0) return '';
+    
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => 
+        headers.map(header => {
+          const value = row[header];
+          // Escape quotes and wrap in quotes if contains comma
+          if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+            return `"${value.replace(/"/g, '""')}"`;
+          }
+          return value;
+        }).join(',')
+      )
+    ].join('\n');
+    
+    return csvContent;
+  },
+};

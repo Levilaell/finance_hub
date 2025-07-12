@@ -36,9 +36,11 @@ from django.utils import timezone as django_timezone
 logger = logging.getLogger(__name__)
 
 
+# Adicionar estas correções ao backend/apps/reports/views.py
+
 class ReportViewSet(viewsets.ModelViewSet):
     """
-    Report management viewset
+    Report management viewset - CORRIGIDO
     """
     serializer_class = ReportSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -49,69 +51,106 @@ class ReportViewSet(viewsets.ModelViewSet):
         ).order_by('-created_at')
     
     def create(self, request, *args, **kwargs):
-        """Generate a new report"""
+        """Generate a new report with proper validation"""
         report_type = request.data.get('report_type')
         period_start = request.data.get('period_start')
         period_end = request.data.get('period_end')
+        file_format = request.data.get('file_format', 'pdf')  # Default to PDF
         
+        # Validação melhorada
         if not all([report_type, period_start, period_end]):
             return Response({
                 'error': 'report_type, period_start, and period_end are required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create report instance
+        # Validar datas
+        try:
+            start_date = datetime.strptime(period_start, '%Y-%m-%d').date()
+            end_date = datetime.strptime(period_end, '%Y-%m-%d').date()
+            
+            if start_date > end_date:
+                return Response({
+                    'error': 'Start date must be before end date'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+            if end_date > timezone.now().date():
+                return Response({
+                    'error': 'End date cannot be in the future'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except ValueError:
+            return Response({
+                'error': 'Invalid date format. Use YYYY-MM-DD'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validar tipo de relatório
+        valid_types = [choice[0] for choice in Report.REPORT_TYPES]
+        if report_type not in valid_types:
+            return Response({
+                'error': f'Invalid report type. Valid types: {", ".join(valid_types)}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Criar relatório com todos os campos necessários
         report = Report.objects.create(
             company=request.user.company,
             report_type=report_type,
-            title=request.data.get('title', f'{report_type} Report'),
-            period_start=period_start,
-            period_end=period_end,
+            title=request.data.get('title', f'{report_type} Report - {period_start} to {period_end}'),
+            description=request.data.get('description', ''),
+            period_start=start_date,
+            period_end=end_date,
+            file_format=file_format,
+            parameters=request.data.get('parameters', {}),
+            filters=request.data.get('filters', {}),
             created_by=request.user
         )
         
         # Queue report generation
         generate_report_task.delay(report.id)
         
+        serializer = self.get_serializer(report)
         return Response(
-            ReportSerializer(report).data,
+            serializer.data,
             status=status.HTTP_201_CREATED
         )
     
-    @action(detail=True, methods=['get'])
-    def download(self, request, pk=None):
-        """Download report file"""
-        report = self.get_object()
-        
-        if not report.is_generated or not report.file:
-            return Response({
-                'error': 'Report is not ready for download'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            return FileResponse(
-                report.file.open('rb'),
-                as_attachment=True,
-                filename=f'{report.title}_{report.created_at.strftime("%Y%m%d")}.{report.file_format}'
-            )
-        except FileNotFoundError:
-            raise Http404("Report file not found")
-    
     @action(detail=False, methods=['get'])
     def summary(self, request):
-        """Get reports summary statistics"""
+        """Get reports summary statistics with proper data structure"""
         company = request.user.company
         reports = self.get_queryset()
         
-        return Response({
+        # Adicionar dados agregados úteis
+        from django.db.models import Count, Q
+        from datetime import timedelta
+        
+        today = timezone.now().date()
+        last_30_days = today - timedelta(days=30)
+        
+        summary_data = {
             'total_reports': reports.count(),
-            'reports_by_type': reports.values('report_type').annotate(count=Count('id')),
-            'recent_reports': ReportSerializer(reports[:5], many=True).data
-        })
+            'reports_generated': reports.filter(is_generated=True).count(),
+            'reports_pending': reports.filter(is_generated=False, error_message='').count(),
+            'reports_failed': reports.filter(is_generated=False).exclude(error_message='').count(),
+            'reports_by_type': list(reports.values('report_type').annotate(
+                count=Count('id'),
+                label=Count('id')  # Para o frontend
+            )),
+            'recent_reports': ReportSerializer(
+                reports.select_related('created_by')[:10], 
+                many=True
+            ).data,
+            'reports_last_30_days': reports.filter(created_at__gte=last_30_days).count(),
+            'most_used_type': reports.values('report_type').annotate(
+                count=Count('id')
+            ).order_by('-count').first()
+        }
+        
+        return Response(summary_data)
 
 
 class ReportScheduleViewSet(viewsets.ModelViewSet):
     """
-    Report schedule management
+    Report schedule management - CORRIGIDO
     """
     serializer_class = ReportScheduleSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -123,85 +162,149 @@ class ReportScheduleViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return ReportSchedule.objects.filter(
             company=self.request.user.company
-        )
+        ).select_related('created_by')
     
     def create(self, request, *args, **kwargs):
-        """Create a new scheduled report"""
-        from datetime import datetime, timedelta
+        """Create a new scheduled report with validation"""
         
-        # Calculate next_run_at based on frequency
+        # Validar campos obrigatórios
+        required_fields = ['name', 'report_type', 'frequency', 'email_recipients']
+        missing_fields = [field for field in required_fields if not request.data.get(field)]
+        
+        if missing_fields:
+            return Response({
+                'error': f'Missing required fields: {", ".join(missing_fields)}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validar email_recipients
+        email_recipients = request.data.get('email_recipients', [])
+        if isinstance(email_recipients, str):
+            email_recipients = [email.strip() for email in email_recipients.split(',')]
+        
+        if not email_recipients:
+            return Response({
+                'error': 'At least one email recipient is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validar emails
+        import re
+        email_pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+        invalid_emails = [email for email in email_recipients if not re.match(email_pattern, email)]
+        
+        if invalid_emails:
+            return Response({
+                'error': f'Invalid email addresses: {", ".join(invalid_emails)}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Calcular next_run_at baseado na frequência
         frequency = request.data.get('frequency', 'monthly')
         now = timezone.now()
         
-        if frequency == 'daily':
-            next_run = now + timedelta(days=1)
-        elif frequency == 'weekly':
-            next_run = now + timedelta(weeks=1)
-        elif frequency == 'monthly':
-            next_run = now + timedelta(days=30)
-        elif frequency == 'quarterly':
-            next_run = now + timedelta(days=90)
-        elif frequency == 'yearly':
-            next_run = now + timedelta(days=365)
-        else:
-            next_run = now + timedelta(days=30)
+        frequency_deltas = {
+            'daily': timedelta(days=1),
+            'weekly': timedelta(weeks=1),
+            'monthly': timedelta(days=30),
+            'quarterly': timedelta(days=90),
+            'yearly': timedelta(days=365)
+        }
         
-        # Add next_run_at to the request data
-        request.data['next_run_at'] = next_run.isoformat()
+        next_run = now + frequency_deltas.get(frequency, timedelta(days=30))
         
-        return super().create(request, *args, **kwargs)
-    
-    @action(detail=True, methods=['post'])
-    def toggle_active(self, request, pk=None):
-        """Toggle schedule active status"""
-        schedule = self.get_object()
-        schedule.is_active = not schedule.is_active
-        schedule.save()
+        # Preparar dados para criação
+        schedule_data = {
+            'company': request.user.company,
+            'name': request.data.get('name'),
+            'report_type': request.data.get('report_type'),
+            'frequency': frequency,
+            'send_email': request.data.get('send_email', True),
+            'email_recipients': email_recipients,
+            'file_format': request.data.get('file_format', 'pdf'),
+            'is_active': request.data.get('is_active', True),
+            'next_run_at': next_run,
+            'parameters': request.data.get('parameters', {}),
+            'filters': request.data.get('filters', {}),
+            'created_by': request.user
+        }
         
-        return Response({
-            'status': 'success',
-            'is_active': schedule.is_active
-        })
+        # Criar agendamento
+        schedule = ReportSchedule.objects.create(**schedule_data)
+        
+        serializer = self.get_serializer(schedule)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     @action(detail=True, methods=['post'])
     def run_now(self, request, pk=None):
-        """Run scheduled report immediately"""
-        schedule = self.get_object()
-        
-        # Create report based on schedule
-        report = Report.objects.create(
-            company=schedule.company,
-            report_type=schedule.report_type,
-            title=f'{schedule.get_report_type_display()} - Manual Run',
-            period_start=timezone.now().date() - timedelta(days=30),
-            period_end=timezone.now().date(),
-            created_by=request.user
-        )
-        
-        # Queue report generation
-        generate_report_task.delay(report.id)
-        
-        # Update schedule
-        schedule.last_run_at = timezone.now()
-        schedule.save()
-        
-        return Response({
-            'status': 'success',
-            'report_id': report.id,
-            'message': 'Report generation started'
-        })
+        """Run scheduled report immediately with better error handling"""
+        try:
+            schedule = self.get_object()
+            
+            # Determinar período baseado no tipo de relatório
+            today = timezone.now().date()
+            
+            if schedule.frequency == 'daily':
+                period_start = today - timedelta(days=1)
+                period_end = today
+            elif schedule.frequency == 'weekly':
+                period_start = today - timedelta(days=7)
+                period_end = today
+            elif schedule.frequency == 'monthly':
+                # Mês anterior completo
+                first_day_current = today.replace(day=1)
+                period_end = first_day_current - timedelta(days=1)
+                period_start = period_end.replace(day=1)
+            elif schedule.frequency == 'quarterly':
+                period_start = today - timedelta(days=90)
+                period_end = today
+            else:  # yearly
+                period_start = today.replace(year=today.year-1)
+                period_end = today
+            
+            # Criar relatório
+            report = Report.objects.create(
+                company=schedule.company,
+                report_type=schedule.report_type,
+                title=f'{schedule.name} - Execução Manual - {timezone.now().strftime("%d/%m/%Y %H:%M")}',
+                description=f'Relatório gerado manualmente a partir do agendamento: {schedule.name}',
+                period_start=period_start,
+                period_end=period_end,
+                file_format=schedule.file_format,
+                parameters=schedule.parameters,
+                filters=schedule.filters,
+                created_by=request.user
+            )
+            
+            # Queue report generation
+            generate_report_task.delay(report.id)
+            
+            # Update schedule
+            schedule.last_run_at = timezone.now()
+            schedule.save()
+            
+            return Response({
+                'status': 'success',
+                'report_id': report.id,
+                'message': 'Relatório sendo gerado. Você será notificado quando estiver pronto.'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error running scheduled report: {e}")
+            return Response({
+                'error': 'Falha ao executar relatório',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ReportTemplateViewSet(viewsets.ModelViewSet):
     """
-    Report template management
+    Report template management - CORRIGIDO
     """
     serializer_class = ReportTemplateSerializer
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
+        # Remover referência ao campo is_system inexistente
         return ReportTemplate.objects.filter(
-            Q(company=self.request.user.company) | Q(is_system=True),
+            Q(company=self.request.user.company) | Q(is_public=True),
             is_active=True
         ).order_by('name')
 

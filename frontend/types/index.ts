@@ -277,3 +277,183 @@ export interface TransactionFilter {
   transaction_type?: "debit" | "credit";
   search?: string;
 }
+
+// frontend/types/index.ts
+// Add these types to your existing types file
+
+// Report Types
+export interface Report {
+  id: string;
+  title: string;
+  report_type: 'monthly_summary' | 'quarterly_report' | 'annual_report' | 'cash_flow' | 'profit_loss' | 'category_analysis' | 'tax_report' | 'custom';
+  period_start: string;
+  period_end: string;
+  file_format: 'pdf' | 'xlsx' | 'csv' | 'json';
+  is_generated: boolean;
+  file?: string;
+  file_size?: number;
+  generation_time?: number;
+  error_message?: string;
+  created_at: string;
+  created_by_name?: string;
+  parameters?: Record<string, any>;
+  filters?: Record<string, any>;
+}
+
+export interface ReportParameters {
+  start_date: string;
+  end_date: string;
+  account_ids?: string[];
+  category_ids?: string[];
+  title?: string;
+  file_format?: string;
+  [key: string]: any;
+}
+
+export interface ScheduledReport {
+  id: string;
+  name: string;
+  report_type: string;
+  frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  is_active: boolean;
+  send_email: boolean;
+  email_recipients: string[];
+  file_format: string;
+  next_run_at: string;
+  last_run_at?: string;
+  parameters?: Record<string, any>;
+  filters?: Record<string, any>;
+  created_at: string;
+  created_by_name?: string;
+}
+
+export interface AIInsights {
+  insights: AIInsight[];
+  predictions: AIPredictions;
+  recommendations: AIRecommendation[];
+  alerts?: AIAlert[];
+  key_metrics?: AIKeyMetrics;
+  summary?: AISummary;
+  ai_generated: boolean;
+  from_cache?: boolean;
+  fallback_mode?: boolean;
+  error?: string;
+  generated_at?: string;
+  confidence_level?: 'high' | 'medium' | 'low';
+  version?: string;
+}
+
+export interface AIInsight {
+  type: 'success' | 'warning' | 'info' | 'danger';
+  title: string;
+  description: string;
+  value?: string;
+  trend?: 'up' | 'down' | 'stable';
+  priority?: 'high' | 'medium' | 'low';
+  actionable?: boolean;
+  category?: string;
+  drill_down?: {
+    label: string;
+    url: string;
+  };
+}
+
+export interface AIPredictions {
+  next_month_income: number;
+  next_month_expenses: number;
+  projected_savings: number;
+  growth_rate?: number;
+  risk_score?: number;
+  opportunities?: string[];
+  threats?: string[];
+  confidence?: 'high' | 'medium' | 'low';
+}
+
+export interface AIRecommendation {
+  type: 'cost_reduction' | 'revenue_growth' | 'risk_mitigation' | 'efficiency';
+  title: string;
+  description: string;
+  potential_impact: string;
+  priority: 'high' | 'medium' | 'low';
+  time_to_implement: 'imediato' | 'curto_prazo' | 'medio_prazo';
+  difficulty?: 'easy' | 'medium' | 'hard';
+  action_button?: {
+    label: string;
+    url: string;
+  };
+}
+
+export interface AIAlert {
+  severity: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  action_required?: string;
+  urgency?: 'immediate' | 'urgent' | 'soon' | 'monitor';
+}
+
+export interface AIKeyMetrics {
+  health_score: number;
+  efficiency_score: number;
+  growth_potential: number;
+  overall_grade?: string;
+}
+
+export interface AISummary {
+  overall_status: 'excellent' | 'healthy' | 'attention_needed' | 'critical';
+  status_message: string;
+  key_message: string;
+  main_opportunity?: string;
+  main_risk?: string;
+  recommended_action?: string;
+  executive_takeaway?: string;
+}
+
+// Account Types (if not already defined)
+export interface Account {
+  id: string;
+  name: string;
+  bank_provider: string;
+  account_type: string;
+  account_number: string;
+  current_balance: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Category Types (if not already defined)
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string;
+  category_type: 'income' | 'expense' | 'both';
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Chart Data Types
+export interface CashFlowData {
+  date: string;
+  income: number;
+  expenses: number;
+  balance: number;
+}
+
+export interface CategorySpendingData {
+  category: {
+    name: string;
+    icon: string;
+  };
+  amount: number;
+  percentage: number;
+  transaction_count: number;
+}
+
+export interface IncomeVsExpensesData {
+  month: string;
+  income: number;
+  expenses: number;
+  profit: number;
+}
