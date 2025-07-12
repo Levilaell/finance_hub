@@ -6,8 +6,11 @@ Top-tier financial SaaS for Brazilian SMEs.
 import os
 from datetime import timedelta
 from pathlib import Path
-
+from dotenv import load_dotenv
 from decouple import config
+
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -265,7 +268,7 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 # OpenAI API
-OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 # Pluggy API Configuration
 # Pluggy provides unified API for Brazilian bank connections

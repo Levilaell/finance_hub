@@ -11,6 +11,8 @@ from django.utils.translation import gettext_lazy as _
 User = get_user_model()
 
 
+# Adicione estes campos ao modelo SubscriptionPlan em backend/apps/companies/models.py
+
 class SubscriptionPlan(models.Model):
     """
     Available subscription plans (Starter, Pro, Enterprise)
@@ -30,7 +32,14 @@ class SubscriptionPlan(models.Model):
     max_transactions = models.IntegerField(_('max transactions per month'), default=500)
     max_bank_accounts = models.IntegerField(_('max bank accounts'), default=1)
     max_users = models.IntegerField(_('max users'), default=1)
+    
+    # AI Features - ADICIONE ESTES CAMPOS
     has_ai_categorization = models.BooleanField(_('AI categorization'), default=True)
+    enable_ai_insights = models.BooleanField(_('AI insights'), default=True)
+    enable_ai_reports = models.BooleanField(_('AI reports'), default=False)
+    max_ai_requests_per_month = models.IntegerField(_('max AI requests per month'), default=100)
+    
+    # Other features
     has_advanced_reports = models.BooleanField(_('advanced reports'), default=False)
     has_api_access = models.BooleanField(_('API access'), default=False)
     has_accountant_access = models.BooleanField(_('accountant access'), default=False)
@@ -45,7 +54,6 @@ class SubscriptionPlan(models.Model):
     
     def __str__(self):
         return f"{self.name} - R$ {self.price_monthly}/mês"
-
 
 class Company(models.Model):
     """

@@ -4,9 +4,12 @@ Financial reporting and analytics
 """
 import logging
 from decimal import Decimal
+import math
 from typing import Dict, Any, List
 from datetime import datetime, timedelta
 
+from collections import defaultdict
+from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Count, Q, Sum, Avg, Max, Min
 from django.http import FileResponse, Http404
@@ -17,6 +20,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
+from django.utils import timezone as django_timezone
 
 from apps.banking.models import BankAccount, Transaction, TransactionCategory
 from .models import Report, ReportSchedule, ReportTemplate
@@ -28,7 +32,7 @@ from .serializers import (
 from .tasks import generate_report_task
 from .ai_service import enhanced_ai_service
 from .ai_tasks import generate_company_ai_insights
-
+from django.utils import timezone as django_timezone
 logger = logging.getLogger(__name__)
 
 
@@ -698,9 +702,21 @@ class IncomeVsExpensesView(APIView):
 
 
 class AIInsightsView(APIView):
+    
     """Enhanced AI-powered financial insights with caching and real-time updates"""
     permission_classes = [permissions.IsAuthenticated]
     
+    def _to_float(self, value):
+        """Safely convert any value to float"""
+        if value is None:
+            return 0.0
+        if isinstance(value, Decimal):
+            return float(value)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
     def get(self, request):
         """Get AI insights with optional real-time generation"""
         try:
@@ -884,15 +900,41 @@ class AIInsightsView(APIView):
         cache_key = f"ai_insights_latest_{company_id}"
         return cache.get(cache_key)
     
+    def make_aware_datetime(date_obj):
+        """Convert date to timezone-aware datetime"""
+        if isinstance(date_obj, datetime):
+            if django_timezone.is_naive(date_obj):
+                return django_timezone.make_aware(date_obj)
+            return date_obj
+        elif isinstance(date_obj, date):
+            # Convert date to datetime at start/end of day
+            dt = datetime.combine(date_obj, datetime.min.time())
+            return django_timezone.make_aware(dt)
+        return date_obj
+
     def _get_transactions(self, accounts, start_date, end_date):
         """Get transactions with proper timezone handling"""
+        from django.utils import timezone as django_timezone
+        
         try:
-            start_datetime = timezone.make_aware(
-                datetime.combine(start_date, datetime.min.time())
-            )
-            end_datetime = timezone.make_aware(
-                datetime.combine(end_date, datetime.max.time())
-            )
+            # Convert dates to timezone-aware datetimes
+            if isinstance(start_date, date) and not isinstance(start_date, datetime):
+                start_datetime = django_timezone.make_aware(
+                    datetime.combine(start_date, datetime.min.time())
+                )
+            elif isinstance(start_date, datetime):
+                start_datetime = start_date if django_timezone.is_aware(start_date) else django_timezone.make_aware(start_date)
+            else:
+                start_datetime = django_timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+                
+            if isinstance(end_date, date) and not isinstance(end_date, datetime):
+                end_datetime = django_timezone.make_aware(
+                    datetime.combine(end_date, datetime.max.time().replace(microsecond=999999))
+                )
+            elif isinstance(end_date, datetime):
+                end_datetime = end_date if django_timezone.is_aware(end_date) else django_timezone.make_aware(end_date)
+            else:
+                end_datetime = django_timezone.make_aware(datetime.combine(end_date, datetime.max.time().replace(microsecond=999999)))
             
             return Transaction.objects.filter(
                 bank_account__in=accounts,
@@ -900,14 +942,15 @@ class AIInsightsView(APIView):
                 transaction_date__lte=end_datetime
             ).select_related('category', 'bank_account')
             
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error getting transactions: {e}")
             # Fallback to date-based query
             return Transaction.objects.filter(
                 bank_account__in=accounts,
                 transaction_date__date__gte=start_date,
                 transaction_date__date__lte=end_date
             ).select_related('category', 'bank_account')
-    
+
     def _calculate_comprehensive_metrics(self, transactions, start_date, end_date, company):
         """Calculate comprehensive financial metrics with additional insights"""
         
@@ -1144,99 +1187,151 @@ class AIInsightsView(APIView):
         
         return (retained_customers / total_customers * 100) if total_customers > 0 else 0
     
+
     def _analyze_cash_flow_patterns(self, transactions):
         """Analyze cash flow patterns"""
-        # Group by day of week
-        day_of_week_data = transactions.values(
-            'transaction_date__week_day'
-        ).annotate(
-            income=Sum('amount', filter=Q(transaction_type__in=['credit', 'transfer_in', 'pix_in'])),
-            expenses=Sum('amount', filter=Q(transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']))
-        ).order_by('transaction_date__week_day')
+        # Group by day of week - usando Django ORM compatível
+        day_of_week_data = []
+        for day in range(7):  # 0 = Monday, 6 = Sunday
+            day_transactions = transactions.filter(
+                transaction_date__week_day=day + 2  # Django week_day: 1=Sunday, 2=Monday, etc.
+            )
+            
+            income = day_transactions.filter(
+                transaction_type__in=['credit', 'transfer_in', 'pix_in']
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            
+            expenses = day_transactions.filter(
+                transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            
+            day_of_week_data.append({
+                'transaction_date__week_day': day,
+                'income': income,
+                'expenses': expenses
+            })
         
-        # Group by day of month
-        day_of_month_data = transactions.extra(
-            select={'day': 'EXTRACT(day FROM transaction_date)'}
-        ).values('day').annotate(
-            income=Sum('amount', filter=Q(transaction_type__in=['credit', 'transfer_in', 'pix_in'])),
-            expenses=Sum('amount', filter=Q(transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']))
-        )
+        # Group by day of month - usando Python ao invés de SQL
+        from collections import defaultdict
+        day_of_month_dict = defaultdict(lambda: {'income': Decimal('0'), 'expenses': Decimal('0')})
+        
+        for trans in transactions:
+            day = trans.transaction_date.day
+            if trans.transaction_type in ['credit', 'transfer_in', 'pix_in']:
+                day_of_month_dict[day]['income'] += trans.amount
+            elif trans.transaction_type in ['debit', 'transfer_out', 'pix_out', 'fee']:
+                day_of_month_dict[day]['expenses'] += trans.amount
+        
+        day_of_month_data = [
+            {'day': day, 'income': data['income'], 'expenses': data['expenses']}
+            for day, data in sorted(day_of_month_dict.items())
+        ]
         
         # Find best and worst days
-        best_day = max(day_of_week_data, key=lambda x: (x['income'] or 0) - abs(x['expenses'] or 0))
-        worst_day = min(day_of_week_data, key=lambda x: (x['income'] or 0) - abs(x['expenses'] or 0))
+        if day_of_week_data:
+            best_day = max(day_of_week_data, 
+                        key=lambda x: float(x.get('income', 0) or 0) - float(abs(x.get('expenses', 0) or 0)))
+            worst_day = min(day_of_week_data, 
+                        key=lambda x: float(x.get('income', 0) or 0) - float(abs(x.get('expenses', 0) or 0)))
+        else:
+            best_day = worst_day = None
         
         return {
-            'by_day_of_week': list(day_of_week_data),
-            'by_day_of_month': list(day_of_month_data),
+            'by_day_of_week': day_of_week_data,
+            'by_day_of_month': day_of_month_data,
             'best_day_of_week': best_day['transaction_date__week_day'] if best_day else None,
             'worst_day_of_week': worst_day['transaction_date__week_day'] if worst_day else None,
             'income_concentration': self._calculate_income_concentration(day_of_month_data),
             'expense_concentration': self._calculate_expense_concentration(day_of_month_data)
         }
     
+
     def _calculate_income_concentration(self, day_data):
         """Calculate how concentrated income is on specific days"""
-        total_income = sum(d['income'] or 0 for d in day_data)
+        total_income = sum(float(d['income'] or 0) for d in day_data)
         if total_income == 0:
             return 0
         
         # Calculate Gini coefficient for income distribution
-        sorted_income = sorted([d['income'] or 0 for d in day_data])
+        sorted_income = sorted([float(d['income'] or 0) for d in day_data])
         n = len(sorted_income)
+        if n == 0:
+            return 0
+        
         index = range(1, n + 1)
         
         return (2 * sum(index[i] * sorted_income[i] for i in range(n))) / (n * sum(sorted_income)) - (n + 1) / n
-    
+
     def _calculate_expense_concentration(self, day_data):
         """Calculate how concentrated expenses are on specific days"""
-        total_expenses = sum(abs(d['expenses'] or 0) for d in day_data)
+        total_expenses = sum(abs(float(d['expenses'] or 0)) for d in day_data)
         if total_expenses == 0:
             return 0
         
         # Similar to income concentration
-        sorted_expenses = sorted([abs(d['expenses'] or 0) for d in day_data])
+        sorted_expenses = sorted([abs(float(d['expenses'] or 0)) for d in day_data])
         n = len(sorted_expenses)
+        if n == 0:
+            return 0
+        
         index = range(1, n + 1)
         
         return (2 * sum(index[i] * sorted_expenses[i] for i in range(n))) / (n * sum(sorted_expenses)) - (n + 1) / n
-    
+
+
     def _analyze_expense_trends(self, transactions):
         """Analyze expense trends over time"""
         expense_transactions = transactions.filter(
             transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
         )
         
-        # Monthly trend
-        monthly_expenses = expense_transactions.extra(
-            select={'month': "TO_CHAR(transaction_date, 'YYYY-MM')"}
-        ).values('month').annotate(
-            total=Sum('amount'),
-            count=Count('id'),
-            avg=Avg('amount')
-        ).order_by('month')
+        # Monthly trend - usando Python ao invés de SQL raw
+        from collections import defaultdict
+        monthly_dict = defaultdict(lambda: {'total': Decimal('0'), 'count': 0, 'amounts': []})
+        
+        for trans in expense_transactions:
+            month_key = trans.transaction_date.strftime('%Y-%m')
+            monthly_dict[month_key]['total'] += abs(trans.amount)
+            monthly_dict[month_key]['count'] += 1
+            monthly_dict[month_key]['amounts'].append(abs(trans.amount))
+        
+        # Calcular média e converter para lista ordenada
+        monthly_expenses = []
+        for month, data in sorted(monthly_dict.items()):
+            avg_amount = data['total'] / data['count'] if data['count'] > 0 else Decimal('0')
+            monthly_expenses.append({
+                'month': month,
+                'total': data['total'],
+                'count': data['count'],
+                'avg': avg_amount
+            })
         
         # Category trends
         category_trends = {}
         for category in expense_transactions.values('category__name').distinct():
             if category['category__name']:
-                trend_data = expense_transactions.filter(
-                    category__name=category['category__name']
-                ).extra(
-                    select={'month': "TO_CHAR(transaction_date, 'YYYY-MM')"}
-                ).values('month').annotate(
-                    total=Sum('amount')
-                ).order_by('month')
+                cat_name = category['category__name']
+                cat_monthly = defaultdict(lambda: Decimal('0'))
                 
-                category_trends[category['category__name']] = list(trend_data)
+                cat_transactions = expense_transactions.filter(category__name=cat_name)
+                for trans in cat_transactions:
+                    month_key = trans.transaction_date.strftime('%Y-%m')
+                    cat_monthly[month_key] += abs(trans.amount)
+                
+                category_trends[cat_name] = [
+                    {'month': month, 'total': total}
+                    for month, total in sorted(cat_monthly.items())
+                ]
         
         return {
-            'monthly_trend': list(monthly_expenses),
+            'monthly_trend': monthly_expenses,
             'category_trends': category_trends,
             'growth_rate': self._calculate_expense_growth_rate(monthly_expenses),
             'volatility': self._calculate_expense_volatility(monthly_expenses)
         }
-    
+
+
+
     def _calculate_expense_growth_rate(self, monthly_data):
         """Calculate average monthly expense growth rate"""
         if len(monthly_data) < 2:
@@ -1244,25 +1339,29 @@ class AIInsightsView(APIView):
         
         growth_rates = []
         for i in range(1, len(monthly_data)):
-            if monthly_data[i-1]['total'] != 0:
-                growth = (monthly_data[i]['total'] - monthly_data[i-1]['total']) / abs(monthly_data[i-1]['total']) * 100
+            prev_total = float(monthly_data[i-1].get('total', 0))
+            curr_total = float(monthly_data[i].get('total', 0))
+            
+            if prev_total != 0:
+                growth = ((curr_total - prev_total) / abs(prev_total)) * 100
                 growth_rates.append(growth)
         
-        return sum(growth_rates) / len(growth_rates) if growth_rates else 0
-    
+        return float(sum(growth_rates) / len(growth_rates)) if growth_rates else 0
+
     def _calculate_expense_volatility(self, monthly_data):
         """Calculate expense volatility (standard deviation / mean)"""
         if not monthly_data:
             return 0
         
-        expenses = [abs(m['total']) for m in monthly_data]
-        mean = sum(expenses) / len(expenses)
+        expenses = [abs(float(m['total'])) for m in monthly_data]
+        mean = sum(expenses) / len(expenses) if expenses else 0
         
         if mean == 0:
             return 0
         
+        # Use float operations
         variance = sum((x - mean) ** 2 for x in expenses) / len(expenses)
-        std_dev = variance ** 0.5
+        std_dev = math.sqrt(variance)  # Use math.sqrt instead of ** 0.5
         
         return (std_dev / mean) * 100
     
@@ -1302,69 +1401,76 @@ class AIInsightsView(APIView):
         if not daily_revenue:
             return 0
         
-        revenues = [d['total'] for d in daily_revenue]
+        # Convert all values to float
+        revenues = [float(d['total']) for d in daily_revenue]
         mean = sum(revenues) / len(revenues)
         
         if mean == 0:
             return 100
         
+        # Calculate variance using float operations
         variance = sum((r - mean) ** 2 for r in revenues) / len(revenues)
-        std_dev = variance ** 0.5
+        std_dev = math.sqrt(variance)  # Use math.sqrt instead of ** 0.5
         
         return (std_dev / mean) * 100
     
+
     def _identify_revenue_sources(self, income_transactions):
         """Identify and categorize revenue sources"""
-        sources = income_transactions.values('description').annotate(
-            total=Sum('amount'),
-            count=Count('id')
-        ).order_by('-total')[:20]
+        # Usar apenas os primeiros 20 registros para análise
+        sources = income_transactions.values('description')[:20]
         
         categorized_sources = {
-            'sales': 0,
-            'services': 0,
-            'subscriptions': 0,
-            'other': 0
+            'sales': Decimal('0'),
+            'services': Decimal('0'),
+            'subscriptions': Decimal('0'),
+            'other': Decimal('0')
         }
         
-        for source in sources:
-            desc_lower = source['description'].lower()
+        # Analisar cada transação
+        for trans in income_transactions:
+            desc_lower = trans.description.lower() if trans.description else ''
+            amount = trans.amount
+            
             if any(word in desc_lower for word in ['venda', 'produto', 'pedido']):
-                categorized_sources['sales'] += source['total']
+                categorized_sources['sales'] += amount
             elif any(word in desc_lower for word in ['serviço', 'consultoria', 'projeto']):
-                categorized_sources['services'] += source['total']
+                categorized_sources['services'] += amount
             elif any(word in desc_lower for word in ['assinatura', 'mensalidade', 'recorrente']):
-                categorized_sources['subscriptions'] += source['total']
+                categorized_sources['subscriptions'] += amount
             else:
-                categorized_sources['other'] += source['total']
+                categorized_sources['other'] += amount
         
         return {k: float(v) for k, v in categorized_sources.items()}
-    
+
+
     def _calculate_seasonality_index(self, income_transactions):
         """Calculate seasonality index (0-100, higher = more seasonal)"""
-        # Group by month
-        monthly_data = income_transactions.extra(
-            select={'month': 'EXTRACT(month FROM transaction_date)'}
-        ).values('month').annotate(
-            total=Sum('amount')
-        )
+        # Agrupar por mês usando Python
+        from collections import defaultdict
+        monthly_data = defaultdict(lambda: Decimal('0'))
+        
+        for trans in income_transactions:
+            month = trans.transaction_date.month
+            monthly_data[month] += trans.amount
         
         if len(monthly_data) < 3:
             return 0
         
-        # Calculate coefficient of variation
-        revenues = [m['total'] for m in monthly_data]
+        # Converter para lista de floats
+        revenues = [float(amount) for amount in monthly_data.values()]
         mean = sum(revenues) / len(revenues)
         
         if mean == 0:
             return 0
         
+        # Calcular coefficient of variation
         variance = sum((r - mean) ** 2 for r in revenues) / len(revenues)
         std_dev = variance ** 0.5
         cv = (std_dev / mean) * 100
         
-        # Convert to 0-100 scale
-        return min(cv, 100)
+        # Converter para escala 0-100
+        return min(float(cv), 100.0)
     
     def _calculate_operational_efficiency(self, transactions):
         """Calculate operational efficiency metrics"""
@@ -1649,6 +1755,25 @@ class AIInsightsView(APIView):
                 'end_date': end_date
             }
         })
+    
+    def _calculate_volatility(self, values: List[float]) -> float:
+        """Calculate volatility (coefficient of variation) safely"""
+        if not values or len(values) < 2:
+            return 0
+        
+        # Filter out non-finite values and convert to float
+        clean_values = [float(v) for v in values if np.isfinite(float(v))]
+        if len(clean_values) < 2:
+            return 0
+        
+        mean = np.mean(clean_values)
+        if mean == 0:
+            return 0
+        
+        std_dev = np.std(clean_values)
+        cv = (std_dev / abs(mean)) * 100
+        
+        return min(cv, 200)
     
     def _analyze_historical_trends(self, insights_history):
         """Analyze trends from historical insights"""
