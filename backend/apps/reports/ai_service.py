@@ -18,12 +18,15 @@ from decimal import Decimal
 from datetime import datetime, timedelta
 from collections import defaultdict
 import re
+from dotenv import load_dotenv
 
 from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 from openai import OpenAI
 import numpy as np
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
