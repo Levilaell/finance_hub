@@ -4,7 +4,7 @@ Financial reporting and analytics
 """
 from datetime import datetime, timedelta
 from decimal import Decimal
-
+from django.utils import timezone
 from django.db.models import Count, Q, Sum, Avg
 from django.http import FileResponse, Http404
 from django.utils import timezone
@@ -319,14 +319,18 @@ class AnalyticsView(APIView):
         end_date = timezone.now().date()
         start_date = end_date - timedelta(days=period_days)
         
+        # Convert dates to datetime for proper comparison
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        
         # Get all company accounts
         accounts = BankAccount.objects.filter(company=company, is_active=True)
         
         # Get transactions for period
         transactions = Transaction.objects.filter(
             bank_account__in=accounts,
-            transaction_date__gte=start_date,
-            transaction_date__lte=end_date
+            transaction_date__gte=start_datetime,
+            transaction_date__lte=end_datetime
         )
         
         # Income vs Expenses
@@ -367,9 +371,13 @@ class AnalyticsView(APIView):
             week_start = end_date - timedelta(days=period_days-i)
             week_end = min(week_start + timedelta(days=6), end_date)
             
+            # Convert dates to datetime for proper comparison
+            week_start_datetime = datetime.combine(week_start, datetime.min.time())
+            week_end_datetime = datetime.combine(week_end, datetime.max.time())
+            
             week_transactions = transactions.filter(
-                transaction_date__gte=week_start,
-                transaction_date__lte=week_end
+                transaction_date__gte=week_start_datetime,
+                transaction_date__lte=week_end_datetime
             )
             
             week_income = week_transactions.filter(
@@ -566,6 +574,10 @@ class CategorySpendingView(APIView):
             return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, 
                           status=status.HTTP_400_BAD_REQUEST)
         
+        # Convert dates to datetime for proper comparison
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        
         if category_type == 'expense':
             transaction_types = ['debit', 'transfer_out', 'pix_out', 'fee']
         else:
@@ -573,8 +585,8 @@ class CategorySpendingView(APIView):
         
         category_data = Transaction.objects.filter(
             bank_account__in=accounts,
-            transaction_date__gte=start_date,
-            transaction_date__lte=end_date,
+            transaction_date__gte=start_datetime,
+            transaction_date__lte=end_datetime,
             transaction_type__in=transaction_types,
             category__isnull=False
         ).values('category__name', 'category__icon').annotate(
@@ -638,10 +650,14 @@ class IncomeVsExpensesView(APIView):
             
             month_end = next_month - timedelta(days=1)
             
+            # Convert dates to datetime for proper comparison
+            current_datetime = datetime.combine(current_date, datetime.min.time())
+            month_end_datetime = datetime.combine(month_end, datetime.max.time())
+            
             transactions = Transaction.objects.filter(
                 bank_account__in=accounts,
-                transaction_date__gte=current_date,
-                transaction_date__lte=month_end
+                transaction_date__gte=current_datetime,
+                transaction_date__lte=month_end_datetime
             )
             
             income = transactions.filter(
@@ -668,43 +684,112 @@ class IncomeVsExpensesView(APIView):
         return Response(monthly_data)
 
 
+
 class AIInsightsView(APIView):
-    """AI-powered financial insights"""
+    """AI-powered financial insights using OpenAI"""
     permission_classes = [permissions.IsAuthenticated]
     
     def get(self, request):
-        company = request.user.company
-        accounts = BankAccount.objects.filter(company=company, is_active=True)
-        
-        start_date = request.GET.get('start_date')
-        end_date = request.GET.get('end_date')
-        
-        if not start_date or not end_date:
-            return Response({'error': 'start_date and end_date are required'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
-        
         try:
-            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-        except ValueError:
-            return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
+            company = request.user.company
+            accounts = BankAccount.objects.filter(company=company, is_active=True)
+            
+            start_date = request.GET.get('start_date')
+            end_date = request.GET.get('end_date')
+            
+            if not start_date or not end_date:
+                return Response({'error': 'start_date and end_date are required'}, 
+                              status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+            except ValueError as e:
+                logger.error(f"Date parsing error: {e}")
+                return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, 
+                              status=status.HTTP_400_BAD_REQUEST)
+            
+            # Define system cutoff date
+            SYSTEM_CUTOFF_DATE = datetime(2025, 1, 31).date()
+            
+            # Check if period is after system cutoff
+            if start_date > SYSTEM_CUTOFF_DATE:
+                return self._empty_insights_response(start_date, end_date, 
+                    "Não há dados disponíveis para este período")
+            
+            # Adjust end_date if beyond system cutoff
+            original_end_date = end_date
+            if end_date > SYSTEM_CUTOFF_DATE:
+                end_date = SYSTEM_CUTOFF_DATE
+            
+            # Get transactions
+            try:
+                start_datetime = timezone.make_aware(
+                    datetime.combine(start_date, datetime.min.time()),
+                    timezone.get_current_timezone()
+                )
+                end_datetime = timezone.make_aware(
+                    datetime.combine(end_date, datetime.max.time()),
+                    timezone.get_current_timezone()
+                )
+                
+                transactions = Transaction.objects.filter(
+                    bank_account__in=accounts,
+                    transaction_date__gte=start_datetime,
+                    transaction_date__lte=end_datetime
+                )
+            except Exception as e:
+                logger.error(f"Error with timezone-aware query: {e}")
+                # Fallback to date-based query
+                transactions = Transaction.objects.filter(
+                    bank_account__in=accounts,
+                    transaction_date__date__gte=start_date,
+                    transaction_date__date__lte=end_date
+                )
+            
+            # If no transactions, return empty response
+            if not transactions.exists():
+                return self._empty_insights_response(start_date, original_end_date, 
+                    "Não foram encontradas transações neste período")
+            
+            # Calculate financial metrics
+            financial_data = self._calculate_financial_metrics(transactions, start_date, end_date)
+            
+            # Generate AI insights
+            ai_response = ai_insights_service.generate_insights(
+                financial_data,
+                company_name=company.name
+            )
+            
+            # Add period information
+            ai_response['period'] = {
+                'start_date': start_date,
+                'end_date': original_end_date,
+                'days': (original_end_date - start_date).days + 1,
+                'adjusted_end_date': end_date if original_end_date != end_date else None
+            }
+            
+            # Add note if period was adjusted
+            if original_end_date != end_date and ai_response.get('insights'):
+                ai_response['insights'].insert(0, {
+                    'type': 'info',
+                    'title': 'Período Ajustado',
+                    'description': f'Dados disponíveis até {end_date.strftime("%d/%m/%Y")}',
+                    'value': 'Info'
+                })
+            
+            return Response(ai_response)
+            
+        except Exception as e:
+            logger.error(f"Unexpected error in AIInsightsView: {e}", exc_info=True)
+            return Response({
+                'error': 'An unexpected error occurred while generating insights'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _calculate_financial_metrics(self, transactions, start_date, end_date):
+        """Calculate financial metrics for AI analysis"""
         
-        # Get transactions for the period
-        # Convert dates to datetime for proper comparison
-        start_datetime = datetime.combine(start_date, datetime.min.time())
-        end_datetime = datetime.combine(end_date, datetime.max.time())
-        
-        transactions = Transaction.objects.filter(
-            bank_account__in=accounts,
-            transaction_date__gte=start_datetime,
-            transaction_date__lte=end_datetime
-        )
-        
-        # Calculate insights
-        insights = []
-        
-        # 1. Cash Flow Analysis
+        # Basic metrics
         income = transactions.filter(
             transaction_type__in=['credit', 'transfer_in', 'pix_in']
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
@@ -715,118 +800,115 @@ class AIInsightsView(APIView):
         
         net_flow = income - abs(expenses)
         
-        if net_flow > 0:
-            insights.append({
-                'type': 'success',
-                'title': 'Fluxo de Caixa Positivo',
-                'description': f'Você manteve um fluxo de caixa positivo de {net_flow:,.2f}',
-                'value': f'R$ {net_flow:,.2f}',
-                'trend': 'up'
-            })
-        else:
-            insights.append({
-                'type': 'warning',
-                'title': 'Fluxo de Caixa Negativo',
-                'description': f'Suas despesas superaram a receita em {abs(net_flow):,.2f}',
-                'value': f'R$ {abs(net_flow):,.2f}',
-                'trend': 'down'
-            })
-        
-        # 2. Top Spending Category
-        top_expense_category = transactions.filter(
+        # Category breakdown
+        category_data = transactions.filter(
             transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee'],
             category__isnull=False
         ).values('category__name').annotate(
             total=Sum('amount'),
             count=Count('id')
-        ).order_by('total').first()
+        ).order_by('total')
         
-        if top_expense_category:
-            total_expenses = abs(expenses)
-            percentage = (abs(top_expense_category['total']) / total_expenses * 100) if total_expenses > 0 else 0
-            insights.append({
-                'type': 'info',
-                'title': 'Maior Categoria de Gastos',
-                'description': f'{top_expense_category["category__name"]} representa {percentage:.1f}% dos gastos',
-                'value': f'R$ {abs(top_expense_category["total"]):,.2f}',
+        # Format category data
+        total_categorized_expenses = sum(abs(item['total']) for item in category_data)
+        top_categories = []
+        
+        for item in category_data[:10]:  # Top 10 categories
+            amount = abs(item['total'])
+            percentage = (amount / total_categorized_expenses * 100) if total_categorized_expenses > 0 else 0
+            top_categories.append({
+                'name': item['category__name'],
+                'amount': float(amount),
+                'percentage': round(percentage, 1),
+                'count': item['count']
             })
         
-        # 3. Savings Rate
-        if income > 0:
-            savings_rate = (net_flow / income) * 100
-            insights.append({
-                'type': 'success' if savings_rate > 20 else 'warning' if savings_rate > 10 else 'danger',
-                'title': 'Taxa de Poupança',
-                'description': f'Você está poupando {savings_rate:.1f}% da sua renda',
-                'value': f'{savings_rate:.1f}%',
-                'trend': 'up' if savings_rate > 0 else 'down'
-            })
-        
-        # 4. Transaction Volume Insight
+        # Transaction patterns
         days_in_period = (end_date - start_date).days + 1
-        daily_transactions = transactions.count() / days_in_period if days_in_period > 0 else 0
         
-        if daily_transactions > 15:
-            insights.append({
-                'type': 'info',
-                'title': 'Alto Volume de Transações',
-                'description': f'Você tem {daily_transactions:.1f} transações por dia em média',
-                'value': f'{daily_transactions:.1f}/dia'
-            })
-        
-        # 5. Predictions (simplified)
-        if days_in_period >= 30:
-            monthly_income = income / (days_in_period / 30)
-            monthly_expenses = abs(expenses) / (days_in_period / 30)
+        # Weekly patterns
+        weekly_data = []
+        for i in range(0, days_in_period, 7):
+            week_start = start_date + timedelta(days=i)
+            week_end = min(week_start + timedelta(days=6), end_date)
             
-            predictions = {
-                'next_month_income': float(monthly_income),
-                'next_month_expenses': float(monthly_expenses),
-                'projected_savings': float(monthly_income - monthly_expenses)
-            }
-        else:
-            predictions = {
-                'next_month_income': float(income * 30 / days_in_period),
-                'next_month_expenses': float(abs(expenses) * 30 / days_in_period),
-                'projected_savings': float(net_flow * 30 / days_in_period)
-            }
-        
-        # 6. Recommendations
-        recommendations = []
-        
-        if income > 0:
-            savings_rate = (net_flow / income) * 100
-            if savings_rate < 10:
-                recommendations.append({
-                    'type': 'warning',
-                    'title': 'Aumente sua Taxa de Poupança',
-                    'description': 'Tente economizar pelo menos 10% da sua renda mensal'
-                })
-        
-        if daily_transactions > 20:
-            recommendations.append({
-                'type': 'info',
-                'title': 'Automatize a Categorização',
-                'description': 'Com muitas transações, considere usar regras automáticas'
+            week_transactions = transactions.filter(
+                transaction_date__date__gte=week_start,
+                transaction_date__date__lte=week_end
+            )
+            
+            week_income = week_transactions.filter(
+                transaction_type__in=['credit', 'transfer_in', 'pix_in']
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            
+            week_expenses = week_transactions.filter(
+                transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            
+            weekly_data.append({
+                'week_start': week_start,
+                'week_end': week_end,
+                'income': float(week_income),
+                'expenses': float(abs(week_expenses)),
+                'net': float(week_income - abs(week_expenses))
             })
         
-        if top_expense_category:
-            total_expenses = abs(expenses)
-            percentage = (abs(top_expense_category['total']) / total_expenses * 100) if total_expenses > 0 else 0
-            if percentage > 40:
-                recommendations.append({
-                    'type': 'warning',
-                    'title': 'Diversifique seus Gastos',
-                    'description': f'Mais de 40% dos gastos estão em {top_expense_category["category__name"]}'
-                })
+        # Top transactions
+        largest_income = transactions.filter(
+            transaction_type__in=['credit', 'transfer_in', 'pix_in']
+        ).order_by('-amount').first()
         
+        largest_expense = transactions.filter(
+            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+        ).order_by('amount').first()
+        
+        return {
+            'income': float(income),
+            'expenses': float(abs(expenses)),
+            'net_flow': float(net_flow),
+            'transaction_count': transactions.count(),
+            'period_days': days_in_period,
+            'top_expense_categories': top_categories,
+            'weekly_patterns': weekly_data,
+            'largest_income': {
+                'amount': float(largest_income.amount) if largest_income else 0,
+                'description': largest_income.description if largest_income else ''
+            },
+            'largest_expense': {
+                'amount': float(abs(largest_expense.amount)) if largest_expense else 0,
+                'description': largest_expense.description if largest_expense else ''
+            },
+            'daily_avg_transactions': transactions.count() / days_in_period if days_in_period > 0 else 0,
+            'savings_rate': (net_flow / income * 100) if income > 0 else 0
+        }
+    
+    def _empty_insights_response(self, start_date, end_date, message):
+        """Return empty insights response with appropriate message"""
         return Response({
-            'insights': insights,
-            'predictions': predictions,
-            'recommendations': recommendations,
+            'insights': [
+                {
+                    'type': 'info',
+                    'title': 'Dados Indisponíveis',
+                    'description': message,
+                    'value': 'N/A',
+                }
+            ],
+            'predictions': {
+                'next_month_income': 0,
+                'next_month_expenses': 0,
+                'projected_savings': 0
+            },
+            'recommendations': [
+                {
+                    'type': 'info',
+                    'title': 'Conecte suas Contas',
+                    'description': 'Conecte suas contas bancárias para começar a receber insights com IA'
+                }
+            ],
             'period': {
                 'start_date': start_date,
                 'end_date': end_date,
-                'days': days_in_period
-            }
+                'days': (end_date - start_date).days + 1
+            },
+            'ai_generated': False
         })
