@@ -97,7 +97,7 @@ class UserAdmin(BaseUserAdmin):
     
     def company_display(self, obj):
         """Display user's companies"""
-        companies = obj.company_users.filter(is_active=True).select_related('company')
+        companies = obj.company_memberships.filter(is_active=True).select_related('company')
         if companies:
             company_links = []
             for cu in companies[:3]:  # Show max 3 companies

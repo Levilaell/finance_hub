@@ -182,13 +182,32 @@ class PluggyTransactionSyncService:
     
     def _get_sync_from_date_safe(self, account_info: Dict) -> datetime.date:
         """Determine the date to sync from using account info dict"""
-        if account_info.get('last_sync_at'):
-            # Sync from last sync date minus 1 day for overlap
-            return (account_info['last_sync_at'] - timedelta(days=1)).date()
+        last_sync = account_info.get('last_sync_at')
+        
+        if not last_sync:
+            # ✅ PRIMEIRA SYNC: 1 ano no sandbox, 3 meses em produção
+            if getattr(settings, 'PLUGGY_USE_SANDBOX', False):
+                days = 365  # 1 ano para pegar transações Netflix de 2024
+                logger.info(f"🧪 Sandbox: First sync, using {days} days")
+            else:
+                days = 90   # 3 meses em produção
+                logger.info(f"🚀 Production: First sync, using {days} days")
+            
+            return (timezone.now() - timedelta(days=days)).date()
         else:
-            # ✅ CORRIGIDO: First sync - get last 365 days (1 year) to catch sandbox transactions
-            return (timezone.now() - timedelta(days=365)).date()
-    
+            # ✅ SYNC INCREMENTAL: 1 dia de overlap
+            days_since_sync = (timezone.now() - last_sync).days
+            
+            if days_since_sync > 30:
+                # Se muito tempo sem sync, buscar 30 dias para não perder nada
+                logger.info(f"⚠️ Long gap ({days_since_sync} days), using 30 days")
+                return (timezone.now() - timedelta(days=30)).date()
+            else:
+                # Incremental normal
+                logger.info(f"🔄 Incremental sync, {days_since_sync} days since last sync")
+                return (last_sync - timedelta(days=1)).date()
+
+
     async def _get_accounts_to_sync(self, company_id: int = None) -> List[BankAccount]:
         """Get Pluggy accounts that need synchronization"""
         @sync_to_async
@@ -298,10 +317,17 @@ class PluggyTransactionSyncService:
             external_id = str(tx_data.get('id'))
             logger.info(f"🆔 External ID: {external_id}")
             
+            # ✅ NOVO: Categorização APENAS com dados da Pluggy
+            category = self._get_pluggy_category(tx_data)
+            if category:
+                logger.info(f"🎯 Pluggy category found: {category.name}")
+            else:
+                logger.info(f"❓ No Pluggy category data available")
+            
             # Create transaction
             logger.info(f"💾 Creating transaction in database...")
             
-            # ✅ CORRIGIDO: Handle balance None case
+            # Handle balance None case
             balance_value = tx_data.get('balance')
             if balance_value is None or balance_value == '':
                 balance_after = Decimal('0')
@@ -314,16 +340,18 @@ class PluggyTransactionSyncService:
                 description=description,
                 amount=amount,
                 transaction_type=transaction_type,
-                transaction_date=tx_date,  # ✅ MANTIDO: usar date(), não datetime()
+                transaction_date=tx_date,
                 counterpart_name=merchant_name,
-                counterpart_document='',  # Pluggy doesn't always provide this
-                balance_after=balance_after,  # ✅ CORRIGIDO: usar balance_after tratado
-                is_ai_categorized=False,
+                counterpart_document='',
+                balance_after=balance_after,
+                category=category,  # ✅ APENAS categoria da Pluggy ou None
+                is_ai_categorized=False,  # ✅ Não é IA, é da Pluggy
                 status='completed',
                 created_at=timezone.now()
             )
             
-            logger.info(f"✅ Transaction created successfully: ID={transaction_obj.id}, Description='{transaction_obj.description}'")
+            category_name = category.name if category else 'Uncategorized'
+            logger.info(f"✅ Transaction created: ID={transaction_obj.id}, Description='{transaction_obj.description}', Category='{category_name}'")
             
             return transaction_obj
             
@@ -332,6 +360,61 @@ class PluggyTransactionSyncService:
             logger.error(f"❌ Transaction data that failed: {tx_data}")
             return None
 
+    def _get_pluggy_category(self, tx_data: Dict) -> Optional['TransactionCategory']:
+        """Get category from Pluggy data only"""
+        try:
+            # ✅ Verificar se a Pluggy forneceu categoria
+            pluggy_category = tx_data.get('category')
+            pluggy_category_id = tx_data.get('categoryId')
+            
+            logger.info(f"🔍 Pluggy category data: category='{pluggy_category}', categoryId='{pluggy_category_id}'")
+            
+            # Se a Pluggy não forneceu categoria, retornar None
+            if not pluggy_category and not pluggy_category_id:
+                logger.info(f"ℹ️ No category data from Pluggy - will be uncategorized")
+                return None
+            
+            # ✅ Se a Pluggy forneceu categoria, mapear para nossas categorias
+            if pluggy_category:
+                # Mapear categorias da Pluggy para nossas categorias
+                category_mapping = {
+                    # Pluggy category name -> nossa categoria
+                    'entertainment': 'Entretenimento',
+                    'food': 'Alimentação', 
+                    'transportation': 'Transporte',
+                    'utilities': 'Utilidades',
+                    'streaming': 'Streaming',
+                    'shopping': 'Compras',
+                    'healthcare': 'Saúde',
+                    'education': 'Educação',
+                    'travel': 'Viagem',
+                    'bills': 'Contas',
+                    'transfer': 'Transferências'
+                }
+                
+                mapped_category_name = category_mapping.get(pluggy_category.lower())
+                if mapped_category_name:
+                    # Buscar categoria no nosso sistema
+                    from django.db import models
+                    category = TransactionCategory.objects.filter(
+                        name__iexact=mapped_category_name
+                    ).first()
+                    
+                    if category:
+                        logger.info(f"✅ Mapped Pluggy category '{pluggy_category}' to '{category.name}'")
+                        return category
+                    else:
+                        logger.warning(f"⚠️ Category '{mapped_category_name}' not found in our system")
+                else:
+                    logger.info(f"ℹ️ Pluggy category '{pluggy_category}' not mapped")
+            
+            # Se chegou até aqui, não conseguiu mapear
+            return None
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting Pluggy category: {e}")
+            return None
+    
     async def _update_account_sync_time(self, account: BankAccount):
         """Update account last sync time"""
         @sync_to_async

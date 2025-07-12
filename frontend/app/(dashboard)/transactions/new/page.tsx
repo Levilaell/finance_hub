@@ -120,7 +120,7 @@ export default function NewTransactionPage() {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          account: form.account_id,
+          bank_account: form.account_id,
           amount: parseFloat(form.amount),
           description: form.description,
           transaction_type: form.transaction_type,

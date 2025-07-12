@@ -691,10 +691,14 @@ class AIInsightsView(APIView):
                           status=status.HTTP_400_BAD_REQUEST)
         
         # Get transactions for the period
+        # Convert dates to datetime for proper comparison
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        
         transactions = Transaction.objects.filter(
             bank_account__in=accounts,
-            transaction_date__gte=start_date,
-            transaction_date__lte=end_date
+            transaction_date__gte=start_datetime,
+            transaction_date__lte=end_datetime
         )
         
         # Calculate insights

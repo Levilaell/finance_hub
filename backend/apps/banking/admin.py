@@ -200,8 +200,8 @@ class TransactionAdmin(admin.ModelAdmin):
             color = 'red'
             sign = '-'
         return format_html(
-            '<span style="color: {};">{} R$ {:,.2f}</span>',
-            color, sign, abs(obj.amount)
+            '<span style="color: {};">{} R$ {}</span>',
+            color, sign, '{:,.2f}'.format(abs(obj.amount))
         )
     formatted_amount_display.short_description = 'Valor'
     
