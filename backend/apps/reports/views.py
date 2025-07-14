@@ -29,18 +29,42 @@ from .serializers import (
     ReportSerializer,
     ReportTemplateSerializer,
 )
-from .tasks import generate_report_task
 from .ai_service import enhanced_ai_service
-from .ai_tasks import generate_company_ai_insights
 from django.utils import timezone as django_timezone
 logger = logging.getLogger(__name__)
 
 
 # Adicionar estas correções ao backend/apps/reports/views.py
 
+# backend/apps/reports/views.py
+
+import logging
+from decimal import Decimal
+import math
+from typing import Dict, Any, List
+from datetime import datetime, timedelta
+
+from django.http import HttpResponse
+from rest_framework import generics, permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from apps.banking.models import BankAccount, Transaction
+from .models import Report, ReportSchedule, ReportTemplate
+from .serializers import (
+    ReportScheduleSerializer,
+    ReportSerializer,
+    ReportTemplateSerializer,
+)
+from .report_generator import ReportGenerator
+
+logger = logging.getLogger(__name__)
+
+
 class ReportViewSet(viewsets.ModelViewSet):
     """
-    Report management viewset - CORRIGIDO
+    Report management viewset - SEM CELERY
     """
     serializer_class = ReportSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -51,13 +75,15 @@ class ReportViewSet(viewsets.ModelViewSet):
         ).order_by('-created_at')
     
     def create(self, request, *args, **kwargs):
-        """Generate a new report with proper validation"""
+        """Generate a new report SINCRONAMENTE"""
+        logger.info(f"Report creation request data: {request.data}")
+        
         report_type = request.data.get('report_type')
         period_start = request.data.get('period_start')
         period_end = request.data.get('period_end')
-        file_format = request.data.get('file_format', 'pdf')  # Default to PDF
+        file_format = request.data.get('file_format', 'pdf')
         
-        # Validação melhorada
+        # Validação
         if not all([report_type, period_start, period_end]):
             return Response({
                 'error': 'report_type, period_start, and period_end are required'
@@ -78,9 +104,9 @@ class ReportViewSet(viewsets.ModelViewSet):
                     'error': 'End date cannot be in the future'
                 }, status=status.HTTP_400_BAD_REQUEST)
                 
-        except ValueError:
+        except ValueError as e:
             return Response({
-                'error': 'Invalid date format. Use YYYY-MM-DD'
+                'error': f'Invalid date format. Use YYYY-MM-DD. Error: {str(e)}'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Validar tipo de relatório
@@ -90,38 +116,114 @@ class ReportViewSet(viewsets.ModelViewSet):
                 'error': f'Invalid report type. Valid types: {", ".join(valid_types)}'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Criar relatório com todos os campos necessários
-        report = Report.objects.create(
-            company=request.user.company,
-            report_type=report_type,
-            title=request.data.get('title', f'{report_type} Report - {period_start} to {period_end}'),
-            description=request.data.get('description', ''),
-            period_start=start_date,
-            period_end=end_date,
-            file_format=file_format,
-            parameters=request.data.get('parameters', {}),
-            filters=request.data.get('filters', {}),
-            created_by=request.user
-        )
-        
-        # Queue report generation
-        generate_report_task.delay(report.id)
-        
-        serializer = self.get_serializer(report)
-        return Response(
-            serializer.data,
-            status=status.HTTP_201_CREATED
-        )
+        # Criar relatório
+        try:
+            report = Report.objects.create(
+                company=request.user.company,
+                report_type=report_type,
+                title=request.data.get('title', f'{report_type} Report - {period_start} to {period_end}'),
+                description=request.data.get('description', ''),
+                period_start=start_date,
+                period_end=end_date,
+                file_format=file_format,
+                parameters=request.data.get('parameters', {}),
+                filters=request.data.get('filters', {}),
+                created_by=request.user
+            )
+            
+            # Gerar relatório SINCRONAMENTE
+            try:
+                from django.core.files.base import ContentFile
+                generator = ReportGenerator(report.company)
+                
+                # Gerar relatório baseado no tipo
+                buffer = generator.generate_transaction_report(
+                    start_date=report.period_start,
+                    end_date=report.period_end,
+                    format=report.file_format or 'pdf',
+                    filters=report.parameters
+                )
+                
+                filename = f"{report.report_type}_{report.period_start}_{report.period_end}.{report.file_format or 'pdf'}"
+                
+                # Salvar arquivo
+                report.file.save(filename, ContentFile(buffer.getvalue()))
+                report.is_generated = True
+                report.generation_time = 1  # Geração síncrona é rápida
+                report.file_size = buffer.tell()
+                report.save()
+                
+            except Exception as e:
+                logger.error(f"Error generating report: {str(e)}")
+                report.error_message = str(e)
+                report.save()
+            
+            serializer = self.get_serializer(report)
+            return Response(
+                serializer.data,
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            logger.error(f"Error creating report: {str(e)}")
+            return Response({
+                'error': f'Failed to create report: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['get'])
+    def download(self, request, pk=None):
+        """Download report file"""
+        try:
+            report = self.get_object()
+            
+            if not report.is_generated:
+                return Response({
+                    'error': 'Report is not ready for download'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not report.file:
+                return Response({
+                    'error': 'Report file not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Abrir e retornar o arquivo
+            try:
+                file_handle = report.file.open('rb')
+                response = HttpResponse(
+                    file_handle.read(),
+                    content_type=self._get_content_type(report.file_format)
+                )
+                response['Content-Disposition'] = f'attachment; filename="{report.title}_{report.id}.{report.file_format}"'
+                file_handle.close()
+                return response
+            except Exception as e:
+                logger.error(f"Error downloading report {pk}: {str(e)}")
+                return Response({
+                    'error': 'Failed to download report'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Report.DoesNotExist:
+            return Response({
+                'error': 'Report not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+    
+    def _get_content_type(self, file_format):
+        """Get content type for file format"""
+        content_types = {
+            'pdf': 'application/pdf',
+            'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'csv': 'text/csv',
+            'json': 'application/json'
+        }
+        return content_types.get(file_format, 'application/octet-stream')
     
     @action(detail=False, methods=['get'])
     def summary(self, request):
-        """Get reports summary statistics with proper data structure"""
+        """Get reports summary statistics"""
         company = request.user.company
         reports = self.get_queryset()
         
-        # Adicionar dados agregados úteis
-        from django.db.models import Count, Q
-        from datetime import timedelta
+        from django.db.models import Count
+        from django.utils import timezone
         
         today = timezone.now().date()
         last_30_days = today - timedelta(days=30)
@@ -133,7 +235,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             'reports_failed': reports.filter(is_generated=False).exclude(error_message='').count(),
             'reports_by_type': list(reports.values('report_type').annotate(
                 count=Count('id'),
-                label=Count('id')  # Para o frontend
+                label=Count('id')
             )),
             'recent_reports': ReportSerializer(
                 reports.select_related('created_by')[:10], 
@@ -148,171 +250,8 @@ class ReportViewSet(viewsets.ModelViewSet):
         return Response(summary_data)
 
 
-class ReportScheduleViewSet(viewsets.ModelViewSet):
-    """
-    Report schedule management - CORRIGIDO
-    """
-    serializer_class = ReportScheduleSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['is_active', 'report_type', 'frequency']
-    ordering_fields = ['report_type', 'frequency', 'next_run_at']
-    ordering = ['report_type']
-    
-    def get_queryset(self):
-        return ReportSchedule.objects.filter(
-            company=self.request.user.company
-        ).select_related('created_by')
-    
-    def create(self, request, *args, **kwargs):
-        """Create a new scheduled report with validation"""
-        
-        # Validar campos obrigatórios
-        required_fields = ['name', 'report_type', 'frequency', 'email_recipients']
-        missing_fields = [field for field in required_fields if not request.data.get(field)]
-        
-        if missing_fields:
-            return Response({
-                'error': f'Missing required fields: {", ".join(missing_fields)}'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Validar email_recipients
-        email_recipients = request.data.get('email_recipients', [])
-        if isinstance(email_recipients, str):
-            email_recipients = [email.strip() for email in email_recipients.split(',')]
-        
-        if not email_recipients:
-            return Response({
-                'error': 'At least one email recipient is required'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Validar emails
-        import re
-        email_pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-        invalid_emails = [email for email in email_recipients if not re.match(email_pattern, email)]
-        
-        if invalid_emails:
-            return Response({
-                'error': f'Invalid email addresses: {", ".join(invalid_emails)}'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Calcular next_run_at baseado na frequência
-        frequency = request.data.get('frequency', 'monthly')
-        now = timezone.now()
-        
-        frequency_deltas = {
-            'daily': timedelta(days=1),
-            'weekly': timedelta(weeks=1),
-            'monthly': timedelta(days=30),
-            'quarterly': timedelta(days=90),
-            'yearly': timedelta(days=365)
-        }
-        
-        next_run = now + frequency_deltas.get(frequency, timedelta(days=30))
-        
-        # Preparar dados para criação
-        schedule_data = {
-            'company': request.user.company,
-            'name': request.data.get('name'),
-            'report_type': request.data.get('report_type'),
-            'frequency': frequency,
-            'send_email': request.data.get('send_email', True),
-            'email_recipients': email_recipients,
-            'file_format': request.data.get('file_format', 'pdf'),
-            'is_active': request.data.get('is_active', True),
-            'next_run_at': next_run,
-            'parameters': request.data.get('parameters', {}),
-            'filters': request.data.get('filters', {}),
-            'created_by': request.user
-        }
-        
-        # Criar agendamento
-        schedule = ReportSchedule.objects.create(**schedule_data)
-        
-        serializer = self.get_serializer(schedule)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    
-    @action(detail=True, methods=['post'])
-    def run_now(self, request, pk=None):
-        """Run scheduled report immediately with better error handling"""
-        try:
-            schedule = self.get_object()
-            
-            # Determinar período baseado no tipo de relatório
-            today = timezone.now().date()
-            
-            if schedule.frequency == 'daily':
-                period_start = today - timedelta(days=1)
-                period_end = today
-            elif schedule.frequency == 'weekly':
-                period_start = today - timedelta(days=7)
-                period_end = today
-            elif schedule.frequency == 'monthly':
-                # Mês anterior completo
-                first_day_current = today.replace(day=1)
-                period_end = first_day_current - timedelta(days=1)
-                period_start = period_end.replace(day=1)
-            elif schedule.frequency == 'quarterly':
-                period_start = today - timedelta(days=90)
-                period_end = today
-            else:  # yearly
-                period_start = today.replace(year=today.year-1)
-                period_end = today
-            
-            # Criar relatório
-            report = Report.objects.create(
-                company=schedule.company,
-                report_type=schedule.report_type,
-                title=f'{schedule.name} - Execução Manual - {timezone.now().strftime("%d/%m/%Y %H:%M")}',
-                description=f'Relatório gerado manualmente a partir do agendamento: {schedule.name}',
-                period_start=period_start,
-                period_end=period_end,
-                file_format=schedule.file_format,
-                parameters=schedule.parameters,
-                filters=schedule.filters,
-                created_by=request.user
-            )
-            
-            # Queue report generation
-            generate_report_task.delay(report.id)
-            
-            # Update schedule
-            schedule.last_run_at = timezone.now()
-            schedule.save()
-            
-            return Response({
-                'status': 'success',
-                'report_id': report.id,
-                'message': 'Relatório sendo gerado. Você será notificado quando estiver pronto.'
-            })
-            
-        except Exception as e:
-            logger.error(f"Error running scheduled report: {e}")
-            return Response({
-                'error': 'Falha ao executar relatório',
-                'details': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-class ReportTemplateViewSet(viewsets.ModelViewSet):
-    """
-    Report template management - CORRIGIDO
-    """
-    serializer_class = ReportTemplateSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get_queryset(self):
-        # Remover referência ao campo is_system inexistente
-        return ReportTemplate.objects.filter(
-            Q(company=self.request.user.company) | Q(is_public=True),
-            is_active=True
-        ).order_by('name')
-
-
 class QuickReportsView(APIView):
-    """
-    Quick report generation for common reports
-    """
+    """Quick report generation for common reports - SEM CELERY"""
     permission_classes = [permissions.IsAuthenticated]
     
     def get(self, request):
@@ -353,7 +292,10 @@ class QuickReportsView(APIView):
         })
     
     def post(self, request):
-        """Generate quick report"""
+        """Generate quick report SINCRONAMENTE"""
+        from django.utils import timezone
+        from django.core.files.base import ContentFile
+        
         report_id = request.data.get('report_id')
         company = request.user.company
         
@@ -397,23 +339,87 @@ class QuickReportsView(APIView):
                 'error': 'Invalid report_id'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create and queue report
+        # Create report
         report = Report.objects.create(
             company=company,
             report_type=report_type,
             title=title,
             period_start=period_start,
             period_end=period_end,
-            created_by=request.user
+            created_by=request.user,
+            file_format='pdf'
         )
         
-        generate_report_task.delay(report.id)
+        # Generate report immediately
+        try:
+            generator = ReportGenerator(report.company)
+            buffer = generator.generate_transaction_report(
+                start_date=report.period_start,
+                end_date=report.period_end,
+                format=report.file_format or 'pdf',
+                filters={}
+            )
+            
+            filename = f"{report.report_type}_{report.period_start}_{report.period_end}.pdf"
+            report.file.save(filename, ContentFile(buffer.getvalue()))
+            report.is_generated = True
+            report.file_size = buffer.tell()
+            report.save()
+            
+        except Exception as e:
+            logger.error(f"Error generating quick report: {str(e)}")
+            report.error_message = str(e)
+            report.save()
         
         return Response({
             'status': 'success',
             'report': ReportSerializer(report).data,
-            'message': 'Relatório sendo gerado. Você será notificado quando estiver pronto.'
+            'message': 'Relatório gerado com sucesso!'
         })
+
+
+# Remover ou simplificar ReportScheduleViewSet
+class ReportScheduleViewSet(viewsets.ModelViewSet):
+    """
+    Report schedule management - SIMPLIFICADO SEM EMAIL
+    """
+    serializer_class = ReportScheduleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        return ReportSchedule.objects.filter(
+            company=self.request.user.company
+        ).select_related('created_by')
+    
+    def create(self, request, *args, **kwargs):
+        """Criar agendamento apenas para lembrete (sem envio automático)"""
+        return Response({
+            'message': 'Agendamento de relatórios está temporariamente desabilitado'
+        }, status=status.HTTP_501_NOT_IMPLEMENTED)
+    
+    @action(detail=True, methods=['post'])
+    def run_now(self, request, pk=None):
+        """Executar relatório agendado manualmente"""
+        return Response({
+            'message': 'Execução automática está temporariamente desabilitada. Por favor, gere o relatório manualmente.'
+        }, status=status.HTTP_501_NOT_IMPLEMENTED)
+
+
+# Manter outras views (AnalyticsView, DashboardStatsView, etc.) como estão
+
+class ReportTemplateViewSet(viewsets.ModelViewSet):
+    """
+    Report template management - CORRIGIDO
+    """
+    serializer_class = ReportTemplateSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        # Remover referência ao campo is_system inexistente
+        return ReportTemplate.objects.filter(
+            Q(company=self.request.user.company) | Q(is_public=True),
+            is_active=True
+        ).order_by('name')
 
 
 class AnalyticsView(APIView):

@@ -29,31 +29,6 @@ import numpy as np
 load_dotenv(override=True)
 logger = logging.getLogger(__name__)
 
-
-# Debug: Log API key status
-api_key = os.getenv('OPENAI_API_KEY')
-if api_key:
-    logger.info(f"OpenAI API Key loaded successfully (starts with: {api_key[:10]}...)")
-    print(f"DEBUG: OpenAI API Key loaded successfully (starts with: {api_key[:10]}...)")
-else:
-    logger.error("OpenAI API Key NOT FOUND in environment variables")
-    print("DEBUG: OpenAI API Key NOT FOUND")
-
-# Also check Django settings
-try:
-    from django.conf import settings
-    settings_key = getattr(settings, 'OPENAI_API_KEY', None)
-    if settings_key:
-        logger.info(f"OpenAI API Key found in Django settings")
-        print(f"DEBUG: API Key in Django settings: {settings_key[:10]}...")
-    else:
-        logger.warning("OpenAI API Key not in Django settings")
-        print("DEBUG: API Key NOT in Django settings")
-except Exception as e:
-    logger.error(f"Error checking Django settings: {e}")
-    print(f"DEBUG: Error checking Django settings: {e}")
-
-
 # Versão do cache para invalidação automática em updates
 CACHE_VERSION = "v2.0"
 MAX_API_RETRIES = 3

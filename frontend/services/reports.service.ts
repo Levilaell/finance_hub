@@ -9,12 +9,14 @@ import {
 } from '@/types';
 
 export interface GenerateReportParams {
-  type: string;
-  parameters: ReportParameters & {
-    title?: string;
-    file_format?: string;
-  };
-  format: 'pdf' | 'excel';
+  report_type: string;
+  title: string;
+  description?: string;
+  period_start: string;
+  period_end: string;
+  file_format: 'pdf' | 'xlsx' | 'csv' | 'json';
+  parameters?: Record<string, any>;
+  filters?: Record<string, any>;
 }
 
 export interface CreateScheduledReportData {
@@ -40,14 +42,38 @@ export const reportsService = {
     return response.data;
   },
 
-  // Generate a new report with enhanced parameters
-  async generateReport(type: string, parameters: ReportParameters, format: 'pdf' | 'excel' = 'pdf') {
-    const response = await api.post('/reports/reports/', {
+  // Generate a new report - CORRIGIDO
+  async generateReport(type: string, parameters: ReportParameters, format: 'pdf' | 'xlsx' | 'csv' | 'json' = 'pdf') {
+    // Validar parâmetros antes de enviar
+    const errors = this.validateReportParameters(parameters);
+    if (errors.length > 0) {
+      throw new Error(errors.join(', '));
+    }
+
+    // Formatar dados corretamente para o backend
+    const reportData: GenerateReportParams = {
       report_type: type,
-      ...parameters,
-      file_format: format,
-    });
-    return response.data;
+      title: parameters.title || `${type} - ${parameters.start_date} to ${parameters.end_date}`,
+      description: parameters.description || '',
+      period_start: parameters.start_date,
+      period_end: parameters.end_date,
+      file_format: format === 'excel' ? 'xlsx' : format,
+      parameters: {
+        account_ids: parameters.account_ids || [],
+        category_ids: parameters.category_ids || [],
+        include_charts: true,
+        detailed_breakdown: true,
+      },
+      filters: parameters.filters || {},
+    };
+
+    try {
+      const response = await api.post('/reports/reports/', reportData);
+      return response.data;
+    } catch (error: any) {
+      console.error('Generate report error:', error.response?.data);
+      throw error;
+    }
   },
 
   // Download report file
@@ -75,8 +101,13 @@ export const reportsService = {
   },
 
   async createScheduledReport(data: CreateScheduledReportData) {
-    const response = await api.post('/reports/schedules/', data);
-    return response.data;
+    try {
+      const response = await api.post('/reports/schedules/', data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Create scheduled report error:', error.response?.data);
+      throw error;
+    }
   },
 
   async updateScheduledReport(id: string, data: Partial<CreateScheduledReportData>) {
@@ -246,7 +277,7 @@ export const reportsService = {
     return response.data;
   },
 
-  // Utility function to validate report parameters
+  // Utility function to validate report parameters - MELHORADO
   validateReportParameters(params: ReportParameters): string[] {
     const errors: string[] = [];
     
@@ -259,15 +290,30 @@ export const reportsService = {
     }
     
     if (params.start_date && params.end_date) {
-      const start = new Date(params.start_date);
-      const end = new Date(params.end_date);
-      
-      if (start > end) {
-        errors.push('Data inicial deve ser anterior à data final');
-      }
-      
-      if (end > new Date()) {
-        errors.push('Data final não pode ser no futuro');
+      try {
+        const start = new Date(params.start_date);
+        const end = new Date(params.end_date);
+        
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          errors.push('Formato de data inválido');
+        } else {
+          if (start > end) {
+            errors.push('Data inicial deve ser anterior à data final');
+          }
+          
+          if (end > new Date()) {
+            errors.push('Data final não pode ser no futuro');
+          }
+          
+          // Validar período máximo (1 ano)
+          const diffTime = Math.abs(end.getTime() - start.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays > 365) {
+            errors.push('Período máximo permitido é de 1 ano');
+          }
+        }
+      } catch (e) {
+        errors.push('Erro ao validar datas');
       }
     }
     

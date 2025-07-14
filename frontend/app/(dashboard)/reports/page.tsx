@@ -9,7 +9,6 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { reportsService } from '@/services/reports.service';
 import { Report, ReportParameters, Account, Category } from '@/types';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
@@ -17,7 +16,6 @@ import {
   DocumentChartBarIcon,
   ArrowDownTrayIcon,
   PlayIcon,
-  PlusIcon,
   ClockIcon,
   CalendarIcon,
   ChartBarIcon,
@@ -25,13 +23,11 @@ import {
   BanknotesIcon,
   ArrowTrendingUpIcon as TrendingUpIcon,
   LightBulbIcon,
-  EnvelopeIcon,
   SparklesIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
-  XMarkIcon
 } from '@heroicons/react/24/outline';
 import {
   Select,
@@ -42,8 +38,6 @@ import {
 } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Input } from '@/components/ui/input';
 import {
   LineChart,
   Line,
@@ -70,14 +64,6 @@ const REPORT_TYPES = [
   { value: 'cash_flow', label: 'Fluxo de Caixa', icon: BanknotesIcon },
   { value: 'monthly_summary', label: 'Resumo Mensal', icon: ChartBarIcon },
   { value: 'category_analysis', label: 'Análise por Categoria', icon: ChartPieIcon },
-];
-
-const FREQUENCIES = [
-  { value: 'daily', label: 'Diário' },
-  { value: 'weekly', label: 'Semanal' },
-  { value: 'monthly', label: 'Mensal' },
-  { value: 'quarterly', label: 'Trimestral' },
-  { value: 'yearly', label: 'Anual' },
 ];
 
 const QUICK_PERIODS = [
@@ -392,92 +378,6 @@ const ExecutiveSummary: React.FC<{ summary: any }> = ({ summary }) => {
   );
 };
 
-const ScheduledReportCard = ({ schedule, onToggle, onDelete, onRunNow }: { 
-  schedule: any;
-  onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
-  onRunNow: (id: string) => void;
-}) => {
-  const getNextRunLabel = (nextRunAt: string) => {
-    if (!nextRunAt) return 'Não agendado';
-    
-    const nextRun = new Date(nextRunAt);
-    const now = new Date();
-    const diffHours = (nextRun.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
-    if (diffHours < 0) return 'Atrasado';
-    if (diffHours < 24) return `Em ${Math.round(diffHours)} horas`;
-    if (diffHours < 168) return `Em ${Math.round(diffHours / 24)} dias`;
-    
-    return formatDate(nextRunAt);
-  };
-  
-  return (
-    <div className="flex items-center justify-between p-4 border rounded-lg hover:shadow-md transition-shadow">
-      <div className="flex items-center space-x-4">
-        <div className={cn(
-          "p-2 rounded-lg",
-          schedule.is_active ? "bg-primary/10" : "bg-gray-100"
-        )}>
-          <ClockIcon className={cn(
-            "h-5 w-5",
-            schedule.is_active ? "text-primary" : "text-gray-400"
-          )} />
-        </div>
-        <div>
-          <h3 className="font-medium flex items-center">
-            {schedule.name || `${schedule.report_type} Report`}
-            {!schedule.is_active && (
-              <span className="ml-2 text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded">
-                Inativo
-              </span>
-            )}
-          </h3>
-          <div className="flex items-center space-x-4 text-sm text-gray-600">
-            <span>{FREQUENCIES.find(f => f.value === schedule.frequency)?.label}</span>
-            <span className="flex items-center">
-              <EnvelopeIcon className="h-4 w-4 mr-1" />
-              {schedule.email_recipients?.length || 0} destinatário(s)
-            </span>
-            {schedule.file_format && (
-              <span className="uppercase text-xs bg-gray-100 px-2 py-0.5 rounded">
-                {schedule.file_format}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
-            <span>Próxima execução: {getNextRunLabel(schedule.next_run_at)}</span>
-            {schedule.last_run_at && (
-              <span>Última execução: {formatDate(schedule.last_run_at)}</span>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center space-x-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onRunNow(schedule.id)}
-          disabled={!schedule.is_active}
-        >
-          <PlayIcon className="h-4 w-4" />
-        </Button>
-        <Switch
-          checked={schedule.is_active}
-          onCheckedChange={() => onToggle(schedule.id)}
-        />
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onDelete(schedule.id)}
-        >
-          <XMarkIcon className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  );
-};
-
 export default function ReportsPage() {
   const queryClient = useQueryClient();
   
@@ -493,10 +393,6 @@ export default function ReportsPage() {
   const [reportType, setReportType] = useState<string>('profit_loss');
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
-  const [scheduleName, setScheduleName] = useState('');
-  const [scheduleFrequency, setScheduleFrequency] = useState('monthly');
-  const [scheduleRecipients, setScheduleRecipients] = useState('');
   const [exportFormat, setExportFormat] = useState<'pdf' | 'excel'>('pdf');
 
   // Set dates on client-side after hydration
@@ -561,11 +457,6 @@ export default function ReportsPage() {
     enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
   });
 
-  const { data: scheduledReports, refetch: refetchScheduledReports } = useQuery({
-    queryKey: ['scheduledReports'],
-    queryFn: () => reportsService.getScheduledReports(),
-  });
-
   const { data: aiInsightsData, isLoading: aiInsightsLoading, error: aiInsightsError } = useQuery({
     queryKey: ['ai-insights', selectedPeriod],
     queryFn: () => {
@@ -585,8 +476,13 @@ export default function ReportsPage() {
     mutationFn: (params: { type: string; parameters: ReportParameters; format: 'pdf' | 'excel' }) =>
       reportsService.generateReport(params.type, params.parameters, params.format),
     onSuccess: (data) => {
-      toast.success('Relatório está sendo gerado. Você será notificado quando estiver pronto.');
+      toast.success('Relatório gerado com sucesso! Fazendo download...');
       refetchReports();
+      
+      // Fazer download automaticamente após gerar
+      if (data.id && data.is_generated) {
+        downloadReportMutation.mutate(data.id);
+      }
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.detail || 'Falha ao gerar relatório');
@@ -611,58 +507,6 @@ export default function ReportsPage() {
     },
     onError: (error: any) => {
       toast.error('Falha ao baixar relatório');
-    },
-  });
-
-  const createScheduledReportMutation = useMutation({
-    mutationFn: (data: any) => reportsService.createScheduledReport(data),
-    onSuccess: () => {
-      refetchScheduledReports();
-      toast.success('Agendamento criado com sucesso');
-      setIsScheduleDialogOpen(false);
-      setScheduleName('');
-      setScheduleRecipients('');
-    },
-    onError: (error: any) => {
-      console.error('Erro ao criar agendamento:', error);
-      const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          'Falha ao criar agendamento';
-      toast.error(errorMessage);
-    },
-  });
-
-  const toggleScheduledReportMutation = useMutation({
-    mutationFn: (id: string) => reportsService.toggleScheduledReport(id),
-    onSuccess: () => {
-      refetchScheduledReports();
-      toast.success('Status do agendamento alterado');
-    },
-    onError: (error: any) => {
-      toast.error('Falha ao alterar status');
-    },
-  });
-
-  const deleteScheduledReportMutation = useMutation({
-    mutationFn: (id: string) => reportsService.deleteScheduledReport(id),
-    onSuccess: () => {
-      refetchScheduledReports();
-      toast.success('Agendamento removido');
-    },
-    onError: (error: any) => {
-      toast.error('Falha ao remover agendamento');
-    },
-  });
-
-  const runScheduledReportNowMutation = useMutation({
-    mutationFn: (id: string) => reportsService.runScheduledReportNow(id),
-    onSuccess: (data) => {
-      toast.success(data.message || 'Relatório sendo gerado');
-      refetchReports();
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Falha ao executar relatório');
     },
   });
 
@@ -703,69 +547,19 @@ export default function ReportsPage() {
     const parameters: ReportParameters = {
       start_date: selectedPeriod.start_date.toISOString().split('T')[0],
       end_date: selectedPeriod.end_date.toISOString().split('T')[0],
-      account_ids: selectedAccounts,
-      category_ids: selectedCategories,
+      account_ids: selectedAccounts.length > 0 ? selectedAccounts : undefined,
+      category_ids: selectedCategories.length > 0 ? selectedCategories : undefined,
       title: `${REPORT_TYPES.find(t => t.value === reportType)?.label} - ${formatDate(selectedPeriod.start_date)} a ${formatDate(selectedPeriod.end_date)}`,
-      file_format: exportFormat,
+      description: `Relatório gerado via interface web`,
+      filters: {},
     };
 
     generateReportMutation.mutate({ 
       type: reportType, 
       parameters, 
-      format: exportFormat 
+      format: exportFormat === 'excel' ? 'xlsx' : exportFormat 
     });
   }, [selectedPeriod, selectedAccounts, selectedCategories, reportType, exportFormat, generateReportMutation]);
-
-  const handleScheduleReport = useCallback(() => {
-    // Validações
-    if (!scheduleName.trim()) {
-      toast.error('Por favor, insira um nome para o agendamento');
-      return;
-    }
-    
-    if (!scheduleRecipients.trim()) {
-      toast.error('Por favor, insira pelo menos um email de destinatário');
-      return;
-    }
-    
-    // Validar emails
-    const emails = scheduleRecipients.split(',').map(email => email.trim());
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const invalidEmails = emails.filter(email => !emailRegex.test(email));
-    
-    if (invalidEmails.length > 0) {
-      toast.error(`Emails inválidos: ${invalidEmails.join(', ')}`);
-      return;
-    }
-
-    const scheduleData = {
-      name: scheduleName.trim(),
-      report_type: reportType,
-      frequency: scheduleFrequency,
-      email_recipients: emails,
-      file_format: exportFormat,
-      send_email: true,
-      parameters: {
-        account_ids: selectedAccounts,
-        category_ids: selectedCategories,
-      },
-      filters: {}
-    };
-
-    createScheduledReportMutation.mutate(scheduleData);
-  }, [scheduleName, scheduleRecipients, reportType, scheduleFrequency, exportFormat, selectedAccounts, selectedCategories, createScheduledReportMutation]);
-
-  const handleRunScheduledReport = useCallback((scheduleId: string) => {
-    if (confirm('Deseja executar este relatório agora?')) {
-      runScheduledReportNowMutation.mutate(scheduleId);
-    }
-  }, [runScheduledReportNowMutation]);
-
-  const handleDeleteScheduledReport = useCallback((scheduleId: string) => {
-    if (confirm('Tem certeza que deseja remover este agendamento?')) {
-      deleteScheduledReportMutation.mutate(scheduleId);
-    }
-  }, [deleteScheduledReportMutation]);
 
   if (isLoading) {
     return (
@@ -822,10 +616,9 @@ export default function ReportsPage() {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="visualizations" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="visualizations">Visualizações</TabsTrigger>
           <TabsTrigger value="custom">Relatórios Personalizados</TabsTrigger>
-          <TabsTrigger value="scheduled">Agendados</TabsTrigger>
           <TabsTrigger value="insights">Insights com IA</TabsTrigger>
         </TabsList>
 
@@ -1087,13 +880,6 @@ export default function ReportsPage() {
                       </>
                     )}
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsScheduleDialogOpen(true)}
-                  >
-                    <ClockIcon className="h-4 w-4 mr-2" />
-                    Agendar
-                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -1178,41 +964,6 @@ export default function ReportsPage() {
                   description="Gere seu primeiro relatório para obter insights sobre suas finanças"
                 />
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Scheduled Reports Tab */}
-        <TabsContent value="scheduled" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Relatórios Agendados</CardTitle>
-              <CardDescription>Gerencie relatórios automáticos recorrentes</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {scheduledReports?.results?.map((schedule: any) => (
-                  <ScheduledReportCard
-                    key={schedule.id}
-                    schedule={schedule}
-                    onToggle={toggleScheduledReportMutation.mutate}
-                    onDelete={handleDeleteScheduledReport}
-                    onRunNow={handleRunScheduledReport}
-                  />
-                ))}
-                
-                {(!scheduledReports?.results || scheduledReports.results.length === 0) && (
-                  <EmptyState
-                    icon={ClockIcon}
-                    title="Nenhum relatório agendado"
-                    description="Agende relatórios para receber análises automáticas"
-                    action={{
-                      label: 'Criar Agendamento',
-                      onClick: () => setIsScheduleDialogOpen(true)
-                    }}
-                  />
-                )}
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1477,94 +1228,6 @@ export default function ReportsPage() {
         </TabsContent>
         
       </Tabs>
-
-      {/* Schedule Dialog */}
-      <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Agendar Relatório</DialogTitle>
-            <DialogDescription>
-              Configure um relatório para ser gerado e enviado automaticamente
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Nome do Agendamento</Label>
-              <Input
-                value={scheduleName}
-                onChange={(e) => setScheduleName(e.target.value)}
-                placeholder="Ex: Relatório Mensal de Despesas"
-              />
-            </div>
-            <div>
-              <Label>Tipo de Relatório</Label>
-              <Select value={reportType} onValueChange={setReportType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {REPORT_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Frequência</Label>
-              <Select value={scheduleFrequency} onValueChange={setScheduleFrequency}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {FREQUENCIES.map((freq) => (
-                    <SelectItem key={freq.value} value={freq.value}>
-                      {freq.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Formato do Arquivo</Label>
-              <Select value={exportFormat} onValueChange={(value: 'pdf' | 'excel') => setExportFormat(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pdf">PDF</SelectItem>
-                  <SelectItem value="excel">Excel</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Destinatários (emails separados por vírgula)</Label>
-              <Input
-                value={scheduleRecipients}
-                onChange={(e) => setScheduleRecipients(e.target.value)}
-                placeholder="email1@example.com, email2@example.com"
-              />
-            </div>
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button variant="outline" onClick={() => {
-                setIsScheduleDialogOpen(false);
-                setScheduleName('');
-                setScheduleRecipients('');
-              }}>
-                Cancelar
-              </Button>
-              <Button onClick={handleScheduleReport} disabled={createScheduledReportMutation.isPending}>
-                {createScheduledReportMutation.isPending ? (
-                  <LoadingSpinner />
-                ) : (
-                  'Criar Agendamento'
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

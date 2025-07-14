@@ -172,13 +172,20 @@ export interface CategoryRule {
 // Reports
 export interface Report {
   id: string;
-  name: string;
-  report_type: "income_statement" | "cash_flow" | "balance_sheet" | "custom";
-  frequency: "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
-  parameters: ReportParameters;
-  last_generated: string | null;
+  title: string;
+  report_type: string;
+  period_start: string;
+  period_end: string;
+  file_format: string;
+  is_generated: boolean;
   created_at: string;
-  updated_at: string;
+  created_by_name?: string;
+  file?: string;
+  file_size?: number;
+  generation_time?: number;
+  error_message?: string;
+  parameters?: Record<string, any>;
+  filters?: Record<string, any>;
 }
 
 export interface ReportParameters {
@@ -306,8 +313,9 @@ export interface ReportParameters {
   account_ids?: string[];
   category_ids?: string[];
   title?: string;
+  description?: string;
   file_format?: string;
-  [key: string]: any;
+  filters?: Record<string, any>;
 }
 
 export interface ScheduledReport {

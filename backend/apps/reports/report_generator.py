@@ -1,3 +1,5 @@
+# backend/apps/reports/report_generator.py
+
 """
 Report generation service for creating PDF and Excel reports
 """
@@ -87,6 +89,18 @@ class ReportGenerator:
         else:
             return self._generate_transaction_excel(transactions, start_date, end_date)
     
+    def _get_account_display_name(self, account):
+        """Get display name for bank account"""
+        if hasattr(account, 'name') and account.name:
+            return account.name
+        elif hasattr(account, 'alias') and account.alias:
+            return account.alias
+        else:
+            # Construir nome baseado no banco e tipo
+            bank_name = account.bank_provider.name if hasattr(account, 'bank_provider') else 'Banco'
+            account_type = account.get_account_type_display() if hasattr(account, 'get_account_type_display') else account.account_type
+            return f"{bank_name} - {account_type}"
+    
     def _generate_transaction_pdf(self, transactions, start_date, end_date) -> io.BytesIO:
         """Generate PDF transaction report"""
         buffer = io.BytesIO()
@@ -115,7 +129,7 @@ class ReportGenerator:
         summary_table_data = [
             ['Total Transactions', str(summary_data['total_count'])],
             ['Total Income', f"R$ {summary_data['total_income']:,.2f}"],
-            ['Total Expenses', f"R$ {summary_data['total_expenses']:,.2f}"],
+            ['Total Expenses', f"R$ {abs(summary_data['total_expenses']):,.2f}"],
             ['Net Balance', f"R$ {summary_data['net_balance']:,.2f}"],
         ]
         
@@ -165,7 +179,7 @@ class ReportGenerator:
                 trans.transaction_date.strftime('%Y-%m-%d'),
                 trans.description[:40] + '...' if len(trans.description) > 40 else trans.description,
                 trans.category.name if trans.category else 'Uncategorized',
-                trans.bank_account.get_display_name(),
+                self._get_account_display_name(trans.bank_account),
                 trans.transaction_type.title(),
                 f"R$ {trans.amount:,.2f}"
             ])
@@ -265,7 +279,7 @@ class ReportGenerator:
             trans_sheet.write(row, 0, trans.transaction_date, date_format)
             trans_sheet.write(row, 1, trans.description)
             trans_sheet.write(row, 2, trans.category.name if trans.category else 'Uncategorized')
-            trans_sheet.write(row, 3, trans.bank_account.get_display_name())
+            trans_sheet.write(row, 3, self._get_account_display_name(trans.bank_account))
             trans_sheet.write(row, 4, trans.transaction_type.title())
             trans_sheet.write(row, 5, float(trans.amount), money_format)
             row += 1
@@ -340,6 +354,24 @@ class ReportGenerator:
         else:
             return self._generate_statement_excel(account, transactions, start_date, end_date)
     
+    def _get_balance_at_date(self, account, date):
+        """Calculate account balance at a specific date"""
+        # Simplificado - você pode melhorar isso com um campo de saldo histórico
+        transactions_before = Transaction.objects.filter(
+            bank_account=account,
+            transaction_date__lt=date
+        )
+        
+        credits = transactions_before.filter(
+            transaction_type='credit'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        
+        debits = transactions_before.filter(
+            transaction_type='debit'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        
+        return credits - debits
+    
     def _generate_statement_pdf(self, account, transactions, start_date, end_date) -> io.BytesIO:
         """Generate PDF bank statement"""
         buffer = io.BytesIO()
@@ -347,7 +379,7 @@ class ReportGenerator:
         story = []
         
         # Header
-        story.append(Paragraph(f"Bank Statement - {account.get_display_name()}", self.styles['CustomTitle']))
+        story.append(Paragraph(f"Bank Statement - {self._get_account_display_name(account)}", self.styles['CustomTitle']))
         story.append(Paragraph(f"{self.company.name}", self.styles['Normal']))
         story.append(Paragraph(
             f"Period: {start_date.strftime('%B %d, %Y')} to {end_date.strftime('%B %d, %Y')}",
@@ -360,8 +392,8 @@ class ReportGenerator:
             ['Bank:', account.bank_provider.name],
             ['Account Type:', account.get_account_type_display()],
             ['Account Number:', f"****{account.account_number[-4:]}"],
-            ['Opening Balance:', f"R$ {account.get_balance_at_date(start_date):,.2f}"],
-            ['Closing Balance:', f"R$ {account.get_balance_at_date(end_date):,.2f}"],
+            ['Opening Balance:', f"R$ {self._get_balance_at_date(account, start_date):,.2f}"],
+            ['Closing Balance:', f"R$ {self._get_balance_at_date(account, end_date):,.2f}"],
         ]
         
         info_table = Table(info_data, colWidths=[2*inch, 3*inch])
@@ -377,7 +409,7 @@ class ReportGenerator:
         story.append(Paragraph("Transaction History", self.styles['CustomHeading']))
         
         # Calculate running balance
-        running_balance = account.get_balance_at_date(start_date)
+        running_balance = self._get_balance_at_date(account, start_date)
         
         table_data = [['Date', 'Description', 'Debit', 'Credit', 'Balance']]
         
@@ -438,7 +470,7 @@ class ReportGenerator:
         sheet = workbook.add_worksheet('Statement')
         
         # Header
-        sheet.write('A1', f'Bank Statement - {account.get_display_name()}')
+        sheet.write('A1', f'Bank Statement - {self._get_account_display_name(account)}')
         sheet.write('A2', self.company.name)
         sheet.write('A3', f'Period: {start_date.strftime("%B %d, %Y")} to {end_date.strftime("%B %d, %Y")}')
         
@@ -448,16 +480,16 @@ class ReportGenerator:
         sheet.write('A6', 'Account Type:')
         sheet.write('B6', account.get_account_type_display())
         sheet.write('A7', 'Opening Balance:')
-        sheet.write('B7', float(account.get_balance_at_date(start_date)), money_format)
+        sheet.write('B7', float(self._get_balance_at_date(account, start_date)), money_format)
         sheet.write('A8', 'Closing Balance:')
-        sheet.write('B8', float(account.get_balance_at_date(end_date)), money_format)
+        sheet.write('B8', float(self._get_balance_at_date(account, end_date)), money_format)
         
         # Transactions
         headers = ['Date', 'Description', 'Debit', 'Credit', 'Balance']
         for col, header in enumerate(headers):
             sheet.write(10, col, header, header_format)
         
-        running_balance = account.get_balance_at_date(start_date)
+        running_balance = self._get_balance_at_date(account, start_date)
         row = 11
         
         for trans in transactions:
