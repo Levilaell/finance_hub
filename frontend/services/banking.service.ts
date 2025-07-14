@@ -20,6 +20,19 @@ class BankingService {
     return response.data || [];
   }
 
+  async createTransaction(data: {
+    bank_account: string;
+    amount: number;
+    description: string;
+    transaction_type: 'credit' | 'debit';
+    category?: string;
+    transaction_date: string;
+    notes?: string;
+    tags?: string[];
+  }): Promise<BankTransaction> {
+    return apiClient.post<BankTransaction>("/api/banking/transactions/", data);
+  }
+
   async getBankProviders(): Promise<PaginatedResponse<BankProvider>> {
     return apiClient.get<PaginatedResponse<BankProvider>>("/api/banking/providers/");
   }
@@ -79,9 +92,20 @@ class BankingService {
 
   async updateTransaction(
     id: string,
-    data: { category_id?: string; notes?: string }
+    data: { category?: string; notes?: string }
   ): Promise<BankTransaction> {
-    return apiClient.patch<BankTransaction>(`/api/banking/transactions/${id}/`, data);
+    // Mapear category para category_id se necessário
+    const payload: any = {};
+    
+    if (data.category !== undefined) {
+      payload.category = data.category || null; // null para remover categoria
+    }
+    
+    if (data.notes !== undefined) {
+      payload.notes = data.notes;
+    }
+    
+    return apiClient.patch<BankTransaction>(`/api/banking/transactions/${id}/`, payload);
   }
 
   async bulkCategorize(data: {

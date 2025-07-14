@@ -81,6 +81,50 @@ interface TransactionWithTags extends BankTransaction {
   } | null;
 }
 
+// Função corrigida para formatar data
+const formatTransactionDate = (dateString: string | null | undefined): string => {
+  if (!dateString) return 'Data não disponível';
+  
+  try {
+    // Tenta diferentes formatos de data
+    let date: Date;
+    
+    // Se já for um objeto Date válido
+    if (dateString instanceof Date && !isNaN(dateString.getTime())) {
+      date = dateString;
+    }
+    // Formato ISO com timezone
+    else if (dateString.includes('T')) {
+      date = new Date(dateString);
+    }
+    // Formato YYYY-MM-DD
+    else if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      date = new Date(dateString + 'T00:00:00');
+    }
+    // Tenta parse direto
+    else {
+      date = new Date(dateString);
+    }
+    
+    // Verifica se a data é válida
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date:', dateString);
+      return 'Data inválida';
+    }
+    
+    // Formata a data
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    }).format(date);
+    
+  } catch (error) {
+    console.error('Error formatting date:', error, dateString);
+    return 'Data inválida';
+  }
+};
+
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
   const isClient = useClientOnly();
@@ -147,13 +191,15 @@ export default function TransactionsPage() {
   // Mutations
   const updateCategoryMutation = useMutation({
     mutationFn: ({ id, categoryId }: { id: string; categoryId: string }) =>
-      bankingService.updateTransaction(id, { category_id: categoryId }),
+      bankingService.updateTransaction(id, { 
+        category: categoryId === 'uncategorized' ? undefined : categoryId 
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       toast.success('Categoria atualizada com sucesso');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to update category');
+      toast.error(error.response?.data?.detail || 'Falha ao atualizar categoria');
     },
   });
 
@@ -164,10 +210,10 @@ export default function TransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       setEditingNote(null);
       setNoteText('');
-      toast.success('Note updated successfully');
+      toast.success('Nota atualizada com sucesso');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to update note');
+      toast.error(error.response?.data?.detail || 'Falha ao atualizar nota');
     },
   });
 
@@ -177,10 +223,10 @@ export default function TransactionsPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       setSelectedTransactions([]);
-      toast.success(`${data.updated} transactions categorized successfully`);
+      toast.success(`${data.updated} transações categorizadas com sucesso`);
     },
     onError: (error: any) => {
-      toast.error('Failed to update categories');
+      toast.error('Falha ao atualizar categorias');
     },
   });
 
@@ -200,10 +246,10 @@ export default function TransactionsPage() {
         link.remove();
         window.URL.revokeObjectURL(url);
       }
-      toast.success('Transactions exported successfully');
+      toast.success('Transações exportadas com sucesso');
     },
     onError: (error: any) => {
-      toast.error('Failed to export transactions');
+      toast.error('Falha ao exportar transações');
     },
   });
 
@@ -232,7 +278,7 @@ export default function TransactionsPage() {
   }
 
   if (error) {
-    return <ErrorMessage message="Failed to load transactions" />;
+    return <ErrorMessage message="Falha ao carregar transações" />;
   }
 
   const columns = [
@@ -257,24 +303,19 @@ export default function TransactionsPage() {
     },
     {
       key: 'date',
-      header: 'Date',
+      header: 'Data',
       cell: (transaction: TransactionWithTags) => (
-        <HydrationBoundary fallback={
-          <div className="whitespace-nowrap">
-            <div className="h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
-            <div className="h-3 bg-gray-100 rounded animate-pulse"></div>
-          </div>
-        }>
-          <div className="whitespace-nowrap">
-            <p className="font-medium text-sm">{formatDate(transaction.transaction_date)}</p>
-            <p className="text-xs text-gray-500">{formatDate(transaction.posted_date)}</p>
-          </div>
-        </HydrationBoundary>
+        <div className="whitespace-nowrap">
+          <p className="font-medium text-sm">{formatTransactionDate(transaction.transaction_date)}</p>
+          {transaction.posted_date && transaction.posted_date !== transaction.transaction_date && (
+            <p className="text-xs text-gray-500">Lançado: {formatTransactionDate(transaction.posted_date)}</p>
+          )}
+        </div>
       ),
     },
     {
       key: 'description',
-      header: 'Description',
+      header: 'Descrição',
       cell: (transaction: TransactionWithTags) => (
         <div className="max-w-xs">
           <p className="font-medium text-sm truncate">{transaction.description}</p>
@@ -287,29 +328,20 @@ export default function TransactionsPage() {
               <span className="truncate">{transaction.notes}</span>
             </div>
           )}
-          {transaction.tags && transaction.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {transaction.tags.map((tag, idx) => (
-                <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
       ),
     },
     {
       key: 'category',
-      header: 'Category',
+      header: 'Categoria',
       cell: (transaction: TransactionWithTags) => (
         <div className="min-w-[180px]">
           <Select
-            value={transaction.category_detail?.id || 'uncategorized'}
+            value={transaction.category || 'uncategorized'}
             onValueChange={(value) =>
               updateCategoryMutation.mutate({ 
                 id: transaction.id, 
-                categoryId: value === 'uncategorized' ? '' : value 
+                categoryId: value
               })
             }
           >
@@ -327,13 +359,13 @@ export default function TransactionsPage() {
                     <span className="truncate">{transaction.category_detail.name}</span>
                   </>
                 ) : (
-                  <span className="text-gray-400">Uncategorized</span>
+                  <span className="text-gray-400">Sem categoria</span>
                 )}
               </div>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="uncategorized">
-                <span className="text-gray-400">Uncategorized</span>
+                <span className="text-gray-400">Sem categoria</span>
               </SelectItem>
               {categories.map((category) => (
                 <SelectItem key={category.id} value={category.id}>
@@ -351,7 +383,7 @@ export default function TransactionsPage() {
           {transaction.ai_categorized && transaction.ai_confidence && (
             <div className="flex items-center mt-1 text-xs text-purple-600">
               <SparklesIcon className="h-3 w-3 mr-1" />
-              <span>AI: {Math.round(transaction.ai_confidence * 100)}% confident</span>
+              <span>IA: {Math.round(transaction.ai_confidence * 100)}% confiante</span>
             </div>
           )}
         </div>
@@ -359,7 +391,7 @@ export default function TransactionsPage() {
     },
     {
       key: 'amount',
-      header: 'Amount',
+      header: 'Valor',
       cell: (transaction: TransactionWithTags) => (
         <div className={cn(
           "font-semibold text-right whitespace-nowrap",
@@ -378,14 +410,14 @@ export default function TransactionsPage() {
     },
     {
       key: 'account',
-      header: 'Account',
+      header: 'Conta',
       cell: (transaction: TransactionWithTags) => {
         const account = accounts?.results?.find(
           (acc) => acc.id === transaction.bank_account
         );
         return (
           <p className="text-sm text-gray-600 truncate max-w-[120px]">
-            {account?.account_name || 'Unknown'}
+            {account?.account_name || 'Desconhecida'}
           </p>
         );
       },
@@ -394,27 +426,17 @@ export default function TransactionsPage() {
       key: 'actions',
       header: '',
       cell: (transaction: TransactionWithTags) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <PencilIcon className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => {
-              setEditingNote(transaction.id);
-              setNoteText(transaction.notes || '');
-            }}>
-              Add/Edit Note
-            </DropdownMenuItem>
-            <DropdownMenuItem>Add Tags</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-600">
-              Report Issue
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setEditingNote(transaction.id);
+            setNoteText(transaction.notes || '');
+          }}
+          className="h-8 w-8 p-0"
+        >
+          <PencilIcon className="h-4 w-4" />
+        </Button>
       ),
     },
   ];
@@ -426,7 +448,7 @@ export default function TransactionsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Transactions</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">Transações</h1>
           <p className="text-sm md:text-base text-gray-600">Visualize e categorize suas transações</p>
         </div>
         
@@ -450,24 +472,24 @@ export default function TransactionsPage() {
               disabled={isLoading}
             >
               <ArrowPathIcon className={cn("h-4 w-4", isLoading && "animate-spin")} />
-              <span className="hidden sm:inline ml-2">Refresh</span>
+              <span className="hidden sm:inline ml-2">Atualizar</span>
             </Button>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
                   <ArrowDownTrayIcon className="h-4 w-4" />
-                  <span className="hidden sm:inline ml-2">Export</span>
+                  <span className="hidden sm:inline ml-2">Exportar</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => exportTransactionsMutation.mutate('csv')}>
                   <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
-                  Export as CSV
+                  Exportar como CSV
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => exportTransactionsMutation.mutate('excel')}>
                   <TableCellsIcon className="h-4 w-4 mr-2" />
-                  Export as Excel
+                  Exportar como Excel
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -590,7 +612,7 @@ export default function TransactionsPage() {
           <CardContent className="py-3 px-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <p className="text-sm text-gray-600">
-                {selectedTransactions.length} transaction(s) selected
+                {selectedTransactions.length} transação(ões) selecionada(s)
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <Select
@@ -620,16 +642,12 @@ export default function TransactionsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button variant="outline" size="sm">
-                  <TagIcon className="h-4 w-4 mr-2" />
-                  Add Tags
-                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setSelectedTransactions([])}
                 >
-                  Clear Selection
+                  Limpar Seleção
                 </Button>
               </div>
             </div>
@@ -654,7 +672,7 @@ export default function TransactionsPage() {
           {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Label className="text-sm">Rows per page:</Label>
+              <Label className="text-sm">Linhas por página:</Label>
               <Select
                 value={pageSize.toString()}
                 onValueChange={(value) => {
@@ -676,7 +694,7 @@ export default function TransactionsPage() {
 
             <div className="flex items-center gap-2">
               <p className="text-sm text-gray-600">
-                Page {page} of {totalPages} ({transactions.count} total)
+                Página {page} de {totalPages} ({transactions.count} total)
               </p>
               <div className="flex gap-1">
                 <Button
@@ -735,7 +753,7 @@ export default function TransactionsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle>Edit Note</CardTitle>
+              <CardTitle>Editar Nota</CardTitle>
             </CardHeader>
             <CardContent>
               <textarea
@@ -752,14 +770,14 @@ export default function TransactionsPage() {
                     setNoteText('');
                   }}
                 >
-                  Cancel
+                  Cancelar
                 </Button>
                 <Button
                   onClick={() => {
                     updateNoteMutation.mutate({ id: editingNote, notes: noteText });
                   }}
                 >
-                  Save
+                  Salvar
                 </Button>
               </div>
             </CardContent>
@@ -772,23 +790,34 @@ export default function TransactionsPage() {
 
 // Filters Component
 function FiltersContent({ filters, setFilters, accounts, categories }: any) {
+  const [localFilters, setLocalFilters] = useState(filters);
+
+  // Atualiza filtros locais quando os filtros externos mudam
+  useEffect(() => {
+    setLocalFilters(filters);
+  }, [filters]);
+
+  const applyFilters = () => {
+    setFilters(localFilters);
+  };
+
   return (
     <div className="space-y-4">
-      <h4 className="font-medium">Filter Transactions</h4>
+      <h4 className="font-medium">Filtrar Transações</h4>
       
       <div>
-        <Label>Account</Label>
+        <Label>Conta</Label>
         <Select
-          value={filters.account_id || 'all'}
+          value={localFilters.account_id || 'all'}
           onValueChange={(value) =>
-            setFilters({ ...filters, account_id: value === 'all' ? undefined : value })
+            setLocalFilters({ ...localFilters, account_id: value === 'all' ? undefined : value })
           }
         >
           <SelectTrigger>
             <SelectValue placeholder="Todas as contas" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All accounts</SelectItem>
+            <SelectItem value="all">Todas as contas</SelectItem>
             {accounts?.results?.map((account: any) => (
               <SelectItem key={account.id} value={account.id}>
                 {account.account_name}
@@ -799,19 +828,19 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
       </div>
 
       <div>
-        <Label>Category</Label>
+        <Label>Categoria</Label>
         <Select
-          value={filters.category_id || 'all'}
+          value={localFilters.category || 'all'}
           onValueChange={(value) =>
-            setFilters({ ...filters, category_id: value === 'all' ? undefined : value })
+            setLocalFilters({ ...localFilters, category: value === 'all' ? undefined : value })
           }
         >
           <SelectTrigger>
             <SelectValue placeholder="Todas as categorias" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
-            <SelectItem value="uncategorized">Uncategorized</SelectItem>
+            <SelectItem value="all">Todas as categorias</SelectItem>
+            <SelectItem value="uncategorized">Sem categoria</SelectItem>
             {categories.map((category: any) => (
               <SelectItem key={category.id} value={category.id}>
                 <div className="flex items-center">
@@ -828,12 +857,12 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
       </div>
 
       <div>
-        <Label>Transaction Type</Label>
+        <Label>Tipo de Transação</Label>
         <Select
-          value={filters.transaction_type || 'all'}
+          value={localFilters.transaction_type || 'all'}
           onValueChange={(value) =>
-            setFilters({
-              ...filters,
+            setLocalFilters({
+              ...localFilters,
               transaction_type: value === 'all' ? undefined : (value as 'debit' | 'credit'),
             })
           }
@@ -842,22 +871,22 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
             <SelectValue placeholder="Todos os tipos" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All types</SelectItem>
+            <SelectItem value="all">Todos os tipos</SelectItem>
             <SelectItem value="credit">Receita</SelectItem>
-            <SelectItem value="debit">Expense</SelectItem>
+            <SelectItem value="debit">Despesa</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <Label>From Date</Label>
+          <Label>Data Inicial</Label>
           <HydrationBoundary fallback={<div className="h-10 bg-gray-100 rounded animate-pulse" />}>
             <DatePicker
-              date={filters.start_date ? new Date(filters.start_date) : undefined}
+              date={localFilters.start_date ? new Date(localFilters.start_date) : undefined}
               onDateChange={(date) =>
-                setFilters({
-                  ...filters,
+                setLocalFilters({
+                  ...localFilters,
                   start_date: date?.toISOString().split('T')[0],
                 })
               }
@@ -865,13 +894,13 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
           </HydrationBoundary>
         </div>
         <div>
-          <Label>To Date</Label>
+          <Label>Data Final</Label>
           <HydrationBoundary fallback={<div className="h-10 bg-gray-100 rounded animate-pulse" />}>
             <DatePicker
-              date={filters.end_date ? new Date(filters.end_date) : undefined}
+              date={localFilters.end_date ? new Date(localFilters.end_date) : undefined}
               onDateChange={(date) =>
-                setFilters({
-                  ...filters,
+                setLocalFilters({
+                  ...localFilters,
                   end_date: date?.toISOString().split('T')[0],
                 })
               }
@@ -882,28 +911,28 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <Label>Min Amount</Label>
+          <Label>Valor Mínimo</Label>
           <Input
             type="number"
             placeholder="0.00"
-            value={filters.min_amount || ''}
+            value={localFilters.min_amount || ''}
             onChange={(e) =>
-              setFilters({
-                ...filters,
+              setLocalFilters({
+                ...localFilters,
                 min_amount: e.target.value ? parseFloat(e.target.value) : undefined,
               })
             }
           />
         </div>
         <div>
-          <Label>Max Amount</Label>
+          <Label>Valor Máximo</Label>
           <Input
             type="number"
             placeholder="0.00"
-            value={filters.max_amount || ''}
+            value={localFilters.max_amount || ''}
             onChange={(e) =>
-              setFilters({
-                ...filters,
+              setLocalFilters({
+                ...localFilters,
                 max_amount: e.target.value ? parseFloat(e.target.value) : undefined,
               })
             }
@@ -911,13 +940,24 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
         </div>
       </div>
 
-      <Button
-        variant="outline"
-        className="w-full"
-        onClick={() => setFilters({})}
-      >
-        Limpar Filtros
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={() => {
+            setLocalFilters({});
+            setFilters({});
+          }}
+        >
+          Limpar Filtros
+        </Button>
+        <Button
+          className="flex-1"
+          onClick={applyFilters}
+        >
+          Aplicar Filtros
+        </Button>
+      </div>
     </div>
   );
 }

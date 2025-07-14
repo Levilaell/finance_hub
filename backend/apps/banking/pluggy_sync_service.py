@@ -2,6 +2,8 @@
 Async service for transaction synchronization with Pluggy API
 """
 import asyncio
+from .pluggy_category_mapper import pluggy_category_mapper
+
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -361,55 +363,27 @@ class PluggyTransactionSyncService:
             return None
 
     def _get_pluggy_category(self, tx_data: Dict) -> Optional['TransactionCategory']:
-        """Get category from Pluggy data only"""
+        """Get category from Pluggy data using mapper"""
         try:
-            # ✅ Verificar se a Pluggy forneceu categoria
             pluggy_category = tx_data.get('category')
-            pluggy_category_id = tx_data.get('categoryId')
-            
-            logger.info(f"🔍 Pluggy category data: category='{pluggy_category}', categoryId='{pluggy_category_id}'")
-            
-            # Se a Pluggy não forneceu categoria, retornar None
-            if not pluggy_category and not pluggy_category_id:
-                logger.info(f"ℹ️ No category data from Pluggy - will be uncategorized")
+            if not pluggy_category:
                 return None
-            
-            # ✅ Se a Pluggy forneceu categoria, mapear para nossas categorias
-            if pluggy_category:
-                # Mapear categorias da Pluggy para nossas categorias
-                category_mapping = {
-                    # Pluggy category name -> nossa categoria
-                    'entertainment': 'Entretenimento',
-                    'food': 'Alimentação', 
-                    'transportation': 'Transporte',
-                    'utilities': 'Utilidades',
-                    'streaming': 'Streaming',
-                    'shopping': 'Compras',
-                    'healthcare': 'Saúde',
-                    'education': 'Educação',
-                    'travel': 'Viagem',
-                    'bills': 'Contas',
-                    'transfer': 'Transferências'
-                }
                 
-                mapped_category_name = category_mapping.get(pluggy_category.lower())
-                if mapped_category_name:
-                    # Buscar categoria no nosso sistema
-                    from django.db import models
-                    category = TransactionCategory.objects.filter(
-                        name__iexact=mapped_category_name
-                    ).first()
-                    
-                    if category:
-                        logger.info(f"✅ Mapped Pluggy category '{pluggy_category}' to '{category.name}'")
-                        return category
-                    else:
-                        logger.warning(f"⚠️ Category '{mapped_category_name}' not found in our system")
-                else:
-                    logger.info(f"ℹ️ Pluggy category '{pluggy_category}' not mapped")
+            # Determinar tipo da transação
+            transaction_type = 'credit' if tx_data.get('type') == 'CREDIT' else 'debit'
             
-            # Se chegou até aqui, não conseguiu mapear
-            return None
+            # Usar o mapper
+            category = pluggy_category_mapper.map_category(
+                pluggy_category, 
+                transaction_type
+            )
+            
+            if category:
+                logger.info(f"✅ Mapped Pluggy category '{pluggy_category}' to '{category.name}'")
+            else:
+                logger.info(f"❓ No mapping for Pluggy category '{pluggy_category}'")
+                
+            return category
             
         except Exception as e:
             logger.error(f"❌ Error getting Pluggy category: {e}")
