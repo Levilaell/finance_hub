@@ -18,6 +18,7 @@ import {
   X,
   ChevronDown,
   Bell,
+  Sparkles,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -29,6 +30,7 @@ const navigation = [
   { name: "Transações", href: "/transactions", icon: Receipt },
   { name: "Contas", href: "/accounts", icon: Wallet },
   { name: "Categorias", href: "/categories", icon: Tags },
+  { name: "Insights com IA", href: "/ai-insights", icon: Sparkles },
   { name: "Relatórios", href: "/reports", icon: FileText },
   { name: "Configurações", href: "/settings", icon: Settings },
 ];

@@ -128,22 +128,3 @@ LOGGING = {
         },
     },
 }
-
-# ===== PAYMENT GATEWAY SETTINGS =====
-# Payment Gateway Settings
-DEFAULT_PAYMENT_GATEWAY = config('DEFAULT_PAYMENT_GATEWAY', default='stripe')
-
-# Stripe Configuration
-STRIPE_PUBLIC_KEY = config('STRIPE_PUBLIC_KEY', default='')
-STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
-STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
-
-# MercadoPago Configuration
-MERCADOPAGO_ACCESS_TOKEN = config('MERCADOPAGO_ACCESS_TOKEN', default='')
-MERCADOPAGO_PUBLIC_KEY = config('MERCADOPAGO_PUBLIC_KEY', default='')
-
-# Trial Period Settings
-DEFAULT_TRIAL_DAYS = config('TRIAL_PERIOD_DAYS', default=14, cast=int)
-
-# Currency Settings
-DEFAULT_CURRENCY = config('DEFAULT_CURRENCY', default='BRL')

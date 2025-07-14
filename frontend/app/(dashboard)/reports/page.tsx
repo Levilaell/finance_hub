@@ -28,6 +28,7 @@ import {
   CheckCircleIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import {
   Select,
@@ -457,7 +458,13 @@ export default function ReportsPage() {
     enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
   });
 
-  const { data: aiInsightsData, isLoading: aiInsightsLoading, error: aiInsightsError } = useQuery({
+  const { 
+    data: aiInsightsData, 
+    isLoading: aiInsightsLoading, 
+    error: aiInsightsError,
+    refetch: refetchAIInsights,
+    dataUpdatedAt
+  } = useQuery({
     queryKey: ['ai-insights', selectedPeriod],
     queryFn: () => {
       if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
@@ -469,6 +476,9 @@ export default function ReportsPage() {
     enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
     retry: 2,
     retryDelay: 1000,
+    staleTime: 7 * 24 * 60 * 60 * 1000, // 7 dias em milissegundos
+    cacheTime: 7 * 24 * 60 * 60 * 1000, // Manter cache por 7 dias
+    refetchOnWindowFocus: false, // Não refetch automaticamente
   });
 
   // Mutations
@@ -978,12 +988,29 @@ export default function ReportsPage() {
                     <SparklesIcon className="h-5 w-5 mr-2" />
                     Análise com Inteligência Artificial
                   </div>
-                  {aiInsightsData?.predictions?.confidence && (
-                    <ConfidenceIndicator level={aiInsightsData.predictions.confidence} />
-                  )}
+                  <div className="flex items-center gap-2">
+                    {aiInsightsData?.predictions?.confidence && (
+                      <ConfidenceIndicator level={aiInsightsData.predictions.confidence} />
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => refetchAIInsights()}
+                      disabled={aiInsightsLoading}
+                      title="Atualizar análise"
+                    >
+                      <ArrowPathIcon className={cn("h-4 w-4", aiInsightsLoading && "animate-spin")} />
+                      <span className="ml-2">Atualizar</span>
+                    </Button>
+                  </div>
                 </CardTitle>
-                <CardDescription>
-                  Insights automáticos e previsões baseadas em seus dados financeiros
+                <CardDescription className="flex items-center justify-between">
+                  <span>Insights automáticos e previsões baseadas em seus dados financeiros</span>
+                  {dataUpdatedAt && (
+                    <span className="text-xs text-gray-500">
+                      Última análise: {formatDate(new Date(dataUpdatedAt))}
+                    </span>
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1215,9 +1242,6 @@ export default function ReportsPage() {
                         <span className="text-purple-700 font-medium">
                           {aiInsightsData.ai_generated ? 'Powered by OpenAI GPT' : 'Análise Avançada (Modo Offline)'}
                         </span>
-                        {aiInsightsData.from_cache && (
-                          <span className="text-xs text-purple-600">(Cache)</span>
-                        )}
                       </div>
                     </div>
                   )}

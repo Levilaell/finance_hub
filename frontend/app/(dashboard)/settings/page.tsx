@@ -253,12 +253,11 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="security">Segurança</TabsTrigger>
-          <TabsTrigger value="ai">IA & Regras</TabsTrigger>
           <TabsTrigger value="billing">Faturamento</TabsTrigger>
-          <TabsTrigger value="notifications">Notificações</TabsTrigger>
+          <TabsTrigger value="notifications">Notificações (Em Breve)</TabsTrigger>
         </TabsList>
 
         {/* Profile Settings */}

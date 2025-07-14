@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
-
+from ..companies.models import PaymentHistory
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -131,29 +131,8 @@ class StripeGateway(PaymentGateway):
             logger.error(f"Error canceling Stripe subscription: {e}")
             raise
     
-    def update_subscription(self, subscription_id: str, new_plan_id: str) -> Dict[str, Any]:
-        """Update Stripe subscription"""
-        try:
-            subscription = self.stripe.Subscription.retrieve(subscription_id)
-            
-            updated = self.stripe.Subscription.modify(
-                subscription_id,
-                items=[{
-                    'id': subscription['items']['data'][0].id,
-                    'price': new_plan_id,
-                }],
-                proration_behavior='create_prorations'
-            )
-            
-            return {
-                'subscription_id': updated.id,
-                'status': updated.status,
-                'data': updated
-            }
-        except Exception as e:
-            logger.error(f"Error updating Stripe subscription: {e}")
-            raise
-    
+
+
     def create_payment_method(self, customer_id: str, payment_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a payment method for Stripe customer"""
         try:
@@ -477,27 +456,68 @@ class PaymentService:
         
         return result
     
-    def create_subscription(self, company, plan) -> Dict[str, Any]:
-        """Create a subscription for a company"""
+    def create_subscription(self, company, plan, billing_cycle='monthly'):
+        """Create a subscription for a company with proper error handling"""
         # Ensure customer exists
         if not company.owner.payment_customer_id:
             self.create_customer(company.owner)
         
+        # Get correct price ID based on billing cycle and gateway
+        if self.gateway_name == 'stripe':
+            price_id = plan.stripe_price_id
+        elif self.gateway_name == 'mercadopago':
+            price_id = plan.mercadopago_plan_id
+        else:
+            raise ValueError(f"No price ID configured for {self.gateway_name}")
+        
+        if not price_id:
+            raise ValueError(f"Plan {plan.name} not configured for {self.gateway_name}")
+        
         # Create subscription
-        result = self.gateway.create_subscription(
-            customer_id=company.owner.payment_customer_id,
-            plan_id=plan.gateway_plan_id
-        )
-        
-        # Update company subscription info
-        with transaction.atomic():
-            company.subscription_id = result['subscription_id']
-            company.subscription_plan = plan
-            company.subscription_status = 'pending'  # Will be updated by webhook
-            company.subscription_start_date = timezone.now()
+        try:
+            result = self.gateway.create_subscription(
+                customer_id=company.owner.payment_customer_id,
+                plan_id=price_id
+            )
+            
+            # Update company subscription info
+            with transaction.atomic():
+                company.subscription_id = result['subscription_id']
+                company.subscription_plan = plan
+                company.subscription_status = 'pending'  # Will be updated by webhook
+                company.billing_cycle = billing_cycle
+                company.subscription_start_date = timezone.now()
+                
+                # Calculate next billing date
+                if billing_cycle == 'yearly':
+                    company.next_billing_date = timezone.now().date() + timedelta(days=365)
+                else:
+                    # Add one month
+                    next_month = timezone.now().date().replace(day=1) + timedelta(days=32)
+                    company.next_billing_date = next_month.replace(day=1)
+                
+                company.save()
+                
+                # Log payment history
+                PaymentHistory.objects.create(
+                    company=company,
+                    subscription_plan=plan,
+                    transaction_type='subscription',
+                    amount=plan.price_yearly if billing_cycle == 'yearly' else plan.price_monthly,
+                    currency='BRL',
+                    status='pending',
+                    description=f'Assinatura {plan.name} - Ciclo {billing_cycle}',
+                    transaction_date=timezone.now()
+                )
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error creating subscription: {e}")
+            # Rollback any changes
+            company.subscription_status = 'trial'
             company.save()
-        
-        return result
+            raise
     
     def cancel_subscription(self, company) -> bool:
         """Cancel a company's subscription"""
@@ -577,3 +597,112 @@ class PaymentService:
         """Handle invoice-related events"""
         # Implement invoice event handling
         pass
+
+    def update_subscription(self, company, new_plan, billing_cycle='monthly'):
+        """Update subscription with proration"""
+        if not company.subscription_id:
+            # No existing subscription, create new one
+            return self.create_subscription(company, new_plan, billing_cycle)
+        
+        try:
+            # Get correct price ID
+            if self.gateway_name == 'stripe':
+                price_id = new_plan.stripe_price_id
+            else:
+                price_id = new_plan.mercadopago_plan_id
+            
+            result = self.gateway.update_subscription(
+                subscription_id=company.subscription_id,
+                new_plan_id=price_id
+            )
+            
+            # Update company
+            old_plan = company.subscription_plan
+            company.subscription_plan = new_plan
+            company.billing_cycle = billing_cycle
+            company.save()
+            
+            # Log the upgrade
+            PaymentHistory.objects.create(
+                company=company,
+                subscription_plan=new_plan,
+                transaction_type='upgrade',
+                amount=new_plan.price_yearly if billing_cycle == 'yearly' else new_plan.price_monthly,
+                currency='BRL',
+                status='paid',
+                description=f'Upgrade de {old_plan.name} para {new_plan.name}',
+                transaction_date=timezone.now(),
+                paid_at=timezone.now()
+            )
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error updating subscription: {e}")
+            raise
+
+    def check_trial_expiration(self):
+        """Check and handle trial expirations"""
+        from apps.companies.models import Company
+        from apps.notifications.email_service import EmailService
+        
+        now = timezone.now()
+        
+        # Find companies with expired trials
+        expired_trials = Company.objects.filter(
+            subscription_status='trial',
+            trial_ends_at__lt=now
+        )
+        
+        for company in expired_trials:
+            company.subscription_status = 'expired'
+            company.save()
+            
+            # Send notification
+            EmailService.send_trial_expired_email(
+                email=company.owner.email,
+                company_name=company.name,
+                owner_name=company.owner.get_full_name()
+            )
+        
+        # Find companies with trials expiring soon (3 days)
+        expiring_soon = Company.objects.filter(
+            subscription_status='trial',
+            trial_ends_at__lte=now + timedelta(days=3),
+            trial_ends_at__gt=now
+        )
+        
+        for company in expiring_soon:
+            # Send reminder
+            EmailService.send_trial_expiring_email(
+                email=company.owner.email,
+                company_name=company.name,
+                owner_name=company.owner.get_full_name(),
+                days_remaining=(company.trial_ends_at - now).days
+            )
+    
+    def process_failed_payments(self):
+        """Process failed payments and update subscription status"""
+        from apps.companies.models import Company
+        
+        # This would be called by a cron job or celery task
+        companies_with_failed_payments = Company.objects.filter(
+            subscription_status='active',
+            next_billing_date__lt=timezone.now().date()
+        )
+        
+        for company in companies_with_failed_payments:
+            # Check with payment provider
+            try:
+                status = self.gateway.get_subscription_status(company.subscription_id)
+                
+                if status['status'] == 'past_due':
+                    company.subscription_status = 'past_due'
+                    company.save()
+                elif status['status'] == 'canceled':
+                    company.subscription_status = 'cancelled'
+                    company.subscription_end_date = timezone.now()
+                    company.save()
+                    
+            except Exception as e:
+                logger.error(f"Error checking payment status for company {company.id}: {e}")

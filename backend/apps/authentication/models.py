@@ -46,6 +46,26 @@ class User(AbstractUser):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
     
+    # Payment Gateway Fields
+    payment_customer_id = models.CharField(
+        _('payment gateway customer ID'),
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text='ID do cliente no gateway de pagamento (Stripe/MercadoPago)'
+    )
+    payment_gateway = models.CharField(
+        _('payment gateway'),
+        max_length=50,
+        choices=[
+            ('stripe', 'Stripe'),
+            ('mercadopago', 'MercadoPago'),
+        ],
+        blank=True,
+        null=True,
+        help_text='Gateway de pagamento utilizado'
+    )
+
     class Meta:
         db_table = 'auth_user'
         verbose_name = _('User')

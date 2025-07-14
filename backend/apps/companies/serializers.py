@@ -10,16 +10,23 @@ User = get_user_model()
 
 
 class SubscriptionPlanSerializer(serializers.ModelSerializer):
-    """Subscription plan details"""
+    """Serializer for subscription plans"""
+    yearly_discount = serializers.SerializerMethodField()
     
     class Meta:
         model = SubscriptionPlan
         fields = [
-            'id', 'name', 'slug', 'plan_type', 'price_monthly', 'price_yearly',
+            'id', 'name', 'slug', 'plan_type',
+            'price_monthly', 'price_yearly',
             'max_transactions', 'max_bank_accounts', 'max_users',
-            'has_ai_categorization', 'has_advanced_reports', 'has_api_access',
-            'has_accountant_access'
+            'has_ai_categorization', 'enable_ai_insights', 'enable_ai_reports',
+            'max_ai_requests_per_month', 'has_advanced_reports',
+            'has_api_access', 'has_accountant_access', 'has_priority_support',
+            'yearly_discount'
         ]
+    
+    def get_yearly_discount(self, obj):
+        return obj.get_yearly_discount_percentage()
 
 
 class CompanySerializer(serializers.ModelSerializer):
@@ -116,26 +123,31 @@ class InviteUserSerializer(serializers.Serializer):
 
 
 class UpgradeSubscriptionSerializer(serializers.Serializer):
-    """Upgrade subscription serializer"""
-    plan_id = serializers.IntegerField(required=True)
+    """Serializer for subscription upgrade"""
+    plan_id = serializers.CharField(required=True)
     billing_cycle = serializers.ChoiceField(
         choices=['monthly', 'yearly'],
-        required=True
+        default='monthly'
     )
+    payment_method_id = serializers.CharField(required=False)
     
     def validate_plan_id(self, value):
-        """Validate plan exists and is upgradeable"""
         try:
             plan = SubscriptionPlan.objects.get(id=value, is_active=True)
-            current_plan = self.context['request'].user.company.subscription_plan
-            
-            # Check if it's actually an upgrade
-            if plan.price_monthly <= current_plan.price_monthly:
-                raise serializers.ValidationError("Selected plan is not an upgrade.")
-                
-            return value
         except SubscriptionPlan.DoesNotExist:
-            raise serializers.ValidationError("Invalid subscription plan.")
+            raise serializers.ValidationError("Plano inválido ou inativo")
+        
+        # Check if it's actually an upgrade
+        user = self.context['request'].user
+        current_plan = user.company.subscription_plan
+        
+        if current_plan and plan.price_monthly <= current_plan.price_monthly:
+            if plan.id != current_plan.id:
+                raise serializers.ValidationError(
+                    "Só é possível fazer upgrade para um plano superior"
+                )
+        
+        return value
 
 
 class PaymentMethodSerializer(serializers.ModelSerializer):
@@ -151,47 +163,67 @@ class PaymentMethodSerializer(serializers.ModelSerializer):
 
 
 class AddPaymentMethodSerializer(serializers.Serializer):
-    """Add payment method serializer"""
-    payment_type = serializers.ChoiceField(choices=PaymentMethod.PAYMENT_TYPES)
-    
-    # Credit card fields
-    card_number = serializers.CharField(max_length=19, required=False)
-    exp_month = serializers.IntegerField(min_value=1, max_value=12, required=False)
-    exp_year = serializers.IntegerField(min_value=2024, max_value=2040, required=False)
-    cvc = serializers.CharField(max_length=4, required=False)
-    cardholder_name = serializers.CharField(max_length=200, required=False)
+    """Serializer for adding payment methods"""
+    payment_type = serializers.ChoiceField(
+        choices=['credit_card', 'debit_card', 'pix']
+    )
+    card_number = serializers.CharField(required=False)
+    exp_month = serializers.IntegerField(required=False, min_value=1, max_value=12)
+    exp_year = serializers.IntegerField(required=False, min_value=2024, max_value=2050)
+    cvc = serializers.CharField(required=False, max_length=4)
+    cardholder_name = serializers.CharField(required=False)
     
     def validate(self, data):
-        """Validate payment method data"""
         if data['payment_type'] in ['credit_card', 'debit_card']:
             required_fields = ['card_number', 'exp_month', 'exp_year', 'cvc', 'cardholder_name']
             for field in required_fields:
                 if not data.get(field):
-                    raise serializers.ValidationError(f"{field} is required for card payments")
+                    raise serializers.ValidationError(
+                        f"Campo {field} é obrigatório para cartões"
+                    )
+            
+            # Validate card number
+            card_number = data['card_number'].replace(' ', '').replace('-', '')
+            if not card_number.isdigit() or len(card_number) < 13 or len(card_number) > 19:
+                raise serializers.ValidationError("Número de cartão inválido")
+            
+            # Basic Luhn check
+            if not self.luhn_check(card_number):
+                raise serializers.ValidationError("Número de cartão inválido")
+        
         return data
+    
+    def luhn_check(self, card_number):
+        """Validate credit card number using Luhn algorithm"""
+        def digits_of(n):
+            return [int(d) for d in str(n)]
+        
+        digits = digits_of(card_number)
+        odd_digits = digits[-1::-2]
+        even_digits = digits[-2::-2]
+        checksum = sum(odd_digits)
+        for d in even_digits:
+            checksum += sum(digits_of(d*2))
+        return checksum % 10 == 0
 
 
 class PaymentHistorySerializer(serializers.ModelSerializer):
-    """Payment history serializer"""
+    """Serializer for payment history"""
+    plan_name = serializers.CharField(source='subscription_plan.name', read_only=True)
     payment_method_display = serializers.SerializerMethodField()
-    plan_name = serializers.SerializerMethodField()
     
     class Meta:
         model = PaymentHistory
         fields = [
-            'id', 'transaction_type', 'amount', 'currency', 'status', 
-            'description', 'invoice_number', 'invoice_url', 'transaction_date',
-            'due_date', 'paid_at', 'payment_method_display', 'plan_name', 'created_at'
+            'id', 'transaction_type', 'amount', 'currency', 'status',
+            'description', 'invoice_number', 'invoice_url',
+            'transaction_date', 'due_date', 'paid_at',
+            'plan_name', 'payment_method_display', 'created_at'
         ]
     
     def get_payment_method_display(self, obj):
-        """Get payment method display string"""
         if obj.payment_method:
-            return str(obj.payment_method)
-        return "N/A"
-    
-    def get_plan_name(self, obj):
-        """Get subscription plan name"""
-        if obj.subscription_plan:
-            return obj.subscription_plan.name
-        return None
+            if obj.payment_method.payment_type == 'pix':
+                return 'PIX'
+            return f"{obj.payment_method.card_brand} •••• {obj.payment_method.last_four}"
+        return "Método padrão"

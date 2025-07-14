@@ -77,3 +77,5 @@ whitenoise==6.6.0
 # Report Generation
 reportlab==4.0.4
 xlsxwriter==3.1.2
+stripe==7.10.0
+mercadopago==2.2.1

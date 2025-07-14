@@ -3,6 +3,7 @@ Company and business models
 Handles company profiles, subscription plans, and business information
 """
 from decimal import Decimal
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.db import models
@@ -11,29 +12,39 @@ from django.utils.translation import gettext_lazy as _
 User = get_user_model()
 
 
-# Adicione estes campos ao modelo SubscriptionPlan em backend/apps/companies/models.py
-
 class SubscriptionPlan(models.Model):
     """
     Available subscription plans (Starter, Pro, Enterprise)
     """
     PLAN_TYPES = [
+        ('free', 'Grátis'),  # ADICIONAR PLANO FREE
         ('starter', 'Inicial'),
-        ('pro', 'Profissional'),
+        ('professional', 'Profissional'),  # CORRIGIR: era 'pro'
         ('enterprise', 'Empresarial'),
     ]
     
     name = models.CharField(_('plan name'), max_length=50)
     slug = models.SlugField(_('slug'), unique=True)
     plan_type = models.CharField(_('plan type'), max_length=20, choices=PLAN_TYPES)
-    gateway_plan_id = models.CharField(_('payment gateway plan ID'), max_length=255, blank=True)
+    
+    # Gateway IDs - CORREÇÃO: Múltiplos gateways
+    stripe_price_id = models.CharField(_('Stripe price ID'), max_length=255, blank=True)
+    mercadopago_plan_id = models.CharField(_('MercadoPago plan ID'), max_length=255, blank=True)
+    gateway_plan_id = models.CharField(
+        _('payment gateway plan ID'), 
+        max_length=255, 
+        blank=True,
+        help_text='ID do plano/preço no gateway de pagamento (Stripe/MercadoPago)'
+    )
     price_monthly = models.DecimalField(_('monthly price'), max_digits=8, decimal_places=2)
     price_yearly = models.DecimalField(_('yearly price'), max_digits=8, decimal_places=2)
+    
+    # Limites do plano
     max_transactions = models.IntegerField(_('max transactions per month'), default=500)
     max_bank_accounts = models.IntegerField(_('max bank accounts'), default=1)
     max_users = models.IntegerField(_('max users'), default=1)
     
-    # AI Features - ADICIONE ESTES CAMPOS
+    # AI Features
     has_ai_categorization = models.BooleanField(_('AI categorization'), default=True)
     enable_ai_insights = models.BooleanField(_('AI insights'), default=True)
     enable_ai_reports = models.BooleanField(_('AI reports'), default=False)
@@ -43,17 +54,30 @@ class SubscriptionPlan(models.Model):
     has_advanced_reports = models.BooleanField(_('advanced reports'), default=False)
     has_api_access = models.BooleanField(_('API access'), default=False)
     has_accountant_access = models.BooleanField(_('accountant access'), default=False)
+    has_priority_support = models.BooleanField(_('priority support'), default=False)
+    
+    # NOVO: Ordem de exibição
+    display_order = models.IntegerField(_('display order'), default=0)
+    
     is_active = models.BooleanField(_('is active'), default=True)
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
     
     class Meta:
         db_table = 'subscription_plans'
         verbose_name = _('Subscription Plan')
         verbose_name_plural = _('Subscription Plans')
-        ordering = ['price_monthly']
+        ordering = ['display_order', 'price_monthly']  # CORREÇÃO: ordenar por display_order
     
     def __str__(self):
         return f"{self.name} - R$ {self.price_monthly}/mês"
+    
+    def get_yearly_discount_percentage(self):
+        """Calcula o percentual de desconto no plano anual"""
+        if self.price_monthly == 0:
+            return 0
+        monthly_total = self.price_monthly * 12
+        return int(((monthly_total - self.price_yearly) / monthly_total) * 100)
 
 class Company(models.Model):
     """
@@ -123,7 +147,9 @@ class Company(models.Model):
     subscription_plan = models.ForeignKey(
         SubscriptionPlan, 
         on_delete=models.PROTECT, 
-        related_name='companies'
+        related_name='companies',
+        null=True,  # Allow null for companies without plan
+        blank=True
     )
     subscription_status = models.CharField(
         _('subscription status'),
@@ -134,14 +160,44 @@ class Company(models.Model):
             ('past_due', 'Em Atraso'),
             ('cancelled', 'Cancelada'),
             ('suspended', 'Suspensa'),
+            ('expired', 'Expirada'),
         ],
         default='trial'
+    )
+    
+    # Billing information
+    billing_cycle = models.CharField(
+        _('billing cycle'),
+        max_length=20,
+        choices=[
+            ('monthly', 'Mensal'),
+            ('yearly', 'Anual'),
+        ],
+        default='monthly'
     )
     trial_ends_at = models.DateTimeField(_('trial ends at'), blank=True, null=True)
     next_billing_date = models.DateField(_('next billing date'), blank=True, null=True)
     subscription_id = models.CharField(_('subscription ID'), max_length=255, blank=True, null=True)
     subscription_start_date = models.DateTimeField(_('subscription start date'), blank=True, null=True)
     subscription_end_date = models.DateTimeField(_('subscription end date'), blank=True, null=True)
+    
+    # Usage counters
+    current_month_transactions = models.IntegerField(
+        _('current month transactions'), 
+        default=0
+    )
+    current_month_ai_requests = models.IntegerField(
+        _('current month AI requests'), 
+        default=0
+    )
+    last_usage_reset = models.DateTimeField(
+        _('last usage reset'), 
+        auto_now_add=True
+    )
+    
+    # Usage notifications flags
+    notified_80_percent = models.BooleanField(default=False)
+    notified_90_percent = models.BooleanField(default=False)
     
     # Company settings
     logo = models.ImageField(_('logo'), upload_to='company_logos/', blank=True, null=True)
@@ -184,7 +240,190 @@ class Company(models.Model):
     @property
     def display_name(self):
         return self.trade_name or self.name
-
+    
+    @property
+    def days_until_trial_ends(self):
+        """Calculate days remaining in trial"""
+        if not self.trial_ends_at or self.subscription_status != 'trial':
+            return None
+        
+        from django.utils import timezone
+        delta = self.trial_ends_at - timezone.now()
+        return max(0, delta.days)
+    
+    @property
+    def trial_has_expired(self):
+        """Check if trial has expired"""
+        if not self.trial_ends_at or self.subscription_status != 'trial':
+            return False
+        
+        from django.utils import timezone
+        return timezone.now() > self.trial_ends_at
+    
+    def check_plan_limits(self, limit_type='transactions'):
+        """Check if company has reached plan limits"""
+        if not self.subscription_plan:
+            return False, "Sem plano ativo"
+        
+        if limit_type == 'transactions':
+            limit_reached = self.current_month_transactions >= self.subscription_plan.max_transactions
+            usage_info = f"{self.current_month_transactions}/{self.subscription_plan.max_transactions} transações"
+            return limit_reached, usage_info
+            
+        elif limit_type == 'bank_accounts':
+            count = self.bank_accounts.filter(is_active=True).count()
+            limit_reached = count >= self.subscription_plan.max_bank_accounts
+            usage_info = f"{count}/{self.subscription_plan.max_bank_accounts} contas"
+            return limit_reached, usage_info
+            
+        elif limit_type == 'users':
+            count = self.company_users.filter(is_active=True).count() + 1  # +1 for owner
+            limit_reached = count >= self.subscription_plan.max_users
+            usage_info = f"{count}/{self.subscription_plan.max_users} usuários"
+            return limit_reached, usage_info
+            
+        elif limit_type == 'ai_requests':
+            limit_reached = self.current_month_ai_requests >= self.subscription_plan.max_ai_requests_per_month
+            usage_info = f"{self.current_month_ai_requests}/{self.subscription_plan.max_ai_requests_per_month} requisições IA"
+            return limit_reached, usage_info
+        
+        return False, "Tipo de limite inválido"
+    
+    def get_usage_percentage(self, limit_type='transactions'):
+        """Get usage percentage for a specific limit"""
+        if not self.subscription_plan:
+            return 0
+        
+        if limit_type == 'transactions':
+            if self.subscription_plan.max_transactions == 0:
+                return 0
+            return (self.current_month_transactions / self.subscription_plan.max_transactions) * 100
+            
+        elif limit_type == 'bank_accounts':
+            count = self.bank_accounts.filter(is_active=True).count()
+            if self.subscription_plan.max_bank_accounts == 0:
+                return 0
+            return (count / self.subscription_plan.max_bank_accounts) * 100
+            
+        elif limit_type == 'users':
+            count = self.company_users.filter(is_active=True).count() + 1
+            if self.subscription_plan.max_users == 0:
+                return 0
+            return (count / self.subscription_plan.max_users) * 100
+            
+        elif limit_type == 'ai_requests':
+            if self.subscription_plan.max_ai_requests_per_month == 0:
+                return 0
+            return (self.current_month_ai_requests / self.subscription_plan.max_ai_requests_per_month) * 100
+        
+        return 0
+    
+    def increment_transaction_count(self):
+        """Increment transaction counter"""
+        self.current_month_transactions += 1
+        self.save(update_fields=['current_month_transactions'])
+        
+        # Check if limit reached
+        limit_reached, usage_info = self.check_plan_limits('transactions')
+        if limit_reached:
+            # Send notification
+            from apps.notifications.email_service import EmailService
+            EmailService.send_limit_reached_notification(
+                email=self.owner.email,
+                company_name=self.name,
+                limit_type='transações',
+                usage_info=usage_info
+            )
+    
+    def increment_ai_request_count(self):
+        """Increment AI request counter"""
+        self.current_month_ai_requests += 1
+        self.save(update_fields=['current_month_ai_requests'])
+        
+        # Check if limit reached
+        limit_reached, usage_info = self.check_plan_limits('ai_requests')
+        if limit_reached:
+            # Send notification
+            from apps.notifications.email_service import EmailService
+            EmailService.send_limit_reached_notification(
+                email=self.owner.email,
+                company_name=self.name,
+                limit_type='requisições de IA',
+                usage_info=usage_info
+            )
+    
+    def reset_monthly_usage(self):
+        """Reset monthly usage counters"""
+        from django.utils import timezone
+        self.current_month_transactions = 0
+        self.current_month_ai_requests = 0
+        self.notified_80_percent = False
+        self.notified_90_percent = False
+        self.last_usage_reset = timezone.now()
+        self.save(update_fields=[
+            'current_month_transactions', 
+            'current_month_ai_requests',
+            'notified_80_percent',
+            'notified_90_percent',
+            'last_usage_reset'
+        ])
+    
+    def can_add_bank_account(self):
+        """Check if company can add more bank accounts"""
+        if not self.subscription_plan:
+            return False
+        
+        current_count = self.bank_accounts.filter(is_active=True).count()
+        return current_count < self.subscription_plan.max_bank_accounts
+    
+    def can_add_user(self):
+        """Check if company can add more users"""
+        if not self.subscription_plan:
+            return False
+        
+        current_count = self.company_users.filter(is_active=True).count() + 1  # +1 for owner
+        return current_count < self.subscription_plan.max_users
+    
+    def get_usage_summary(self):
+        """Get complete usage summary"""
+        if not self.subscription_plan:
+            return None
+        
+        bank_accounts_count = self.bank_accounts.filter(is_active=True).count()
+        users_count = self.company_users.filter(is_active=True).count() + 1
+        
+        return {
+            'transactions': {
+                'used': self.current_month_transactions,
+                'limit': self.subscription_plan.max_transactions,
+                'percentage': self.get_usage_percentage('transactions'),
+            },
+            'bank_accounts': {
+                'used': bank_accounts_count,
+                'limit': self.subscription_plan.max_bank_accounts,
+                'percentage': self.get_usage_percentage('bank_accounts'),
+            },
+            'users': {
+                'used': users_count,
+                'limit': self.subscription_plan.max_users,
+                'percentage': self.get_usage_percentage('users'),
+            },
+            'ai_requests': {
+                'used': self.current_month_ai_requests,
+                'limit': self.subscription_plan.max_ai_requests_per_month,
+                'percentage': self.get_usage_percentage('ai_requests'),
+            },
+        }
+    
+    def save(self, *args, **kwargs):
+        # Set trial end date for new companies
+        if not self.pk and not self.trial_ends_at:
+            from django.utils import timezone
+            from django.conf import settings
+            trial_days = getattr(settings, 'TRIAL_PERIOD_DAYS', 14)
+            self.trial_ends_at = timezone.now() + timedelta(days=trial_days)
+        
+        super().save(*args, **kwargs)
 
 class CompanyUser(models.Model):
     """

@@ -49,35 +49,64 @@ export interface TwoFactorVerifyResponse {
 export interface Company {
   id: string;
   name: string;
-  subscription_plan: SubscriptionPlan;
-  subscription_status: "active" | "trialing" | "past_due" | "canceled" | "unpaid";
-  trial_ends_at: string | null;
-  next_billing_date: string | null;
-  subscription_start_date: string | null;
-  subscription_end_date: string | null;
-  created_at: string;
-  updated_at: string;
+  trade_name?: string;
+  cnpj?: string;
+  company_type: string;
+  business_sector: string;
+  subscription_plan?: SubscriptionPlan;
+  subscription_status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'suspended' | 'expired';
+  billing_cycle: 'monthly' | 'yearly';
+  trial_ends_at?: string;
+  next_billing_date?: string;
+  subscription_start_date?: string;
+  subscription_end_date?: string;
+  current_month_transactions: number;
+  current_month_ai_requests: number;
+  // ... outros campos
 }
 
 export interface SubscriptionPlan {
   id: string;
   name: string;
   slug: string;
-  plan_type: string;
+  plan_type: 'free' | 'starter' | 'professional' | 'enterprise';
   price_monthly: number;
   price_yearly: number;
   max_transactions: number;
   max_bank_accounts: number;
   max_users: number;
   has_ai_categorization: boolean;
+  enable_ai_insights: boolean;
+  enable_ai_reports: boolean;
+  max_ai_requests_per_month: number;
   has_advanced_reports: boolean;
   has_api_access: boolean;
   has_accountant_access: boolean;
-  // Legacy fields for backward compatibility
-  price?: number;
-  currency?: string;
-  interval?: "month" | "year";
-  features?: string[];
+  has_priority_support: boolean;
+  yearly_discount?: number;
+}
+
+export interface UsageLimits {
+  transactions: {
+    used: number;
+    limit: number;
+    percentage: number;
+  };
+  bank_accounts: {
+    used: number;
+    limit: number;
+    percentage: number;
+  };
+  users: {
+    used: number;
+    limit: number;
+    percentage: number;
+  };
+  ai_requests: {
+    used: number;
+    limit: number;
+    percentage: number;
+  };
 }
 
 // Banking
