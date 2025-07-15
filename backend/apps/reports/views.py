@@ -8,6 +8,7 @@ import math
 from typing import Dict, Any, List
 from datetime import datetime, timedelta
 
+from apps.companies.decorators import requires_plan_feature
 from collections import defaultdict
 from django.conf import settings
 from django.core.cache import cache
@@ -831,11 +832,15 @@ class AIInsightsView(APIView):
         try:
             company = request.user.company
             
-            # Check subscription
-            if not self._check_ai_access(company):
+            # Verificar acesso à IA baseado no plano
+            can_use_ai, message = company.can_use_ai_insight()
+            if not can_use_ai:
                 return Response({
-                    'error': 'AI insights not available in your plan',
-                    'upgrade_required': True
+                    'error': message,
+                    'upgrade_required': True,
+                    'current_plan': company.subscription_plan.name if company.subscription_plan else None,
+                    'suggested_plan': 'professional' if company.subscription_plan and company.subscription_plan.plan_type == 'starter' else 'enterprise',
+                    'pricing_url': '/pricing'
                 }, status=status.HTTP_403_FORBIDDEN)
             
             # Get parameters
@@ -852,14 +857,14 @@ class AIInsightsView(APIView):
                     return Response(cached_insights)
                 
                 return Response({'error': 'start_date and end_date are required'}, 
-                              status=status.HTTP_400_BAD_REQUEST)
+                            status=status.HTTP_400_BAD_REQUEST)
             
             try:
                 start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
                 end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
             except ValueError:
                 return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, 
-                              status=status.HTTP_400_BAD_REQUEST)
+                            status=status.HTTP_400_BAD_REQUEST)
             
             # Check for future dates
             if start_date > timezone.now().date():
@@ -884,6 +889,13 @@ class AIInsightsView(APIView):
                 if cached:
                     logger.info(f"Returning cached insights for company {company.id}")
                     cached['from_cache'] = True
+                    # Adicionar informações de uso mesmo para cache
+                    if company.subscription_plan and company.subscription_plan.plan_type == 'professional':
+                        cached['ai_usage'] = {
+                            'used': company.current_month_ai_requests,
+                            'limit': company.subscription_plan.max_ai_requests_per_month,
+                            'remaining': company.subscription_plan.max_ai_requests_per_month - company.current_month_ai_requests
+                        }
                     return Response(cached)
             
             # Calculate comprehensive financial metrics
@@ -907,13 +919,69 @@ class AIInsightsView(APIView):
             # Add interactive elements
             insights = self._add_interactive_elements(insights, company)
             
+            # Adicionar informações de uso de IA
+            if company.subscription_plan:
+                if company.subscription_plan.plan_type == 'professional':
+                    insights['ai_usage'] = {
+                        'used': company.current_month_ai_requests,
+                        'limit': company.subscription_plan.max_ai_requests_per_month,
+                        'remaining': company.subscription_plan.max_ai_requests_per_month - company.current_month_ai_requests,
+                        'percentage_used': round((company.current_month_ai_requests / company.subscription_plan.max_ai_requests_per_month) * 100, 1)
+                    }
+                    
+                    # Alertas de uso
+                    if insights['ai_usage']['percentage_used'] >= 90:
+                        insights['ai_usage']['warning'] = 'Você está próximo do limite mensal. Considere fazer upgrade para Enterprise.'
+                    elif insights['ai_usage']['percentage_used'] >= 80:
+                        insights['ai_usage']['warning'] = 'Você já usou 80% das suas requisições de IA este mês.'
+                        
+                elif company.subscription_plan.plan_type == 'enterprise':
+                    insights['ai_usage'] = {
+                        'unlimited': True,
+                        'message': 'Você tem acesso ilimitado aos insights de IA'
+                    }
+            
             # Cache the result
             cache.set(cache_key, insights, 86400)  # 24 hours
             
-            # Queue background analysis for patterns (commented out for now)
-            # if force_refresh:
-            #     from .ai_tasks import analyze_deeper_patterns
-            #     analyze_deeper_patterns.delay(company.id, financial_data)
+            # Incrementar contador de uso de IA apenas para plano Professional
+            # (Enterprise tem uso ilimitado, Starter não tem acesso)
+            if company.subscription_plan and company.subscription_plan.plan_type == 'professional':
+                company.increment_ai_request_count()
+                
+                # Verificar se deve enviar notificação de uso
+                usage_percentage = (company.current_month_ai_requests / company.subscription_plan.max_ai_requests_per_month) * 100
+                
+                if usage_percentage >= 90 and not company.notified_90_percent:
+                    # Enviar notificação de 90%
+                    from apps.notifications.email_service import EmailService
+                    EmailService.send_usage_limit_warning(
+                        email=company.owner.email,
+                        company_name=company.name,
+                        limit_type='requisições de IA',
+                        percentage=90,
+                        current=company.current_month_ai_requests,
+                        limit=company.subscription_plan.max_ai_requests_per_month
+                    )
+                    company.notified_90_percent = True
+                    company.save()
+                    
+                elif usage_percentage >= 80 and not company.notified_80_percent:
+                    # Enviar notificação de 80%
+                    from apps.notifications.email_service import EmailService
+                    EmailService.send_usage_limit_warning(
+                        email=company.owner.email,
+                        company_name=company.name,
+                        limit_type='requisições de IA',
+                        percentage=80,
+                        current=company.current_month_ai_requests,
+                        limit=company.subscription_plan.max_ai_requests_per_month
+                    )
+                    company.notified_80_percent = True
+                    company.save()
+            
+            # Log de métricas para monitoramento
+            logger.info(f"AI insights generated for company {company.id} - Plan: {company.subscription_plan.plan_type if company.subscription_plan else 'None'}")
             
             return Response(insights)
             
@@ -999,10 +1067,11 @@ class AIInsightsView(APIView):
     
     def _check_ai_access(self, company) -> bool:
         """Check if company has access to AI features"""
-        # Check subscription plan
-        if hasattr(company, 'subscription_plan'):
-            return company.subscription_plan.enable_ai_insights
-        return True  # Default to true for now
+        if not hasattr(company, 'subscription_plan') or not company.subscription_plan:
+            return False  # Sem plano = sem IA
+        
+        # Apenas Professional e Enterprise têm IA
+        return company.subscription_plan.plan_type in ['professional', 'enterprise']
     
     def _get_cached_insights(self, company_id: int) -> Dict[str, Any]:
         """Get latest cached insights for company"""

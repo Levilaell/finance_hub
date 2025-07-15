@@ -12,36 +12,46 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { authService } from '@/services/auth.service';
+import { paymentService } from '@/services/payment.service';
 import { useAuthStore } from '@/store/auth-store';
 import { RegisterData } from '@/types';
-import { EyeIcon, EyeSlashIcon, CheckIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon, CheckIcon, SparklesIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 
 interface RegisterFormData extends RegisterData {
   selected_plan?: string;
 }
 
-const planInfo: Record<string, { name: string; price: string; badge?: string }> = {
-  free: { name: 'Grátis', price: 'R$ 0/mês' },
-  starter: { name: 'Starter', price: 'R$ 49/mês' },
-  professional: { name: 'Profissional', price: 'R$ 149/mês', badge: 'Mais Popular' },
-  enterprise: { name: 'Empresarial', price: 'R$ 449/mês' },
+const planInfo: Record<string, { name: string; price: string; badge?: string; requiresPayment: boolean }> = {
+  free: { name: 'Grátis', price: 'R$ 0/mês', requiresPayment: false },
+  starter: { name: 'Starter', price: 'R$ 49/mês', requiresPayment: true },
+  professional: { name: 'Profissional', price: 'R$ 149/mês', badge: 'Mais Popular', requiresPayment: true },
+  enterprise: { name: 'Empresarial', price: 'R$ 449/mês', requiresPayment: true },
 };
 
 export default function RegisterPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { setAuth } = useAuthStore();
+  const { setAuth, user } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string>('free');
+  const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false);
 
   useEffect(() => {
     const plan = searchParams.get('plan');
     if (plan && planInfo[plan]) {
       setSelectedPlan(plan);
     }
-  }, [searchParams]);
+    
+    // If user is already authenticated, redirect to upgrade page
+    if (user && plan) {
+      router.push(`/dashboard/subscription/upgrade?plan=${plan}`);
+    } else if (user) {
+      router.push('/dashboard');
+    }
+  }, [searchParams, user, router]);
 
   const {
     register,
@@ -57,10 +67,37 @@ export default function RegisterPage() {
       const response = await authService.register(data);
       return response;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       setAuth(data.user, data.tokens);
-      toast.success('Cadastro realizado com sucesso!');
-      router.push('/dashboard');
+      
+      // Se o plano selecionado requer pagamento, redirecionar para checkout
+      if (selectedPlan !== 'free' && planInfo[selectedPlan]?.requiresPayment) {
+        setIsRedirectingToPayment(true);
+        toast.info('Redirecionando para pagamento...');
+        
+        try {
+          // Criar sessão de checkout
+          const checkoutResponse = await paymentService.createCheckoutSession({
+            plan_slug: selectedPlan,
+            billing_cycle: 'monthly'
+          });
+          
+          // Redirecionar para URL de checkout
+          if (checkoutResponse.checkout_url) {
+            window.location.href = checkoutResponse.checkout_url;
+          } else {
+            throw new Error('URL de checkout não retornada');
+          }
+        } catch (error) {
+          setIsRedirectingToPayment(false);
+          toast.error('Erro ao criar sessão de pagamento. Você pode fazer isso mais tarde.');
+          router.push('/dashboard');
+        }
+      } else {
+        // Plano grátis - ir direto para dashboard
+        toast.success('Cadastro realizado com sucesso!');
+        router.push('/dashboard');
+      }
     },
     onError: (error: any) => {
       const errorMessage = error.response?.data?.errors
@@ -90,7 +127,9 @@ export default function RegisterPage() {
       <CardHeader>
         <CardTitle>Criar uma Conta</CardTitle>
         <CardDescription>
-          Inicie seu período de avaliação gratuito e gerencie suas finanças
+          {selectedPlan === 'free' 
+            ? 'Comece grátis e gerencie suas finanças'
+            : 'Inicie seu período de teste de 14 dias'}
         </CardDescription>
         
         {/* Selected Plan Display */}
@@ -122,6 +161,17 @@ export default function RegisterPage() {
             </Button>
           </div>
         </div>
+
+        {/* Payment Notice for Paid Plans */}
+        {selectedPlan !== 'free' && (
+          <Alert className="mt-4">
+            <ExclamationCircleIcon className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Período de teste grátis:</strong> Você terá 14 dias para testar o plano {planInfo[selectedPlan].name} gratuitamente. 
+              Após o período de teste, você precisará adicionar um método de pagamento para continuar.
+            </AlertDescription>
+          </Alert>
+        )}
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent>
@@ -234,15 +284,15 @@ export default function RegisterPage() {
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="">Selecione o setor</option>
-                  <option value="commerce">Comércio</option>
+                  <option value="retail">Comércio</option>
                   <option value="services">Serviços</option>
                   <option value="industry">Indústria</option>
                   <option value="technology">Tecnologia</option>
-                  <option value="health">Saúde</option>
+                  <option value="healthcare">Saúde</option>
                   <option value="education">Educação</option>
                   <option value="food">Alimentação</option>
                   <option value="construction">Construção</option>
-                  <option value="transport">Transporte</option>
+                  <option value="automotive">Automotivo</option>
                   <option value="agriculture">Agricultura</option>
                   <option value="other">Outros</option>
                 </select>
@@ -353,17 +403,23 @@ export default function RegisterPage() {
           <Button
             type="submit"
             className="w-full"
-            disabled={registerMutation.isPending}
+            disabled={registerMutation.isPending || isRedirectingToPayment}
           >
-            {registerMutation.isPending ? <LoadingSpinner /> : 'Criar Conta'}
+            {registerMutation.isPending || isRedirectingToPayment ? (
+              <LoadingSpinner />
+            ) : selectedPlan === 'free' ? (
+              'Criar Conta Grátis'
+            ) : (
+              'Criar Conta e Iniciar Trial'
+            )}
           </Button>
           <p className="text-sm text-center text-gray-600">
             Ao se cadastrar, você concorda com nossos{' '}
-            <Link href="#" className="text-primary hover:underline">
+            <Link href="/terms" className="text-primary hover:underline">
               Termos de Serviço
             </Link>{' '}
             e{' '}
-            <Link href="#" className="text-primary hover:underline">
+            <Link href="/privacy" className="text-primary hover:underline">
               Política de Privacidade
             </Link>
           </p>

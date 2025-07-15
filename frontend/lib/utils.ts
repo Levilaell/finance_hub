@@ -13,20 +13,64 @@ export function formatCurrency(amount: number, currency: string = "BRL"): string
 }
 
 export function formatDate(date: string | Date): string {
-  // Ensure consistent date parsing by treating string dates as UTC
-  const d = typeof date === 'string' 
-    ? new Date(date + (date.includes('T') ? '' : 'T00:00:00.000Z'))
-    : new Date(date);
+  // Handle null/undefined
+  if (!date) {
+    return "Nunca";
+  }
+  
+  let d: Date;
+  
+  if (typeof date === 'string') {
+    // Check if it's in Brazilian format: dd/mm/yyyy hh:mm:ss
+    const brazilianFormat = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})$/;
+    const match = date.match(brazilianFormat);
+    
+    if (match) {
+      // Parse Brazilian format: dd/mm/yyyy hh:mm:ss
+      const [, day, month, year, hours, minutes, seconds] = match;
+      d = new Date(
+        parseInt(year),
+        parseInt(month) - 1, // Month is 0-indexed
+        parseInt(day),
+        parseInt(hours),
+        parseInt(minutes),
+        parseInt(seconds)
+      );
+    } else {
+      // Try ISO format or other standard formats
+      d = new Date(date);
+    }
+  } else {
+    d = date;
+  }
     
   if (isNaN(d.getTime())) {
+    console.error('formatDate: Invalid date', { date, d });
     return "Data inválida";
   }
   
+  // Format relative time
+  const now = new Date();
+  const diffInMs = now.getTime() - d.getTime();
+  const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+  const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+  
+  if (diffInMinutes < 1) {
+    return "Agora mesmo";
+  } else if (diffInMinutes < 60) {
+    return `Há ${diffInMinutes} minuto${diffInMinutes !== 1 ? 's' : ''}`;
+  } else if (diffInHours < 24) {
+    return `Há ${diffInHours} hora${diffInHours !== 1 ? 's' : ''}`;
+  } else if (diffInDays < 7) {
+    return `Há ${diffInDays} dia${diffInDays !== 1 ? 's' : ''}`;
+  }
+  
+  // For older dates, use absolute format
   return new Intl.DateTimeFormat("pt-BR", {
     year: "numeric",
     month: "short",
     day: "numeric",
-    timeZone: "UTC" // Force UTC to ensure consistency between server and client
   }).format(d);
 }
 

@@ -393,11 +393,19 @@ class PluggyTransactionSyncService:
         """Update account last sync time"""
         @sync_to_async
         def update_sync_time():
-            BankAccount.objects.filter(id=account.id).update(
-                last_sync_at=timezone.now()
+            now = timezone.now()
+            rows_updated = BankAccount.objects.filter(id=account.id).update(
+                last_sync_at=now
             )
+            logger.info(f"🕐 Updated last_sync_at to {now} for account {account.id} (rows updated: {rows_updated})")
+            return rows_updated
         
-        await update_sync_time()
+        rows_updated = await update_sync_time()
+        if rows_updated == 0:
+            logger.warning(f"⚠️ Failed to update last_sync_at for account {account.id}")
+        
+        # Also refresh the account instance to ensure it has the latest data
+        await sync_to_async(account.refresh_from_db)()
     
     async def _update_account_balance(self, account: BankAccount):
         """Update account balance from Pluggy"""

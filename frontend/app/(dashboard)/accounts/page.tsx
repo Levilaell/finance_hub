@@ -39,7 +39,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { BankAccountForm } from '@/components/accounts/bank-account-form';
 import { bankingService } from '@/services/banking.service';
 import { PluggyConnectWidget } from '@/components/banking/pluggy-connect-widget';
 import { PluggyInfoDialog } from '@/components/banking/pluggy-info-dialog';
@@ -129,10 +128,8 @@ export default function AccountsPage() {
   } = usePluggyProviders();
   
   const [isAddingAccount, setIsAddingAccount] = useState(false);
-  const [isManualForm, setIsManualForm] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<any>(null);
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
-  const [editingAccount, setEditingAccount] = useState<any>(null);
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
   const [pluggyConnectToken, setPluggyConnectToken] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -434,16 +431,10 @@ export default function AccountsPage() {
             Gerencie suas contas conectadas via Open Banking
           </p>
         </div>
-        <div className="flex space-x-2">
-          <Button onClick={() => setIsAddingAccount(true)}>
-            <LinkIcon className="h-4 w-4 mr-2" />
-            Conectar via Open Banking
-          </Button>
-          <Button variant="outline" onClick={() => setIsManualForm(true)}>
-            <PlusIcon className="h-4 w-4 mr-2" />
-            Adicionar Manualmente
-          </Button>
-        </div>
+        <Button onClick={() => setIsAddingAccount(true)}>
+          <LinkIcon className="h-4 w-4 mr-2" />
+          Conectar via Open Banking
+        </Button>
       </div>
 
       {/* Accounts Grid */}
@@ -500,15 +491,22 @@ export default function AccountsPage() {
                         <span className={statusInfo.color}>{statusInfo.label}</span>
                       </div>
                       <span className="text-gray-500">
-                        {account.last_synced 
-                          ? `Sincronizado ${formatDate(account.last_synced)}`
-                          : 'Nunca sincronizado'}
+                        {(() => {
+                          console.log('Account sync data:', { 
+                            id: account.id, 
+                            last_sync_at: account.last_sync_at,
+                            account_name: account.account_name 
+                          });
+                          return account.last_sync_at 
+                            ? `Sincronizado ${formatDate(account.last_sync_at)}`
+                            : 'Nunca sincronizado';
+                        })()}
                       </span>
                     </div>
 
                     {/* Actions */}
                     <div className="flex space-x-2">
-                      {account.status === 'sync_error' ? (
+                      {account.status === 'sync_error' && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -517,14 +515,6 @@ export default function AccountsPage() {
                         >
                           <ArrowPathIcon className="h-4 w-4 mr-1" />
                           Renovar Token
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setEditingAccount(account)}
-                        >
-                          Editar
                         </Button>
                       )}
                       <Button
@@ -557,16 +547,10 @@ export default function AccountsPage() {
           title="Nenhuma conta conectada"
           description="Conecte sua primeira conta bancária para começar a acompanhar suas finanças automaticamente"
           action={
-            <div className="flex space-x-2">
-              <Button onClick={() => setIsAddingAccount(true)}>
-                <LinkIcon className="h-4 w-4 mr-2" />
-                Conectar via Open Banking
-              </Button>
-              <Button variant="outline" onClick={() => setIsManualForm(true)}>
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Adicionar Manualmente
-              </Button>
-            </div>
+            <Button onClick={() => setIsAddingAccount(true)}>
+              <LinkIcon className="h-4 w-4 mr-2" />
+              Conectar via Open Banking
+            </Button>
           }
         />
       )}
@@ -745,23 +729,6 @@ export default function AccountsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Manual Account Form */}
-      <BankAccountForm
-        isOpen={isManualForm}
-        onClose={() => {
-          setIsManualForm(false);
-          setEditingAccount(null);
-        }}
-        account={editingAccount}
-      />
-
-      {/* Edit Account Form */}
-      <BankAccountForm
-        isOpen={!!editingAccount && !isManualForm}
-        onClose={() => setEditingAccount(null)}
-        account={editingAccount}
-      />
 
     </div>
   );

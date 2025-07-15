@@ -35,8 +35,14 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const response = await apiClient.login(credentials.email, credentials.password);
-          await get().fetchUser();
-          set({ isAuthenticated: true, isLoading: false });
+          // Use setAuth to properly set cookies and tokens
+          if (response.tokens && response.user) {
+            get().setAuth(response.user, response.tokens);
+          } else {
+            // If user is not in response, fetch it
+            await get().fetchUser();
+            set({ isAuthenticated: true, isLoading: false });
+          }
         } catch (error: any) {
           set({
             error: error.response?.data?.detail || "Login failed",

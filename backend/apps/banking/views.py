@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+from apps.companies.decorators import requires_plan_feature
 import requests
 from django.conf import settings
 from django.db.models import Count, Max, Q, Sum
@@ -118,6 +119,8 @@ class BankAccountViewSet(viewsets.ModelViewSet):
         })
 
 
+from apps.companies.decorators import requires_plan_feature
+
 class TransactionViewSet(viewsets.ModelViewSet):
     """
     Transaction management and filtering
@@ -130,6 +133,59 @@ class TransactionViewSet(viewsets.ModelViewSet):
     ordering_fields = ['transaction_date', 'amount']
     ordering = ['-transaction_date']
     
+    @requires_plan_feature('create_transaction')
+    def create(self, request, *args, **kwargs):
+        """Create a new transaction with automatic usage tracking"""
+        company = request.user.company
+        
+        # Verificar se a conta bancária pertence à empresa do usuário
+        bank_account_id = request.data.get('bank_account')
+        if bank_account_id:
+            try:
+                bank_account = BankAccount.objects.get(id=bank_account_id)
+                if bank_account.company != company:
+                    return Response({
+                        'error': 'Conta bancária não pertence à sua empresa'
+                    }, status=status.HTTP_403_FORBIDDEN)
+            except BankAccount.DoesNotExist:
+                return Response({
+                    'error': 'Conta bancária não encontrada'
+                }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Criar a transação usando o método pai
+        response = super().create(request, *args, **kwargs)
+        
+        # Se criou com sucesso, incrementar contador e adicionar avisos
+        if response.status_code == 201:
+            # Incrementar contador
+            company.increment_transaction_count()
+            
+            # Calcular uso atual
+            usage_percentage = company.get_usage_percentage('transactions')
+            
+            # Adicionar informações de uso se estiver próximo do limite
+            if usage_percentage >= 80:
+                response.data['usage_warning'] = {
+                    'percentage': round(usage_percentage, 1),
+                    'used': company.current_month_transactions,
+                    'limit': company.subscription_plan.max_transactions,
+                    'remaining': company.subscription_plan.max_transactions - company.current_month_transactions,
+                    'message': f'Atenção: Você já utilizou {round(usage_percentage, 1)}% do seu limite mensal de transações.'
+                }
+                
+                # Se atingiu 90%, adicionar sugestão de upgrade
+                if usage_percentage >= 90:
+                    response.data['usage_warning']['upgrade_suggestion'] = True
+                    response.data['usage_warning']['message'] = 'Você está próximo do limite! Considere fazer upgrade do seu plano.'
+            
+            # Log para monitoramento
+            logger.info(
+                f"Transaction created for company {company.id} - "
+                f"Usage: {company.current_month_transactions}/{company.subscription_plan.max_transactions if company.subscription_plan else 'unlimited'}"
+            )
+        
+        return response
+
     def get_queryset(self):
         queryset = Transaction.objects.filter(
             bank_account__company=self.request.user.company

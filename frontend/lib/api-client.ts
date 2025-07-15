@@ -13,7 +13,7 @@ class ApiClient {
       headers: {
         "Content-Type": "application/json",
       },
-      withCredentials: false,
+      withCredentials: true,
     });
     
     // API Client initialized

@@ -5,6 +5,7 @@ Handles company profiles, subscription plans, and business information
 from decimal import Decimal
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -17,16 +18,16 @@ class SubscriptionPlan(models.Model):
     Available subscription plans (Starter, Pro, Enterprise)
     """
     PLAN_TYPES = [
-        ('free', 'Grátis'),  # ADICIONAR PLANO FREE
         ('starter', 'Inicial'),
-        ('professional', 'Profissional'),  # CORRIGIR: era 'pro'
+        ('professional', 'Profissional'),  
         ('enterprise', 'Empresarial'),
     ]
     
     name = models.CharField(_('plan name'), max_length=50)
     slug = models.SlugField(_('slug'), unique=True)
     plan_type = models.CharField(_('plan type'), max_length=20, choices=PLAN_TYPES)
-    
+    trial_days = models.IntegerField(default=14)
+
     # Gateway IDs - CORREÇÃO: Múltiplos gateways
     stripe_price_id = models.CharField(_('Stripe price ID'), max_length=255, blank=True)
     mercadopago_plan_id = models.CharField(_('MercadoPago plan ID'), max_length=255, blank=True)
@@ -71,7 +72,11 @@ class SubscriptionPlan(models.Model):
     
     def __str__(self):
         return f"{self.name} - R$ {self.price_monthly}/mês"
-    
+
+    def clean(self):
+        if self.plan_type == 'free' and self.price_monthly > 0:
+            raise ValidationError('Plano gratuito não pode ter preço')
+        
     def get_yearly_discount_percentage(self):
         """Calcula o percentual de desconto no plano anual"""
         if self.price_monthly == 0:
@@ -220,6 +225,28 @@ class Company(models.Model):
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     updated_at = models.DateTimeField(_('updated at'), auto_now=True)
     is_active = models.BooleanField(_('is active'), default=True)
+    
+
+    def can_use_ai_insight(self) -> tuple[bool, str]:
+        """Check if company can make an AI request"""
+        if not self.subscription_plan:
+            return False, "Plano não encontrado"
+        
+        # Starter não tem IA
+        if self.subscription_plan.plan_type == 'starter':
+            return False, "Upgrade para Professional para acessar insights de IA"
+        
+        # Enterprise tem IA ilimitada
+        if self.subscription_plan.plan_type == 'enterprise':
+            return True, "IA ilimitada disponível"
+        
+        # Professional tem limite mensal
+        if self.subscription_plan.plan_type == 'professional':
+            if self.current_month_ai_requests >= self.subscription_plan.max_ai_requests_per_month:
+                return False, f"Limite de {self.subscription_plan.max_ai_requests_per_month} requisições de IA atingido este mês"
+            return True, f"{self.subscription_plan.max_ai_requests_per_month - self.current_month_ai_requests} requisições restantes"
+        
+        return False, "Plano não reconhecido"
     
     class Meta:
         db_table = 'companies'

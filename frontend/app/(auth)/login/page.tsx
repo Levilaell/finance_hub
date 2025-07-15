@@ -235,7 +235,14 @@ export default function LoginPage() {
           </Button>
           <p className="text-sm text-center text-gray-600">
             Não tem uma conta?{' '}
-            <Link href="/register" className="text-primary hover:underline">
+            <Link 
+              href="/register" 
+              className="text-primary hover:underline"
+              onClick={(e) => {
+                e.preventDefault();
+                router.push('/register');
+              }}
+            >
               Cadastre-se
             </Link>
           </p>

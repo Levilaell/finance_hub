@@ -16,7 +16,7 @@ class Command(BaseCommand):
             {
                 'name': 'Grátis',
                 'slug': 'free',
-                'plan_type': 'starter',  # Using starter as plan_type since free is not in choices
+                'plan_type': 'free',  # Using starter as plan_type since free is not in choices
                 'price_monthly': Decimal('0.00'),
                 'price_yearly': Decimal('0.00'),
                 'max_transactions': 100,
@@ -44,7 +44,7 @@ class Command(BaseCommand):
             {
                 'name': 'Profissional',
                 'slug': 'professional',
-                'plan_type': 'pro',
+                'plan_type': 'professional',
                 'price_monthly': Decimal('149.00'),
                 'price_yearly': Decimal('1490.00'),
                 'max_transactions': 2000,

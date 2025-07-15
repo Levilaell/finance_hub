@@ -140,7 +140,7 @@ export interface BankAccount {
   available_balance: number;
   is_active: boolean;
   status: "active" | "inactive" | "sync_error" | "pending";
-  last_synced: string | null;
+  last_sync_at: string | null;
   created_at: string;
   updated_at: string;
 }

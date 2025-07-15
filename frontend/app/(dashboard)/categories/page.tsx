@@ -318,14 +318,7 @@ export default function CategoriesPage() {
           <p className="text-gray-600">Organize suas transações com categorias</p>
         </div>
         <div className="flex space-x-2">
-          <Button
-            variant="outline"
-            onClick={() => autoCategorizeMutation.mutate()}
-            disabled={autoCategorizeMutation.isPending}
-          >
-            <SparklesIcon className="h-4 w-4 mr-2" />
-            Categorização Automática
-          </Button>
+
           <Button onClick={() => setIsAddingCategory(true)}>
             <PlusIcon className="h-4 w-4 mr-2" />
             Adicionar Categoria

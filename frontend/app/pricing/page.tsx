@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { CheckIcon, XMarkIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,94 +25,68 @@ interface PricingPlan {
 
 const plans: PricingPlan[] = [
   {
-    id: 'free',
-    name: 'Grátis',
-    slug: 'free',
-    description: 'Ideal para MEI e autônomos começando',
-    priceMonthly: 0,
-    priceYearly: 0,
-    features: [
-      '1 usuário',
-      '1 conta bancária',
-      '100 transações por mês',
-      'Relatórios básicos',
-      'Dashboard simples',
-      'Suporte por email',
-    ],
-    limitations: [
-      'Sem categorização por IA',
-      'Sem relatórios avançados',
-      'Sem API',
-    ],
-  },
-  {
     id: 'starter',
     name: 'Starter',
     slug: 'starter',
-    description: 'Para pequenos negócios em crescimento',
+    description: 'Desenvolvido para empresas em crescimento que precisam de mais controle financeiro',
     priceMonthly: 49,
     priceYearly: 490,
     features: [
-      '3 usuários',
       '2 contas bancárias',
       '500 transações por mês',
-      'Relatórios completos',
-      'Dashboard avançado',
-      'Categorização manual',
+      'Categorização automática via Open Banking',
+      'Relatórios avançados',
+      'Dashboard completo',
       'Exportação PDF/Excel',
       'Suporte prioritário',
+      'Sincronização em tempo real',
     ],
     limitations: [
-      'Sem categorização por IA',
-      'Sem API',
+      'Sem análises por IA',
+      'Sem insights preditivos',
     ],
   },
   {
     id: 'professional',
     name: 'Profissional',
     slug: 'professional',
-    description: 'Para empresas estabelecidas',
+    description: 'A solução completa com inteligência artificial para empresas que buscam automação e insights',
     priceMonthly: 149,
     priceYearly: 1490,
     highlighted: true,
     badge: 'Mais Popular',
     features: [
-      '10 usuários',
       '5 contas bancárias',
       '2.000 transações por mês',
-      'Categorização por IA',
-      'Relatórios avançados',
-      'Análise preditiva',
-      'Integração completa Open Banking',
-      'Notificações em tempo real',
-      'Suporte prioritário 24/7',
-      'Backup automático',
+      'Categorização automática via Open Banking',
+      '✨ Análises inteligentes com IA',
+      '✨ Insights e recomendações personalizadas',
+      '✨ 1.000 requisições de IA por mês',
+      '✨ Relatórios com IA',
+      '✨ Previsões de fluxo de caixa',
+      '✨ Alertas inteligentes',
+      'Detecção de anomalias',
+      'Otimização de despesas com IA',
     ],
     limitations: [
-      'Sem API',
-      'Sem personalização',
+      'Limite de 1.000 requisições de IA/mês',
     ],
   },
   {
     id: 'enterprise',
     name: 'Empresarial',
     slug: 'enterprise',
-    description: 'Solução completa para grandes empresas',
+    description: 'Solução ilimitada para grandes empresas com necessidades complexas',
     priceMonthly: 449,
     priceYearly: 4490,
     features: [
-      'Usuários ilimitados',
       'Contas bancárias ilimitadas',
       'Transações ilimitadas',
-      'Categorização por IA avançada',
-      'API completa',
+      'Categorização automática via Open Banking',
+      '✨ IA sem restrições',
+      '✨ Análises avançadas ilimitadas',
+      '✨ Machine Learning personalizado',
       'Relatórios personalizados',
-      'Dashboard personalizado',
-      'Integração com ERPs',
-      'Suporte dedicado',
-      'SLA garantido',
-      'Treinamento incluído',
-      'Consultoria financeira',
     ],
     limitations: [],
   },
@@ -121,17 +95,13 @@ const plans: PricingPlan[] = [
 export default function PricingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isYearly, setIsYearly] = useState(false);
+  const [isYearly, setIsYearly] = useState(true); // Default para anual (mais vantajoso)
   const fromRegister = searchParams.get('from') === 'register';
 
   const handleSelectPlan = (planSlug: string) => {
-    if (fromRegister) {
-      // If coming from register, pass the selected plan
-      router.push(`/register?plan=${planSlug}`);
-    } else {
-      // If already logged in, go to subscription page
-      router.push(`/dashboard/subscription/upgrade?plan=${planSlug}`);
-    }
+    // Always redirect to register page with the selected plan
+    // The register page will handle redirecting logged-in users
+    router.push(`/register?plan=${planSlug}`);
   };
 
   const formatPrice = (price: number) => {
@@ -156,8 +126,11 @@ export default function PricingPage() {
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Escolha o plano ideal para sua empresa
           </h1>
-          <p className="text-xl text-gray-600 mb-8">
-            Comece grátis e escale conforme cresce. Cancele quando quiser.
+          <p className="text-xl text-gray-600 mb-2">
+            Sistema financeiro que funciona sozinho com IA
+          </p>
+          <p className="text-lg text-gray-500 mb-8">
+            14 dias grátis em todos os planos • Cancele quando quiser
           </p>
           
           {/* Billing Toggle */}
@@ -172,62 +145,94 @@ export default function PricingPage() {
             />
             <Label htmlFor="billing-toggle" className={isYearly ? 'font-semibold' : ''}>
               Anual
-              <Badge variant="secondary" className="ml-2">
+              <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700">
                 Economize até 17%
               </Badge>
             </Label>
           </div>
         </div>
 
+        {/* Value Props */}
+        <div className="flex flex-wrap justify-center gap-4 mb-12">
+          <Badge variant="outline" className="px-4 py-2">
+            ✅ Categorização automática via Open Banking
+          </Badge>
+          <Badge variant="outline" className="px-4 py-2">
+            🤖 IA que aprende seu negócio
+          </Badge>
+          <Badge variant="outline" className="px-4 py-2">
+            📊 Relatórios prontos em segundos
+          </Badge>
+        </div>
+
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16 max-w-6xl mx-auto">
           {plans.map((plan) => {
             const price = isYearly ? plan.priceYearly : plan.priceMonthly;
+            const monthlyPrice = isYearly ? plan.priceYearly / 12 : plan.priceMonthly;
             const discount = getDiscountPercentage(plan.priceMonthly, plan.priceYearly);
             
             return (
               <Card
                 key={plan.id}
-                className={`relative ${
+                className={`relative flex flex-col ${
                   plan.highlighted
-                    ? 'border-primary shadow-lg scale-105'
+                    ? 'border-primary shadow-xl scale-105 z-10'
                     : 'border-gray-200'
                 }`}
               >
                 {plan.badge && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge variant="default">{plan.badge}</Badge>
+                    <Badge className="bg-primary text-white px-4">
+                      {plan.badge}
+                    </Badge>
                   </div>
                 )}
                 
-                <CardHeader>
+                <CardHeader className="pb-8">
                   <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
+                  <CardDescription className="mt-2">{plan.description}</CardDescription>
                 </CardHeader>
                 
-                <CardContent>
+                <CardContent className="flex-1">
                   <div className="mb-6">
                     <div className="flex items-baseline">
-                      <span className="text-4xl font-bold">{formatPrice(price)}</span>
-                      {price > 0 && (
-                        <span className="text-gray-600 ml-2">
-                          /{isYearly ? 'ano' : 'mês'}
-                        </span>
-                      )}
+                      <span className="text-4xl font-bold">
+                        {formatPrice(monthlyPrice)}
+                      </span>
+                      <span className="text-gray-600 ml-2">/mês</span>
                     </div>
-                    {isYearly && discount > 0 && (
-                      <p className="text-sm text-green-600 mt-1">
-                        Economia de {discount}% no plano anual
-                      </p>
+                    {isYearly && (
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          Cobrado anualmente: {formatPrice(price)}
+                        </p>
+                        {discount > 0 && (
+                          <p className="text-sm text-green-600 font-medium">
+                            Economia de {discount}% no plano anual
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                   
                   <div className="space-y-3">
-                    <p className="font-semibold text-sm text-gray-700">Inclui:</p>
+                    <p className="font-semibold text-sm text-gray-700">O que está incluído:</p>
                     {plan.features.map((feature, index) => (
                       <div key={index} className="flex items-start gap-2">
-                        <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-sm text-gray-700">{feature}</span>
+                        {feature.startsWith('✨') ? (
+                          <>
+                            <SparklesIcon className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                            <span className="text-sm text-gray-700 font-medium">
+                              {feature.replace('✨ ', '')}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                            <span className="text-sm text-gray-700">{feature}</span>
+                          </>
+                        )}
                       </div>
                     ))}
                     
@@ -245,18 +250,64 @@ export default function PricingPage() {
                   </div>
                 </CardContent>
                 
-                <CardFooter>
+                <CardFooter className="pt-6">
                   <Button
                     className="w-full"
                     variant={plan.highlighted ? 'default' : 'outline'}
+                    size="lg"
                     onClick={() => handleSelectPlan(plan.slug)}
                   >
-                    {plan.priceMonthly === 0 ? 'Começar Grátis' : 'Escolher Plano'}
+                    Começar teste grátis
                   </Button>
                 </CardFooter>
               </Card>
             );
           })}
+        </div>
+
+        {/* Comparison Table */}
+        <div className="max-w-4xl mx-auto mb-16">
+          <h2 className="text-2xl font-bold text-center mb-8">
+            Compare os recursos
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-4">Recurso</th>
+                  <th className="text-center p-4">Starter</th>
+                  <th className="text-center p-4 bg-primary/5">Professional</th>
+                  <th className="text-center p-4">Enterprise</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b">
+                  <td className="p-4">Transações mensais</td>
+                  <td className="text-center p-4">500</td>
+                  <td className="text-center p-4 bg-primary/5 font-medium">2.000</td>
+                  <td className="text-center p-4">Ilimitadas</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="p-4">Insights com IA</td>
+                  <td className="text-center p-4">❌</td>
+                  <td className="text-center p-4 bg-primary/5">✅ 1.000/mês</td>
+                  <td className="text-center p-4">✅ Ilimitado</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="p-4">Contas bancárias</td>
+                  <td className="text-center p-4">2</td>
+                  <td className="text-center p-4 bg-primary/5 font-medium">5</td>
+                  <td className="text-center p-4">Ilimitadas</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="p-4">API</td>
+                  <td className="text-center p-4">❌</td>
+                  <td className="text-center p-4 bg-primary/5">❌</td>
+                  <td className="text-center p-4">✅</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* FAQ Section */}
@@ -266,6 +317,17 @@ export default function PricingPage() {
           </h2>
           
           <div className="space-y-6">
+            <div>
+              <h3 className="font-semibold text-lg mb-2">
+                O que são os insights com IA?
+              </h3>
+              <p className="text-gray-600">
+                Nossa IA analisa suas transações e gera recomendações personalizadas para economizar, 
+                identifica padrões de gastos, prevê fluxo de caixa e sugere otimizações específicas 
+                para o seu negócio. É como ter um consultor financeiro 24/7.
+              </p>
+            </div>
+            
             <div>
               <h3 className="font-semibold text-lg mb-2">
                 Posso mudar de plano depois?
@@ -281,18 +343,8 @@ export default function PricingPage() {
                 Como funciona o período de teste?
               </h3>
               <p className="text-gray-600">
-                Todos os planos pagos incluem 14 dias de teste grátis. 
-                Não é necessário cartão de crédito para começar.
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold text-lg mb-2">
-                Quais formas de pagamento são aceitas?
-              </h3>
-              <p className="text-gray-600">
-                Aceitamos cartões de crédito (Visa, Mastercard, Elo, American Express), 
-                PIX e boleto bancário através do MercadoPago e Stripe.
+                Todos os planos incluem 14 dias de teste grátis com acesso completo aos recursos. 
+                Não é necessário cartão de crédito para começar. Você só paga se decidir continuar.
               </p>
             </div>
             
@@ -302,25 +354,42 @@ export default function PricingPage() {
               </h3>
               <p className="text-gray-600">
                 Você será notificado quando atingir 80% do limite. 
-                Ao exceder, sugerimos fazer upgrade para continuar usando normalmente.
+                Ao exceder, você pode fazer upgrade instantaneamente ou aguardar o próximo mês 
+                para os contadores resetarem.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="font-semibold text-lg mb-2">
+                A categorização automática funciona com todos os bancos?
+              </h3>
+              <p className="text-gray-600">
+                Sim! Usamos o Open Banking e integrações diretas com os principais bancos brasileiros. 
+                A categorização é feita automaticamente pela Pluggy, sem nenhum trabalho manual.
               </p>
             </div>
           </div>
         </div>
 
         {/* CTA Section */}
-        {!fromRegister && (
-          <div className="text-center mt-16">
-            <p className="text-gray-600 mb-4">
-              Ainda não tem uma conta?
-            </p>
-            <Button asChild size="lg">
-              <Link href="/register">
-                Criar Conta Gratuita
-              </Link>
-            </Button>
-          </div>
-        )}
+        <div className="text-center mt-16 bg-gray-50 rounded-lg p-8">
+          <h3 className="text-2xl font-bold mb-4">
+            Pronto para automatizar suas finanças?
+          </h3>
+          <p className="text-gray-600 mb-6">
+            Junte-se a milhares de empresas que economizam 10+ horas por mês com o CaixaHub
+          </p>
+          <Button asChild size="lg" className="mr-4">
+            <Link href="/register">
+              Começar Teste Grátis
+            </Link>
+          </Button>
+          <Button asChild size="lg" variant="outline">
+            <Link href="/demo">
+              Agendar Demonstração
+            </Link>
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -61,17 +61,45 @@ class RegisterSerializer(serializers.ModelSerializer):
             **validated_data
         )
         
-        # Get selected plan or fallback to free plan
+        # Get selected plan
         selected_plan = SubscriptionPlan.objects.filter(slug=selected_plan_slug).first()
         if not selected_plan:
-            # If selected plan not found, try to get free plan
+            # If selected plan not found, fallback to free plan
             selected_plan = SubscriptionPlan.objects.filter(slug='free').first()
             if not selected_plan:
-                # If no free plan, get any available plan
-                selected_plan = SubscriptionPlan.objects.first()
+                # Create a minimal free plan if it doesn't exist
+                selected_plan = SubscriptionPlan.objects.create(
+                    name='Grátis',
+                    slug='free',
+                    plan_type='free',
+                    price_monthly=0,
+                    price_yearly=0,
+                    max_transactions=100,
+                    max_bank_accounts=1,
+                    max_users=1,
+                    has_ai_categorization=False,
+                    has_advanced_reports=False,
+                    has_api_access=False,
+                    has_accountant_access=False,
+                    has_priority_support=False,
+                    max_ai_requests_per_month=0,
+                    display_order=1
+                )
         
-        # Determine subscription status based on plan
-        subscription_status = 'active' if selected_plan_slug == 'free' else 'trial'
+        # CORREÇÃO CRÍTICA: Determinar status baseado no plano
+        # Apenas o plano FREE é ativado imediatamente
+        # Planos pagos iniciam em TRIAL
+        if selected_plan.slug == 'free':
+            subscription_status = 'active'
+            # Para plano grátis, não há trial
+            from django.utils import timezone
+            trial_ends_at = None
+        else:
+            subscription_status = 'trial'
+            # Para planos pagos, 14 dias de trial
+            from django.utils import timezone
+            from datetime import timedelta
+            trial_ends_at = timezone.now() + timedelta(days=14)
             
         Company.objects.create(
             owner=user,
@@ -79,7 +107,8 @@ class RegisterSerializer(serializers.ModelSerializer):
             company_type=company_type,
             business_sector=business_sector,
             subscription_plan=selected_plan,
-            subscription_status=subscription_status
+            subscription_status=subscription_status,
+            trial_ends_at=trial_ends_at
         )
         
         return user
@@ -89,6 +118,7 @@ class LoginSerializer(serializers.Serializer):
     """Login serializer"""
     email = serializers.EmailField(required=True)
     password = serializers.CharField(required=True, write_only=True)
+    two_fa_code = serializers.CharField(required=False, allow_blank=True)
     
     def validate(self, attrs):
         email = attrs.get('email')
