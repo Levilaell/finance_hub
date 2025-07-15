@@ -86,7 +86,6 @@ const formatTransactionDate = (dateString: string | null | undefined): string =>
   if (!dateString) return 'Data não disponível';
   
   try {
-    // Tenta diferentes formatos de data
     let date: Date;
     
     // Se já for um objeto Date válido
@@ -100,6 +99,17 @@ const formatTransactionDate = (dateString: string | null | undefined): string =>
     // Formato YYYY-MM-DD
     else if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
       date = new Date(dateString + 'T00:00:00');
+    }
+    // Formato DD/MM/YYYY (formato brasileiro)
+    else if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+      const [day, month, year] = dateString.split('/');
+      date = new Date(`${year}-${month}-${day}T00:00:00`);
+    }
+    // Formato DD/MM/YYYY HH:MM:SS
+    else if (dateString.match(/^\d{2}\/\d{2}\/\d{4}\s\d{2}:\d{2}:\d{2}$/)) {
+      const [datePart, timePart] = dateString.split(' ');
+      const [day, month, year] = datePart.split('/');
+      date = new Date(`${year}-${month}-${day}T${timePart}`);
     }
     // Tenta parse direto
     else {
