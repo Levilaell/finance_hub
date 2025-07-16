@@ -4,6 +4,8 @@ import { useAuthStore } from '@/store/auth-store';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { MainLayout } from '@/components/layouts/main-layout';
+import { PaymentSetupBanner } from '@/components/payment/payment-setup-banner';
+import { useSubscriptionCheck } from '@/hooks/use-subscription-check';
 
 export default function DashboardLayout({
   children,
@@ -11,8 +13,11 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   console.log('DashboardLayout rendered');
-  const { isAuthenticated, isLoading, _hasHydrated } = useAuthStore();
+  const { isAuthenticated, isLoading, _hasHydrated, user } = useAuthStore();
   const router = useRouter();
+  
+  // Use subscription check hook - but only when authenticated
+  const { subscriptionStatus, isTrialExpired } = useSubscriptionCheck();
 
   console.log('Auth state:', { isAuthenticated, isLoading, _hasHydrated });
 
@@ -23,6 +28,29 @@ export default function DashboardLayout({
       router.push('/login');
     }
   }, [isAuthenticated, isLoading, _hasHydrated, router]);
+
+  // Handle trial expiration redirect
+  useEffect(() => {
+    if (isAuthenticated && isTrialExpired) {
+      // Check if user is on allowed pages
+      const currentPath = window.location.pathname;
+      const allowedPaths = [
+        '/dashboard/subscription',
+        '/dashboard/billing',
+        '/dashboard/settings',
+        '/settings'
+      ];
+      
+      const isOnAllowedPath = allowedPaths.some(path => 
+        currentPath.startsWith(path)
+      );
+      
+      if (!isOnAllowedPath) {
+        console.log('Trial expired, redirecting to subscription upgrade');
+        router.push('/dashboard/subscription/upgrade');
+      }
+    }
+  }, [isAuthenticated, isTrialExpired, router]);
 
   if (!_hasHydrated || isLoading) {
     console.log('Showing loading');
@@ -41,6 +69,16 @@ export default function DashboardLayout({
     return null;
   }
 
-  console.log('Rendering children');
-  return <MainLayout>{children}</MainLayout>;
+  console.log('Rendering children with payment banner');
+  return (
+    <MainLayout>
+      <div className="min-h-screen">
+        {/* Payment Setup Banner - Will only show when needed */}
+        {isAuthenticated && user && <PaymentSetupBanner />}
+        
+        {/* Main content */}
+        {children}
+      </div>
+    </MainLayout>
+  );
 }

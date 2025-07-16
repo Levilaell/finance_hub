@@ -626,10 +626,9 @@ export default function ReportsPage() {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="visualizations" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="visualizations">Visualizações</TabsTrigger>
           <TabsTrigger value="custom">Relatórios Personalizados</TabsTrigger>
-          <TabsTrigger value="insights">Insights com IA</TabsTrigger>
         </TabsList>
 
         {/* Visualizations Tab */}

@@ -314,6 +314,8 @@ const QUICK_PERIODS = [
   { id: 'last_month', label: 'Mês Anterior', icon: CalendarIcon },
   { id: 'quarterly', label: 'Trimestre', icon: ChartBarIcon },
   { id: 'year_to_date', label: 'Ano Atual', icon: ArrowTrendingUpIcon },
+  { id: 'last_12_months', label: 'Últimos 12 Meses', icon: ArrowTrendingUpIcon },
+  { id: 'all_time', label: 'Todo Período', icon: BanknotesIcon },
 ];
 
 export default function AIInsightsPage() {
@@ -325,13 +327,15 @@ export default function AIInsightsPage() {
     start_date: null,
     end_date: null,
   });
+  const [forceRefresh, setForceRefresh] = useState(false);
 
   // Set dates on client-side after hydration
   useEffect(() => {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    // Usar últimos 12 meses como padrão para incluir as transações existentes
+    const start = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
     setSelectedPeriod({
-      start_date: startOfMonth,
+      start_date: start,
       end_date: now,
     });
   }, []);
@@ -344,19 +348,25 @@ export default function AIInsightsPage() {
     refetch: refetchAIInsights,
     dataUpdatedAt
   } = useQuery({
-    queryKey: ['ai-insights', selectedPeriod],
+    queryKey: ['ai-insights', selectedPeriod, forceRefresh],
     queryFn: () => {
       if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
-      return reportsService.getAIInsights({
+      const result = reportsService.getAIInsights({
         start_date: selectedPeriod.start_date,
-        end_date: selectedPeriod.end_date
+        end_date: selectedPeriod.end_date,
+        force_refresh: forceRefresh
       });
+      // Reset force refresh after use
+      if (forceRefresh) {
+        setForceRefresh(false);
+      }
+      return result;
     },
     enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
     retry: 2,
     retryDelay: 1000,
-    staleTime: 7 * 24 * 60 * 60 * 1000, // 7 dias em milissegundos
-    cacheTime: 7 * 24 * 60 * 60 * 1000, // Manter cache por 7 dias
+    staleTime: forceRefresh ? 0 : 7 * 24 * 60 * 60 * 1000, // No cache if force refresh
+    cacheTime: forceRefresh ? 0 : 7 * 24 * 60 * 60 * 1000, // No cache if force refresh
     refetchOnWindowFocus: false, // Não refetch automaticamente
   });
 
@@ -380,6 +390,12 @@ export default function AIInsightsPage() {
         break;
       case 'year_to_date':
         start = new Date(now.getFullYear(), 0, 1);
+        break;
+      case 'last_12_months':
+        start = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        break;
+      case 'all_time':
+        start = new Date(2020, 0, 1); // Data muito antiga para pegar tudo
         break;
       default:
         start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -466,7 +482,13 @@ export default function AIInsightsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => refetchAIInsights()}
+                  onClick={() => {
+                    // Force refetch with cache invalidation
+                    setForceRefresh(true);
+                    setTimeout(() => {
+                      refetchAIInsights();
+                    }, 100);
+                  }}
                   disabled={aiInsightsLoading}
                   title="Atualizar análise"
                 >

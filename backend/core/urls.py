@@ -24,6 +24,7 @@ def api_root(request):
             'categories': '/api/categories/',
             'reports': '/api/reports/',
             'notifications': '/api/notifications/',
+            'payments': '/api/payments/',
             'documentation': '/swagger/',
             'admin': '/admin/'
         }
@@ -49,6 +50,7 @@ schema_view = get_schema_view(
             path('categories/', include('apps.categories.urls')),
             path('reports/', include('apps.reports.urls')),
             path('notifications/', include('apps.notifications.urls')),
+            path('payments/', include('apps.payments.urls')),
         ])),
     ],
 )
@@ -65,6 +67,7 @@ urlpatterns = [
     path('api/categories/', include('apps.categories.urls')),
     path('api/reports/', include('apps.reports.urls')),
     path('api/notifications/', include('apps.notifications.urls')),
+    path('api/payments/', include('apps.payments.urls')),
     
     # API Documentation
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),

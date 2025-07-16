@@ -87,6 +87,9 @@ const plans: PricingPlan[] = [
       '✨ Análises avançadas ilimitadas',
       '✨ Machine Learning personalizado',
       'Relatórios personalizados',
+      'API completa',
+      'Acesso para contador',
+      'Suporte dedicado',
     ],
     limitations: [],
   },
@@ -100,7 +103,6 @@ export default function PricingPage() {
 
   const handleSelectPlan = (planSlug: string) => {
     // Always redirect to register page with the selected plan
-    // The register page will handle redirecting logged-in users
     router.push(`/register?plan=${planSlug}`);
   };
 
@@ -130,7 +132,7 @@ export default function PricingPage() {
             Sistema financeiro que funciona sozinho com IA
           </p>
           <p className="text-lg text-gray-500 mb-8">
-            14 dias grátis em todos os planos • Cancele quando quiser
+            <span className="text-green-600 font-semibold">14 dias grátis</span> em todos os planos • Cancele quando quiser
           </p>
           
           {/* Billing Toggle */}
@@ -162,6 +164,9 @@ export default function PricingPage() {
           </Badge>
           <Badge variant="outline" className="px-4 py-2">
             📊 Relatórios prontos em segundos
+          </Badge>
+          <Badge variant="outline" className="px-4 py-2">
+            🎯 14 dias para testar grátis
           </Badge>
         </div>
 
@@ -214,6 +219,11 @@ export default function PricingPage() {
                         )}
                       </div>
                     )}
+                    <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                      <p className="text-sm text-green-700 font-medium">
+                        ✓ 14 dias grátis para testar
+                      </p>
+                    </div>
                   </div>
                   
                   <div className="space-y-3">
@@ -305,6 +315,12 @@ export default function PricingPage() {
                   <td className="text-center p-4 bg-primary/5">❌</td>
                   <td className="text-center p-4">✅</td>
                 </tr>
+                <tr className="border-b">
+                  <td className="p-4">Período de teste</td>
+                  <td className="text-center p-4 text-green-600 font-medium">14 dias</td>
+                  <td className="text-center p-4 bg-primary/5 text-green-600 font-medium">14 dias</td>
+                  <td className="text-center p-4 text-green-600 font-medium">14 dias</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -317,6 +333,17 @@ export default function PricingPage() {
           </h2>
           
           <div className="space-y-6">
+            <div>
+              <h3 className="font-semibold text-lg mb-2">
+                Como funciona o período de teste?
+              </h3>
+              <p className="text-gray-600">
+                Todos os planos incluem 14 dias de teste grátis com acesso completo aos recursos. 
+                Não é necessário cartão de crédito para começar. Você só paga se decidir continuar 
+                após o período de teste.
+              </p>
+            </div>
+            
             <div>
               <h3 className="font-semibold text-lg mb-2">
                 O que são os insights com IA?
@@ -340,11 +367,12 @@ export default function PricingPage() {
             
             <div>
               <h3 className="font-semibold text-lg mb-2">
-                Como funciona o período de teste?
+                O que acontece após o período de teste?
               </h3>
               <p className="text-gray-600">
-                Todos os planos incluem 14 dias de teste grátis com acesso completo aos recursos. 
-                Não é necessário cartão de crédito para começar. Você só paga se decidir continuar.
+                Após os 14 dias de teste, você precisará configurar um método de pagamento para 
+                continuar usando o sistema. Você será notificado com antecedência e poderá escolher 
+                entre pagamento mensal ou anual (com desconto).
               </p>
             </div>
             
@@ -381,7 +409,7 @@ export default function PricingPage() {
           </p>
           <Button asChild size="lg" className="mr-4">
             <Link href="/register">
-              Começar Teste Grátis
+              Começar Teste Grátis de 14 Dias
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline">

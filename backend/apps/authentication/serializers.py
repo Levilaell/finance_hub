@@ -34,7 +34,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(required=True)
     company_type = serializers.CharField(required=True)
     business_sector = serializers.CharField(required=True)
-    selected_plan = serializers.CharField(required=False, default='free')
+    selected_plan = serializers.CharField(required=False, default='starter')
     
     class Meta:
         model = User
@@ -52,7 +52,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         company_name = validated_data.pop('company_name')
         company_type = validated_data.pop('company_type')
         business_sector = validated_data.pop('business_sector')
-        selected_plan_slug = validated_data.pop('selected_plan', 'free')
+        selected_plan_slug = validated_data.pop('selected_plan', 'starter')
         validated_data.pop('password2')
         
         # Create user
@@ -61,54 +61,45 @@ class RegisterSerializer(serializers.ModelSerializer):
             **validated_data
         )
         
-        # Get selected plan
+        # Get selected plan - NO MORE FREE PLAN
         selected_plan = SubscriptionPlan.objects.filter(slug=selected_plan_slug).first()
-        if not selected_plan:
-            # If selected plan not found, fallback to free plan
-            selected_plan = SubscriptionPlan.objects.filter(slug='free').first()
+        if not selected_plan or selected_plan_slug == 'free':
+            # Fallback to starter plan if invalid or trying to use free
+            selected_plan = SubscriptionPlan.objects.filter(slug='starter').first()
             if not selected_plan:
-                # Create a minimal free plan if it doesn't exist
+                # Create a minimal starter plan if it doesn't exist
                 selected_plan = SubscriptionPlan.objects.create(
-                    name='Grátis',
-                    slug='free',
-                    plan_type='free',
-                    price_monthly=0,
-                    price_yearly=0,
-                    max_transactions=100,
-                    max_bank_accounts=1,
-                    max_users=1,
+                    name='Starter',
+                    slug='starter',
+                    plan_type='starter',
+                    price_monthly=49,
+                    price_yearly=490,
+                    max_transactions=500,
+                    max_bank_accounts=2,
+                    max_users=3,
                     has_ai_categorization=False,
-                    has_advanced_reports=False,
+                    enable_ai_insights=False,
+                    enable_ai_reports=False,
+                    max_ai_requests_per_month=0,
+                    has_advanced_reports=True,
                     has_api_access=False,
                     has_accountant_access=False,
-                    has_priority_support=False,
-                    max_ai_requests_per_month=0,
+                    has_priority_support=True,
                     display_order=1
                 )
         
-        # CORREÇÃO CRÍTICA: Determinar status baseado no plano
-        # Apenas o plano FREE é ativado imediatamente
-        # Planos pagos iniciam em TRIAL
-        if selected_plan.slug == 'free':
-            subscription_status = 'active'
-            # Para plano grátis, não há trial
-            from django.utils import timezone
-            trial_ends_at = None
-        else:
-            subscription_status = 'trial'
-            # Para planos pagos, 14 dias de trial
-            from django.utils import timezone
-            from datetime import timedelta
-            trial_ends_at = timezone.now() + timedelta(days=14)
-            
+        # ALWAYS CREATE TRIAL FOR 14 DAYS - NO EXCEPTIONS
+        from django.utils import timezone
+        from datetime import timedelta
+        
         Company.objects.create(
             owner=user,
             name=company_name,
             company_type=company_type,
             business_sector=business_sector,
             subscription_plan=selected_plan,
-            subscription_status=subscription_status,
-            trial_ends_at=trial_ends_at
+            subscription_status='trial',  # ALWAYS trial
+            trial_ends_at=timezone.now() + timedelta(days=14)  # ALWAYS 14 days
         )
         
         return user

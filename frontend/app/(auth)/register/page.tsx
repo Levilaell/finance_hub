@@ -14,20 +14,18 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { authService } from '@/services/auth.service';
-import { paymentService } from '@/services/payment.service';
 import { useAuthStore } from '@/store/auth-store';
 import { RegisterData } from '@/types';
-import { EyeIcon, EyeSlashIcon, CheckIcon, SparklesIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon, CheckIcon, ExclamationCircleIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 
 interface RegisterFormData extends RegisterData {
   selected_plan?: string;
 }
 
-const planInfo: Record<string, { name: string; price: string; badge?: string; requiresPayment: boolean }> = {
-  free: { name: 'Grátis', price: 'R$ 0/mês', requiresPayment: false },
-  starter: { name: 'Starter', price: 'R$ 49/mês', requiresPayment: true },
-  professional: { name: 'Profissional', price: 'R$ 149/mês', badge: 'Mais Popular', requiresPayment: true },
-  enterprise: { name: 'Empresarial', price: 'R$ 449/mês', requiresPayment: true },
+const planInfo: Record<string, { name: string; price: string; badge?: string }> = {
+  starter: { name: 'Starter', price: 'R$ 49/mês' },
+  professional: { name: 'Profissional', price: 'R$ 149/mês', badge: 'Mais Popular' },
+  enterprise: { name: 'Empresarial', price: 'R$ 449/mês' },
 };
 
 export default function RegisterPage() {
@@ -36,8 +34,7 @@ export default function RegisterPage() {
   const { setAuth, user } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<string>('free');
-  const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<string>('starter');
 
   useEffect(() => {
     const plan = searchParams.get('plan');
@@ -70,34 +67,15 @@ export default function RegisterPage() {
     onSuccess: async (data) => {
       setAuth(data.user, data.tokens);
       
-      // Se o plano selecionado requer pagamento, redirecionar para checkout
-      if (selectedPlan !== 'free' && planInfo[selectedPlan]?.requiresPayment) {
-        setIsRedirectingToPayment(true);
-        toast.info('Redirecionando para pagamento...');
-        
-        try {
-          // Criar sessão de checkout
-          const checkoutResponse = await paymentService.createCheckoutSession({
-            plan_slug: selectedPlan,
-            billing_cycle: 'monthly'
-          });
-          
-          // Redirecionar para URL de checkout
-          if (checkoutResponse.checkout_url) {
-            window.location.href = checkoutResponse.checkout_url;
-          } else {
-            throw new Error('URL de checkout não retornada');
-          }
-        } catch (error) {
-          setIsRedirectingToPayment(false);
-          toast.error('Erro ao criar sessão de pagamento. Você pode fazer isso mais tarde.');
-          router.push('/dashboard');
-        }
-      } else {
-        // Plano grátis - ir direto para dashboard
-        toast.success('Cadastro realizado com sucesso!');
-        router.push('/dashboard');
+      // Save info that payment needs to be configured
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pending_payment_setup', 'true');
+        localStorage.setItem('selected_plan', selectedPlan);
+        localStorage.setItem('trial_start_date', new Date().toISOString());
       }
+      
+      toast.success('Cadastro realizado! Você tem 14 dias grátis para testar.');
+      router.push('/dashboard');
     },
     onError: (error: any) => {
       const errorMessage = error.response?.data?.errors
@@ -127,9 +105,7 @@ export default function RegisterPage() {
       <CardHeader>
         <CardTitle>Criar uma Conta</CardTitle>
         <CardDescription>
-          {selectedPlan === 'free' 
-            ? 'Comece grátis e gerencie suas finanças'
-            : 'Inicie seu período de teste de 14 dias'}
+          Inicie seu período de teste gratuito de 14 dias
         </CardDescription>
         
         {/* Selected Plan Display */}
@@ -146,8 +122,7 @@ export default function RegisterPage() {
                 )}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                {planInfo[selectedPlan].price}
-                {selectedPlan !== 'free' && ' - 14 dias grátis'}
+                {planInfo[selectedPlan].price} após o período de teste
               </p>
             </div>
             <Button
@@ -162,16 +137,14 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* Payment Notice for Paid Plans */}
-        {selectedPlan !== 'free' && (
-          <Alert className="mt-4">
-            <ExclamationCircleIcon className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Período de teste grátis:</strong> Você terá 14 dias para testar o plano {planInfo[selectedPlan].name} gratuitamente. 
-              Após o período de teste, você precisará adicionar um método de pagamento para continuar.
-            </AlertDescription>
-          </Alert>
-        )}
+        {/* Trial Notice */}
+        <Alert className="mt-4">
+          <CreditCardIcon className="h-4 w-4" />
+          <AlertDescription>
+            <strong>14 dias grátis:</strong> Teste todos os recursos do plano {planInfo[selectedPlan].name} sem compromisso. 
+            Não é necessário cartão de crédito para começar.
+          </AlertDescription>
+        </Alert>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent>
@@ -403,12 +376,10 @@ export default function RegisterPage() {
           <Button
             type="submit"
             className="w-full"
-            disabled={registerMutation.isPending || isRedirectingToPayment}
+            disabled={registerMutation.isPending}
           >
-            {registerMutation.isPending || isRedirectingToPayment ? (
+            {registerMutation.isPending ? (
               <LoadingSpinner />
-            ) : selectedPlan === 'free' ? (
-              'Criar Conta Grátis'
             ) : (
               'Criar Conta e Iniciar Trial'
             )}

@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { 
   ChartBarIcon, 
   BanknotesIcon, 
-  UserGroupIcon,
   SparklesIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
@@ -72,14 +71,6 @@ export function UsageLimitsCard() {
       limit: limits.bank_accounts.limit,
       percentage: limits.bank_accounts.percentage,
       unit: 'contas',
-    },
-    {
-      icon: UserGroupIcon,
-      title: 'Usuários',
-      used: limits.users.used,
-      limit: limits.users.limit,
-      percentage: limits.users.percentage,
-      unit: 'usuários',
     },
     {
       icon: SparklesIcon,

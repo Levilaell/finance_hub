@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 
-from .models import Company, CompanyUser, SubscriptionPlan, PaymentMethod, PaymentHistory
+from .models import Company, CompanyUser, SubscriptionPlan, PaymentMethod, PaymentHistory, ResourceUsage
 from .serializers import (
     CompanySerializer,
     CompanyUpdateSerializer,
@@ -642,3 +642,82 @@ class InvoiceDownloadView(APIView):
             return Response({
                 'error': 'Invoice not available for download'
             }, status=status.HTTP_404_NOT_FOUND)
+
+
+class UsageLimitsView(APIView):
+    """Get current usage limits for the company"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            company = request.user.company
+        except Exception as e:
+            logger.error(f"Error getting company for user {request.user.id}: {str(e)}")
+            return Response({'error': 'Company not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            # Get current usage counts
+            from apps.banking.models import BankAccount
+            
+            # Get or create current month usage record
+            usage_record = ResourceUsage.get_or_create_current_month(company)
+            
+            # Get transaction count from usage record
+            transaction_count = usage_record.transactions_count
+            
+            # Get bank account count (real-time)
+            bank_account_count = BankAccount.objects.filter(company=company, is_active=True).count()
+            
+            # Get AI requests count from usage record
+            ai_requests_count = usage_record.total_ai_usage
+            
+        except Exception as e:
+            logger.error(f"Error getting usage counts: {str(e)}")
+            # Return default values if there's an error
+            transaction_count = 0
+            bank_account_count = 0
+            ai_requests_count = 0
+        
+        try:
+            # Get limits from subscription plan
+            plan = company.subscription_plan
+            if not plan:
+                # Default limits for free/trial
+                limits = {
+                    'transactions': {'limit': 100, 'used': transaction_count},
+                    'bank_accounts': {'limit': 2, 'used': bank_account_count},
+                    'ai_requests': {'limit': 10, 'used': ai_requests_count}
+                }
+            else:
+                limits = {
+                    'transactions': {
+                        'limit': plan.max_transactions,
+                        'used': transaction_count
+                    },
+                    'bank_accounts': {
+                        'limit': plan.max_bank_accounts,
+                        'used': bank_account_count
+                    },
+                    'ai_requests': {
+                        'limit': plan.max_ai_requests_per_month,
+                        'used': ai_requests_count
+                    }
+                }
+            
+            # Calculate percentages
+            for key in limits:
+                limit_value = limits[key]['limit']
+                used_value = limits[key]['used']
+                if limit_value == 999999:  # Unlimited
+                    limits[key]['percentage'] = 0
+                else:
+                    limits[key]['percentage'] = round((used_value / limit_value) * 100, 1) if limit_value > 0 else 0
+            
+            return Response(limits)
+            
+        except Exception as e:
+            logger.error(f"Error in UsageLimitsView: {str(e)}", exc_info=True)
+            return Response({
+                'error': 'Failed to get usage limits',
+                'detail': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

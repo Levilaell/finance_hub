@@ -47,6 +47,19 @@ import {
 import { UpgradePlanDialog } from '@/components/billing/upgrade-plan-dialog';
 import { BillingHistoryDialog } from '@/components/billing/billing-history-dialog';
 import { PaymentMethodsDialog } from '@/components/billing/payment-methods-dialog';
+import { UsageLimitsCard } from '@/components/billing/usage-limits';
+import { useSubscriptionCheck } from '@/hooks/use-subscription-check';
+import { subscriptionService } from '@/services/subscription.service';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { 
+  CheckCircleIcon,
+  ClockIcon,
+  ExclamationCircleIcon,
+  ChartBarIcon,
+  BanknotesIcon,
+  SparklesIcon
+} from '@heroicons/react/24/outline';
 
 interface ProfileForm {
   first_name: string;
@@ -105,6 +118,16 @@ export default function SettingsPage() {
 
   const passwordForm = useForm<PasswordForm>();
   const deleteAccountForm = useForm<DeleteAccountForm>();
+
+  // Subscription check hook
+  const { subscriptionStatus, isLoading: isLoadingSubscription } = useSubscriptionCheck();
+
+  // Usage limits query
+  const { data: usageLimits, isLoading: isLoadingLimits } = useQuery({
+    queryKey: ['usage-limits'],
+    queryFn: () => subscriptionService.getUsageLimits(),
+    refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
+  });
 
   // Performance metrics query
   const { data: performanceMetrics, isLoading: isLoadingMetrics } = useQuery({
@@ -253,9 +276,10 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="security">Segurança</TabsTrigger>
+          <TabsTrigger value="status">Status & Limites</TabsTrigger>
           <TabsTrigger value="billing">Faturamento</TabsTrigger>
           <TabsTrigger value="notifications">Notificações (Em Breve)</TabsTrigger>
         </TabsList>
@@ -578,6 +602,125 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Status & Limits Tab */}
+        <TabsContent value="status" className="space-y-6">
+          {/* Subscription Status Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <ChartBarIcon className="h-5 w-5 mr-2" />
+                Status da Assinatura
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingSubscription ? (
+                <div className="space-y-4">
+                  <div className="animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
+                    <div className="h-8 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+              ) : subscriptionStatus ? (
+                <div className="space-y-4">
+                  {/* Status Row */}
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="text-sm text-gray-600">Status Atual</p>
+                      <div className="flex items-center mt-1">
+                        {subscriptionStatus.subscription_status === 'active' && (
+                          <>
+                            <CheckCircleIcon className="h-5 w-5 text-green-500 mr-2" />
+                            <span className="text-lg font-semibold text-green-700">Ativo</span>
+                          </>
+                        )}
+                        {subscriptionStatus.subscription_status === 'trial' && (
+                          <>
+                            <ClockIcon className="h-5 w-5 text-blue-500 mr-2" />
+                            <span className="text-lg font-semibold text-blue-700">Período de Teste</span>
+                          </>
+                        )}
+                        {subscriptionStatus.subscription_status === 'expired' && (
+                          <>
+                            <ExclamationCircleIcon className="h-5 w-5 text-red-500 mr-2" />
+                            <span className="text-lg font-semibold text-red-700">Expirado</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {subscriptionStatus.plan && (
+                        <div>
+                          <p className="text-sm text-gray-600">Plano</p>
+                          <p className="text-lg font-semibold">{subscriptionStatus.plan.name}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Trial Info */}
+                  {subscriptionStatus.subscription_status === 'trial' && (
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        {subscriptionStatus.trial_days_left > 0 ? (
+                          <>Período de teste expira em <strong>{subscriptionStatus.trial_days_left} dias</strong></>
+                        ) : (
+                          <>Período de teste <strong>expirado</strong></>
+                        )}
+                      </p>
+                      {subscriptionStatus.trial_ends_at && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Data de expiração: {new Date(subscriptionStatus.trial_ends_at).toLocaleDateString('pt-BR')}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Payment Method Status */}
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="text-sm text-gray-600">Método de Pagamento</p>
+                      <p className="mt-1">
+                        {subscriptionStatus.has_payment_method ? (
+                          <span className="text-green-600 font-medium">Configurado</span>
+                        ) : (
+                          <span className="text-orange-600 font-medium">Não configurado</span>
+                        )}
+                      </p>
+                    </div>
+                    {subscriptionStatus.next_billing_date && (
+                      <div className="text-right">
+                        <p className="text-sm text-gray-600">Próxima cobrança</p>
+                        <p className="text-sm font-medium">
+                          {new Date(subscriptionStatus.next_billing_date).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  {subscriptionStatus.requires_payment_setup && (
+                    <div className="pt-4">
+                      <Button 
+                        onClick={() => setPaymentMethodsDialogOpen(true)}
+                        className="w-full"
+                      >
+                        Configurar Pagamento
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center text-gray-500">
+                  Não foi possível carregar o status da assinatura
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Usage Limits Card */}
+          <UsageLimitsCard />
         </TabsContent>
 
         {/* Billing Settings */}

@@ -15,7 +15,8 @@ User = get_user_model()
 
 class SubscriptionPlan(models.Model):
     """
-    Available subscription plans (Starter, Pro, Enterprise)
+    Available subscription plans (Starter, Professional, Enterprise)
+    NO FREE PLAN - Only paid plans with 14-day trial
     """
     PLAN_TYPES = [
         ('starter', 'Inicial'),
@@ -28,7 +29,7 @@ class SubscriptionPlan(models.Model):
     plan_type = models.CharField(_('plan type'), max_length=20, choices=PLAN_TYPES)
     trial_days = models.IntegerField(default=14)
 
-    # Gateway IDs - CORREÇÃO: Múltiplos gateways
+    # Gateway IDs
     stripe_price_id = models.CharField(_('Stripe price ID'), max_length=255, blank=True)
     mercadopago_plan_id = models.CharField(_('MercadoPago plan ID'), max_length=255, blank=True)
     gateway_plan_id = models.CharField(
@@ -57,7 +58,6 @@ class SubscriptionPlan(models.Model):
     has_accountant_access = models.BooleanField(_('accountant access'), default=False)
     has_priority_support = models.BooleanField(_('priority support'), default=False)
     
-    # NOVO: Ordem de exibição
     display_order = models.IntegerField(_('display order'), default=0)
     
     is_active = models.BooleanField(_('is active'), default=True)
@@ -68,14 +68,19 @@ class SubscriptionPlan(models.Model):
         db_table = 'subscription_plans'
         verbose_name = _('Subscription Plan')
         verbose_name_plural = _('Subscription Plans')
-        ordering = ['display_order', 'price_monthly']  # CORREÇÃO: ordenar por display_order
+        ordering = ['display_order', 'price_monthly']
     
     def __str__(self):
         return f"{self.name} - R$ {self.price_monthly}/mês"
 
     def clean(self):
-        if self.plan_type == 'free' and self.price_monthly > 0:
-            raise ValidationError('Plano gratuito não pode ter preço')
+        # Ensure no free plans
+        if self.price_monthly <= 0 or self.price_yearly <= 0:
+            raise ValidationError('Todos os planos devem ter preço maior que zero')
+        
+        # Validate plan type
+        if self.plan_type not in ['starter', 'professional', 'enterprise']:
+            raise ValidationError('Tipo de plano inválido')
         
     def get_yearly_discount_percentage(self):
         """Calcula o percentual de desconto no plano anual"""
@@ -83,6 +88,7 @@ class SubscriptionPlan(models.Model):
             return 0
         monthly_total = self.price_monthly * 12
         return int(((monthly_total - self.price_yearly) / monthly_total) * 100)
+
 
 class Company(models.Model):
     """
@@ -153,7 +159,7 @@ class Company(models.Model):
         SubscriptionPlan, 
         on_delete=models.PROTECT, 
         related_name='companies',
-        null=True,  # Allow null for companies without plan
+        null=True,
         blank=True
     )
     subscription_status = models.CharField(
@@ -225,12 +231,15 @@ class Company(models.Model):
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     updated_at = models.DateTimeField(_('updated at'), auto_now=True)
     is_active = models.BooleanField(_('is active'), default=True)
-    
 
     def can_use_ai_insight(self) -> tuple[bool, str]:
         """Check if company can make an AI request"""
         if not self.subscription_plan:
             return False, "Plano não encontrado"
+        
+        # Check if subscription is active
+        if self.subscription_status not in ['trial', 'active']:
+            return False, "Assinatura não está ativa. Configure o pagamento para continuar."
         
         # Starter não tem IA
         if self.subscription_plan.plan_type == 'starter':
@@ -443,14 +452,14 @@ class Company(models.Model):
         }
     
     def save(self, *args, **kwargs):
-        # Set trial end date for new companies
-        if not self.pk and not self.trial_ends_at:
+        # Set trial end date for new companies - ALWAYS 14 DAYS
+        if not self.pk:
             from django.utils import timezone
-            from django.conf import settings
-            trial_days = getattr(settings, 'TRIAL_PERIOD_DAYS', 14)
-            self.trial_ends_at = timezone.now() + timedelta(days=trial_days)
+            self.trial_ends_at = timezone.now() + timedelta(days=14)
+            self.subscription_status = 'trial'
         
         super().save(*args, **kwargs)
+
 
 class CompanyUser(models.Model):
     """
@@ -608,3 +617,57 @@ class PaymentHistory(models.Model):
             timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
             self.invoice_number = f"{prefix}-{timestamp}"
         super().save(*args, **kwargs)
+
+
+class ResourceUsage(models.Model):
+    """
+    Track resource usage for companies
+    """
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name='resource_usage'
+    )
+    
+    # Usage tracking
+    month = models.DateField(_('month'), help_text='First day of the month')
+    transactions_count = models.IntegerField(_('transactions count'), default=0)
+    ai_requests_count = models.IntegerField(_('AI requests count'), default=0)
+    reports_generated = models.IntegerField(_('reports generated'), default=0)
+    
+    # Metadata
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    
+    class Meta:
+        db_table = 'resource_usage'
+        verbose_name = _('Resource Usage')
+        verbose_name_plural = _('Resource Usage')
+        unique_together = ['company', 'month']
+        ordering = ['-month']
+    
+    def __str__(self):
+        return f"{self.company.name} - {self.month.strftime('%B %Y')}"
+    
+    @property
+    def total_ai_usage(self):
+        """Total AI usage including categorizations and reports"""
+        return self.ai_requests_count + self.reports_generated
+    
+    @classmethod
+    def get_or_create_current_month(cls, company):
+        """Get or create usage record for current month"""
+        from django.utils import timezone
+        now = timezone.now()
+        month_start = now.replace(day=1).date()
+        
+        usage, created = cls.objects.get_or_create(
+            company=company,
+            month=month_start,
+            defaults={
+                'transactions_count': 0,
+                'ai_requests_count': 0,
+                'reports_generated': 0
+            }
+        )
+        return usage

@@ -11,6 +11,9 @@ urlpatterns = [
     path('checkout/create/', views.CreateCheckoutSessionView.as_view(), name='create-checkout'),
     path('checkout/validate/', views.ValidatePaymentView.as_view(), name='validate-payment'),
     
+    # Subscription status
+    path('subscription-status/', views.CheckSubscriptionStatusView.as_view(), name='subscription-status'),
+    
     # Webhook endpoints
     path('webhooks/stripe/', views.stripe_webhook, name='stripe-webhook'),
     path('webhooks/mercadopago/', views.mercadopago_webhook, name='mercadopago-webhook'),

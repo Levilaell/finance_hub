@@ -97,11 +97,6 @@ export interface UsageLimits {
     limit: number;
     percentage: number;
   };
-  users: {
-    used: number;
-    limit: number;
-    percentage: number;
-  };
   ai_requests: {
     used: number;
     limit: number;

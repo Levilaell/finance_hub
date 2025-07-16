@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 
 from .payment_service import PaymentService
 from apps.companies.models import SubscriptionPlan
+from apps.companies.serializers import SubscriptionPlanSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +32,6 @@ class CreateCheckoutSessionView(APIView):
         try:
             # Get the plan
             plan = SubscriptionPlan.objects.get(slug=plan_slug, is_active=True)
-            
-            # Don't allow checkout for free plan
-            if plan.slug == 'free':
-                return Response({
-                    'error': 'Free plan does not require payment'
-                }, status=status.HTTP_400_BAD_REQUEST)
             
             # Get user's company
             company = request.user.company
@@ -196,6 +191,45 @@ class ValidatePaymentView(APIView):
             return Response({
                 'error': 'Failed to validate payment'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CheckSubscriptionStatusView(APIView):
+    """Check if user has active paid subscription"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            company = request.user.company
+        except:
+            return Response({
+                'error': 'Company not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if has payment method
+        has_payment_method = company.payment_methods.filter(is_active=True).exists()
+        
+        # Calculate days left in trial
+        days_left = 0
+        if company.trial_ends_at:
+            from django.utils import timezone
+            delta = company.trial_ends_at - timezone.now()
+            days_left = max(0, delta.days)
+        
+        # Determine if payment setup is required
+        requires_payment_setup = (
+            company.subscription_status == 'trial' and 
+            not has_payment_method
+        )
+        
+        return Response({
+            'subscription_status': company.subscription_status,
+            'has_payment_method': has_payment_method,
+            'trial_days_left': days_left,
+            'plan': SubscriptionPlanSerializer(company.subscription_plan).data if company.subscription_plan else None,
+            'requires_payment_setup': requires_payment_setup,
+            'trial_ends_at': company.trial_ends_at.isoformat() if company.trial_ends_at else None,
+            'next_billing_date': company.next_billing_date.isoformat() if company.next_billing_date else None,
+        })
 
 
 @api_view(['POST'])

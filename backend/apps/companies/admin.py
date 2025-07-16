@@ -9,7 +9,7 @@ from django.db.models import Sum, Count, Q
 from datetime import datetime, timedelta
 from django.utils import timezone
 
-from .models import Company, SubscriptionPlan, CompanyUser, PaymentMethod, PaymentHistory
+from .models import Company, SubscriptionPlan, CompanyUser, PaymentMethod, PaymentHistory, ResourceUsage
 
 
 @admin.register(SubscriptionPlan)
@@ -645,6 +645,158 @@ class BillingDashboardAdmin(admin.ModelAdmin):
             'monthly_revenue': monthly_revenue,
             'trials_expiring': trials_expiring,
             'recent_payments': recent_payments,
+            'next_week': (timezone.now() + timedelta(days=7)).date().isoformat(),
         })
         
         return super().changelist_view(request, extra_context=extra_context)
+
+
+@admin.register(ResourceUsage)
+class ResourceUsageAdmin(admin.ModelAdmin):
+    list_display = [
+        'company', 'month', 'transactions_count', 'ai_requests_count', 
+        'reports_generated', 'usage_status', 'updated_at'
+    ]
+    list_filter = ['month', 'company__subscription_plan']
+    search_fields = ['company__name']
+    date_hierarchy = 'month'
+    ordering = ['-month', 'company__name']
+    
+    readonly_fields = ['created_at', 'updated_at', 'usage_chart']
+    
+    fieldsets = (
+        ('Empresa e Período', {
+            'fields': ('company', 'month')
+        }),
+        ('Uso de Recursos', {
+            'fields': (
+                'transactions_count', 
+                'ai_requests_count', 
+                'reports_generated',
+                'usage_chart'
+            )
+        }),
+        ('Metadados', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def usage_status(self, obj):
+        """Show usage status with color coding"""
+        if not obj.company.subscription_plan:
+            return format_html('<span style="color: gray;">Sem plano</span>')
+        
+        plan = obj.company.subscription_plan
+        
+        # Check transaction usage
+        trans_percent = (obj.transactions_count / plan.max_transactions * 100) if plan.max_transactions > 0 else 0
+        
+        # Check AI usage
+        ai_percent = (obj.total_ai_usage / plan.max_ai_requests_per_month * 100) if plan.max_ai_requests_per_month > 0 else 0
+        
+        # Determine status color
+        max_percent = max(trans_percent, ai_percent)
+        if max_percent >= 90:
+            color = 'red'
+            status = 'Crítico'
+        elif max_percent >= 80:
+            color = 'orange'
+            status = 'Alto'
+        elif max_percent >= 60:
+            color = 'yellow'
+            status = 'Médio'
+        else:
+            color = 'green'
+            status = 'Normal'
+        
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">{}</span><br/>'
+            '<small>Trans: {:.1f}% | IA: {:.1f}%</small>',
+            color, status, trans_percent, ai_percent
+        )
+    usage_status.short_description = 'Status de Uso'
+    
+    def usage_chart(self, obj):
+        """Display usage chart"""
+        if not obj.company.subscription_plan:
+            return "Sem plano ativo"
+        
+        plan = obj.company.subscription_plan
+        
+        # Calculate percentages
+        trans_percent = min(100, (obj.transactions_count / plan.max_transactions * 100) if plan.max_transactions > 0 else 0)
+        ai_percent = min(100, (obj.total_ai_usage / plan.max_ai_requests_per_month * 100) if plan.max_ai_requests_per_month > 0 else 0)
+        
+        return format_html(
+            '<div style="margin: 10px 0;">'
+            '<div style="margin-bottom: 10px;">'
+            '<strong>Transações:</strong> {} / {} ({:.1f}%)<br/>'
+            '<div style="background: #e0e0e0; height: 20px; width: 300px; border-radius: 4px;">'
+            '<div style="background: #4CAF50; height: 100%; width: {}%; border-radius: 4px;"></div>'
+            '</div>'
+            '</div>'
+            '<div>'
+            '<strong>Requisições IA:</strong> {} / {} ({:.1f}%)<br/>'
+            '<div style="background: #e0e0e0; height: 20px; width: 300px; border-radius: 4px;">'
+            '<div style="background: #2196F3; height: 100%; width: {}%; border-radius: 4px;"></div>'
+            '</div>'
+            '</div>'
+            '</div>',
+            obj.transactions_count, plan.max_transactions, trans_percent,
+            trans_percent,
+            obj.total_ai_usage, plan.max_ai_requests_per_month, ai_percent,
+            ai_percent
+        )
+    usage_chart.short_description = 'Gráfico de Uso'
+    
+    def changelist_view(self, request, extra_context=None):
+        """Add summary stats to changelist"""
+        extra_context = extra_context or {}
+        
+        # Get current month
+        current_month = timezone.now().replace(day=1).date()
+        
+        # Get usage stats
+        current_usage = ResourceUsage.objects.filter(month=current_month)
+        
+        total_transactions = current_usage.aggregate(Sum('transactions_count'))['transactions_count__sum'] or 0
+        total_ai_requests = current_usage.aggregate(
+            total=Sum('ai_requests_count') + Sum('reports_generated')
+        )['total'] or 0
+        
+        # Companies near limits
+        companies_near_limit = 0
+        for usage in current_usage.select_related('company__subscription_plan'):
+            if usage.company.subscription_plan:
+                plan = usage.company.subscription_plan
+                trans_percent = (usage.transactions_count / plan.max_transactions * 100) if plan.max_transactions > 0 else 0
+                ai_percent = (usage.total_ai_usage / plan.max_ai_requests_per_month * 100) if plan.max_ai_requests_per_month > 0 else 0
+                if trans_percent >= 80 or ai_percent >= 80:
+                    companies_near_limit += 1
+        
+        extra_context.update({
+            'title': 'Uso de Recursos',
+            'current_month': current_month.strftime('%B %Y'),
+            'total_transactions': total_transactions,
+            'total_ai_requests': total_ai_requests,
+            'companies_near_limit': companies_near_limit,
+            'total_companies': current_usage.count(),
+        })
+        
+        return super().changelist_view(request, extra_context=extra_context)
+    
+    actions = ['reset_usage_counters']
+    
+    def reset_usage_counters(self, request, queryset):
+        """Reset usage counters for selected records"""
+        count = 0
+        for usage in queryset:
+            usage.transactions_count = 0
+            usage.ai_requests_count = 0
+            usage.reports_generated = 0
+            usage.save()
+            count += 1
+        
+        self.message_user(request, f'{count} registros de uso foram resetados.')
+    reset_usage_counters.short_description = 'Resetar contadores de uso'

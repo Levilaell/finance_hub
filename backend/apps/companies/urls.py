@@ -17,6 +17,7 @@ from .views import (
     PaymentMethodDetailView,
     PaymentHistoryView,
     InvoiceDownloadView,
+    UsageLimitsView,
 )
 
 # Import public views from views_package
@@ -50,4 +51,7 @@ urlpatterns = [
     path('billing/payment-methods/<int:payment_method_id>/', PaymentMethodDetailView.as_view(), name='payment-method-detail'),
     path('billing/history/', PaymentHistoryView.as_view(), name='payment-history'),
     path('billing/invoices/<int:payment_id>/', InvoiceDownloadView.as_view(), name='invoice-download'),
+    
+    # Usage limits
+    path('usage-limits/', UsageLimitsView.as_view(), name='usage-limits'),
 ]
