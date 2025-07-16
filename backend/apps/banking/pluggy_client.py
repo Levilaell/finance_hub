@@ -115,8 +115,6 @@ class PluggyClient:
             # Pluggy tokens typically expire in 2 hours
             self._token_expires_at = datetime.now() + timedelta(hours=2)
             
-            logger.info("Successfully authenticated with Pluggy API")
-            
         except Exception as e:
             logger.error(f"Pluggy authentication error: {e}")
             raise PluggyAuthenticationError(f"Failed to authenticate: {e}")
@@ -140,9 +138,14 @@ class PluggyClient:
             await self._ensure_authenticated()
             
             params = {'country': country}
-
-            if getattr(settings, 'PLUGGY_USE_SANDBOX', False):
+            
+            # NÃO adicionar sandbox=True quando usar trial/produção
+            use_sandbox = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
+            if use_sandbox:
                 params['sandbox'] = True
+                logger.info("🧪 Using Pluggy SANDBOX connectors")
+            else:
+                logger.info("🚀 Using Pluggy PRODUCTION connectors")
                 
             response = await self.client.get(
                 f"{self.base_url}/connectors",
@@ -461,7 +464,7 @@ class PluggyService:
                         'id': connector['id'],
                         'name': connector['name'],
                         'code': str(connector['id']),  # Use Pluggy ID as code
-                        'logo': connector.get('primaryColor', '#000000'),
+                        'logo': connector.get('imageUrl'),
                         'color': connector.get('primaryColor', '#000000'),
                         'country': connector.get('country', 'BR'),
                         'health_status': connector.get('health', {}).get('status', 'ONLINE'),

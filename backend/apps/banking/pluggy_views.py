@@ -1,5 +1,5 @@
 """
-Pluggy views usando sandbox oficial da Pluggy
+Pluggy views para integração com bancos brasileiros
 """
 import logging
 from typing import Dict, Any
@@ -47,7 +47,7 @@ class PluggyBankProvidersView(APIView):
                                 'primary_color': connector.get('primaryColor', '#000000'),
                                 'supports_accounts': connector.get('hasAccounts', True),
                                 'supports_transactions': connector.get('hasTransactions', True),
-                                'is_sandbox': getattr(settings, 'PLUGGY_USE_SANDBOX', False)
+                                'is_sandbox': False  # Em produção/trial, não é sandbox
                             })
                     
                     return banks
@@ -60,6 +60,7 @@ class PluggyBankProvidersView(APIView):
             finally:
                 loop.close()
             
+            # Detecta se está em modo sandbox ou produção
             sandbox_mode = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
             
             return Response({
@@ -73,24 +74,14 @@ class PluggyBankProvidersView(APIView):
         except Exception as e:
             logger.error(f"Error getting Pluggy banks: {e}")
             
-            # Fallback to default banks if API fails
-            default_banks = [
-                {
-                    'id': 201,
-                    'name': 'Pluggy Bank (Sandbox)',
-                    'code': '999',
-                    'health_status': 'ONLINE',
-                    'is_sandbox': True
-                }
-            ]
-            
+            # Em caso de erro, retorna resposta vazia ao invés de fallback
             return Response({
-                'success': True,
-                'data': default_banks,
-                'total': len(default_banks),
-                'sandbox_mode': True,
-                'fallback': True
-            })
+                'success': False,
+                'data': [],
+                'total': 0,
+                'error': str(e),
+                'message': 'Erro ao buscar bancos disponíveis'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @method_decorator(ratelimit(key='user', rate='5/m', method='POST'), name='dispatch')
@@ -120,21 +111,26 @@ class PluggyConnectTokenView(APIView):
             connect_token = token_data.get('accessToken')
             sandbox_mode = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
             
-            return Response({
+            response_data = {
                 'success': True,
                 'data': {
                     'connect_token': connect_token,
                     'connect_url': getattr(settings, 'PLUGGY_CONNECT_URL', 'https://connect.pluggy.ai'),
                     'sandbox_mode': sandbox_mode,
                     'expires_at': token_data.get('expiresAt'),
-                    'message': 'Token para sandbox Pluggy' if sandbox_mode else 'Token para produção Pluggy',
-                    'sandbox_credentials': {
-                        'user': 'user-ok',
-                        'password': 'password-ok', 
-                        'token': '123456'
-                    } if sandbox_mode else None
+                    'message': 'Token para sandbox Pluggy' if sandbox_mode else 'Token para produção Pluggy'
                 }
-            })
+            }
+            
+            # Só adiciona credenciais de sandbox se estiver em modo sandbox
+            if sandbox_mode:
+                response_data['data']['sandbox_credentials'] = {
+                    'user': 'user-ok',
+                    'password': 'password-ok', 
+                    'token': '123456'
+                }
+            
+            return Response(response_data)
             
         except PluggyAuthenticationError as e:
             logger.error(f"Pluggy authentication error: {e}")
@@ -153,14 +149,14 @@ class PluggyConnectTokenView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# ✅ SUBSTITUIR apenas a função _parse_account_number no pluggy_views.py
-
 def _parse_account_number(account_data):
     """
     Parse account number from Pluggy data to Brazilian format
     """
     # Get the number field from Pluggy
     full_number = account_data.get('number', '')
+    
+    logger.info(f"🔍 Parsing account number: '{full_number}'")
     
     # Pluggy may return formats like:
     # - "0001/12345-0"  (with agency)
@@ -171,20 +167,20 @@ def _parse_account_number(account_data):
         # Format: "0001/12345-0" -> extract "12345-0"
         parts = full_number.split('/')
         if len(parts) >= 2:
-            agency = parts[0]
-            account_number = parts[1]
+            agency = parts[0].strip()
+            account_number = parts[1].strip()
         else:
             agency = '0001'
-            account_number = full_number
+            account_number = full_number.strip()
     else:
         # Format: "12345-0" or "123456"
         agency = '0001'  # Default agency
-        account_number = full_number
+        account_number = full_number.strip()
     
     # Ensure account number has check digit
     if account_number and '-' not in account_number:
         # Add check digit if missing
-        if len(account_number) >= 1:
+        if len(account_number) >= 2:
             account_number = f"{account_number[:-1]}-{account_number[-1]}"
         else:
             account_number = "12345-6"  # Fallback
@@ -192,10 +188,15 @@ def _parse_account_number(account_data):
     # Validate final format
     if not account_number or len(account_number) < 3:
         account_number = "12345-6"  # Safe fallback
+        
+    # Ensure agency is not empty
+    if not agency:
+        agency = "0001"
+    
+    logger.info(f"✅ Parsed result: agency='{agency}', account='{account_number}'")
     
     return agency, account_number
 
-# ✅ SUBSTITUIR a função post() completa no PluggyItemCallbackView:
 
 @method_decorator(ratelimit(key='user', rate='10/h', method='POST'), name='dispatch')
 class PluggyItemCallbackView(APIView):
@@ -254,8 +255,8 @@ class PluggyItemCallbackView(APIView):
             for account_data in accounts_data:
                 logger.info(f"Processing Pluggy account: {account_data}")
                 
-                # ✅ NOVO: Parse correto do número da conta
-                agency, account_number = self._parse_account_number(account_data)
+                # Parse account number correctly
+                agency, account_number = _parse_account_number(account_data)
                 
                 # Map account types
                 account_type_map = {
@@ -273,7 +274,7 @@ class PluggyItemCallbackView(APIView):
                     'checking'
                 )
                 
-                # ✅ MELHOR: Nickname usando nome do banco + tipo de conta
+                # Better nickname using bank name + account type
                 account_name = account_data.get('name', 'Conta Corrente')
                 nickname = f"{bank_provider.name} - {account_name}"
                 
@@ -350,54 +351,7 @@ class PluggyItemCallbackView(APIView):
                 'error': 'An error occurred processing the connection',
                 'details': str(e) if settings.DEBUG else None
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-    def _parse_account_number(self, account_data):
-        """
-        Parse account number from Pluggy data to Brazilian format
-        """
-        # Get the number field from Pluggy
-        full_number = account_data.get('number', '')
-        
-        logger.info(f"🔍 Parsing account number: '{full_number}'")
-        
-        # Pluggy may return formats like:
-        # - "0001/12345-0"  (with agency)
-        # - "12345-0"       (just account)
-        # - "123456"        (without digit)
-        
-        if '/' in full_number:
-            # Format: "0001/12345-0" -> extract "12345-0"
-            parts = full_number.split('/')
-            if len(parts) >= 2:
-                agency = parts[0].strip()
-                account_number = parts[1].strip()
-            else:
-                agency = '0001'
-                account_number = full_number.strip()
-        else:
-            # Format: "12345-0" or "123456"
-            agency = '0001'  # Default agency
-            account_number = full_number.strip()
-        
-        # Ensure account number has check digit
-        if account_number and '-' not in account_number:
-            # Add check digit if missing
-            if len(account_number) >= 2:
-                account_number = f"{account_number[:-1]}-{account_number[-1]}"
-            else:
-                account_number = "12345-6"  # Fallback
-        
-        # Validate final format
-        if not account_number or len(account_number) < 3:
-            account_number = "12345-6"  # Safe fallback
-            
-        # Ensure agency is not empty
-        if not agency:
-            agency = "0001"
-        
-        logger.info(f"✅ Parsed result: agency='{agency}', account='{account_number}'")
-        
-        return agency, account_number
+
 
 @method_decorator(ratelimit(key='user', rate='20/h', method='POST'), name='dispatch')
 class PluggySyncAccountView(APIView):
@@ -473,6 +427,7 @@ class PluggySyncAccountView(APIView):
                 'error': 'Sync failed',
                 'details': str(e) if settings.DEBUG else None
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])

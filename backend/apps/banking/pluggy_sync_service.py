@@ -73,7 +73,7 @@ class PluggyTransactionSyncService:
     async def sync_account_transactions(self, account: BankAccount) -> Dict[str, Any]:
         """Sync transactions for a specific Pluggy account"""
         try:
-            # ✅ CORRIGIDO: Buscar dados da conta de forma assíncrona
+            # Get account info asynchronously
             account_info = await self._get_account_info(account)
             
             logger.info(f"🔄 Syncing Pluggy account {account_info['id']} - {account_info['bank_name']}")
@@ -187,17 +187,18 @@ class PluggyTransactionSyncService:
         last_sync = account_info.get('last_sync_at')
         
         if not last_sync:
-            # ✅ PRIMEIRA SYNC: 1 ano no sandbox, 3 meses em produção
-            if getattr(settings, 'PLUGGY_USE_SANDBOX', False):
-                days = 365  # 1 ano para pegar transações Netflix de 2024
+            # PRIMEIRA SYNC: período baseado no modo
+            sandbox_mode = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
+            if sandbox_mode:
+                days = 365  # 1 ano para sandbox
                 logger.info(f"🧪 Sandbox: First sync, using {days} days")
             else:
-                days = 90   # 3 meses em produção
-                logger.info(f"🚀 Production: First sync, using {days} days")
+                days = 90   # 3 meses em produção/trial
+                logger.info(f"🚀 Production/Trial: First sync, using {days} days")
             
             return (timezone.now() - timedelta(days=days)).date()
         else:
-            # ✅ SYNC INCREMENTAL: 1 dia de overlap
+            # SYNC INCREMENTAL: 1 dia de overlap
             days_since_sync = (timezone.now() - last_sync).days
             
             if days_since_sync > 30:
@@ -209,7 +210,6 @@ class PluggyTransactionSyncService:
                 logger.info(f"🔄 Incremental sync, {days_since_sync} days since last sync")
                 return (last_sync - timedelta(days=1)).date()
 
-
     async def _get_accounts_to_sync(self, company_id: int = None) -> List[BankAccount]:
         """Get Pluggy accounts that need synchronization"""
         @sync_to_async
@@ -219,7 +219,7 @@ class PluggyTransactionSyncService:
             queryset = BankAccount.objects.filter(
                 status='active',
                 external_id__isnull=False,
-                # ✅ CORRIGIDO: Filtrar por contas Pluggy usando external_id
+                # Filter for Pluggy accounts (have external_id)
                 external_id__startswith=''  # Pluggy IDs são UUIDs
             ).select_related('bank_provider', 'company')
             
@@ -268,7 +268,6 @@ class PluggyTransactionSyncService:
         
         return await save_transactions()
     
-
     def _create_transaction_from_pluggy_data(self, account: BankAccount, tx_data: Dict) -> Optional[Transaction]:
         """Create Transaction object from Pluggy data"""
         try:
@@ -305,7 +304,7 @@ class PluggyTransactionSyncService:
                 logger.info(f"✅ Parsed date: {tx_date}")
             except ValueError as e:
                 logger.error(f"❌ Invalid date format in transaction: {date_str} - {e}")
-                return None
+                return ValueError
             
             # Get merchant info
             merchant_info = tx_data.get('merchant', {}) or {}
@@ -319,7 +318,7 @@ class PluggyTransactionSyncService:
             external_id = str(tx_data.get('id'))
             logger.info(f"🆔 External ID: {external_id}")
             
-            # ✅ NOVO: Categorização APENAS com dados da Pluggy
+            # Categorização com dados da Pluggy
             category = self._get_pluggy_category(tx_data)
             if category:
                 logger.info(f"🎯 Pluggy category found: {category.name}")
@@ -346,8 +345,8 @@ class PluggyTransactionSyncService:
                 counterpart_name=merchant_name,
                 counterpart_document='',
                 balance_after=balance_after,
-                category=category,  # ✅ APENAS categoria da Pluggy ou None
-                is_ai_categorized=False,  # ✅ Não é IA, é da Pluggy
+                category=category,  # Categoria da Pluggy ou None
+                is_ai_categorized=False,  # Não é IA, é da Pluggy
                 status='completed',
                 created_at=timezone.now()
             )
@@ -410,7 +409,7 @@ class PluggyTransactionSyncService:
     async def _update_account_balance(self, account: BankAccount):
         """Update account balance from Pluggy"""
         try:
-            # ✅ CORRIGIDO: Buscar external_id de forma assíncrona
+            # Get external_id asynchronously
             external_id = await sync_to_async(lambda: account.external_id)()
             
             async with PluggyClient() as client:
