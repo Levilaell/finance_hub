@@ -1,6 +1,5 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
@@ -41,71 +40,8 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { bankingService } from '@/services/banking.service';
-import { PluggyConnectWidget } from '@/components/banking/pluggy-connect-widget';
+import { PluggyConnectModal } from '@/components/banking/pluggy-connect-widget';
 import { PluggyInfoDialog } from '@/components/banking/pluggy-info-dialog';
-
-// ✅ Hook customizado para Pluggy Providers
-function usePluggyProviders() {
-  const [providers, setProviders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [sandboxMode, setSandboxMode] = useState(false);
-
-  const fetchProviders = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      console.log('🏦 Fetching Pluggy banks...');
-      
-      const response = await bankingService.getPluggyBanks();
-      
-      console.log('🏦 Pluggy banks response:', response);
-      
-      if (response.success) {
-        setProviders(response.data);
-        setSandboxMode(response.sandbox_mode);
-        console.log(`🏦 Loaded ${response.data.length} banks (sandbox: ${response.sandbox_mode})`);
-      } else {
-        throw new Error('Failed to fetch banks from Pluggy');
-      }
-    } catch (err: any) {
-      console.error('❌ Error fetching Pluggy providers:', err);
-      setError(err.message || 'Failed to fetch bank providers');
-      
-      // Fallback providers para desenvolvimento
-      setProviders([
-        {
-          id: 999,
-          name: 'Pluggy Bank (Sandbox)',
-          code: 'pluggy-sandbox',
-          health_status: 'ONLINE',
-          supports_accounts: true,
-          supports_transactions: true,
-          is_sandbox: true,
-          primary_color: '#007BFF',
-          is_open_banking: true,
-          supports_pix: true
-        }
-      ]);
-      setSandboxMode(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProviders();
-  }, []);
-
-  return { 
-    providers, 
-    loading, 
-    error, 
-    sandboxMode,
-    refresh: fetchProviders
-  };
-}
 
 export default function AccountsPage() {
   const router = useRouter();
@@ -119,17 +55,6 @@ export default function AccountsPage() {
     deleteAccount
   } = useBankingStore();
   
-  // ✅ Use the custom Pluggy hook
-  const { 
-    providers, 
-    loading: providersLoading, 
-    error: providersError,
-    sandboxMode,
-    refresh: refreshProviders
-  } = usePluggyProviders();
-  
-  const [isAddingAccount, setIsAddingAccount] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<any>(null);
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
   const [pluggyConnectToken, setPluggyConnectToken] = useState<string | null>(null);
@@ -176,20 +101,12 @@ export default function AccountsPage() {
     }
   }, [isAuthenticated]);
 
-  // Debug: log providers
-  useEffect(() => {
-    console.log('Providers loaded:', providers);
-  }, [providers]);
-
-  // ✅ NOVA função handleConnectBank (corrigida)
-  const handleConnectBank = async (provider: any) => {
+  // ✅ Função simplificada - abre Pluggy Connect diretamente
+  const handleConnectBank = async () => {
     try {
-      setIsAddingAccount(false); // Close the bank selection dialog
-      
-      console.log('🔗 Starting bank connection with:', provider.name);
+      console.log('🔗 Starting Pluggy Connect...');
       toast.info('Iniciando conexão com seu banco...');
 
-      // ✅ SEMPRE usar Pluggy (simplificado)
       const result = await bankingService.createPluggyConnectToken();
 
       console.log('🔗 Pluggy connect token response:', result);
@@ -198,10 +115,6 @@ export default function AccountsPage() {
         const connectToken = result.data.connect_token;
         
         console.log('🔗 Connect token received:', connectToken.substring(0, 50) + '...');
-        
-        // Store provider info for callback handling
-        sessionStorage.setItem('pluggy_provider', provider.name);
-        sessionStorage.setItem('pluggy_bank_code', provider.code);
         
         // Setup Pluggy Connect widget
         setPluggyConnectToken(connectToken);
@@ -236,7 +149,7 @@ export default function AccountsPage() {
     }
   };
 
-  // ✅ NOVA função handleSyncAccount (corrigida)
+  // ✅ Função handleSyncAccount (mantida como está)
   const handleSyncAccount = async (accountId: string) => {
     setSyncingAccountId(accountId);
     try {
@@ -289,7 +202,7 @@ export default function AccountsPage() {
     }
   };
 
-  // ✅ NOVA função handlePluggyCallback (corrigida)
+  // ✅ Função handlePluggyCallback (mantida como está)
   const handlePluggyCallback = async (itemId: string) => {
     try {
       console.log('🎯 Processing Pluggy callback for item:', itemId);
@@ -304,7 +217,7 @@ export default function AccountsPage() {
       
       if (response.success && response.data) {
         const accountsCreated = response.data.accounts?.length || 0;
-        toast.success(`🎉 ${accountsCreated} conta(s) conectada(s) com sucesso ao ${providerName}!`);
+        toast.success(`🎉 ${accountsCreated} conta(s) conectada(s) com sucesso!`);
         
         // Clear stored data
         sessionStorage.removeItem('pluggy_provider');
@@ -322,22 +235,6 @@ export default function AccountsPage() {
       toast.error('Erro ao finalizar conexão: ' + error.message);
       throw error;
     }
-  };
-
-  // ✅ Função para renderizar informações de debug
-  const renderDebugInfo = () => {
-    if (!sandboxMode) return null;
-    
-    return (
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-        <div className="flex items-center gap-2 text-blue-700">
-          <span className="text-sm font-medium">🧪 Modo Sandbox Ativo</span>
-        </div>
-        <div className="text-xs text-blue-600 mt-1">
-          Credenciais de teste: user-ok / password-ok / 123456
-        </div>
-      </div>
-    );
   };
 
   const getAccountTypeInfo = (type: string) => {
@@ -372,6 +269,12 @@ export default function AccountsPage() {
     }
   };
 
+  // ✅ Função para resetar o estado do widget
+  const resetPluggyWidget = () => {
+    setPluggyConnectToken(null);
+    setIsConnecting(false);
+  };
+
   if (loading && accounts.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -390,9 +293,9 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Pluggy Connect Widget */}
+      {/* Pluggy Connect Modal */}
       {pluggyConnectToken && isConnecting && (
-        <PluggyConnectWidget
+        <PluggyConnectModal
           connectToken={pluggyConnectToken}
           onSuccess={async (itemData) => {
             console.log('Pluggy Connect success:', itemData);
@@ -404,22 +307,19 @@ export default function AccountsPage() {
             }
             
             // Reset states
-            setPluggyConnectToken(null);
-            setIsConnecting(false);
-            setSelectedProvider(null);
+            resetPluggyWidget();
           }}
           onError={(error) => {
             console.error('Pluggy Connect error:', error);
             toast.error(`Erro na conexão: ${error.message || 'Erro desconhecido'}`);
             
             // Reset states
-            setPluggyConnectToken(null);
-            setIsConnecting(false);
+            resetPluggyWidget();
           }}
           onClose={() => {
+            console.log('Pluggy widget closed by user');
             // Reset states if user closes without completing
-            setPluggyConnectToken(null);
-            setIsConnecting(false);
+            resetPluggyWidget();
           }}
         />
       )}
@@ -432,7 +332,7 @@ export default function AccountsPage() {
             Gerencie suas contas conectadas via Open Banking
           </p>
         </div>
-        <Button onClick={() => setIsAddingAccount(true)}>
+        <Button onClick={handleConnectBank}>
           <LinkIcon className="h-4 w-4 mr-2" />
           Conectar via Open Banking
         </Button>
@@ -492,16 +392,9 @@ export default function AccountsPage() {
                         <span className={statusInfo.color}>{statusInfo.label}</span>
                       </div>
                       <span className="text-gray-500">
-                        {(() => {
-                          console.log('Account sync data:', { 
-                            id: account.id, 
-                            last_sync_at: account.last_sync_at,
-                            account_name: account.account_name 
-                          });
-                          return account.last_sync_at 
-                            ? `Sincronizado ${formatDate(account.last_sync_at)}`
-                            : 'Nunca sincronizado';
-                        })()}
+                        {account.last_sync_at 
+                          ? `Sincronizado ${formatDate(account.last_sync_at)}`
+                          : 'Nunca sincronizado'}
                       </span>
                     </div>
 
@@ -548,161 +441,13 @@ export default function AccountsPage() {
           title="Nenhuma conta conectada"
           description="Conecte sua primeira conta bancária para começar a acompanhar suas finanças automaticamente"
           action={
-            <Button onClick={() => setIsAddingAccount(true)}>
+            <Button onClick={handleConnectBank}>
               <LinkIcon className="h-4 w-4 mr-2" />
               Conectar via Open Banking
             </Button>
           }
         />
       )}
-
-      {/* Connect Account Dialog */}
-      <Dialog open={isAddingAccount} onOpenChange={setIsAddingAccount}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Conectar Conta Bancária</DialogTitle>
-            <DialogDescription>
-              Selecione seu banco para conectar via Open Banking de forma segura
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-4">
-            {/* ✅ Info sobre sandbox */}
-            {renderDebugInfo()}
-            
-            {/* Info about Pluggy */}
-            <div className="mb-4">
-              <PluggyInfoDialog />
-            </div>
-            
-            {/* Search */}
-            <div className="mb-4">
-              <Input
-                placeholder="Buscar banco..."
-                className="w-full"
-                onChange={(e) => {
-                  // TODO: Implement search
-                }}
-              />
-            </div>
-
-            {/* Popular Banks */}
-            <div className="mb-6">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">
-                Bancos Populares ({providers ? providers.length : 0} total)
-                {sandboxMode && <span className="text-blue-600 ml-2">🧪 Sandbox</span>}
-              </h4>
-              
-              {/* Loading state */}
-              {providersLoading && (
-                <div className="text-sm text-blue-500 mb-2">
-                  Carregando bancos disponíveis...
-                </div>
-              )}
-              
-              {/* Error state */}
-              {providersError && (
-                <div className="text-sm text-red-500 mb-2">
-                  Erro ao carregar bancos: {providersError}
-                  <Button 
-                    variant="link" 
-                    size="sm" 
-                    onClick={refreshProviders}
-                    className="ml-2"
-                  >
-                    Tentar novamente
-                  </Button>
-                </div>
-              )}
-              
-              <div className="grid grid-cols-2 gap-3">
-                {(providers || [])
-                  .filter(p => p.is_open_banking || p.supports_accounts)
-                  .slice(0, 6)
-                  .map((provider) => (
-                    <button
-                      key={provider.id}
-                      onClick={() => setSelectedProvider(provider)}
-                      className={`flex items-center gap-3 p-3 rounded-lg border transition-all hover:shadow-md ${
-                        selectedProvider?.id === provider.id 
-                          ? 'border-blue-500 bg-blue-50' 
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      {provider.logo ? (
-                        <img 
-                          src={provider.logo} 
-                          alt={provider.name}
-                          className="h-8 w-8 object-contain"
-                        />
-                      ) : (
-                        <div 
-                          className="h-8 w-8 rounded-full flex items-center justify-center text-white font-bold"
-                          style={{ backgroundColor: provider.primary_color || '#6B7280' }}
-                        >
-                          {provider.name.charAt(0)}
-                        </div>
-                      )}
-                      <div className="flex-1 text-left">
-                        <span className="font-medium text-sm">{provider.name}</span>
-                        {provider.is_sandbox && (
-                          <div className="text-xs text-blue-600">Sandbox</div>
-                        )}
-                      </div>
-                      {provider.supports_pix && (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                          PIX
-                        </span>
-                      )}
-                    </button>
-                  ))}
-              </div>
-            </div>
-
-            {/* Other Banks */}
-            <details className="group">
-              <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-900">
-                Ver todos os bancos ({(providers || []).length})
-              </summary>
-              <div className="mt-3 grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                {(providers || []).map((provider) => (
-                  <button
-                    key={provider.id}
-                    onClick={() => setSelectedProvider(provider)}
-                    className="text-left px-3 py-2 text-sm hover:bg-gray-50 rounded"
-                  >
-                    {provider.name}
-                    {provider.is_sandbox && <span className="text-blue-600 ml-1">🧪</span>}
-                  </button>
-                ))}
-              </div>
-            </details>
-          </div>
-
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setIsAddingAccount(false);
-                setSelectedProvider(null);
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button 
-              onClick={() => {
-                if (selectedProvider) {
-                  handleConnectBank(selectedProvider);
-                }
-              }}
-              disabled={!selectedProvider}
-            >
-              <LinkIcon className="h-4 w-4 mr-2" />
-              Conectar com {selectedProvider?.name || 'Banco'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!selectedAccount} onOpenChange={() => setSelectedAccount(null)}>

@@ -1,0 +1,31 @@
+<!-- test-pluggy-post.html -->
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Pluggy POST Test</title>
+</head>
+
+<body>
+    <h1>Teste Pluggy com POST</h1>
+
+    <form id="pluggyForm" method="POST" action="https://connect.pluggy.ai" target="_blank">
+        <input type="hidden" name="connectToken" id="tokenInput" />
+        <input type="hidden" name="token" id="tokenInput2" />
+        <input type="hidden" name="accessToken" id="tokenInput3" />
+    </form>
+
+    <script>
+        // Cole o token aqui
+        const token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRJZCI6IjM3N2JkM2RhLWMzNWQtNDZjNi05NDc1LWE3YWU5Yzg3OGRiZCIsImRhdGEiOiIzMThmNjdjYTVlNTQ0Y2ZjNTE0ZjNmOTEyOWJiMDE5MjpiNDU3ZGI4MDM3ZDAyOTVhY2Y1YzFhYmNiYzQwNzQ2M2RlNDkzNDE3NWM1ZWM1Y2U1MjJiZWEwOTVmNDFjOGFiMzFlYTU3NTMxNzkxMzg5NjIwMmQ4ZWVkM2M4NTBjZDUyNzk4NjY0ODViZWY2MGJmY2YxNTBkZTBmYzljMjU3NjUwMGRjY2M1ZjMwYTU1NTM4OWQwNmM1ODRmN2ZhYmQ0OGE0NjljYjQxZTYxZmY2ZThhYmQ0NjlkMDA4ZTU1NjFiYWFkYzkwYTIyOTM1YzNjOWY5NDhiOWQ3MTU5ODI4MGIwN2MxMTAzNTZjYmM3ODlhM2Y1YzY0Y2MzZGI2OGM0IiwiaWF0IjoxNzUyNzI2MDE3LCJleHAiOjE3NTI3Mjc4MTd9.SgK4KPKHTJvXIiumaBk34L6DupPHZoAhXpxbEwjykIJyRYQRrHUxg1x6HyGuVA4zUfQJsy3yb6AidTgb4Tic7d2PLPgHI7S21F3nFSI7Lh0UnQoCiL46jo2vLpzY5rM34CRAinBTnYVo-G34ze1EPJj4WeufYs8p8mw9fgtC0_w3rI3ujgem37_dcQi4ty5tbf26wKY9tkIadmNENTYGcG8goo2HUCf6Wjh6axFN8ZO3soNQY6cntddj9irnKbnt-j6jKLhlhq5s1qEVgx1Y5geGriDlLZTsvrG_z0OMWVQdhv2EYMWiCzfPMVCjAS1fRfThJ3q8xGEzkI75_bDc9Q";
+
+        document.getElementById('tokenInput').value = token;
+        document.getElementById('tokenInput2').value = token;
+        document.getElementById('tokenInput3').value = token;
+
+        // Submeter automaticamente
+        document.getElementById('pluggyForm').submit();
+    </script>
+</body>
+
+</html>

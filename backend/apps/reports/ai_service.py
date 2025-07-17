@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # Versão do cache para invalidação automática em updates
 CACHE_VERSION = "v2.0"
 MAX_API_RETRIES = 3
-OPENAI_TIMEOUT = 30  # segundos
+OPENAI_TIMEOUT = 180  # segundos
 
 
 class EnhancedAIInsightsService:

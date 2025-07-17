@@ -38,7 +38,7 @@ export const reportsService = {
     report_type?: string;
     is_generated?: boolean;
   }) {
-    const response = await api.get('/reports/reports/', { params });
+    const response = await api.get('/api/reports/reports/', { params });
     return response.data;
   },
 
@@ -68,7 +68,7 @@ export const reportsService = {
     };
 
     try {
-      const response = await api.post('/reports/reports/', reportData);
+      const response = await api.post('/api/reports/reports/', reportData);
       return response.data;
     } catch (error: any) {
       console.error('Generate report error:', error.response?.data);
@@ -78,7 +78,7 @@ export const reportsService = {
 
   // Download report file
   async downloadReport(reportId: string) {
-    const response = await api.get(`/reports/reports/${reportId}/download/`, {
+    const response = await api.get(`/api/reports/reports/${reportId}/download/`, {
       responseType: 'blob',
     });
     return response.data;
@@ -86,7 +86,7 @@ export const reportsService = {
 
   // Get report summary with statistics
   async getReportSummary() {
-    const response = await api.get('/reports/reports/summary/');
+    const response = await api.get('/api/reports/reports/summary/');
     return response.data;
   },
 
@@ -96,13 +96,13 @@ export const reportsService = {
     report_type?: string;
     frequency?: string;
   }) {
-    const response = await api.get('/reports/schedules/', { params });
+    const response = await api.get('/api/reports/schedules/', { params });
     return response.data;
   },
 
   async createScheduledReport(data: CreateScheduledReportData) {
     try {
-      const response = await api.post('/reports/schedules/', data);
+      const response = await api.post('/api/reports/schedules/', data);
       return response.data;
     } catch (error: any) {
       console.error('Create scheduled report error:', error.response?.data);
@@ -116,34 +116,34 @@ export const reportsService = {
   },
 
   async toggleScheduledReport(id: string) {
-    const response = await api.post(`/reports/schedules/${id}/toggle_active/`);
+    const response = await api.post(`/api/reports/schedules/${id}/toggle_active/`);
     return response.data;
   },
 
   async runScheduledReportNow(id: string) {
-    const response = await api.post(`/reports/schedules/${id}/run_now/`);
+    const response = await api.post(`/api/reports/schedules/${id}/run_now/`);
     return response.data;
   },
 
   async deleteScheduledReport(id: string) {
-    const response = await api.delete(`/reports/schedules/${id}/`);
+    const response = await api.delete(`/api/reports/schedules/${id}/`);
     return response.data;
   },
 
   // Quick Reports
   async getQuickReports() {
-    const response = await api.get('/reports/quick/');
+    const response = await api.get('/api/reports/quick/');
     return response.data;
   },
 
   async generateQuickReport(reportId: string) {
-    const response = await api.post('/reports/quick/', { report_id: reportId });
+    const response = await api.post('/api/reports/quick/', { report_id: reportId });
     return response.data;
   },
 
   // Analytics
   async getAnalytics(period: number = 30) {
-    const response = await api.get('/reports/analytics/', {
+    const response = await api.get('/api/reports/analytics/', {
       params: { period }
     });
     return response.data;
@@ -151,7 +151,7 @@ export const reportsService = {
 
   // Dashboard data
   async getDashboardStats() {
-    const response = await api.get('/reports/dashboard/stats/');
+    const response = await api.get('/api/reports/dashboard/stats/');
     return response.data;
   },
 
@@ -159,7 +159,7 @@ export const reportsService = {
     start_date: Date;
     end_date: Date;
   }) {
-    const response = await api.get('/reports/dashboard/cash-flow/', {
+    const response = await api.get('/api/reports/dashboard/cash-flow/', {
       params: {
         start_date: params.start_date.toISOString().split('T')[0],
         end_date: params.end_date.toISOString().split('T')[0],
@@ -173,7 +173,7 @@ export const reportsService = {
     end_date: Date;
     type?: 'expense' | 'income';
   }) {
-    const response = await api.get('/reports/dashboard/category-spending/', {
+    const response = await api.get('/api/reports/dashboard/category-spending/', {
       params: {
         start_date: params.start_date.toISOString().split('T')[0],
         end_date: params.end_date.toISOString().split('T')[0],
@@ -187,7 +187,7 @@ export const reportsService = {
     start_date: Date;
     end_date: Date;
   }) {
-    const response = await api.get('/reports/dashboard/income-vs-expenses/', {
+    const response = await api.get('/api/reports/dashboard/income-vs-expenses/', {
       params: {
         start_date: params.start_date.toISOString().split('T')[0],
         end_date: params.end_date.toISOString().split('T')[0],
@@ -204,7 +204,7 @@ export const reportsService = {
     type?: 'comprehensive' | 'quick' | 'custom';
   }): Promise<AIInsights> {
     try {
-      const response = await api.get('/reports/ai-insights/', {
+      const response = await api.get('/api/reports/ai-insights/', {
         params: {
           start_date: params.start_date.toISOString().split('T')[0],
           end_date: params.end_date.toISOString().split('T')[0],
@@ -242,7 +242,7 @@ export const reportsService = {
 
   // Ask AI questions
   async askAI(question: string, context?: Record<string, any>) {
-    const response = await api.post('/reports/ai-insights/ask_ai/', {
+    const response = await api.post('/api/reports/ai-insights/ask_ai/', {
       question,
       context: context || {},
     });
@@ -251,7 +251,7 @@ export const reportsService = {
 
   // Get AI insights history
   async getAIInsightsHistory(period: number = 30) {
-    const response = await api.get('/reports/ai-insights/insights_history/', {
+    const response = await api.get('/api/reports/ai-insights/insights_history/', {
       params: { period }
     });
     return response.data;
@@ -259,7 +259,7 @@ export const reportsService = {
 
   // Report templates
   async getReportTemplates() {
-    const response = await api.get('/reports/templates/');
+    const response = await api.get('/api/reports/templates/');
     return response.data;
   },
 
@@ -273,7 +273,7 @@ export const reportsService = {
     default_filters?: Record<string, any>;
     is_public?: boolean;
   }) {
-    const response = await api.post('/reports/templates/', data);
+    const response = await api.post('/api/reports/templates/', data);
     return response.data;
   },
 
