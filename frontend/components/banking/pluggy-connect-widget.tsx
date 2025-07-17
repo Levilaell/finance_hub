@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface PluggyConnectWidgetProps {
@@ -10,7 +10,155 @@ interface PluggyConnectWidgetProps {
   onClose?: () => void;
 }
 
+// Declaração global para o SDK da Pluggy
+declare global {
+  interface Window {
+    PluggyConnect: any;
+  }
+}
+
 export function PluggyConnectWidget({
+  connectToken,
+  onSuccess,
+  onError,
+  onClose
+}: PluggyConnectWidgetProps) {
+  const [sdkLoaded, setSdkLoaded] = useState(false);
+  const pluggyInstance = useRef<any>(null);
+
+  useEffect(() => {
+    // Carregar o SDK da Pluggy
+    const script = document.createElement('script');
+    script.src = 'https://cdn.pluggy.ai/pluggy-connect.js';
+    script.async = true;
+    script.onload = () => {
+      console.log('✅ Pluggy SDK loaded');
+      setSdkLoaded(true);
+    };
+    script.onerror = () => {
+      console.error('❌ Failed to load Pluggy SDK');
+      onError(new Error('Failed to load Pluggy SDK'));
+    };
+    
+    document.body.appendChild(script);
+
+    return () => {
+      // Cleanup
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+      
+      // Destruir instância se existir
+      if (pluggyInstance.current && pluggyInstance.current.destroy) {
+        pluggyInstance.current.destroy();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sdkLoaded || !connectToken || !window.PluggyConnect) {
+      return;
+    }
+
+    console.log('🔌 Initializing Pluggy Connect...');
+    
+    try {
+      // Criar instância do Pluggy Connect
+      pluggyInstance.current = new window.PluggyConnect({
+        connectToken: connectToken,
+        includeSandbox: false, // Em produção deve ser false
+        updateItem: null,
+        // Configurações opcionais
+        products: ['ACCOUNTS', 'TRANSACTIONS'], // Produtos que queremos acessar
+        countries: ['BR'], // Apenas Brasil
+        language: 'pt', // Português
+        
+        // Callbacks
+        onSuccess: (data: any) => {
+          console.log('✅ Pluggy Connect success:', data);
+          
+          // A resposta pode vir em diferentes formatos
+          const itemId = data?.item?.id || data?.itemId || data?.data?.itemId;
+          
+          if (itemId) {
+            onSuccess({ 
+              item: { 
+                id: itemId,
+                ...data.item 
+              } 
+            });
+          } else {
+            console.error('❌ No itemId in success response:', data);
+            onError(new Error('No itemId received'));
+          }
+        },
+        
+        onError: (error: any) => {
+          console.error('❌ Pluggy Connect error:', error);
+          
+          const errorMessage = error?.message || error?.error || 'Erro ao conectar com o banco';
+          onError(new Error(errorMessage));
+        },
+        
+        onExit: () => {
+          console.log('🚪 Pluggy Connect closed');
+          if (onClose) {
+            onClose();
+          }
+        },
+        
+        // Eventos adicionais para debug
+        onEvent: (event: string, metadata: any) => {
+          console.log(`📊 Pluggy event: ${event}`, metadata);
+          
+          switch (event) {
+            case 'OPEN':
+              toast.info('Abrindo conexão com o banco...');
+              break;
+            case 'SELECT_INSTITUTION':
+              if (metadata?.connector?.name) {
+                toast.info(`Conectando com ${metadata.connector.name}...`);
+              }
+              break;
+            case 'SUBMIT_CREDENTIALS':
+              toast.loading('Validando credenciais...', { id: 'pluggy-auth' });
+              break;
+            case 'LOGIN_SUCCESS':
+              toast.dismiss('pluggy-auth');
+              toast.success('Login realizado com sucesso!');
+              break;
+            case 'ACCOUNT_CREATED':
+              toast.success('Conta conectada!');
+              break;
+            case 'ERROR':
+              toast.dismiss('pluggy-auth');
+              break;
+          }
+        }
+      });
+      
+      // Abrir o widget
+      pluggyInstance.current.init()
+        .then(() => {
+          console.log('✅ Pluggy Connect opened');
+        })
+        .catch((error: any) => {
+          console.error('❌ Failed to open Pluggy Connect:', error);
+          onError(error);
+        });
+      
+    } catch (error: any) {
+      console.error('❌ Error initializing Pluggy Connect:', error);
+      onError(error);
+    }
+  }, [sdkLoaded, connectToken, onSuccess, onError, onClose]);
+
+  // Componente não renderiza nada - o SDK cria seu próprio modal
+  return null;
+}
+
+// Componente alternativo que abre em popup (método antigo)
+export function PluggyConnectPopup({
   connectToken,
   onSuccess,
   onError,
@@ -18,7 +166,6 @@ export function PluggyConnectWidget({
 }: PluggyConnectWidgetProps) {
   const windowRef = useRef<Window | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const messageHandlerRef = useRef<((event: MessageEvent) => void) | null>(null);
 
   useEffect(() => {
     if (!connectToken) {
@@ -26,13 +173,18 @@ export function PluggyConnectWidget({
       return;
     }
 
-    // URL da Pluggy Connect com o token
-    const pluggyConnectUrl = `https://connect.pluggy.ai?connectToken=${encodeURIComponent(connectToken)}`;
+    // URL correta segundo a documentação
+    const pluggyConnectUrl = `https://connect.pluggy.ai/?connectToken=${connectToken}`;
     
-    console.log('🔗 Opening Pluggy Connect with URL:', pluggyConnectUrl);
+    console.log('🔗 Opening Pluggy Connect popup...');
     
     // Configurações da janela
-    const windowFeatures = 'width=500,height=700,left=200,top=100,toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes';
+    const width = 500;
+    const height = 700;
+    const left = (window.screen.width - width) / 2;
+    const top = (window.screen.height - height) / 2;
+    
+    const windowFeatures = `width=${width},height=${height},left=${left},top=${top},toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes`;
     
     // Abrir janela
     windowRef.current = window.open(pluggyConnectUrl, 'pluggy-connect', windowFeatures);
@@ -42,258 +194,67 @@ export function PluggyConnectWidget({
       onError(new Error('Pop-up bloqueado'));
       return;
     }
-    
-    console.log('✅ Pluggy Connect window opened successfully');
 
-    // Handler para mensagens da Pluggy
-    messageHandlerRef.current = (event: MessageEvent) => {
+    // Handler para mensagens
+    const handleMessage = (event: MessageEvent) => {
       // Verificar origem
-      if (event.origin !== 'https://connect.pluggy.ai') {
+      if (!event.origin.includes('pluggy.ai')) {
         return;
       }
 
-      console.log('📬 Received message from Pluggy:', event.data);
+      console.log('📬 Message from Pluggy:', event.data);
 
       const data = event.data;
       
-      // Diferentes formatos de resposta da Pluggy
-      
-      // Formato 1: Mensagem de sucesso com item
+      // Sucesso
       if (data.success === true && data.item) {
-        console.log('✅ Pluggy Connect success (format 1):', data);
         onSuccess({ item: data.item });
         closeWindow();
-        return;
       }
-      
-      // Formato 2: Evento com tipo
-      if (data.type) {
-        switch (data.type) {
-          case 'success':
-          case 'PLUGGY_SUCCESS':
-          case 'ITEM_CREATED':
-            console.log('✅ Pluggy Connect success (format 2):', data);
-            const itemId = data.itemId || data.item?.id || data.data?.itemId;
-            if (itemId) {
-              onSuccess({ item: { id: itemId } });
-              closeWindow();
-            }
-            break;
-            
-          case 'error':
-          case 'PLUGGY_ERROR':
-            console.error('❌ Pluggy Connect error:', data);
-            onError(new Error(data.message || data.error || 'Erro na conexão'));
-            closeWindow();
-            break;
-            
-          case 'close':
-          case 'PLUGGY_CLOSE':
-          case 'exit':
-            console.log('🔒 Pluggy Connect closed by user');
-            if (onClose) {
-              onClose();
-            }
-            closeWindow();
-            break;
-        }
+      // Erro
+      else if (data.error || data.type === 'error') {
+        onError(new Error(data.message || 'Erro na conexão'));
+        closeWindow();
       }
-      
-      // Formato 3: Ação direta
-      if (data.action) {
-        switch (data.action) {
-          case 'on-success':
-            console.log('✅ Pluggy Connect success (format 3):', data);
-            if (data.item) {
-              onSuccess({ item: data.item });
-              closeWindow();
-            }
-            break;
-            
-          case 'on-error':
-            console.error('❌ Pluggy Connect error:', data);
-            onError(new Error(data.error?.message || 'Erro na conexão'));
-            closeWindow();
-            break;
-            
-          case 'on-exit':
-            console.log('🔒 Pluggy Connect exited');
-            if (onClose) {
-              onClose();
-            }
-            closeWindow();
-            break;
-        }
-      }
-      
-      // Formato 4: itemId direto (para retrocompatibilidade)
-      if (data.itemId && !data.type && !data.action) {
-        console.log('✅ Pluggy Connect success (format 4):', data);
-        onSuccess({ item: { id: data.itemId } });
+      // Fechado
+      else if (data.type === 'close' || data.type === 'exit') {
+        if (onClose) onClose();
         closeWindow();
       }
     };
-    
-    // Função para fechar a janela
+
     const closeWindow = () => {
       if (windowRef.current && !windowRef.current.closed) {
         windowRef.current.close();
       }
-      windowRef.current = null;
-      
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
-        intervalRef.current = null;
       }
     };
 
-    // Adicionar listener de mensagens
-    window.addEventListener('message', messageHandlerRef.current);
+    window.addEventListener('message', handleMessage);
 
-    // Verificar periodicamente se a janela foi fechada
+    // Verificar se janela foi fechada
     intervalRef.current = setInterval(() => {
       if (windowRef.current && windowRef.current.closed) {
-        console.log('🔒 Pluggy Connect window was closed manually');
+        if (onClose) onClose();
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
-        if (onClose) {
-          onClose();
         }
       }
     }, 1000);
 
     // Cleanup
     return () => {
-      if (messageHandlerRef.current) {
-        window.removeEventListener('message', messageHandlerRef.current);
-        messageHandlerRef.current = null;
-      }
-      
+      window.removeEventListener('message', handleMessage);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
-        intervalRef.current = null;
       }
-      
       if (windowRef.current && !windowRef.current.closed) {
         windowRef.current.close();
-        windowRef.current = null;
       }
     };
   }, [connectToken, onSuccess, onError, onClose]);
 
-  // Este componente não renderiza nada
   return null;
-}
-
-// Componente alternativo usando iframe embutido
-export function PluggyConnectEmbed({
-  connectToken,
-  onSuccess,
-  onError,
-  onClose
-}: PluggyConnectWidgetProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  useEffect(() => {
-    if (!connectToken) return;
-
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== 'https://connect.pluggy.ai') {
-        return;
-      }
-
-      console.log('📬 Iframe message from Pluggy:', event.data);
-
-      const data = event.data;
-      
-      // Processar resposta similar ao componente principal
-      if (data.success === true && data.item) {
-        onSuccess({ item: data.item });
-      } else if (data.type === 'success' || data.action === 'on-success') {
-        const itemId = data.itemId || data.item?.id;
-        if (itemId) {
-          onSuccess({ item: { id: itemId } });
-        }
-      } else if (data.type === 'error' || data.action === 'on-error') {
-        onError(new Error(data.message || data.error?.message || 'Erro na conexão'));
-      } else if (data.type === 'close' || data.action === 'on-exit') {
-        if (onClose) {
-          onClose();
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, [connectToken, onSuccess, onError, onClose]);
-
-  return (
-    <div 
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999
-      }}
-      onClick={onClose}
-    >
-      <div 
-        style={{
-          width: '500px',
-          height: '700px',
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          overflow: 'hidden',
-          position: 'relative',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '10px',
-            right: '10px',
-            background: 'white',
-            border: '1px solid #e0e0e0',
-            borderRadius: '50%',
-            width: '32px',
-            height: '32px',
-            fontSize: '20px',
-            cursor: 'pointer',
-            zIndex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-          }}
-        >
-          ×
-        </button>
-        <iframe
-          ref={iframeRef}
-          src={`https://connect.pluggy.ai?connectToken=${encodeURIComponent(connectToken)}`}
-          style={{
-            width: '100%',
-            height: '100%',
-            border: 'none'
-          }}
-          title="Pluggy Connect"
-          allow="clipboard-read; clipboard-write"
-        />
-      </div>
-    </div>
-  );
 }
