@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
+import json
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -269,103 +270,119 @@ class PluggyTransactionSyncService:
         return await save_transactions()
     
     def _create_transaction_from_pluggy_data(self, account: BankAccount, tx_data: Dict) -> Optional[Transaction]:
-        """Create Transaction object from Pluggy data"""
-        try:
-            logger.info(f"🔄 Creating transaction from data: {tx_data}")
-            
-            # Parse Pluggy transaction data
-            amount = Decimal(str(tx_data.get('amount', '0')))
-            description = tx_data.get('description', '').strip()
-            
-            logger.info(f"💰 Amount: {amount}, Description: '{description}'")
-            
-            # Pluggy provides 'type' field: DEBIT or CREDIT
-            transaction_type = 'credit' if tx_data.get('type') == 'CREDIT' else 'debit'
-            logger.info(f"📊 Transaction type: {transaction_type} (from Pluggy: {tx_data.get('type')})")
-            
-            # Parse date (Pluggy uses ISO format)
-            date_str = tx_data.get('date')
-            if not date_str:
-                logger.error(f"❌ Transaction missing date: {tx_data}")
-                return None
-            
-            logger.info(f"📅 Parsing date: '{date_str}'")
-            
-            # Handle different date formats from Pluggy
+            """Create Transaction object from Pluggy data"""
             try:
-                if 'T' in date_str:
-                    # Full datetime
-                    tx_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                    tx_date = tx_datetime.date()
-                else:
-                    # Date only
-                    tx_date = datetime.fromisoformat(date_str).date()
+                logger.info(f"🔄 Creating transaction from data: {tx_data}")
                 
-                logger.info(f"✅ Parsed date: {tx_date}")
-            except ValueError as e:
-                logger.error(f"❌ Invalid date format in transaction: {date_str} - {e}")
-                return ValueError
-            
-            # Get merchant info
-            merchant_info = tx_data.get('merchant', {}) or {}
-            merchant_name = ''
-            if merchant_info:
-                merchant_name = merchant_info.get('name', '')
-            
-            logger.info(f"🏪 Merchant: '{merchant_name}'")
-            
-            # Check external_id
-            external_id = str(tx_data.get('id'))
-            logger.info(f"🆔 External ID: {external_id}")
-            
-            # Categorização com dados da Pluggy
-            category = self._get_pluggy_category(tx_data)
-            if category:
-                logger.info(f"🎯 Pluggy category found: {category.name}")
-            else:
-                logger.info(f"❓ No Pluggy category data available")
-            
-            # Create transaction
-            logger.info(f"💾 Creating transaction in database...")
-            
-            # Handle balance None case
-            balance_value = tx_data.get('balance')
-            if balance_value is None or balance_value == '':
-                balance_after = Decimal('0')
-            else:
-                balance_after = Decimal(str(balance_value))
-            
-            transaction_obj = Transaction.objects.create(
-                bank_account=account,
-                external_id=external_id,
-                description=description,
-                amount=amount,
-                transaction_type=transaction_type,
-                transaction_date=tx_date,
-                counterpart_name=merchant_name,
-                counterpart_document='',
-                balance_after=balance_after,
-                category=category,  # Categoria da Pluggy ou None
-                is_ai_categorized=False,  # Não é IA, é da Pluggy
-                status='completed',
-                created_at=timezone.now()
-            )
-            
-            category_name = category.name if category else 'Uncategorized'
-            logger.info(f"✅ Transaction created: ID={transaction_obj.id}, Description='{transaction_obj.description}', Category='{category_name}'")
-            
-            return transaction_obj
-            
-        except Exception as e:
-            logger.error(f"❌ Error creating transaction from Pluggy data: {e}", exc_info=True)
-            logger.error(f"❌ Transaction data that failed: {tx_data}")
-            return None
+                # Parse Pluggy transaction data
+                amount = Decimal(str(tx_data.get('amount', '0')))
+                description = tx_data.get('description', '').strip()
+                
+                logger.info(f"💰 Amount: {amount}, Description: '{description}'")
+                
+                # Pluggy provides 'type' field: DEBIT or CREDIT
+                transaction_type = 'credit' if tx_data.get('type') == 'CREDIT' else 'debit'
+                logger.info(f"📊 Transaction type: {transaction_type} (from Pluggy: {tx_data.get('type')})")
+                
+                # Parse date (Pluggy uses ISO format)
+                date_str = tx_data.get('date')
+                if not date_str:
+                    logger.error(f"❌ Transaction missing date: {tx_data}")
+                    return None
+                
+                logger.info(f"📅 Parsing date: '{date_str}'")
+                
+                # Handle different date formats from Pluggy
+                try:
+                    if 'T' in date_str:
+                        # Full datetime
+                        tx_datetime = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        tx_date = tx_datetime.date()
+                    else:
+                        # Date only
+                        tx_date = datetime.fromisoformat(date_str).date()
+                    
+                    logger.info(f"✅ Parsed date: {tx_date}")
+                except ValueError as e:
+                    logger.error(f"❌ Invalid date format in transaction: {date_str} - {e}")
+                    return None
+                
+                # Get merchant info
+                merchant_info = tx_data.get('merchant', {}) or {}
+                merchant_name = ''
+                if merchant_info:
+                    merchant_name = merchant_info.get('name', '')
+                
+                logger.info(f"🏪 Merchant: '{merchant_name}'")
+                
+                # Check external_id
+                external_id = str(tx_data.get('id'))
+                logger.info(f"🆔 External ID: {external_id}")
+                
+                # Categorização com dados da Pluggy
+                category = self._get_pluggy_category(tx_data)
+                if category:
+                    logger.info(f"🎯 Pluggy category found: {category.name}")
+                else:
+                    logger.info(f"❓ No Pluggy category data available")
+                
+                # Create transaction
+                logger.info(f"💾 Creating transaction in database...")
+                
+                # Handle balance None case
+                balance_value = tx_data.get('balance')
+                if balance_value is None or balance_value == '':
+                    balance_after = Decimal('0')
+                else:
+                    balance_after = Decimal(str(balance_value))
+                
+                transaction_obj = Transaction.objects.create(
+                    bank_account=account,
+                    external_id=external_id,
+                    description=description,
+                    amount=amount,
+                    transaction_type=transaction_type,
+                    transaction_date=tx_date,
+                    counterpart_name=merchant_name,
+                    counterpart_document='',
+                    balance_after=balance_after,
+                    category=category,  # Categoria da Pluggy ou None
+                    is_ai_categorized=False,  # Não é IA, é da Pluggy
+                    status='completed',
+                    created_at=timezone.now()
+                )
+                
+                category_name = category.name if category else 'Uncategorized'
+                logger.info(f"✅ Transaction created: ID={transaction_obj.id}, Description='{transaction_obj.description}', Category='{category_name}'")
+                
+                return transaction_obj
+                
+            except Exception as e:
+                logger.error(f"❌ Error creating transaction from Pluggy data: {e}", exc_info=True)
+                logger.error(f"❌ Transaction data that failed: {tx_data}")
+                return None
+
 
     def _get_pluggy_category(self, tx_data: Dict) -> Optional['TransactionCategory']:
         """Get category from Pluggy data using mapper"""
         try:
+            # Pluggy envia a categoria no campo 'category'
             pluggy_category = tx_data.get('category')
+            
+            # Log detalhado para debug
+            logger.info(f"🔍 Looking for Pluggy category in transaction data...")
+            logger.info(f"📦 Transaction data keys: {list(tx_data.keys())}")
+            logger.info(f"🏷️ Category field value: '{pluggy_category}'")
+            
+            # Verificar também se há categoria em outros campos possíveis
             if not pluggy_category:
+                # Tentar campos alternativos
+                pluggy_category = tx_data.get('categoryId') or tx_data.get('categoryName')
+                if pluggy_category:
+                    logger.info(f"🔄 Found category in alternative field: '{pluggy_category}'")
+            
+            if not pluggy_category:
+                logger.info(f"❌ No category field found in Pluggy data")
                 return None
                 
             # Determinar tipo da transação
@@ -381,6 +398,13 @@ class PluggyTransactionSyncService:
                 logger.info(f"✅ Mapped Pluggy category '{pluggy_category}' to '{category.name}'")
             else:
                 logger.info(f"❓ No mapping for Pluggy category '{pluggy_category}'")
+                # Tentar criar uma nova categoria se não encontrar mapeamento
+                category = pluggy_category_mapper.get_or_create_category(
+                    pluggy_category,
+                    transaction_type
+                )
+                if category:
+                    logger.info(f"🆕 Created new category from Pluggy: '{category.name}'")
                 
             return category
             
