@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pluggy Connect - Integração Funcional</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f0f4f8;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .info {
+            background: #e8f4f8;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #0066cc;
+        }
+
+        .error {
+            background: #fee;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #cc0000;
+        }
+
+        .success {
+            background: #efe;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #00cc00;
+        }
+
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #0052a3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .token-display {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+            margin: 10px 0;
+        }
+
+        #status {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            min-height: 100px;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #ddd;
+            padding-left: 10px;
+        }
+
+        .log-error {
+            border-left-color: #cc0000;
+            color: #cc0000;
+        }
+
+        .log-success {
+            border-left-color: #00cc00;
+            color: #00cc00;
+        }
+
+        .log-info {
+            border-left-color: #0066cc;
+            color: #0066cc;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔌 Pluggy Connect - Teste de Integração</h1>
+
+        <div class="info">
+            <strong>ℹ️ Como funciona:</strong><br>
+            O Pluggy Connect deve ser inicializado via SDK JavaScript, não mais via URL direta.
+        </div>
+
+        <div class="token-display">
+            <strong>Token atual:</strong><br>
+            <span id="current-token">Carregando...</span>
+        </div>
+
+        <div class="button-group">
+            <button id="btn-sdk" onclick="openWithSDK()">
+                🚀 Abrir com SDK (Recomendado)
+            </button>
+
+            <button id="btn-iframe" onclick="openInIframe()">
+                📱 Abrir em iFrame
+            </button>
+
+            <button id="btn-popup" onclick="openInPopup()">
+                🪟 Abrir em Popup
+            </button>
+
+            <button onclick="clearStatus()">
+                🗑️ Limpar Logs
+            </button>
+        </div>
+
+        <div id="status">
+            <strong>📋 Status:</strong>
+            <div id="log-container"></div>
+        </div>
+    </div>
+
+    <!-- Container invisível para o SDK -->
+    <div id="pluggy-container" style="display:none;"></div>
+
+    <!-- Script do Pluggy - IMPORTANTE: Carregar da CDN correta -->
+    <script src="https://cdn.pluggy.ai/pluggy-connect.js"></script>
+
+    <script>
+        // Substitua pelo seu token válido
+        const CONNECT_TOKEN = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRJZCI6ImQzZTAwMmNiLWQ0YmYtNDQ2Ny1iZTBhLTk1OTU4NzQzMzEzMyIsImRhdGEiOiIwMWI4NmU3Mzc1YWQ3YzAxZmQzZDRkZmJhN2FmYWQ2NDo0NGU2YWRjMTQ1YThlYWI1OTIzNGE0ZDBiNmRhOWNlMzA3ZWUzNzM5YjhlMmI4NmU1NGNjMmU5M2QyOGZiYzc0ODhhMDQzMGJiMmJiMTY1MDk0NTZjY2Q3NjdhNTJhZDJlZDMyOWM1Njk5NzIyYTUwMzlmMGU5YWI3NTA0ODhkNDFhZjljNTc3NWIyZGIzNjg5OGYzMTNhMzEwZTY4ODUzOWY3MTg5NzVhYjk0NDU2NGJhNWExYTRkYWIxMjdkMzhiZTI0ZGRiZGIwZWRhYTUxNDY4ZjI2ODI2M2JlMDQ4ZWRlMzc1ZWYzYzBkYzU0ZTRjZjUzNzA0NTYyMDY4Y2JiIiwiaWF0IjoxNzUyNzI5NjI2LCJleHAiOjE3NTI3MzE0MjZ9.ctWuUfUDq-jRzcb2R7ASJjxdkCXTh8Dgs3hY8Yn9yyQDOCtvUhTrzHK34UWF7iit9RI6KfJoK3r0rT21g6H78iU2FnAKzW5YfAVfH9c48RdJ0vzpzZIjzRBmpXCWFSzVdYaz6X2MF4ATzzA0TDBZEKrzkP6MxQ_rcf3x0xuLOapsW7FNTEWYeSgOgdBPI6iowi7eyYGcZGUOfYN0cxMW0c-SILwSERUxa6vTpSv7Gy68lzM5tgxiXGergUMfBNfemPMXXPqV4Ru9Wh2uKYJqTh4Y6OJ3I7RfdIhhMxUYxHvofPu5YPqShnnbuq3nuUycRzs2avUwwhGJIRqC3mNbDA';
+
+        let pluggyInstance = null;
+
+        // Atualizar display do token
+        document.getElementById('current-token').textContent =
+            CONNECT_TOKEN.substring(0, 50) + '...' + CONNECT_TOKEN.substring(CONNECT_TOKEN.length - 20);
+
+        function log(message, type = 'info') {
+            const container = document.getElementById('log-container');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.textContent = `[${time}] ${message}`;
+            container.appendChild(entry);
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearStatus() {
+            document.getElementById('log-container').innerHTML = '';
+            log('Logs limpos', 'info');
+        }
+
+        // Verificar se o SDK carregou
+        window.addEventListener('load', function () {
+            if (typeof window.PluggyConnect !== 'undefined') {
+                log('✅ SDK Pluggy carregado com sucesso!', 'success');
+                log('Versão do SDK: ' + (window.PluggyConnect.version || 'não informada'), 'info');
+            } else {
+                log('❌ SDK Pluggy não foi carregado!', 'error');
+                log('Verifique a conexão com https://cdn.pluggy.ai/pluggy-connect.js', 'error');
+            }
+        });
+
+        function openWithSDK() {
+            log('Iniciando Pluggy Connect via SDK...', 'info');
+
+            if (typeof window.PluggyConnect === 'undefined') {
+                log('❌ SDK não carregado! Recarregue a página.', 'error');
+                return;
+            }
+
+            try {
+                // Configuração do Pluggy Connect
+                const config = {
+                    connectToken: CONNECT_TOKEN,
+                    includeSandbox: true, // Incluir bancos de teste
+
+                    // Callbacks
+                    onSuccess: (data) => {
+                        log('🎉 SUCESSO! Conexão estabelecida', 'success');
+                        log('Dados recebidos: ' + JSON.stringify(data), 'success');
+
+                        if (data.item && data.item.id) {
+                            log('Item ID: ' + data.item.id, 'success');
+                            alert('Sucesso! Item ID: ' + data.item.id);
+                        }
+                    },
+
+                    onError: (error) => {
+                        log('❌ ERRO: ' + (error.message || JSON.stringify(error)), 'error');
+
+                        // Tratar erros específicos
+                        if (error.message && error.message.includes('token')) {
+                            log('Possível problema com o token. Verifique se não expirou.', 'error');
+                        }
+                    },
+
+                    onClose: () => {
+                        log('Widget fechado pelo usuário', 'info');
+                    },
+
+                    onEvent: (event, metadata) => {
+                        log(`Evento: ${event} - ${JSON.stringify(metadata || {})}`, 'info');
+
+                        // Eventos específicos
+                        switch (event) {
+                            case 'OPEN':
+                                log('Widget aberto com sucesso', 'success');
+                                break;
+                            case 'SELECT_INSTITUTION':
+                                if (metadata && metadata.connector) {
+                                    log(`Instituição selecionada: ${metadata.connector.name}`, 'info');
+                                }
+                                break;
+                            case 'LOGIN_SUCCESS':
+                                log('Login realizado com sucesso!', 'success');
+                                break;
+                        }
+                    }
+                };
+
+                log('Criando instância do PluggyConnect...', 'info');
+                pluggyInstance = new window.PluggyConnect(config);
+
+                log('Abrindo widget...', 'info');
+
+                // Tentar abrir o widget
+                if (typeof pluggyInstance.open === 'function') {
+                    pluggyInstance.open();
+                    log('Método open() chamado', 'info');
+                } else if (typeof pluggyInstance.init === 'function') {
+                    pluggyInstance.init();
+                    log('Método init() chamado', 'info');
+                } else {
+                    log('❌ Nenhum método open() ou init() disponível!', 'error');
+                    log('Métodos disponíveis: ' + Object.getOwnPropertyNames(pluggyInstance), 'error');
+                }
+
+            } catch (error) {
+                log('❌ Erro ao inicializar: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+
+        function openInIframe() {
+            log('Abrindo em iframe (método alternativo)...', 'info');
+
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.top = '50%';
+            iframe.style.left = '50%';
+            iframe.style.transform = 'translate(-50%, -50%)';
+            iframe.style.width = '500px';
+            iframe.style.height = '700px';
+            iframe.style.border = 'none';
+            iframe.style.borderRadius = '8px';
+            iframe.style.boxShadow = '0 10px 40px rgba(0,0,0,0.2)';
+            iframe.style.zIndex = '10000';
+
+            // Overlay de fundo
+            const overlay = document.createElement('div');
+            overlay.style.position = 'fixed';
+            overlay.style.top = '0';
+            overlay.style.left = '0';
+            overlay.style.width = '100%';
+            overlay.style.height = '100%';
+            overlay.style.background = 'rgba(0,0,0,0.5)';
+            overlay.style.zIndex = '9999';
+
+            // URL com token
+            iframe.src = `https://connect.pluggy.ai?connectToken=${CONNECT_TOKEN}`;
+
+            overlay.onclick = () => {
+                document.body.removeChild(overlay);
+                document.body.removeChild(iframe);
+                log('iFrame fechado', 'info');
+            };
+
+            document.body.appendChild(overlay);
+            document.body.appendChild(iframe);
+
+            log('iFrame criado. URL: ' + iframe.src.substring(0, 80) + '...', 'info');
+
+            // Escutar mensagens
+            window.addEventListener('message', function (event) {
+                if (event.origin.includes('pluggy.ai')) {
+                    log('Mensagem do iframe: ' + JSON.stringify(event.data), 'info');
+                }
+            });
+        }
+
+        function openInPopup() {
+            log('Abrindo em popup...', 'info');
+
+            const url = `https://connect.pluggy.ai?connectToken=${CONNECT_TOKEN}`;
+            const features = 'width=500,height=700,toolbar=no,menubar=no';
+
+            const popup = window.open(url, 'pluggy-connect', features);
+
+            if (popup) {
+                log('Popup aberto com sucesso', 'success');
+
+                // Verificar se fechou
+                const checkInterval = setInterval(() => {
+                    if (popup.closed) {
+                        clearInterval(checkInterval);
+                        log('Popup fechado', 'info');
+                    }
+                }, 1000);
+            } else {
+                log('❌ Popup bloqueado! Permita popups para este site.', 'error');
+            }
+        }
+
+        // Inicialização
+        clearStatus();
+        log('Página carregada. Pronta para testes!', 'info');
+    </script>
+</body>
+
+</html>

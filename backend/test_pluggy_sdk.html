@@ -1,0 +1,132 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Pluggy SDK</title>
+    <meta charset="utf-8">
+    <script src="https://cdn.pluggy.ai/pluggy-connect.js"></script>
+</head>
+<body>
+    <h1>Teste Pluggy Connect SDK</h1>
+    <button id="open-basic">Abrir Pluggy (Básico)</button>
+    <button id="open-sandbox">Abrir Pluggy (Sandbox)</button>
+    <button id="open-debug">Abrir Pluggy (Debug Mode)</button>
+    
+    <div id="logs" style="margin-top: 20px; padding: 10px; background: #f0f0f0; font-family: monospace; white-space: pre-wrap;"></div>
+    
+    <script>
+        const token = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRJZCI6ImQzZTAwMmNiLWQ0YmYtNDQ2Ny1iZTBhLTk1OTU4NzQzMzEzMyIsImRhdGEiOiJiZDA5OWU2YTQzNjFlYmIyYjM4NDQyZGI2MmEyNzNjMTo2M2NkMjYzN2IxNDVmZWYzN2QwYWMzZDhlZTA1M2UxYThiNmIwNDE1MDBlYWIyZDM0YmFhOGQ3YzRiMDdiZDg4OWFkZTRmYjY4NTk2MTg1NzI2NzYwNjA2YjdmZWI2M2Q1ZThmYTI5ZjBkOTZmNTM0ZjdhOTViNTFhOTE2NDFiOTdmOTY2NGZjODBlMjVlODZhNjJkM2MxZjRiZmY1NmY1NzE1ZjA3ZjdhZGUyNDdmNDkzZjQ5MmI4MTg3NmQwNDZjMjJlZTUyMWI5MTNhMmUyOGQ3YzE0Njk3YjYyYTZjYmZiN2NjMmFjNTBjMzE2ZjMxNWNmMjRiNzk5M2ZjNjY4IiwiaWF0IjoxNzUyNzI4MzI4LCJleHAiOjE3NTI3MzAxMjh9.aERcKtf39-zQ0ZzrdoFfLac4-dBviHKusS0HD8vWj37hPFMlYWy9_4HX0o717aQDBCmWXWjJlkKrJcMUa-GLor5OSEmoyJsxvb4MG_NUdYHZRgiNEgsaKM-9iagMjBHfAM9CU_z-Rwv9RmXg0Xp7M_AMpxnrN6xRnIwDQpD9bgOQDRdm_h8_doeX0-bGCRViQaICqqARFty5SdXpPZxYn6FLtjxfxy2WEUuS5wdhvKOW8eLGJ6F_ZldVCJ3wLGaENAwUiuw7qQwRUlOzUJzoo9eJ9wOSbeRr_nbKnMmp6gkRY6j8LPxH5Pri_LxMBZ2iC2OTGYe8T9zgsGN5oq1MTw';
+        const logs = document.getElementById('logs');
+        
+        function log(msg) {
+            console.log(msg);
+            logs.textContent += msg + '\n';
+        }
+        
+        log('Token: ' + token.substring(0, 50) + '...');
+        
+        // Verificar se SDK carregou
+        if (typeof PluggyConnect !== 'undefined') {
+            log('✅ SDK Pluggy carregado!');
+        } else {
+            log('❌ SDK Pluggy NÃO carregado!');
+        }
+        
+        // Configuração básica
+        document.getElementById('open-basic').onclick = function() {
+            log('\n--- Abrindo Pluggy (Básico) ---');
+            
+            try {
+                const config = {
+                    connectToken: token,
+                    onSuccess: (data) => {
+                        log('✅ SUCCESS: ' + JSON.stringify(data));
+                        alert('Sucesso! Veja o console');
+                    },
+                    onError: (error) => {
+                        log('❌ ERROR: ' + JSON.stringify(error));
+                        alert('Erro: ' + (error.message || JSON.stringify(error)));
+                    },
+                    onClose: () => {
+                        log('🚪 CLOSED');
+                    }
+                };
+                
+                log('Config: ' + JSON.stringify(config, null, 2));
+                
+                const pluggy = new PluggyConnect(config);
+                
+                // Tentar diferentes métodos
+                if (typeof pluggy.init === 'function') {
+                    log('Chamando pluggy.init()...');
+                    pluggy.init();
+                } else if (typeof pluggy.open === 'function') {
+                    log('Chamando pluggy.open()...');
+                    pluggy.open();
+                } else {
+                    log('❌ Nenhum método init() ou open() encontrado!');
+                    log('Métodos disponíveis: ' + Object.getOwnPropertyNames(pluggy));
+                }
+                
+            } catch (e) {
+                log('❌ ERRO: ' + e.toString());
+                log('Stack: ' + e.stack);
+            }
+        };
+        
+        // Com sandbox
+        document.getElementById('open-sandbox').onclick = function() {
+            log('\n--- Abrindo Pluggy (Sandbox) ---');
+            
+            try {
+                const config = {
+                    connectToken: token,
+                    includeSandbox: true,
+                    products: ['ACCOUNTS', 'TRANSACTIONS', 'IDENTITY'],
+                    onSuccess: (data) => {
+                        log('✅ SUCCESS: ' + JSON.stringify(data));
+                    },
+                    onError: (error) => {
+                        log('❌ ERROR: ' + JSON.stringify(error));
+                    }
+                };
+                
+                const pluggy = new PluggyConnect(config);
+                pluggy.init ? pluggy.init() : pluggy.open();
+                
+            } catch (e) {
+                log('❌ ERRO: ' + e.toString());
+            }
+        };
+        
+        // Debug mode
+        document.getElementById('open-debug').onclick = function() {
+            log('\n--- Debug Mode ---');
+            
+            // Verificar window.PluggyConnect
+            log('window.PluggyConnect: ' + typeof window.PluggyConnect);
+            
+            if (window.PluggyConnect) {
+                log('PluggyConnect.prototype: ' + Object.getOwnPropertyNames(window.PluggyConnect.prototype));
+                
+                // Tentar criar instância vazia
+                try {
+                    const empty = new PluggyConnect({});
+                    log('Instância vazia criada. Métodos: ' + Object.getOwnPropertyNames(empty));
+                } catch (e) {
+                    log('Erro ao criar instância vazia: ' + e.toString());
+                }
+            }
+            
+            // Verificar localStorage/sessionStorage
+            log('\nlocalStorage.pluggy: ' + localStorage.getItem('pluggy'));
+            log('sessionStorage.pluggy: ' + sessionStorage.getItem('pluggy'));
+        };
+        
+        // Auto-executar debug ao carregar
+        window.onload = function() {
+            document.getElementById('open-debug').click();
+        };
+    </script>
+</body>
+</html>
