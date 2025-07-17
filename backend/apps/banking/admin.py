@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from .models import (
     BankProvider, BankAccount, Transaction, TransactionCategory,
-    RecurringTransaction, Budget, FinancialGoal, BankSync
+    RecurringTransaction, Budget, BankSync
 )
 
 
@@ -263,7 +263,7 @@ class BudgetAdmin(admin.ModelAdmin):
         qs = super().get_queryset(request)
         return qs.select_related('company', 'created_by').prefetch_related('categories')
 
-
+'''
 @admin.register(FinancialGoal)
 class FinancialGoalAdmin(admin.ModelAdmin):
     list_display = [
@@ -312,7 +312,7 @@ class FinancialGoalAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('company', 'created_by').prefetch_related('categories', 'bank_accounts')
-
+'''
 
 @admin.register(BankSync)
 class BankSyncAdmin(admin.ModelAdmin):

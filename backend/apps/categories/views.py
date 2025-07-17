@@ -16,11 +16,13 @@ from .models import (AITrainingData, CategorizationLog, CategoryRule,
 from .serializers import (AITrainingDataSerializer,
                           CategorizationLogSerializer, CategoryRuleSerializer,
                           CategorySuggestionSerializer)
+'''
 from .services import (AICategorizationService, BulkCategorizationService,
                        CategoryAnalyticsService,
                        RuleBasedCategorizationService)
+'''
 
-
+'''
 class CategoryRuleViewSet(viewsets.ModelViewSet):
     """
     Category rule management
@@ -81,7 +83,7 @@ class CategoryRuleViewSet(viewsets.ModelViewSet):
             'status': 'success',
             'results': results
         })
-
+'''
 
 class CategorySuggestionViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -180,6 +182,7 @@ class AITrainingDataViewSet(viewsets.ReadOnlyModelViewSet):
         ).select_related('category', 'verified_by').order_by('-created_at')
 
 
+'''
 class CategorizationAnalyticsView(APIView):
     """
     Categorization analytics and insights
@@ -256,8 +259,9 @@ class CategorizationAnalyticsView(APIView):
                 'total_categorizations': total_categorizations
             }
         })
+'''
 
-
+'''
 class BulkCategorizationView(APIView):
     """
     Bulk categorization operations
@@ -288,8 +292,9 @@ class BulkCategorizationView(APIView):
             'operation': operation,
             'results': results
         })
+'''
 
-
+'''
 class RuleSuggestionsView(APIView):
     """
     AI-generated rule suggestions
@@ -347,8 +352,10 @@ class RuleSuggestionsView(APIView):
             return Response({
                 'error': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
+'''
 
 
+'''
 class CategoryTrainingView(APIView):
     """
     Category training and learning
@@ -396,3 +403,4 @@ class CategoryTrainingView(APIView):
             return Response({
                 'error': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
+'''

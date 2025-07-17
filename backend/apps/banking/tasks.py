@@ -158,6 +158,7 @@ def generate_financial_insights(company_id):
         return {'status': 'error', 'message': str(exc)}
 
 
+'''
 @shared_task
 def process_ai_categorization(transaction_id):
    """
@@ -192,6 +193,7 @@ def process_ai_categorization(transaction_id):
    except Exception as exc:
        logger.error(f"Error processing AI categorization for transaction {transaction_id}: {exc}")
        return {'status': 'error', 'message': str(exc)}
+'''
 
 
 @shared_task
@@ -215,7 +217,7 @@ def cleanup_old_sync_logs():
        'cutoff_date': cutoff_date.isoformat()
    }
 
-
+'''
 @shared_task
 def send_low_balance_alerts():
    """
@@ -236,7 +238,7 @@ def send_low_balance_alerts():
        try:
            send_mail(
                subject=f'⚠️ Saldo Baixo - {account.display_name}',
-               message=f'''
+               message=f''
                Olá {account.company.owner.first_name},
                
                Sua conta {account.display_name} está com saldo baixo:
@@ -246,7 +248,7 @@ def send_low_balance_alerts():
                
                Atenciosamente,
                Equipe CaixaHub
-               ''',
+               '',
                from_email=settings.DEFAULT_FROM_EMAIL,
                recipient_list=[account.company.owner.email],
                fail_silently=False,
@@ -262,9 +264,7 @@ def send_low_balance_alerts():
        'status': 'success',
        'alerts_sent': alerts_sent
    }
-
-
-# ✅ ADICIONAR ao final do tasks.py
+'''
 
 @shared_task(bind=True, max_retries=3)
 def sync_pluggy_account(self, account_id):

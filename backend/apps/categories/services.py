@@ -20,7 +20,7 @@ from .models import (AITrainingData, CategorizationLog, CategoryRule,
 
 logger = logging.getLogger(__name__)
 
-
+'''
 class AICategorizationService:
     """
     AI-powered transaction categorization service
@@ -590,8 +590,9 @@ class AICategorizationService:
             'rule_breakdown': rule_breakdown,
             'period_days': period_days
         }
+'''
 
-
+'''
 class RuleBasedCategorizationService:
     """
     Rule-based categorization system
@@ -690,9 +691,9 @@ class RuleBasedCategorizationService:
        
        # Return most relevant keywords (max 3)
        return keywords[:3]
-    
+'''
 
-
+'''
 class CategoryAnalyticsService:
    """
    Analytics service for categorization performance
@@ -917,8 +918,9 @@ class CategoryAnalyticsService:
            })
        
        return suggestions
+'''
 
-
+'''
 class BulkCategorizationService:
    """
    Service for bulk categorization operations
@@ -1065,3 +1067,4 @@ class BulkCategorizationService:
                results['failed'] += 1
        
        return results
+'''

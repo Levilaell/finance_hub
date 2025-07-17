@@ -4,6 +4,7 @@ Pluggy views para integração com bancos brasileiros
 import logging
 from typing import Dict, Any
 from decimal import Decimal
+import asyncio
 
 from django.conf import settings
 from rest_framework import permissions, status
@@ -27,7 +28,6 @@ class PluggyBankProvidersView(APIView):
     
     def get(self, request):
         """Get list of banks supported by Pluggy"""
-        import asyncio
         
         try:
             async def get_banks():
@@ -91,7 +91,6 @@ class PluggyConnectTokenView(APIView):
     
     def post(self, request):
         """Create a connect token for Pluggy Connect widget"""
-        import asyncio
         
         try:
             item_id = request.data.get('item_id')

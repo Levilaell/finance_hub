@@ -7,8 +7,7 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import (BankAccount, BankProvider, BankSync, Budget, 
-                     FinancialGoal, RecurringTransaction, Transaction, TransactionCategory)
+from .models import (BankAccount, BankProvider, BankSync, Budget, RecurringTransaction, Transaction, TransactionCategory)
 
 
 class BankProviderSerializer(serializers.ModelSerializer):
@@ -292,7 +291,7 @@ class BudgetSerializer(serializers.ModelSerializer):
         
         return instance
 
-
+'''
 class FinancialGoalSerializer(serializers.ModelSerializer):
     """
     Financial goal serializer for goal tracking
@@ -354,7 +353,7 @@ class FinancialGoalSerializer(serializers.ModelSerializer):
             instance.bank_accounts.set(account_ids)
         
         return instance
-
+'''
 
 class TimeSeriesDataSerializer(serializers.Serializer):
     """
@@ -415,7 +414,9 @@ class EnhancedDashboardSerializer(serializers.Serializer):
     budgets_summary = serializers.DictField()
     
     # Goals data
+    '''
     active_goals = FinancialGoalSerializer(many=True)
+    '''
     goals_summary = serializers.DictField()
     
     # Trend data

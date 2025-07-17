@@ -609,7 +609,7 @@ class Budget(models.Model):
             self.status = 'exceeded'
             self.save(update_fields=['status'])
 
-
+'''
 class FinancialGoal(models.Model):
     """
     Financial goals tracking and management
@@ -757,7 +757,7 @@ class FinancialGoal(models.Model):
             self.completed_at = timezone.now()
         
         self.save(update_fields=['current_amount', 'status', 'completed_at', 'updated_at'])
-
+'''
 
 class BankSync(models.Model):
     """

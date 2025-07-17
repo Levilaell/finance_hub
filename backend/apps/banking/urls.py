@@ -20,8 +20,9 @@ router.register(r'transactions', views.TransactionViewSet, basename='transaction
 router.register(r'categories', views.TransactionCategoryViewSet, basename='category')
 router.register(r'providers', views.BankProviderViewSet, basename='bank-provider')
 router.register(r'budgets', views.BudgetViewSet, basename='budget')
+'''
 router.register(r'goals', views.FinancialGoalViewSet, basename='financial-goal')
-
+'''
 urlpatterns = [
     # DRF Router URLs
     path('', include(router.urls)),
