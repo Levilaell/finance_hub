@@ -258,7 +258,7 @@ class ReportGenerator:
         # Account activity
         account_activity = transactions.values(
             'bank_account__id',
-            'bank_account__name'
+            'bank_account__nickname'
         ).annotate(
             transaction_count=Count('id'),
             total_credits=Sum('amount', filter=Q(transaction_type='credit')),
@@ -294,27 +294,30 @@ class ReportGenerator:
         
         # Get all categories
         categories = TransactionCategory.objects.filter(
-            company=self.company
+            is_active=True
         ).annotate(
             total_amount=Sum(
                 'transaction__amount',
                 filter=Q(
                     transaction__transaction_date__gte=start_date,
-                    transaction__transaction_date__lte=end_date
+                    transaction__transaction_date__lte=end_date,
+                    transaction__bank_account__company=self.company
                 )
             ),
             transaction_count=Count(
                 'transaction',
                 filter=Q(
                     transaction__transaction_date__gte=start_date,
-                    transaction__transaction_date__lte=end_date
+                    transaction__transaction_date__lte=end_date,
+                    transaction__bank_account__company=self.company
                 )
             ),
             avg_transaction=Avg(
                 'transaction__amount',
                 filter=Q(
                     transaction__transaction_date__gte=start_date,
-                    transaction__transaction_date__lte=end_date
+                    transaction__transaction_date__lte=end_date,
+                    transaction__bank_account__company=self.company
                 )
             )
         ).order_by('-total_amount')
@@ -1039,7 +1042,7 @@ class ReportGenerator:
             account_data = [['Conta', 'Transações', 'Créditos (R$)', 'Débitos (R$)']]
             
             for item in account_activity:
-                account_name = item['bank_account__name'] or f"Conta {item['bank_account__id']}"
+                account_name = item['bank_account__nickname'] or f"Conta {item['bank_account__id']}"
                 account_data.append([
                     account_name,
                     str(item['transaction_count']),
