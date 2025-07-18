@@ -567,8 +567,8 @@ class ReportGenerator:
         summary_data = [
             ['', 'Valor (R$)', '% do Total'],
             ['RECEITAS', f'{total_revenue:,.2f}', '100%'],
-            ['DESPESAS', f'{total_expenses:,.2f}', 
-             f'{(total_expenses/total_revenue*100):.1f}%' if total_revenue > 0 else '0%'],
+            ['DESPESAS', f'-{total_expenses:,.2f}', 
+             f'-{(total_expenses/total_revenue*100):.1f}%' if total_revenue > 0 else '0%'],
             ['', '', ''],
             ['LUCRO/PREJUÍZO', 
              f'{gross_profit:,.2f}',
@@ -629,7 +629,7 @@ class ReportGenerator:
                 percentage = (item['total'] / total_expenses * 100) if total_expenses > 0 else 0
                 expense_data.append([
                     item['category__name'] or 'Sem categoria',
-                    f"{item['total']:,.2f}",
+                    f"-{item['total']:,.2f}",
                     str(item['count']),
                     f"{percentage:.1f}%"
                 ])
@@ -765,7 +765,7 @@ class ReportGenerator:
         
         flow_summary = [
             ['Entradas', f'R$ {total_inflows:,.2f}'],
-            ['Saídas', f'R$ {total_outflows:,.2f}'],
+            ['Saídas', f'R$ -{total_outflows:,.2f}'],
             ['Fluxo Líquido', f'R$ {net_flow:,.2f}'],
         ]
         
@@ -906,7 +906,7 @@ class ReportGenerator:
             ['Métrica', 'Valor'],
             ['Total de Transações', f"{summary_stats['total_count']}"],
             ['Receitas', f"R$ {summary_stats['total_income']:,.2f} ({summary_stats['income_count']} transações)"],
-            ['Despesas', f"R$ {summary_stats['total_expenses']:,.2f} ({summary_stats['expense_count']} transações)"],
+            ['Despesas', f"R$ -{summary_stats['total_expenses']:,.2f} ({summary_stats['expense_count']} transações)"],
             ['Resultado Líquido', f"R$ {summary_stats['net_balance']:,.2f}"],
             ['Média Diária de Receitas', f"R$ {avg_daily_income:,.2f}"],
             ['Média Diária de Despesas', f"R$ {avg_daily_expense:,.2f}"],

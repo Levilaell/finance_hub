@@ -117,8 +117,8 @@ export default function NewTransactionPage() {
     },
     onSuccess: (data) => {
       // Check for usage warnings in the response
-      if (data.usage_warning) {
-        const warning = data.usage_warning;
+      if ((data as any).usage_warning) {
+        const warning = (data as any).usage_warning;
         
         if (warning.upgrade_suggestion) {
           // Show upgrade suggestion for 90%+ usage

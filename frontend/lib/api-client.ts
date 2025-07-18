@@ -97,7 +97,7 @@ class ApiClient {
         // Handle other errors
         if (error.response?.status === 429) {
           // Handle rate limit / plan limit errors
-          const data = error.response.data;
+          const data = error.response.data as any;
           const limitType = data.error?.includes('transações') ? 'transações' :
                            data.error?.includes('contas bancárias') ? 'contas bancárias' :
                            data.error?.includes('IA') ? 'requisições de IA' : 'recursos';
@@ -115,7 +115,7 @@ class ApiClient {
             duration: 8000
           });
         } else if (error.response?.status === 403) {
-          const data = error.response.data;
+          const data = error.response.data as any;
           
           // Check if it's a plan feature restriction
           if (data.upgrade_required) {
