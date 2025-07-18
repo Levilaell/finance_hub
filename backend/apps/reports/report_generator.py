@@ -297,27 +297,27 @@ class ReportGenerator:
             is_active=True
         ).annotate(
             total_amount=Sum(
-                'transaction__amount',
+                'transactions__amount',
                 filter=Q(
-                    transaction__transaction_date__gte=start_date,
-                    transaction__transaction_date__lte=end_date,
-                    transaction__bank_account__company=self.company
+                    transactions__transaction_date__gte=start_date,
+                    transactions__transaction_date__lte=end_date,
+                    transactions__bank_account__company=self.company
                 )
             ),
             transaction_count=Count(
-                'transaction',
+                'transactions',
                 filter=Q(
-                    transaction__transaction_date__gte=start_date,
-                    transaction__transaction_date__lte=end_date,
-                    transaction__bank_account__company=self.company
+                    transactions__transaction_date__gte=start_date,
+                    transactions__transaction_date__lte=end_date,
+                    transactions__bank_account__company=self.company
                 )
             ),
             avg_transaction=Avg(
-                'transaction__amount',
+                'transactions__amount',
                 filter=Q(
-                    transaction__transaction_date__gte=start_date,
-                    transaction__transaction_date__lte=end_date,
-                    transaction__bank_account__company=self.company
+                    transactions__transaction_date__gte=start_date,
+                    transactions__transaction_date__lte=end_date,
+                    transactions__bank_account__company=self.company
                 )
             )
         ).order_by('-total_amount')

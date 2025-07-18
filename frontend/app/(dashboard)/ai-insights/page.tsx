@@ -9,6 +9,8 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { reportsService } from '@/services/reports.service';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
+import { useAuthStore } from '@/store/auth-store';
+import { useRouter } from 'next/navigation';
 import { 
   SparklesIcon,
   ExclamationTriangleIcon,
@@ -20,6 +22,7 @@ import {
   ChartBarIcon,
   BanknotesIcon,
   ArrowPathIcon,
+  LockClosedIcon,
 } from '@heroicons/react/24/outline';
 
 // Types
@@ -319,6 +322,10 @@ const QUICK_PERIODS = [
 ];
 
 export default function AIInsightsPage() {
+  // Hooks
+  const { user } = useAuthStore();
+  const router = useRouter();
+  
   // State
   const [selectedPeriod, setSelectedPeriod] = useState<{
     start_date: Date | null;
@@ -328,6 +335,7 @@ export default function AIInsightsPage() {
     end_date: null,
   });
   const [forceRefresh, setForceRefresh] = useState(false);
+  const [isUpgradeRequired, setIsUpgradeRequired] = useState(false);
 
   // Set dates on client-side after hydration
   useEffect(() => {
@@ -349,21 +357,35 @@ export default function AIInsightsPage() {
     dataUpdatedAt
   } = useQuery({
     queryKey: ['ai-insights', selectedPeriod, forceRefresh],
-    queryFn: () => {
+    queryFn: async () => {
       if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
-      const result = reportsService.getAIInsights({
-        start_date: selectedPeriod.start_date,
-        end_date: selectedPeriod.end_date,
-        force_refresh: forceRefresh
-      });
-      // Reset force refresh after use
-      if (forceRefresh) {
-        setForceRefresh(false);
+      try {
+        const result = await reportsService.getAIInsights({
+          start_date: selectedPeriod.start_date,
+          end_date: selectedPeriod.end_date,
+          force_refresh: forceRefresh
+        });
+        // Reset force refresh after use
+        if (forceRefresh) {
+          setForceRefresh(false);
+        }
+        setIsUpgradeRequired(false);
+        return result;
+      } catch (error: any) {
+        // Check if it's a 403 upgrade required error
+        if (error.response?.status === 403) {
+          setIsUpgradeRequired(true);
+          throw error;
+        }
+        throw error;
       }
-      return result;
     },
     enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
-    retry: 2,
+    retry: (failureCount, error: any) => {
+      // Don't retry on 403 errors
+      if (error?.response?.status === 403) return false;
+      return failureCount < 2;
+    },
     retryDelay: 1000,
     staleTime: forceRefresh ? 0 : 7 * 24 * 60 * 60 * 1000, // No cache if force refresh
     gcTime: forceRefresh ? 0 : 7 * 24 * 60 * 60 * 1000, // No cache if force refresh
@@ -419,7 +441,8 @@ export default function AIInsightsPage() {
       </div>
 
       {/* Period Selection */}
-      <Card>
+      {!isUpgradeRequired && (
+        <Card>
         <CardHeader>
           <CardTitle>Selecione o Período</CardTitle>
           <CardDescription>Escolha um período para análise</CardDescription>
@@ -465,6 +488,7 @@ export default function AIInsightsPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* AI Insights Content */}
       <AIInsightsErrorBoundary>
@@ -479,23 +503,25 @@ export default function AIInsightsPage() {
                 {aiInsightsData?.predictions?.confidence && (
                   <ConfidenceIndicator level={aiInsightsData.predictions.confidence} />
                 )}
-                <Button
-                  variant="outline"
-                  size="default"
-                  onClick={() => {
-                    // Force refetch with cache invalidation
-                    setForceRefresh(true);
-                    setTimeout(() => {
-                      refetchAIInsights();
-                    }, 100);
-                  }}
-                  disabled={aiInsightsLoading}
-                  title="Atualizar análise"
-                  className="w-full sm:w-auto"
-                >
-                  <ArrowPathIcon className={cn("h-4 w-4", aiInsightsLoading && "animate-spin")} />
-                  <span className="ml-2">Atualizar</span>
-                </Button>
+                {!isUpgradeRequired && (
+                  <Button
+                    variant="outline"
+                    size="default"
+                    onClick={() => {
+                      // Force refetch with cache invalidation
+                      setForceRefresh(true);
+                      setTimeout(() => {
+                        refetchAIInsights();
+                      }, 100);
+                    }}
+                    disabled={aiInsightsLoading}
+                    title="Atualizar análise"
+                    className="w-full sm:w-auto"
+                  >
+                    <ArrowPathIcon className={cn("h-4 w-4", aiInsightsLoading && "animate-spin")} />
+                    <span className="ml-2">Atualizar</span>
+                  </Button>
+                )}
               </div>
             </CardTitle>
             <CardDescription className="flex items-center justify-between">
@@ -557,11 +583,79 @@ export default function AIInsightsPage() {
                 </div>
               )}
 
-              {/* Error State */}
-              {aiInsightsError && (
+              {/* Upgrade Required State */}
+              {isUpgradeRequired && !aiInsightsLoading && (
+                <div className="text-center py-12">
+                  <div className="max-w-md mx-auto">
+                    <div className="mb-6">
+                      <div className="relative">
+                        <LockClosedIcon className="h-16 w-16 mx-auto text-gray-400" />
+                        <SparklesIcon className="h-8 w-8 absolute bottom-0 right-1/3 text-purple-600" />
+                      </div>
+                    </div>
+                    <h3 className="text-xl font-semibold mb-2">
+                      AI Insights Disponível em Planos Superiores
+                    </h3>
+                    <p className="text-gray-600 mb-6">
+                      {user?.company?.subscription_plan?.plan_type === 'starter' 
+                        ? 'Faça upgrade para o plano Professional ou Enterprise para acessar análises avançadas com IA.'
+                        : 'Este recurso requer um plano ativo. Configure seu pagamento para continuar.'}
+                    </p>
+                    
+                    {/* Plan Comparison */}
+                    <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+                      <h4 className="font-medium mb-3">O que você ganha com AI Insights:</h4>
+                      <ul className="space-y-2 text-sm">
+                        <li className="flex items-start">
+                          <CheckCircleIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
+                          <span>Análise automática de padrões de gastos</span>
+                        </li>
+                        <li className="flex items-start">
+                          <CheckCircleIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
+                          <span>Previsões de fluxo de caixa com IA</span>
+                        </li>
+                        <li className="flex items-start">
+                          <CheckCircleIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
+                          <span>Recomendações personalizadas de economia</span>
+                        </li>
+                        <li className="flex items-start">
+                          <CheckCircleIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
+                          <span>Alertas inteligentes de oportunidades</span>
+                        </li>
+                      </ul>
+                    </div>
+                    
+                    <div className="flex gap-3 justify-center">
+                      <Button 
+                        onClick={() => router.push('/pricing')}
+                        className="bg-purple-600 hover:bg-purple-700"
+                      >
+                        Ver Planos
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        onClick={() => router.push('/settings?tab=billing')}
+                      >
+                        Configurar Pagamento
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Generic Error State */}
+              {aiInsightsError && !isUpgradeRequired && (
                 <div className="text-center py-8">
                   <ExclamationTriangleIcon className="h-12 w-12 mx-auto text-yellow-500 mb-4" />
-                  <p className="text-gray-600">Erro ao carregar insights. Usando análise offline.</p>
+                  <p className="text-gray-600">Erro ao carregar insights. Tente novamente mais tarde.</p>
+                  <Button 
+                    variant="outline" 
+                    className="mt-4"
+                    onClick={() => refetchAIInsights()}
+                  >
+                    <ArrowPathIcon className="h-4 w-4 mr-2" />
+                    Tentar Novamente
+                  </Button>
                 </div>
               )}
 

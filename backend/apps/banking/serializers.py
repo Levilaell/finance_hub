@@ -7,7 +7,7 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import (BankAccount, BankProvider, BankSync, Budget, Transaction, TransactionCategory)
+from .models import (BankAccount, BankProvider, BankSync, Transaction, TransactionCategory)
 
 
 class BankProviderSerializer(serializers.ModelSerializer):
@@ -220,56 +220,6 @@ class CategoryAnalysisSerializer(serializers.Serializer):
     average_amount = serializers.DecimalField(max_digits=15, decimal_places=2)
 
 
-class BudgetSerializer(serializers.ModelSerializer):
-    """
-    Budget serializer for expense tracking
-    """
-    remaining_amount = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
-    spent_percentage = serializers.FloatField(read_only=True)
-    is_exceeded = serializers.BooleanField(read_only=True)
-    is_alert_threshold_reached = serializers.BooleanField(read_only=True)
-    categories = TransactionCategorySerializer(many=True, read_only=True)
-    category_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        write_only=True,
-        required=False
-    )
-    
-    class Meta:
-        model = Budget
-        fields = [
-            'id', 'name', 'description', 'budget_type', 'amount', 'spent_amount',
-            'remaining_amount', 'spent_percentage', 'start_date', 'end_date',
-            'alert_threshold', 'is_alert_enabled', 'status', 'is_rollover',
-            'categories', 'category_ids', 'is_exceeded', 'is_alert_threshold_reached',
-            'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'spent_amount', 'created_at', 'updated_at']
-    
-    def create(self, validated_data):
-        category_ids = validated_data.pop('category_ids', [])
-        validated_data['company'] = self.context['request'].user.company
-        validated_data['created_by'] = self.context['request'].user
-        
-        budget = Budget.objects.create(**validated_data)
-        
-        if category_ids:
-            budget.categories.set(category_ids)
-        
-        return budget
-    
-    def update(self, instance, validated_data):
-        category_ids = validated_data.pop('category_ids', None)
-        
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        
-        if category_ids is not None:
-            instance.categories.set(category_ids)
-        
-        return instance
-
 '''
 class FinancialGoalSerializer(serializers.ModelSerializer):
     """
@@ -389,7 +339,7 @@ class EnhancedDashboardSerializer(serializers.Serializer):
     accounts_count = serializers.IntegerField()
     
     # Budget data
-    active_budgets = BudgetSerializer(many=True)
+    # active_budgets = BudgetSerializer(many=True)  # BudgetSerializer removed
     budgets_summary = serializers.DictField()
     
     # Goals data

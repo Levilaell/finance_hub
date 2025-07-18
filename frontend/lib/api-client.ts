@@ -95,8 +95,45 @@ class ApiClient {
         });
         
         // Handle other errors
-        if (error.response?.status === 403) {
-          toast.error("You don't have permission to perform this action");
+        if (error.response?.status === 429) {
+          // Handle rate limit / plan limit errors
+          const data = error.response.data;
+          const limitType = data.error?.includes('transações') ? 'transações' :
+                           data.error?.includes('contas bancárias') ? 'contas bancárias' :
+                           data.error?.includes('IA') ? 'requisições de IA' : 'recursos';
+          
+          const message = data.upgrade_required 
+            ? `Limite de ${limitType} atingido. Faça upgrade do seu plano para continuar.`
+            : data.error || 'Limite de uso atingido';
+          
+          toast.error(message, {
+            description: data.usage_info || undefined,
+            action: data.upgrade_required ? {
+              label: 'Fazer Upgrade',
+              onClick: () => window.location.href = '/settings?tab=billing'
+            } : undefined,
+            duration: 8000
+          });
+        } else if (error.response?.status === 403) {
+          const data = error.response.data;
+          
+          // Check if it's a plan feature restriction
+          if (data.upgrade_required) {
+            const message = data.feature_required 
+              ? `${data.feature_required} disponível apenas em planos superiores`
+              : data.error || 'Recurso não disponível no seu plano atual';
+            
+            toast.error(message, {
+              description: `Plano atual: ${data.current_plan || 'Nenhum'}`,
+              action: {
+                label: 'Ver Planos',
+                onClick: () => window.location.href = '/pricing'
+              },
+              duration: 8000
+            });
+          } else {
+            toast.error("You don't have permission to perform this action");
+          }
         } else if (error.response?.status === 404) {
           // Don't show toast for 404 during development
           console.error("Resource not found:", error.config?.url);

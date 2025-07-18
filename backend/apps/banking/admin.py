@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from .models import (
     BankProvider, BankAccount, Transaction, TransactionCategory,
-    Budget, BankSync
+    BankSync
 )
 
 
@@ -210,55 +210,6 @@ class TransactionAdmin(admin.ModelAdmin):
         qs = super().get_queryset(request)
         return qs.select_related('bank_account__bank_provider', 'category', 'subcategory')
 
-
-@admin.register(Budget)
-class BudgetAdmin(admin.ModelAdmin):
-    list_display = [
-        'name', 'company', 'amount_display', 'budget_type',
-        'spent_percentage', 'alert_threshold', 'status',
-        'start_date', 'end_date'
-    ]
-    list_filter = ['budget_type', 'status', 'created_at']
-    search_fields = ['name', 'company__name']
-    date_hierarchy = 'created_at'
-    filter_horizontal = ['categories']
-    
-    fieldsets = (
-        ('Informações Básicas', {
-            'fields': ('company', 'name', 'description')
-        }),
-        ('Configurações do Orçamento', {
-            'fields': ('budget_type', 'amount', 'spent_amount', 'categories')
-        }),
-        ('Período', {
-            'fields': ('start_date', 'end_date')
-        }),
-        ('Alertas', {
-            'fields': ('alert_threshold', 'is_alert_enabled', 'last_alert_sent')
-        }),
-        ('Status', {
-            'fields': ('status', 'is_rollover', 'created_by')
-        }),
-    )
-    
-    readonly_fields = ['spent_amount', 'last_alert_sent', 'created_at', 'updated_at']
-    
-    def amount_display(self, obj):
-        return f"R$ {obj.amount:,.2f}"
-    amount_display.short_description = 'Orçamento'
-    
-    def spent_percentage(self, obj):
-        percentage = obj.spent_percentage
-        color = 'green' if percentage < 80 else 'orange' if percentage < 100 else 'red'
-        return format_html(
-            '<span style="color: {};">{}%</span>',
-            color, int(percentage)
-        )
-    spent_percentage.short_description = '% Gasto'
-    
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.select_related('company', 'created_by').prefetch_related('categories')
 
 @admin.register(BankSync)
 class BankSyncAdmin(admin.ModelAdmin):

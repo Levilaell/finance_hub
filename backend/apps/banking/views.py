@@ -41,9 +41,9 @@ class StandardResultsSetPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 100
 
-from .models import (BankAccount, BankProvider, Budget, 
+from .models import (BankAccount, BankProvider, 
                      Transaction, TransactionCategory)
-from .serializers import (BankAccountSerializer, BankProviderSerializer, BudgetSerializer,
+from .serializers import (BankAccountSerializer, BankProviderSerializer,
                           DashboardSerializer, EnhancedDashboardSerializer, ExpenseTrendSerializer, TimeSeriesDataSerializer, TransactionCategorySerializer,
                           TransactionSerializer)
 from .services import BankingSyncService
@@ -520,16 +520,6 @@ class EnhancedDashboardView(APIView):
         
         return Response(data)
 
-
-class BudgetViewSet(viewsets.ModelViewSet):
-    """
-    Budget management viewset
-    """
-    serializer_class = BudgetSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get_queryset(self):
-        return Budget.objects.filter(company=self.request.user.company)
 
 '''
 class FinancialGoalViewSet(viewsets.ModelViewSet):

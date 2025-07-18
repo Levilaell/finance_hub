@@ -22,6 +22,7 @@ import {
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline';
+import { UsageIndicators } from '@/components/UsageIndicators';
 
 interface DashboardData {
   current_balance: number;
@@ -293,6 +294,14 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Usage Indicators */}
+      {user?.company && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-4">Uso do Plano</h2>
+          <UsageIndicators company={user.company} />
+        </div>
+      )}
 
       {/* Alerts */}
       {dashboardData.alerts && dashboardData.alerts.length > 0 && (

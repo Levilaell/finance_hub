@@ -192,44 +192,6 @@ def send_balance_notification(bank_account):
         logger.error(f"❌ Error in send_balance_notification: {e}")
 
 
-@receiver(post_save, sender=Transaction)
-def update_budget_tracking(sender, instance, created, **kwargs):
-    """
-    Update budget spent amounts when transactions are created or updated
-    """
-    if instance.transaction_type in ['debit', 'transfer_out', 'pix_out', 'fee']:
-        try:
-            from .models import Budget
-            
-            # Find active budgets that include this transaction's category
-            active_budgets = Budget.objects.filter(
-                company=instance.bank_account.company,
-                status='active',
-                start_date__lte=instance.transaction_date,
-                end_date__gte=instance.transaction_date
-            )
-            
-            if instance.category:
-                active_budgets = active_budgets.filter(
-                    categories=instance.category
-                )
-            
-            # Update spent amounts for each budget
-            for budget in active_budgets:
-                budget.update_spent_amount()
-                
-                # Check if alert should be sent
-                if (budget.is_alert_enabled and 
-                    budget.is_alert_threshold_reached and
-                    not budget.last_alert_sent):
-                    
-                    # Send budget alert
-                    from .notifications import send_budget_alert
-                    send_budget_alert(budget)
-                    
-        except Exception as e:
-            logger.error(f"❌ Error updating budget tracking: {e}")
-
 
 @receiver(post_save, sender=Transaction)
 def detect_recurring_patterns(sender, instance, created, **kwargs):

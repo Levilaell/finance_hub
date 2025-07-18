@@ -11,7 +11,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { EmptyState } from '@/components/ui/empty-state';
 import { categoriesService } from '@/services/categories.service';
-import { Category, CategoryForm, CategoryRule } from '@/types';
+import { Category, CategoryForm } from '@/types';
 import { 
   TagIcon, 
   PlusIcon, 
@@ -63,10 +63,7 @@ export default function CategoriesPage() {
     queryFn: () => categoriesService.getCategories(),
   });
 
-  const { data: rules } = useQuery({
-    queryKey: ['category-rules'],
-    queryFn: () => categoriesService.getRules(),
-  });
+  // Rules endpoint removido - categorização agora é feita automaticamente pela Pluggy
 
   const createCategoryMutation = useMutation({
     mutationFn: (data: CategoryForm) => categoriesService.createCategory(data),
@@ -105,16 +102,7 @@ export default function CategoriesPage() {
     },
   });
 
-  const autoCategorizeMutation = useMutation({
-    mutationFn: () => categoriesService.applyRules(),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
-      toast.success(`${data.categorized} transactions categorized automatically`);
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to auto-categorize');
-    },
-  });
+  // Auto-categorização removida - agora é feita automaticamente pela Pluggy
 
   if (isLoading) {
     return (
@@ -132,10 +120,6 @@ export default function CategoriesPage() {
   const expenseCategories = categories?.filter(cat => cat.category_type === 'expense') || [];
 
   const CategoryCard = ({ category }: { category: Category }) => {
-    // Handle both array and paginated response
-    const rulesArray = Array.isArray(rules) ? rules : (rules as any)?.results || [];
-    const categoryRules = rulesArray.filter((rule: any) => rule.category === category.id) || [];
-    
     return (
       <Card className="hover:shadow-lg transition-shadow">
         <CardContent className="p-6">
@@ -180,16 +164,6 @@ export default function CategoriesPage() {
               </div>
             )}
           </div>
-          {categoryRules.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm text-gray-600 font-medium">Auto-categorization rules:</p>
-              {categoryRules.map((rule: any) => (
-                <div key={rule.id} className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                  {rule.field} {rule.rule_type} &ldquo;{rule.value}&rdquo;
-                </div>
-              ))}
-            </div>
-          )}
         </CardContent>
       </Card>
     );

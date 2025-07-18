@@ -20,7 +20,8 @@ import {
   CalendarIcon,
   TagIcon,
   CheckCircleIcon,
-  ExclamationCircleIcon
+  ExclamationCircleIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import {
   Select,
@@ -114,11 +115,47 @@ export default function NewTransactionPage() {
         tags: tags.length > 0 ? tags : undefined,
       });
     },
-    onSuccess: () => {
-      toast.success('Transação adicionada com sucesso!', {
-        description: 'A transação foi registrada e será categorizada automaticamente.',
-        icon: <CheckCircleIcon className="h-5 w-5 text-green-500" />,
-      });
+    onSuccess: (data) => {
+      // Check for usage warnings in the response
+      if (data.usage_warning) {
+        const warning = data.usage_warning;
+        
+        if (warning.upgrade_suggestion) {
+          // Show upgrade suggestion for 90%+ usage
+          toast.warning(warning.message, {
+            description: `${warning.remaining} transações restantes este mês`,
+            action: {
+              label: 'Fazer Upgrade',
+              onClick: () => router.push('/settings?tab=billing')
+            },
+            duration: 10000,
+            icon: <ExclamationTriangleIcon className="h-5 w-5 text-orange-500" />,
+          });
+        } else {
+          // Show warning for 80%+ usage
+          toast.info(warning.message, {
+            description: `${warning.remaining} transações restantes este mês`,
+            duration: 8000,
+            icon: <ExclamationCircleIcon className="h-5 w-5 text-yellow-500" />,
+          });
+        }
+        
+        // Still show success message but shorter duration
+        setTimeout(() => {
+          toast.success('Transação adicionada com sucesso!', {
+            description: 'A transação foi registrada.',
+            icon: <CheckCircleIcon className="h-5 w-5 text-green-500" />,
+            duration: 3000
+          });
+        }, 500);
+      } else {
+        // No warning, show normal success
+        toast.success('Transação adicionada com sucesso!', {
+          description: 'A transação foi registrada e será categorizada automaticamente.',
+          icon: <CheckCircleIcon className="h-5 w-5 text-green-500" />,
+        });
+      }
+      
       router.push('/transactions');
     },
     onError: (error: any) => {
