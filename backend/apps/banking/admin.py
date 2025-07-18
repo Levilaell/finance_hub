@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from .models import (
     BankProvider, BankAccount, Transaction, TransactionCategory,
-    RecurringTransaction, Budget, BankSync
+    Budget, BankSync
 )
 
 
@@ -142,13 +142,11 @@ class TransactionCategoryAdmin(admin.ModelAdmin):
 class TransactionAdmin(admin.ModelAdmin):
     list_display = [
         'transaction_date', 'description', 'formatted_amount_display',
-        'category', 'account_display', 'transaction_type',
-        'is_ai_categorized', 'is_manually_reviewed'
+        'category', 'account_display', 'transaction_type'
     ]
     list_filter = [
         'transaction_type', 'status', 'category', 'transaction_date',
-        'is_ai_categorized', 'is_manually_reviewed', 'is_reconciled',
-        'bank_account__bank_provider'
+        'is_reconciled', 'bank_account__bank_provider'
     ]
     search_fields = ['description', 'counterpart_name', 'external_id', 'reference_number']
     date_hierarchy = 'transaction_date'
@@ -164,8 +162,7 @@ class TransactionAdmin(admin.ModelAdmin):
         }),
         ('Categorização', {
             'fields': (
-                'category', 'subcategory', 'ai_suggested_category',
-                'ai_category_confidence', 'is_ai_categorized', 'is_manually_reviewed'
+                'category', 'subcategory'
             )
         }),
         ('Contrapartida', {
@@ -211,7 +208,7 @@ class TransactionAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.select_related('bank_account__bank_provider', 'category', 'subcategory', 'ai_suggested_category')
+        return qs.select_related('bank_account__bank_provider', 'category', 'subcategory')
 
 
 @admin.register(Budget)
@@ -262,57 +259,6 @@ class BudgetAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('company', 'created_by').prefetch_related('categories')
-
-'''
-@admin.register(FinancialGoal)
-class FinancialGoalAdmin(admin.ModelAdmin):
-    list_display = [
-        'name', 'goal_type', 'target_amount_display',
-        'progress_bar', 'target_date', 'status'
-    ]
-    list_filter = ['goal_type', 'status', 'target_date']
-    search_fields = ['name', 'description', 'company__name']
-    date_hierarchy = 'target_date'
-    filter_horizontal = ['categories', 'bank_accounts']
-    
-    fieldsets = (
-        ('Informações Básicas', {
-            'fields': ('company', 'name', 'description', 'goal_type')
-        }),
-        ('Configurações da Meta', {
-            'fields': ('target_amount', 'current_amount', 'target_date', 'monthly_target')
-        }),
-        ('Acompanhamento', {
-            'fields': ('categories', 'bank_accounts')
-        }),
-        ('Configurações', {
-            'fields': ('status', 'is_automatic_tracking', 'send_reminders', 'reminder_frequency')
-        }),
-        ('Metadados', {
-            'fields': ('created_by', 'created_at', 'updated_at', 'completed_at')
-        }),
-    )
-    
-    readonly_fields = ['current_amount', 'created_at', 'updated_at', 'completed_at']
-    
-    def target_amount_display(self, obj):
-        return f"R$ {obj.target_amount:,.2f}"
-    target_amount_display.short_description = 'Meta'
-    
-    def progress_bar(self, obj):
-        percentage = obj.progress_percentage
-        return format_html(
-            '<div style="width:100px; border:1px solid #ccc;">'
-            '<div style="height:20px; background-color:#4CAF50; width:{}%"></div>'
-            '</div> {}%',
-            min(percentage, 100), int(percentage)
-        )
-    progress_bar.short_description = 'Progresso'
-    
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.select_related('company', 'created_by').prefetch_related('categories', 'bank_accounts')
-'''
 
 @admin.register(BankSync)
 class BankSyncAdmin(admin.ModelAdmin):
@@ -370,51 +316,5 @@ class BankSyncAdmin(admin.ModelAdmin):
         qs = super().get_queryset(request)
         return qs.select_related('bank_account__bank_provider', 'bank_account__company')
 
-
-@admin.register(RecurringTransaction)
-class RecurringTransactionAdmin(admin.ModelAdmin):
-    list_display = [
-        'name', 'bank_account', 'expected_amount_display', 
-        'frequency', 'next_expected_date', 'is_active',
-        'total_occurrences', 'accuracy_rate_display'
-    ]
-    list_filter = ['frequency', 'is_active', 'auto_categorize', 'send_alerts']
-    search_fields = ['name', 'description_pattern', 'bank_account__nickname']
-    date_hierarchy = 'next_expected_date'
-    
-    fieldsets = (
-        ('Informações Básicas', {
-            'fields': ('bank_account', 'name', 'description_pattern')
-        }),
-        ('Valores', {
-            'fields': ('expected_amount', 'amount_tolerance')
-        }),
-        ('Frequência', {
-            'fields': ('frequency', 'next_expected_date', 'day_tolerance')
-        }),
-        ('Categorização', {
-            'fields': ('category',)
-        }),
-        ('Configurações', {
-            'fields': ('is_active', 'auto_categorize', 'send_alerts')
-        }),
-        ('Estatísticas', {
-            'fields': ('total_occurrences', 'last_occurrence_date', 'accuracy_rate')
-        }),
-    )
-    
-    readonly_fields = ['total_occurrences', 'last_occurrence_date', 'accuracy_rate', 'created_at', 'updated_at']
-    
-    def expected_amount_display(self, obj):
-        return f"R$ {obj.expected_amount:,.2f}"
-    expected_amount_display.short_description = 'Valor Esperado'
-    
-    def accuracy_rate_display(self, obj):
-        return f"{obj.accuracy_rate:.1%}"
-    accuracy_rate_display.short_description = 'Taxa de Acerto'
-    
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.select_related('bank_account__bank_provider', 'category')
 
 

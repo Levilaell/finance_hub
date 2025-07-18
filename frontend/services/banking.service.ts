@@ -83,6 +83,7 @@ class BankingService {
   async getTransactions(
     params?: TransactionFilter & { page?: number; page_size?: number }
   ): Promise<PaginatedResponse<BankTransaction>> {
+    console.log('🔄 BankingService.getTransactions - Parâmetros recebidos:', params);
     return apiClient.get<PaginatedResponse<BankTransaction>>("/api/banking/transactions/", params);
   }
 

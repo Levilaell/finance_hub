@@ -87,7 +87,6 @@ const plans: PricingPlan[] = [
       '✨ Análises avançadas ilimitadas',
       '✨ Machine Learning personalizado',
       'Relatórios personalizados',
-      'API completa',
       'Acesso para contador',
       'Suporte dedicado',
     ],
@@ -310,12 +309,6 @@ export default function PricingPage() {
                   <td className="text-center p-4">Ilimitadas</td>
                 </tr>
                 <tr className="border-b">
-                  <td className="p-4">API</td>
-                  <td className="text-center p-4">❌</td>
-                  <td className="text-center p-4 bg-primary/5">❌</td>
-                  <td className="text-center p-4">✅</td>
-                </tr>
-                <tr className="border-b">
                   <td className="p-4">Período de teste</td>
                   <td className="text-center p-4 text-green-600 font-medium">14 dias</td>
                   <td className="text-center p-4 bg-primary/5 text-green-600 font-medium">14 dias</td>
@@ -407,14 +400,9 @@ export default function PricingPage() {
           <p className="text-gray-600 mb-6">
             Junte-se a milhares de empresas que economizam 10+ horas por mês com o CaixaHub
           </p>
-          <Button asChild size="lg" className="mr-4">
+          <Button asChild size="lg">
             <Link href="/register">
               Começar Teste Grátis de 14 Dias
-            </Link>
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link href="/demo">
-              Agendar Demonstração
             </Link>
           </Button>
         </div>

@@ -5,12 +5,12 @@ from django.urls import path
 
 from .views import (
     NotificationListView,
-    MarkAsReadView,
+    NotificationDetailView,
+    NotificationUpdateView,
+    NotificationDeleteView,
     MarkAllAsReadView,
-    NotificationPreferencesView,
-    UpdatePreferencesView,
-    NotificationCountView,
-    WebSocketHealthView,
+    UnreadCountView,
+    DeleteAllReadView,
 )
 
 app_name = 'notifications'
@@ -18,14 +18,10 @@ app_name = 'notifications'
 urlpatterns = [
     # Notifications management
     path('', NotificationListView.as_view(), name='notification-list'),
-    path('<int:notification_id>/read/', MarkAsReadView.as_view(), name='mark-as-read'),
+    path('<str:notification_id>/', NotificationDetailView.as_view(), name='notification-detail'),
+    path('<str:notification_id>/', NotificationUpdateView.as_view(), name='notification-update'),
+    path('<str:notification_id>/', NotificationDeleteView.as_view(), name='notification-delete'),
     path('mark-all-read/', MarkAllAsReadView.as_view(), name='mark-all-read'),
-    path('count/', NotificationCountView.as_view(), name='notification-count'),
-    
-    # Preferences
-    path('preferences/', NotificationPreferencesView.as_view(), name='preferences'),
-    path('preferences/update/', UpdatePreferencesView.as_view(), name='update-preferences'),
-    
-    # Health checks
-    path('websocket/health/', WebSocketHealthView.as_view(), name='websocket-health'),
+    path('unread-count/', UnreadCountView.as_view(), name='unread-count'),
+    path('delete-all-read/', DeleteAllReadView.as_view(), name='delete-all-read'),
 ]

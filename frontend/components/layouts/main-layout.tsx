@@ -249,6 +249,28 @@ export function MainLayout({ children }: MainLayoutProps) {
 
         {/* Page content */}
         <main className="flex-1 p-6 sm:p-8 lg:p-10">{children}</main>
+        
+        {/* Footer */}
+        <footer className="border-t mt-auto">
+          <div className="px-6 py-4 sm:px-8 lg:px-10">
+            <div className="flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
+              <div className="text-sm text-muted-foreground">
+                © 2024 CaixaHub. Todos os direitos reservados.
+              </div>
+              <div className="flex space-x-4 text-sm text-muted-foreground">
+                <Link href="/terms" className="hover:text-foreground transition-colors">
+                  Termos de Serviço
+                </Link>
+                <Link href="/privacy" className="hover:text-foreground transition-colors">
+                  Política de Privacidade
+                </Link>
+                <Link href="/pricing" className="hover:text-foreground transition-colors">
+                  Planos
+                </Link>
+              </div>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
   );

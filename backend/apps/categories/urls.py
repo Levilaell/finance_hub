@@ -1,42 +1,13 @@
 """
 Categories app URLs
 """
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-
-from .views import (
-    CategorySuggestionViewSet,
-    AITrainingDataViewSet,
-
-)
+from django.urls import path
 
 app_name = 'categories'
 
-router = DefaultRouter()
-'''
-router.register(r'rules', CategoryRuleViewSet, basename='category-rule')
-'''
-router.register(r'suggestions', CategorySuggestionViewSet, basename='category-suggestion')
-router.register(r'training-data', AITrainingDataViewSet, basename='training-data')
-
+# URLs removidas: CategoryRuleViewSet, CategorySuggestionViewSet, AITrainingDataViewSet
+# Categorização agora é feita automaticamente pela Pluggy via pluggy_category_mapper.py
 
 urlpatterns = [
+    # Sem URLs - categorização automática via Pluggy
 ]
-
-
-'''
-    path('', include(router.urls)),
-    
-    
-    path('analytics/', CategorizationAnalyticsView.as_view(), name='categorization-analytics'),
-    
-    # Bulk operations
-    path('bulk/', BulkCategorizationView.as_view(), name='bulk-categorization'),
-    
-    # Rule suggestions
-    path('rule-suggestions/', RuleSuggestionsView.as_view(), name='rule-suggestions'),
-    
-    # AI training
-    path('train/', CategoryTrainingView.as_view(), name='category-training'),
-
-'''

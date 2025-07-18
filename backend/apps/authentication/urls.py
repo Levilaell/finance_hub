@@ -12,19 +12,14 @@ from .views import (
     ProfileView,
     RegisterView,
     ResendVerificationView,
-    health_check,
     Setup2FAView,
     Enable2FAView,
     Disable2FAView,
-    BackupCodesView,
 )
 
 app_name = 'authentication'
 
 urlpatterns = [
-    # Health check
-    path('health/', health_check, name='health'),
-    
     # Authentication
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', LoginView.as_view(), name='login'),
@@ -48,5 +43,4 @@ urlpatterns = [
     path('2fa/setup/', Setup2FAView.as_view(), name='setup_2fa'),
     path('2fa/enable/', Enable2FAView.as_view(), name='enable_2fa'),
     path('2fa/disable/', Disable2FAView.as_view(), name='disable_2fa'),
-    path('2fa/backup-codes/', BackupCodesView.as_view(), name='backup_codes'),
 ]

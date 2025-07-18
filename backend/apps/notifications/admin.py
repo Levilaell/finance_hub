@@ -8,9 +8,6 @@ from django.utils import timezone
 from .models import Notification, NotificationPreference
 
 
-# NotificationTemplateAdmin removed
-
-
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
     list_display = [
@@ -128,6 +125,3 @@ class NotificationPreferenceAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('user')
-
-
-# NotificationLogAdmin removed

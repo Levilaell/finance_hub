@@ -13,10 +13,6 @@ logger = logging.getLogger(__name__)
 
 from .models import Company, CompanyUser, SubscriptionPlan, PaymentMethod, PaymentHistory, ResourceUsage
 from .serializers import (
-    CompanySerializer,
-    CompanyUpdateSerializer,
-    CompanyUserSerializer,
-    InviteUserSerializer,
     SubscriptionPlanSerializer,
     UpgradeSubscriptionSerializer,
     PaymentMethodSerializer,
@@ -26,68 +22,8 @@ from .serializers import (
 User = get_user_model()
 
 
-class CompanyDetailView(generics.RetrieveAPIView):
-    """Get company profile details"""
-    permission_classes = [permissions.IsAuthenticated]
-    serializer_class = CompanySerializer
-    
-    def get_object(self):
-        # Get the user's company - either as owner or team member
-        user = self.request.user
-        company = None
-        
-        # Check if user is a company owner
-        if hasattr(user, 'company'):
-            try:
-                company = user.company
-            except Company.DoesNotExist:
-                pass
-        
-        # If not owner, check if user is a team member
-        if not company:
-            try:
-                company_user = CompanyUser.objects.get(user=user, is_active=True)
-                company = company_user.company
-            except CompanyUser.DoesNotExist:
-                pass
-        
-        if not company:
-            from django.http import Http404
-            raise Http404("User is not associated with any company")
-        
-        return company
-
-
-class CompanyUpdateView(generics.UpdateAPIView):
-    """Update company profile"""
-    permission_classes = [permissions.IsAuthenticated]
-    serializer_class = CompanyUpdateSerializer
-    
-    def get_object(self):
-        # Get the user's company - either as owner or team member
-        user = self.request.user
-        company = None
-        
-        # Check if user is a company owner
-        if hasattr(user, 'company'):
-            try:
-                company = user.company
-            except Company.DoesNotExist:
-                pass
-        
-        # If not owner, check if user is a team member
-        if not company:
-            try:
-                company_user = CompanyUser.objects.get(user=user, is_active=True)
-                company = company_user.company
-            except CompanyUser.DoesNotExist:
-                pass
-        
-        if not company:
-            from django.http import Http404
-            raise Http404("User is not associated with any company")
-        
-        return company
+# Views removed - not used by frontend
+# CompanyDetailView, CompanyUpdateView
 
 
 class SubscriptionPlansView(generics.ListAPIView):
@@ -227,184 +163,12 @@ class CancelSubscriptionView(APIView):
         })
 
 
-class CompanyUsersView(generics.ListAPIView):
-    """List company users/team members"""
-    permission_classes = [permissions.IsAuthenticated]
-    serializer_class = CompanyUserSerializer
-    
-    def get_queryset(self):
-        # Get the user's company - either as owner or team member
-        user = self.request.user
-        company = None
-        
-        # Check if user is a company owner
-        if hasattr(user, 'company'):
-            try:
-                company = user.company
-            except Company.DoesNotExist:
-                pass
-        
-        # If not owner, check if user is a team member
-        if not company:
-            try:
-                company_user = CompanyUser.objects.get(user=user, is_active=True)
-                company = company_user.company
-            except CompanyUser.DoesNotExist:
-                pass
-        
-        if not company:
-            return CompanyUser.objects.none()
-        
-        return CompanyUser.objects.filter(
-            company=company
-        ).select_related('user')
+# View removed - not used by frontend
+# CompanyUsersView
 
 
-class InviteUserView(APIView):
-    """Invite user to company"""
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def post(self, request):
-        # Get the user's company - either as owner or team member  
-        user = request.user
-        company = None
-        
-        # Check if user is a company owner
-        if hasattr(user, 'company'):
-            try:
-                company = user.company
-            except Company.DoesNotExist:
-                pass
-        
-        # If not owner, check if user is a team member
-        if not company:
-            try:
-                company_user = CompanyUser.objects.get(user=user, is_active=True)
-                company = company_user.company
-            except CompanyUser.DoesNotExist:
-                pass
-        
-        if not company:
-            return Response({
-                'error': 'User is not associated with any company'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Check if company plan allows more users
-        current_users = CompanyUser.objects.filter(
-            company=company,
-            is_active=True
-        ).count() + 1  # +1 for owner
-        
-        if current_users >= company.subscription_plan.max_users:
-            return Response({
-                'error': 'User limit reached for current subscription plan'
-            }, status=status.HTTP_403_FORBIDDEN)
-        
-        serializer = InviteUserSerializer(
-            data=request.data,
-            context={'request': request}
-        )
-        serializer.is_valid(raise_exception=True)
-        
-        email = serializer.validated_data['email']
-        role = serializer.validated_data['role']
-        permissions = serializer.validated_data.get('permissions', {})
-        
-        # Check if user exists
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            # Send invitation email to new user
-            from apps.notifications.email_service import EmailService
-            from django.conf import settings
-            
-            invitation_url = f"{settings.FRONTEND_URL}/accept-invitation?email={email}&company={company.id}"
-            EmailService.send_invitation_email(
-                email=email,
-                inviter=request.user,
-                company=company,
-                invitation_url=invitation_url
-            )
-            
-            return Response({
-                'message': 'Invitation sent to new user',
-                'email': email
-            })
-        
-        # Add existing user to company
-        company_user = CompanyUser.objects.create(
-            company=company,
-            user=user,
-            role=role,
-            permissions=permissions,
-            joined_at=timezone.now()
-        )
-        
-        # Send notification to user
-        from apps.notifications.email_service import EmailService
-        from django.conf import settings
-        
-        EmailService.send_invitation_email(
-            email=user.email,
-            inviter=request.user,
-            company=company,
-            invitation_url=f"{settings.FRONTEND_URL}/dashboard"
-        )
-        
-        return Response({
-            'message': 'User added to company',
-            'user': CompanyUserSerializer(company_user).data
-        })
-
-
-class RemoveUserView(APIView):
-    """Remove user from company"""
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def delete(self, request, user_id):
-        # Get the user's company - only owners can remove users
-        user = request.user
-        company = None
-        
-        # Check if user is a company owner
-        if hasattr(user, 'company'):
-            try:
-                company = user.company
-            except Company.DoesNotExist:
-                pass
-        
-        if not company:
-            return Response({
-                'error': 'Only company owner can remove users'
-            }, status=status.HTTP_403_FORBIDDEN)
-        
-        # Only owner can remove users
-        if request.user != company.owner:
-            return Response({
-                'error': 'Only company owner can remove users'
-            }, status=status.HTTP_403_FORBIDDEN)
-        
-        # Check if trying to remove the owner
-        if int(user_id) == company.owner.id:
-            return Response({
-                'error': 'Cannot remove company owner'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            company_user = CompanyUser.objects.get(
-                company=company,
-                user_id=user_id
-            )
-        except CompanyUser.DoesNotExist:
-            return Response({
-                'error': 'User not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-        
-        company_user.delete()
-        
-        return Response({
-            'message': 'User removed successfully'
-        }, status=status.HTTP_204_NO_CONTENT)
+# Views removed - not used by frontend
+# InviteUserView, RemoveUserView
 
 
 class PaymentMethodsView(APIView):

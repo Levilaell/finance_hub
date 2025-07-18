@@ -64,9 +64,7 @@ class EnhancedAIInsightsService:
                 )
                 # Test connection
                 self.client.models.list()
-                logger.info("OpenAI client initialized successfully")
             except Exception as e:
-                logger.error(f"Failed to initialize OpenAI client: {e}")
                 self.client = None
         else:
             logger.warning("OpenAI API key not found. AI insights will use fallback mode.")

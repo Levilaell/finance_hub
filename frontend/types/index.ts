@@ -200,14 +200,6 @@ export interface CategoryRule {
 
 // Reports
 
-export interface ReportResult {
-  id: string;
-  report: string;
-  generated_at: string;
-  data: Record<string, any>;
-  file_url: string | null;
-}
-
 // Notifications
 export interface Notification {
   id: string;
@@ -221,28 +213,6 @@ export interface Notification {
 }
 
 // Dashboard
-export interface DashboardStats {
-  total_balance: number;
-  income_this_month: number;
-  expenses_this_month: number;
-  net_income: number;
-  pending_transactions: number;
-  accounts_count: number;
-}
-
-export interface CashFlowData {
-  date: string;
-  income: number;
-  expenses: number;
-  balance: number;
-}
-
-export interface CategorySpending {
-  category: Category;
-  amount: number;
-  percentage: number;
-  transaction_count: number;
-}
 
 // API Response Types
 export interface PaginatedResponse<T> {
@@ -250,12 +220,6 @@ export interface PaginatedResponse<T> {
   next: string | null;
   previous: string | null;
   results: T[];
-}
-
-export interface ApiError {
-  detail?: string;
-  message?: string;
-  errors?: Record<string, string[]>;
 }
 
 // Form Types
@@ -415,20 +379,3 @@ export interface AISummary {
 }
 
 // Chart Data Types
-
-export interface CategorySpendingData {
-  category: {
-    name: string;
-    icon: string;
-  };
-  amount: number;
-  percentage: number;
-  transaction_count: number;
-}
-
-export interface IncomeVsExpensesData {
-  month: string;
-  income: number;
-  expenses: number;
-  profit: number;
-}

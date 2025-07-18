@@ -9,7 +9,7 @@ from django.db.models import Sum, Count, Q
 from datetime import datetime, timedelta
 from django.utils import timezone
 
-from .models import Company, SubscriptionPlan, CompanyUser, PaymentMethod, PaymentHistory, ResourceUsage
+from .models import Company, SubscriptionPlan, PaymentMethod, PaymentHistory, ResourceUsage
 
 
 @admin.register(SubscriptionPlan)

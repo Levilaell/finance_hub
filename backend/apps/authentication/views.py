@@ -349,14 +349,15 @@ class CustomTokenRefreshView(APIView):
             )
 
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def health_check(request):
-    """Health check endpoint"""
-    return Response({
-        'status': 'healthy',
-        'timestamp': timezone.now()
-    })
+# Health check endpoint removed - not used by frontend
+# @api_view(['GET'])
+# @permission_classes([AllowAny])
+# def health_check(request):
+#     """Health check endpoint"""
+#     return Response({
+#         'status': 'healthy',
+#         'timestamp': timezone.now()
+#     })
 
 
 @method_decorator(ratelimit(key='user', rate='5/h', method='GET'), name='dispatch')
@@ -451,27 +452,28 @@ class Disable2FAView(APIView):
         })
 
 
-class BackupCodesView(APIView):
-    """Regenerate backup codes"""
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request):
-        user = request.user
-        
-        if not user.is_two_factor_enabled:
-            return Response({
-                'error': '2FA não está ativada'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Regenerate hashed backup codes
-        backup_codes = generate_backup_codes()
-        user.backup_codes = hash_backup_codes(backup_codes)
-        user.save()
-        
-        return Response({
-            'backup_codes': backup_codes,  # Show plain codes only once
-            'message': 'Novos códigos de backup gerados. Por favor, guarde-os com segurança.'
-        })
+# BackupCodesView removed - not used by frontend
+# class BackupCodesView(APIView):
+#     """Regenerate backup codes"""
+#     permission_classes = [IsAuthenticated]
+#     
+#     def post(self, request):
+#         user = request.user
+#         
+#         if not user.is_two_factor_enabled:
+#             return Response({
+#                 'error': '2FA não está ativada'
+#             }, status=status.HTTP_400_BAD_REQUEST)
+#         
+#         # Regenerate hashed backup codes
+#         backup_codes = generate_backup_codes()
+#         user.backup_codes = hash_backup_codes(backup_codes)
+#         user.save()
+#         
+#         return Response({
+#             'backup_codes': backup_codes,  # Show plain codes only once
+#             'message': 'Novos códigos de backup gerados. Por favor, guarde-os com segurança.'
+#         })
 
 
 @method_decorator(ratelimit(key='user', rate='3/h', method='POST'), name='dispatch')

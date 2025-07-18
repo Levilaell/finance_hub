@@ -222,7 +222,10 @@ class ApiClient {
 
   // Generic methods
   async get<T>(url: string, params?: any): Promise<T> {
+    console.log('🌐 ApiClient.get - URL:', url);
+    console.log('🌐 ApiClient.get - Params:', params);
     const response = await this.client.get<T>(url, { params });
+    console.log('🌐 ApiClient.get - Response status:', response.status);
     return response.data;
   }
 

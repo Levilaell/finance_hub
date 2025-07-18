@@ -19,7 +19,6 @@ router.register(r'accounts', views.BankAccountViewSet, basename='bank-account')
 router.register(r'transactions', views.TransactionViewSet, basename='transaction')
 router.register(r'categories', views.TransactionCategoryViewSet, basename='category')
 router.register(r'providers', views.BankProviderViewSet, basename='bank-provider')
-router.register(r'budgets', views.BudgetViewSet, basename='budget')
 '''
 router.register(r'goals', views.FinancialGoalViewSet, basename='financial-goal')
 '''
@@ -27,17 +26,9 @@ urlpatterns = [
     # DRF Router URLs
     path('', include(router.urls)),
     
-    # Dashboard and Analytics
+    # Dashboard endpoints (keep only the ones being used)
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
     path('dashboard/enhanced/', views.EnhancedDashboardView.as_view(), name='enhanced-dashboard'),
-    path('analytics/time-series/', views.TimeSeriesAnalyticsView.as_view(), name='time-series'),
-    path('analytics/expense-trends/', views.ExpenseTrendsView.as_view(), name='expense-trends'),
-    
-    # Legacy bank connection endpoints (if still needed)
-    path('sync/<int:account_id>/', views.SyncBankAccountView.as_view(), name='sync-account'),
-    path('connect/', views.ConnectBankAccountView.as_view(), name='connect-account'),
-    path('oauth/callback/', views.OpenBankingCallbackView.as_view(), name='oauth-callback'),
-    path('refresh-token/<int:account_id>/', views.RefreshTokenView.as_view(), name='refresh-token'),
     
     # ===== PLUGGY INTEGRATION (Official Sandbox + Production) =====
     

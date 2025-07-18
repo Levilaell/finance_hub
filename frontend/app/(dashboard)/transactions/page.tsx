@@ -148,12 +148,16 @@ export default function TransactionsPage() {
   // Queries
   const { data: transactions, isLoading, error, refetch } = useQuery({
     queryKey: ['bank-transactions', { ...filters, search: debouncedSearch, page, page_size: pageSize }],
-    queryFn: () => bankingService.getTransactions({ 
-      ...filters, 
-      search: debouncedSearch,
-      page,
-      page_size: pageSize 
-    }),
+    queryFn: () => {
+      const params = { 
+        ...filters, 
+        search: debouncedSearch,
+        page,
+        page_size: pageSize 
+      };
+      console.log('📡 Requisição para API com parâmetros:', params);
+      return bankingService.getTransactions(params);
+    },
   });
 
   const { data: accounts } = useQuery({
@@ -804,6 +808,9 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
   }, [filters]);
 
   const applyFilters = () => {
+    console.log('🔍 Aplicando filtros:', localFilters);
+    console.log('🔍 min_amount:', localFilters.min_amount, typeof localFilters.min_amount);
+    console.log('🔍 max_amount:', localFilters.max_amount, typeof localFilters.max_amount);
     setFilters(localFilters);
   };
 

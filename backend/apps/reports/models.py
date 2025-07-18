@@ -78,61 +78,6 @@ class Report(models.Model):
         return f"{self.title} ({self.period_start} - {self.period_end})"
 
 
-class ReportSchedule(models.Model):
-    """
-    Scheduled report generation
-    """
-    FREQUENCY_CHOICES = [
-        ('daily', 'Diário'),
-        ('weekly', 'Semanal'),
-        ('monthly', 'Mensal'),
-        ('quarterly', 'Trimestral'),
-        ('yearly', 'Anual'),
-    ]
-    
-    company = models.ForeignKey(
-        'companies.Company',
-        on_delete=models.CASCADE,
-        related_name='report_schedules'
-    )
-    
-    # Schedule configuration
-    name = models.CharField(_('name'), max_length=200, blank=True)
-    report_type = models.CharField(_('report type'), max_length=20, choices=Report.REPORT_TYPES)
-    frequency = models.CharField(_('frequency'), max_length=20, choices=FREQUENCY_CHOICES)
-    
-    # Delivery settings
-    send_email = models.BooleanField(_('send by email'), default=True)
-    email_recipients = models.JSONField(_('email recipients'), default=list)
-    file_format = models.CharField(_('file format'), max_length=10, choices=Report.FILE_FORMATS, default='pdf')
-    
-    # Schedule settings
-    is_active = models.BooleanField(_('is active'), default=True)
-    next_run_at = models.DateTimeField(_('next run at'))
-    last_run_at = models.DateTimeField(_('last run at'), blank=True, null=True)
-    
-    # Report parameters
-    parameters = models.JSONField(_('parameters'), default=dict)
-    filters = models.JSONField(_('filters'), default=dict)
-    
-    # Metadata
-    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
-    created_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='created_schedules'
-    )
-    
-    class Meta:
-        db_table = 'report_schedules'
-        verbose_name = _('Report Schedule')
-        verbose_name_plural = _('Report Schedules')
-    
-    def __str__(self):
-        return f"{self.get_report_type_display()} - {self.get_frequency_display()}"
-
-
 class ReportTemplate(models.Model):
     """
     Custom report templates

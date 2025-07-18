@@ -223,14 +223,43 @@ class TransactionViewSet(viewsets.ModelViewSet):
         if transaction_type:
             filters['transaction_type'] = transaction_type
             
-        # Amount filters
+        # Amount filters - aplicar no valor absoluto
         min_amount = self.request.query_params.get('min_amount')
-        if min_amount:
-            filters['amount__gte'] = float(min_amount)
-            
         max_amount = self.request.query_params.get('max_amount')
-        if max_amount:
-            filters['amount__lte'] = float(max_amount)
+        
+        if min_amount or max_amount:
+            # Precisamos filtrar pelo valor absoluto, então vamos usar Q objects
+            amount_q = Q()
+            
+            if min_amount:
+                min_val = float(min_amount)
+                print(f"🔍 Backend - min_amount: {min_amount} -> {min_val}")
+                # Para valores mínimos, queremos transações onde |amount| >= min_val
+                amount_q &= (Q(amount__gte=min_val) | Q(amount__lte=-min_val))
+            
+            if max_amount:
+                max_val = float(max_amount)
+                print(f"🔍 Backend - max_amount: {max_amount} -> {max_val}")
+                # Para valores máximos, queremos transações onde |amount| <= max_val
+                amount_q &= Q(amount__lte=max_val) & Q(amount__gte=-max_val)
+            
+            # Aplicar o filtro de amount usando Q objects
+            queryset = queryset.filter(amount_q)
+            
+            # Debug para verificar se está funcionando
+            if max_amount:
+                test_exceeding = queryset.filter(
+                    Q(amount__gt=max_val) | Q(amount__lt=-max_val)
+                )
+                if test_exceeding.exists():
+                    print(f"⚠️ Transações que excedem {max_val}:")
+                    for t in test_exceeding[:3]:
+                        print(f"  - Amount: {t.amount}, |Amount|: {abs(t.amount)}, Description: {t.description[:30]}")
+                else:
+                    print(f"✅ Nenhuma transação excede o valor máximo de {max_val}")
+        
+        print(f"🔍 Backend - All query params: {dict(self.request.query_params)}")
+        print(f"🔍 Backend - Final filters: {filters}")
             
         # Search filter
         search = self.request.query_params.get('search')
@@ -241,6 +270,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 Q(notes__icontains=search)
             )
         
+        # Apply remaining filters
         return queryset.filter(**filters)
 
     @action(detail=False, methods=['get'])

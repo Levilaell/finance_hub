@@ -275,10 +275,10 @@ export default function Home() {
               <Link href="/pricing" className="hover:text-foreground">
                 Planos
               </Link>
-              <Link href="#" className="hover:text-foreground">
+              <Link href="/terms" className="hover:text-foreground">
                 Termos de Uso
               </Link>
-              <Link href="#" className="hover:text-foreground">
+              <Link href="/privacy" className="hover:text-foreground">
                 Privacidade
               </Link>
               <Link href="#" className="hover:text-foreground">
