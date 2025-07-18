@@ -206,12 +206,15 @@ class TransactionViewSet(viewsets.ModelViewSet):
             filters['transaction_date__lte'] = end_date
             
         # Category filter
-        category_id = self.request.query_params.get('category')
+        category_id = self.request.query_params.get('category_id')
         if category_id:
-            filters['category_id'] = category_id
+            if category_id == 'uncategorized':
+                filters['category__isnull'] = True
+            else:
+                filters['category_id'] = category_id
             
         # Account filter
-        account_id = self.request.query_params.get('account')
+        account_id = self.request.query_params.get('account_id')
         if account_id:
             filters['bank_account_id'] = account_id
             
@@ -219,6 +222,15 @@ class TransactionViewSet(viewsets.ModelViewSet):
         transaction_type = self.request.query_params.get('transaction_type')
         if transaction_type:
             filters['transaction_type'] = transaction_type
+            
+        # Amount filters
+        min_amount = self.request.query_params.get('min_amount')
+        if min_amount:
+            filters['amount__gte'] = float(min_amount)
+            
+        max_amount = self.request.query_params.get('max_amount')
+        if max_amount:
+            filters['amount__lte'] = float(max_amount)
             
         # Search filter
         search = self.request.query_params.get('search')

@@ -59,6 +59,14 @@ class AuthService {
   async deleteAccount(data: { password: string; confirmation: string }) {
     return apiClient.post("/api/auth/delete-account/", data);
   }
+
+  async verifyEmail(token: string) {
+    return apiClient.post("/api/auth/verify-email/", { token });
+  }
+
+  async resendVerificationEmail() {
+    return apiClient.post("/api/auth/resend-verification/");
+  }
 }
 
 export const authService = new AuthService();

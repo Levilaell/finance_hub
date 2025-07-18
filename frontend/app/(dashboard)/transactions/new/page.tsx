@@ -303,14 +303,14 @@ export default function NewTransactionPage() {
                 <span className="text-gray-500 text-xs ml-2">(Pluggy irá categorizar automaticamente)</span>
               </Label>
               <Select 
-                value={watch('category') || ''} 
-                onValueChange={(value) => setValue('category', value)}
+                value={watch('category') || 'auto'} 
+                onValueChange={(value) => setValue('category', value === 'auto' ? '' : value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma categoria (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">
+                  <SelectItem value="auto">
                     <span className="text-gray-500">Deixar Pluggy categorizar</span>
                   </SelectItem>
                   {filteredCategories.map((category) => (

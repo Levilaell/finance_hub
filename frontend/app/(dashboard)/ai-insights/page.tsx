@@ -470,18 +470,18 @@ export default function AIInsightsPage() {
       <AIInsightsErrorBoundary>
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
+            <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center">
                 <SparklesIcon className="h-5 w-5 mr-2" />
                 Análise com Inteligência Artificial
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                 {aiInsightsData?.predictions?.confidence && (
                   <ConfidenceIndicator level={aiInsightsData.predictions.confidence} />
                 )}
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="default"
                   onClick={() => {
                     // Force refetch with cache invalidation
                     setForceRefresh(true);
@@ -491,6 +491,7 @@ export default function AIInsightsPage() {
                   }}
                   disabled={aiInsightsLoading}
                   title="Atualizar análise"
+                  className="w-full sm:w-auto"
                 >
                   <ArrowPathIcon className={cn("h-4 w-4", aiInsightsLoading && "animate-spin")} />
                   <span className="ml-2">Atualizar</span>

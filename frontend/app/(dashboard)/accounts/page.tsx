@@ -325,14 +325,14 @@ export default function AccountsPage() {
       )}
       
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Contas Bancárias</h1>
           <p className="text-gray-600 mt-1">
             Gerencie suas contas conectadas via Open Banking
           </p>
         </div>
-        <Button onClick={handleConnectBank}>
+        <Button onClick={handleConnectBank} className="w-full sm:w-auto">
           <LinkIcon className="h-4 w-4 mr-2" />
           Conectar via Open Banking
         </Button>
@@ -441,7 +441,7 @@ export default function AccountsPage() {
           title="Nenhuma conta conectada"
           description="Conecte sua primeira conta bancária para começar a acompanhar suas finanças automaticamente"
           action={
-            <Button onClick={handleConnectBank}>
+            <Button onClick={handleConnectBank} className="w-full sm:w-auto">
               <LinkIcon className="h-4 w-4 mr-2" />
               Conectar via Open Banking
             </Button>

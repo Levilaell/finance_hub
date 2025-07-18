@@ -840,9 +840,9 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
       <div>
         <Label>Categoria</Label>
         <Select
-          value={localFilters.category || 'all'}
+          value={localFilters.category_id || 'all'}
           onValueChange={(value) =>
-            setLocalFilters({ ...localFilters, category: value === 'all' ? undefined : value })
+            setLocalFilters({ ...localFilters, category_id: value === 'all' ? undefined : value })
           }
         >
           <SelectTrigger>
@@ -893,12 +893,12 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
           <Label>Data Inicial</Label>
           <HydrationBoundary fallback={<div className="h-10 bg-gray-100 rounded animate-pulse" />}>
             <DatePicker
-              date={localFilters.start_date ? new Date(localFilters.start_date) : undefined}
+              date={localFilters.start_date ? new Date(localFilters.start_date + 'T00:00:00') : undefined}
               onDateChange={(date) =>
-                setLocalFilters({
-                  ...localFilters,
-                  start_date: date?.toISOString().split('T')[0],
-                })
+                setLocalFilters(prev => ({
+                  ...prev,
+                  start_date: date ? date.toISOString().split('T')[0] : undefined,
+                }))
               }
             />
           </HydrationBoundary>
@@ -907,12 +907,12 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
           <Label>Data Final</Label>
           <HydrationBoundary fallback={<div className="h-10 bg-gray-100 rounded animate-pulse" />}>
             <DatePicker
-              date={localFilters.end_date ? new Date(localFilters.end_date) : undefined}
+              date={localFilters.end_date ? new Date(localFilters.end_date + 'T00:00:00') : undefined}
               onDateChange={(date) =>
-                setLocalFilters({
-                  ...localFilters,
-                  end_date: date?.toISOString().split('T')[0],
-                })
+                setLocalFilters(prev => ({
+                  ...prev,
+                  end_date: date ? date.toISOString().split('T')[0] : undefined,
+                }))
               }
             />
           </HydrationBoundary>

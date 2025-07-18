@@ -65,12 +65,12 @@ class RegisterView(generics.CreateAPIView):
             expires_at=timezone.now() + timedelta(days=7)
         )
         
-        # Send verification email (disabled for Celery issues)
-        # from apps.notifications.email_service import send_verification_email_task
-        # from django.conf import settings
+        # Send verification email
+        from apps.notifications.email_service import send_verification_email_task
+        from django.conf import settings
         
-        # verification_url = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
-        # send_verification_email_task.delay(user.id, verification_url)
+        verification_url = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
+        send_verification_email_task.delay(user.id, verification_url)
         
         return Response({
             'user': UserSerializer(user).data,

@@ -276,12 +276,12 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="profile">Perfil</TabsTrigger>
-          <TabsTrigger value="security">Segurança</TabsTrigger>
-          <TabsTrigger value="status">Status & Limites</TabsTrigger>
-          <TabsTrigger value="billing">Faturamento</TabsTrigger>
-          <TabsTrigger value="notifications">Notificações (Em Breve)</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1">
+          <TabsTrigger value="profile" className="text-xs sm:text-sm">Perfil</TabsTrigger>
+          <TabsTrigger value="security" className="text-xs sm:text-sm">Segurança</TabsTrigger>
+          <TabsTrigger value="status" className="text-xs sm:text-sm col-span-2 sm:col-span-1">Status & Limites</TabsTrigger>
+          <TabsTrigger value="billing" className="text-xs sm:text-sm">Faturamento</TabsTrigger>
+          <TabsTrigger value="notifications" className="text-xs sm:text-sm col-span-2 sm:col-span-1 lg:col-span-1">Notificações (Em Breve)</TabsTrigger>
         </TabsList>
 
         {/* Profile Settings */}

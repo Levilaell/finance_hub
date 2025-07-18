@@ -312,14 +312,14 @@ export default function CategoriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold">Categories</h1>
           <p className="text-gray-600">Organize suas transações com categorias</p>
         </div>
         <div className="flex space-x-2">
 
-          <Button onClick={() => setIsAddingCategory(true)}>
+          <Button onClick={() => setIsAddingCategory(true)} className="w-full sm:w-auto">
             <PlusIcon className="h-4 w-4 mr-2" />
             Adicionar Categoria
           </Button>

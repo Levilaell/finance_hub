@@ -1,12 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { CalendarIcon } from "lucide-react"
-import { format } from "date-fns"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 interface DateInputProps {
   value?: Date
@@ -19,43 +13,50 @@ interface DateInputProps {
 export function DateInput({
   value,
   onChange,
-  placeholder = "Pick a date",
+  placeholder = "DD/MM/AAAA",
   className,
   disabled,
 }: DateInputProps) {
-  const [open, setOpen] = React.useState(false)
-  const [inputValue, setInputValue] = React.useState("")
+  const [localValue, setLocalValue] = React.useState("")
 
-  // Update input value when the value prop changes
+  // Update local value when prop changes
   React.useEffect(() => {
-    setInputValue(value ? format(value, "yyyy-MM-dd") : "")
+    if (value) {
+      const year = value.getFullYear()
+      const month = String(value.getMonth() + 1).padStart(2, '0')
+      const day = String(value.getDate()).padStart(2, '0')
+      setLocalValue(`${year}-${month}-${day}`)
+    } else {
+      setLocalValue("")
+    }
   }, [value])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
-    setInputValue(newValue)
+    setLocalValue(newValue)
     
-    if (newValue) {
-      const date = new Date(newValue)
-      if (!isNaN(date.getTime())) {
-        onChange?.(date)
+    // Only trigger onChange when we have a valid complete date
+    if (newValue && /^\d{4}-\d{2}-\d{2}$/.test(newValue)) {
+      const [year, month, day] = newValue.split('-').map(Number)
+      if (year > 1900 && year < 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        const date = new Date(year, month - 1, day, 12, 0, 0)
+        if (!isNaN(date.getTime())) {
+          onChange?.(date)
+        }
       }
-    } else {
+    } else if (!newValue) {
       onChange?.(undefined)
     }
   }
 
   return (
-    <div className={cn("relative", className)}>
-      <Input
-        type="date"
-        value={inputValue}
-        onChange={handleInputChange}
-        disabled={disabled}
-        className="pr-10"
-        placeholder={placeholder}
-      />
-      <CalendarIcon className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-    </div>
+    <input
+      type="date"
+      value={localValue}
+      onChange={handleInputChange}
+      disabled={disabled}
+      className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className || ""}`}
+      placeholder={placeholder}
+    />
   )
 }
