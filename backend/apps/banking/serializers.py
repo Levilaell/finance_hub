@@ -7,7 +7,7 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import (BankAccount, BankProvider, BankSync, Budget, RecurringTransaction, Transaction, TransactionCategory)
+from .models import (BankAccount, BankProvider, BankSync, Budget, Transaction, TransactionCategory)
 
 
 class BankProviderSerializer(serializers.ModelSerializer):
@@ -134,13 +134,12 @@ class TransactionSerializer(serializers.ModelSerializer):
             'amount', 'formatted_amount', 'amount_with_sign', 'description',
             'transaction_date', 'posted_date', 'counterpart_name', 'counterpart_document',
             'category', 'category_detail', 'category_name', 'category_icon', 'subcategory',
-            'subcategory_name', 'ai_category_confidence', 'is_ai_categorized',
-            'is_manually_reviewed', 'reference_number', 'pix_key', 'notes',
+            'subcategory_name', 'reference_number', 'pix_key', 'notes',
             'tags', 'status', 'is_income', 'is_expense', 'is_reconciled',
             'created_at', 'updated_at', 'external_id'
         ]
         read_only_fields = [
-            'ai_category_confidence', 'is_ai_categorized', 'formatted_amount',
+            'formatted_amount',
             'amount_with_sign', 'is_income', 'is_expense', 'bank_account_name',
             'account_name', 'category_detail', 'category_name', 'category_icon', 'subcategory_name',
             'external_id'
@@ -148,28 +147,8 @@ class TransactionSerializer(serializers.ModelSerializer):
     
     def update(self, instance, validated_data):
         """Update transaction and mark as manually reviewed"""
-        if 'category' in validated_data or 'subcategory' in validated_data:
-            validated_data['is_manually_reviewed'] = True
+        # Campo is_manually_reviewed removido - categorização automática via Pluggy
         return super().update(instance, validated_data)
-
-
-class RecurringTransactionSerializer(serializers.ModelSerializer):
-    """
-    Recurring transaction pattern serializer
-    """
-    bank_account_name = serializers.CharField(source='bank_account.display_name', read_only=True)
-    category_name = serializers.CharField(source='category.name', read_only=True)
-    
-    class Meta:
-        model = RecurringTransaction
-        fields = [
-            'id', 'bank_account', 'bank_account_name', 'name',
-            'description_pattern', 'expected_amount', 'amount_tolerance',
-            'frequency', 'next_expected_date', 'day_tolerance',
-            'category', 'category_name', 'is_active', 'auto_categorize',
-            'send_alerts', 'total_occurrences', 'last_occurrence_date',
-            'accuracy_rate', 'created_at'
-        ]
 
 
 class BankSyncSerializer(serializers.ModelSerializer):

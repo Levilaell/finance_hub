@@ -2,7 +2,7 @@
 Reports app serializers
 """
 from rest_framework import serializers
-from .models import Report, ReportSchedule, ReportTemplate
+from .models import Report, ReportTemplate
 
 
 class ReportSerializer(serializers.ModelSerializer):
@@ -27,26 +27,6 @@ class ReportSerializer(serializers.ModelSerializer):
             return round(obj.file_size / (1024 * 1024), 2)
         return None
 
-
-class ReportScheduleSerializer(serializers.ModelSerializer):
-    """
-    Report schedule serializer for automated reports
-    """
-    created_by_name = serializers.CharField(source='created_by.full_name', read_only=True)
-    
-    class Meta:
-        model = ReportSchedule
-        fields = [
-            'id', 'name', 'report_type', 'frequency', 'send_email', 'email_recipients',
-            'file_format', 'is_active', 'next_run_at', 'last_run_at',
-            'parameters', 'filters', 'created_at', 'created_by_name'
-        ]
-        read_only_fields = ['id', 'last_run_at', 'created_at']
-    
-    def create(self, validated_data):
-        validated_data['company'] = self.context['request'].user.company
-        validated_data['created_by'] = self.context['request'].user
-        return super().create(validated_data)
 
 
 class ReportTemplateSerializer(serializers.ModelSerializer):

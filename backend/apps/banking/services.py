@@ -21,7 +21,7 @@ from django.conf import settings
 from django.db import models, transaction
 from django.utils import timezone
 
-from .models import (BankAccount, BankProvider, BankSync, RecurringTransaction,
+from .models import (BankAccount, BankProvider, BankSync,
                      Transaction, TransactionCategory)
 # from .open_banking_client import open_banking_service, OpenBankingError  # Replaced with Pluggy
 
@@ -917,99 +917,6 @@ class CashFlowProjectionService:
     
     def __init__(self):
         pass
-    
-    def generate_projection(self, company, days_ahead: int = 30) -> List[Dict]:
-        """
-        Generate cash flow projection based on historical data and recurring transactions
-        
-        Args:
-            company: Company instance
-            days_ahead: Number of days to project
-            
-        Returns:
-            List of daily cash flow projections
-        """
-        start_date = timezone.now().date()
-        projections = []
-        
-        # Get current balance
-        current_balance = BankAccount.objects.filter(
-            company=company,
-            is_active=True
-        ).aggregate(
-            total=models.Sum('current_balance')
-        )['total'] or Decimal('0')
-        
-        # Get recurring transactions
-        recurring_transactions = RecurringTransaction.objects.filter(
-            bank_account__company=company,
-            is_active=True
-        )
-        
-        for day in range(days_ahead + 1):
-            projection_date = start_date + timedelta(days=day)
-            
-            # Calculate expected transactions for this date
-            expected_income = Decimal('0')
-            expected_expenses = Decimal('0')
-            alerts = []
-            
-            for recurring in recurring_transactions:
-                if self._is_transaction_expected(recurring, projection_date):
-                    if recurring.expected_amount > 0:
-                        expected_income += recurring.expected_amount
-                    else:
-                        expected_expenses += abs(recurring.expected_amount)
-                    
-                    # Check for potential issues
-                    if recurring.expected_amount < 0 and abs(recurring.expected_amount) > current_balance * Decimal('0.1'):
-                        alerts.append(f"Grande despesa esperada: {recurring.name}")
-            
-            # Update projected balance
-            daily_net = expected_income - expected_expenses
-            current_balance += daily_net
-            
-            # Warning if balance gets low
-            if current_balance < Decimal('1000'):
-                alerts.append("Saldo projetado baixo")
-            
-            projections.append({
-                'date': projection_date,
-                'projected_balance': current_balance,
-                'expected_income': expected_income,
-                'expected_expenses': expected_expenses,
-                'confidence_level': self._calculate_confidence(recurring_transactions, projection_date),
-                'alerts': alerts
-            })
-        
-        return projections
-    
-    def _is_transaction_expected(self, recurring: RecurringTransaction, date) -> bool:
-        """
-        Check if a recurring transaction is expected on a given date
-        """
-        if not recurring.next_expected_date:
-            return False
-        
-        days_diff = abs((date - recurring.next_expected_date).days)
-        return days_diff <= recurring.day_tolerance
-    
-    def _calculate_confidence(self, recurring_transactions, date) -> float:
-        """
-        Calculate confidence level for projection based on historical accuracy
-        """
-        # Simple confidence calculation based on recurring transaction accuracy
-        if not recurring_transactions:
-            return 0.3
-        
-        total_accuracy = sum(rt.accuracy_rate for rt in recurring_transactions)
-        avg_accuracy = total_accuracy / len(recurring_transactions)
-        
-        # Decrease confidence for future dates
-        days_ahead = (date - timezone.now().date()).days
-        confidence_decay = max(0.1, 1.0 - (days_ahead * 0.02))
-        
-        return min(0.95, avg_accuracy * confidence_decay)
 
 
 class FinancialInsightsService:

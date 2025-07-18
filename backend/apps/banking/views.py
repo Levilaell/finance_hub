@@ -321,7 +321,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 bank_account__company=request.user.company
             ).update(
                 category=category,
-                is_manually_reviewed=True
+                # Campo is_manually_reviewed removido - categorização automática via Pluggy
             )
             
             return Response({

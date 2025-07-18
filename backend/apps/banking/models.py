@@ -377,8 +377,7 @@ class Transaction(models.Model):
             models.Index(fields=['external_id', 'bank_account']),
             
             # AI categorization indexes
-            models.Index(fields=['is_ai_categorized', 'category']),
-            models.Index(fields=['ai_category_confidence', 'is_manually_reviewed']),
+            # AI categorization indexes removed - now using Pluggy automatic categorization
             
             # Reconciliation indexes
             models.Index(fields=['is_reconciled', 'reconciled_at']),

@@ -347,7 +347,7 @@ class PluggyTransactionSyncService:
                     counterpart_document='',
                     balance_after=balance_after,
                     category=category,  # Categoria da Pluggy ou None
-                    is_ai_categorized=False,  # Não é IA, é da Pluggy
+                    # Categorização automática via Pluggy (campo removido)
                     status='completed',
                     created_at=timezone.now()
                 )

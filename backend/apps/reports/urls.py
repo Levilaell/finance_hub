@@ -6,7 +6,6 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     ReportViewSet,
-    ReportScheduleViewSet,
     ReportTemplateViewSet,
     QuickReportsView,
     AnalyticsView,
@@ -21,7 +20,6 @@ app_name = 'reports'
 
 router = DefaultRouter()
 router.register(r'reports', ReportViewSet, basename='report')
-router.register(r'schedules', ReportScheduleViewSet, basename='report-schedule')
 router.register(r'templates', ReportTemplateViewSet, basename='report-template')
 
 urlpatterns = [

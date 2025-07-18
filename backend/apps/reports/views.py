@@ -24,9 +24,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone as django_timezone
 
 from apps.banking.models import BankAccount, Transaction, TransactionCategory
-from .models import Report, ReportSchedule, ReportTemplate
+from .models import Report, ReportTemplate
 from .serializers import (
-    ReportScheduleSerializer,
     ReportSerializer,
     ReportTemplateSerializer,
 )
@@ -52,9 +51,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.banking.models import BankAccount, Transaction
-from .models import Report, ReportSchedule, ReportTemplate
+from .models import Report, ReportTemplate
 from .serializers import (
-    ReportScheduleSerializer,
     ReportSerializer,
     ReportTemplateSerializer,
 )
@@ -381,31 +379,6 @@ class QuickReportsView(APIView):
         })
 
 
-# Remover ou simplificar ReportScheduleViewSet
-class ReportScheduleViewSet(viewsets.ModelViewSet):
-    """
-    Report schedule management - SIMPLIFICADO SEM EMAIL
-    """
-    serializer_class = ReportScheduleSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get_queryset(self):
-        return ReportSchedule.objects.filter(
-            company=self.request.user.company
-        ).select_related('created_by')
-    
-    def create(self, request, *args, **kwargs):
-        """Criar agendamento apenas para lembrete (sem envio automático)"""
-        return Response({
-            'message': 'Agendamento de relatórios está temporariamente desabilitado'
-        }, status=status.HTTP_501_NOT_IMPLEMENTED)
-    
-    @action(detail=True, methods=['post'])
-    def run_now(self, request, pk=None):
-        """Executar relatório agendado manualmente"""
-        return Response({
-            'message': 'Execução automática está temporariamente desabilitada. Por favor, gere o relatório manualmente.'
-        }, status=status.HTTP_501_NOT_IMPLEMENTED)
 
 
 # Manter outras views (AnalyticsView, DashboardStatsView, etc.) como estão
