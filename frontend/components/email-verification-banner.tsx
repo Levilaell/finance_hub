@@ -1,21 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuthStore } from "@/store/auth-store";
 import { authService } from "@/services/auth.service";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Info, X } from "lucide-react";
+import { Mail, X } from "lucide-react";
 import { toast } from "sonner";
 
 export function EmailVerificationBanner() {
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
+  const [localDismissed, setLocalDismissed] = useState(false);
 
-  if (!user || user.is_email_verified || dismissed) {
-    return null;
-  }
+  useEffect(() => {
+    // Check if banner was dismissed
+    const dismissed = localStorage.getItem('email_verification_banner_dismissed');
+    const dismissedDate = localStorage.getItem('email_verification_banner_dismissed_date');
+    
+    if (dismissed && dismissedDate) {
+      // Reset dismissal after 24 hours
+      const dismissedTime = new Date(dismissedDate).getTime();
+      const now = new Date().getTime();
+      const hoursSinceDismissed = (now - dismissedTime) / (1000 * 60 * 60);
+      
+      if (hoursSinceDismissed < 24) {
+        setLocalDismissed(true);
+      } else {
+        localStorage.removeItem('email_verification_banner_dismissed');
+        localStorage.removeItem('email_verification_banner_dismissed_date');
+      }
+    }
+  }, []);
 
   const handleResendEmail = async () => {
     setLoading(true);
@@ -33,36 +50,59 @@ export function EmailVerificationBanner() {
     }
   };
 
+  const handleDismiss = () => {
+    setIsDismissed(true);
+    setLocalDismissed(true);
+    localStorage.setItem('email_verification_banner_dismissed', 'true');
+    localStorage.setItem('email_verification_banner_dismissed_date', new Date().toISOString());
+  };
+
+  if (!user || user.is_email_verified || localDismissed || isDismissed) {
+    return null;
+  }
+
   return (
-    <Alert className="border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-900/20">
-      <Info className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-      <AlertDescription className="flex items-center justify-between">
-        <div className="flex-1">
-          <span className="text-yellow-800 dark:text-yellow-200">
-            Seu e-mail ainda não foi verificado. 
-          </span>
-          <span className="text-yellow-700 dark:text-yellow-300 ml-1">
-            Verifique sua caixa de entrada ou
-          </span>
-          <Button
-            variant="link"
-            size="sm"
-            className="text-yellow-700 hover:text-yellow-800 dark:text-yellow-300 dark:hover:text-yellow-200 p-0 ml-1"
+    <Card className="mb-6 border-muted relative">
+      <button
+        onClick={handleDismiss}
+        className="absolute top-2 right-2 text-muted-foreground hover:text-foreground"
+        aria-label="Fechar banner"
+      >
+        <X className="h-5 w-5" />
+      </button>
+      
+      <CardContent className="flex items-center justify-between p-4">
+        <div className="flex items-center space-x-3 flex-1">
+          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <Mail className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <p className="font-medium text-foreground">
+              Verifique seu e-mail
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Confirme seu endereço de e-mail para acessar todos os recursos do sistema.
+            </p>
+          </div>
+        </div>
+        <div className="flex space-x-2 ml-4">
+          <Button 
+            size="sm" 
             onClick={handleResendEmail}
             disabled={loading}
+            variant="default"
           >
-            {loading ? "Enviando..." : "reenvie o e-mail"}
+            {loading ? "Enviando..." : "Reenviar e-mail"}
+          </Button>
+          <Button 
+            size="sm" 
+            variant="ghost"
+            onClick={handleDismiss}
+          >
+            Depois
           </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="ml-4 text-yellow-600 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300"
-          onClick={() => setDismissed(true)}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </AlertDescription>
-    </Alert>
+      </CardContent>
+    </Card>
   );
 }
