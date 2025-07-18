@@ -9,9 +9,12 @@ from django.utils.translation import gettext_lazy as _
 User = get_user_model()
 
 
-class NotificationTemplate(models.Model):
+# NotificationTemplate model removed
+
+
+class Notification(models.Model):
     """
-    Notification templates for different alert types
+    User notifications
     """
     NOTIFICATION_TYPES = [
         ('low_balance', 'Saldo Baixo'),
@@ -26,39 +29,6 @@ class NotificationTemplate(models.Model):
         ('custom', 'Personalizado'),
     ]
     
-    name = models.CharField(_('template name'), max_length=200)
-    notification_type = models.CharField(_('notification type'), max_length=30, choices=NOTIFICATION_TYPES)
-    
-    # Template content
-    title_template = models.CharField(_('title template'), max_length=200)
-    message_template = models.TextField(_('message template'))
-    
-    # Notification channels
-    send_email = models.BooleanField(_('send email'), default=True)
-    send_push = models.BooleanField(_('send push notification'), default=True)
-    send_sms = models.BooleanField(_('send SMS'), default=False)
-    
-    # Settings
-    is_active = models.BooleanField(_('is active'), default=True)
-    is_system = models.BooleanField(_('is system template'), default=True)
-    
-    # Metadata
-    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
-    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
-    
-    class Meta:
-        db_table = 'notification_templates'
-        verbose_name = _('Notification Template')
-        verbose_name_plural = _('Notification Templates')
-    
-    def __str__(self):
-        return f"{self.name} ({self.get_notification_type_display()})"
-
-
-class Notification(models.Model):
-    """
-    User notifications
-    """
     PRIORITY_LEVELS = [
         ('low', 'Baixa'),
         ('medium', 'Média'),
@@ -81,13 +51,7 @@ class Notification(models.Model):
     )
     
     # Notification content
-    template = models.ForeignKey(
-        NotificationTemplate,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True
-    )
-    notification_type = models.CharField(_('notification type'), max_length=30, choices=NotificationTemplate.NOTIFICATION_TYPES)
+    notification_type = models.CharField(_('notification type'), max_length=30, choices=NOTIFICATION_TYPES)
     title = models.CharField(_('title'), max_length=200)
     message = models.TextField(_('message'))
     
@@ -179,45 +143,4 @@ class NotificationPreference(models.Model):
         return f"Preferences for {self.user.email}"
 
 
-class NotificationLog(models.Model):
-    """
-    Log of sent notifications for debugging and analytics
-    """
-    notification = models.ForeignKey(
-        Notification,
-        on_delete=models.CASCADE,
-        related_name='logs'
-    )
-    
-    # Delivery attempt
-    channel = models.CharField(
-        _('channel'),
-        max_length=20,
-        choices=[
-            ('email', 'Email'),
-            ('push', 'Push'),
-            ('sms', 'SMS'),
-            ('in_app', 'In-App'),
-        ]
-    )
-    
-    # Result
-    success = models.BooleanField(_('success'), default=False)
-    error_message = models.TextField(_('error message'), blank=True)
-    
-    # Additional info
-    recipient = models.CharField(_('recipient'), max_length=200)
-    provider = models.CharField(_('provider'), max_length=50, blank=True)
-    provider_message_id = models.CharField(_('provider message ID'), max_length=200, blank=True)
-    
-    # Metadata
-    attempted_at = models.DateTimeField(_('attempted at'), auto_now_add=True)
-    
-    class Meta:
-        db_table = 'notification_logs'
-        verbose_name = _('Notification Log')
-        verbose_name_plural = _('Notification Logs')
-        ordering = ['-attempted_at']
-    
-    def __str__(self):
-        return f"{self.channel} - {self.notification.title} - {'Success' if self.success else 'Failed'}"
+# NotificationLog model removed

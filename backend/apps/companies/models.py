@@ -359,6 +359,11 @@ class Company(models.Model):
         self.current_month_transactions += 1
         self.save(update_fields=['current_month_transactions'])
         
+        # Update ResourceUsage
+        usage = ResourceUsage.get_or_create_current_month(self)
+        usage.transactions_count += 1
+        usage.save(update_fields=['transactions_count'])
+        
         # Check if limit reached
         limit_reached, usage_info = self.check_plan_limits('transactions')
         if limit_reached:
@@ -376,6 +381,11 @@ class Company(models.Model):
         self.current_month_ai_requests += 1
         self.save(update_fields=['current_month_ai_requests'])
         
+        # Update ResourceUsage
+        usage = ResourceUsage.get_or_create_current_month(self)
+        usage.ai_requests_count += 1
+        usage.save(update_fields=['ai_requests_count'])
+        
         # Check if limit reached
         limit_reached, usage_info = self.check_plan_limits('ai_requests')
         if limit_reached:
@@ -387,6 +397,13 @@ class Company(models.Model):
                 limit_type='requisições de IA',
                 usage_info=usage_info
             )
+    
+    def increment_report_count(self):
+        """Increment report generation counter"""
+        # Update ResourceUsage
+        usage = ResourceUsage.get_or_create_current_month(self)
+        usage.reports_generated += 1
+        usage.save(update_fields=['reports_generated'])
     
     def reset_monthly_usage(self):
         """Reset monthly usage counters"""

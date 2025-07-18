@@ -17,6 +17,7 @@ import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/auth-store';
 import { RegisterData } from '@/types';
 import { EyeIcon, EyeSlashIcon, CheckIcon, ExclamationCircleIcon, CreditCardIcon } from '@heroicons/react/24/outline';
+import { validateCNPJ, validatePhone, cnpjMask, phoneMask } from '@/utils/validation';
 
 interface RegisterFormData extends RegisterData {
   selected_plan?: string;
@@ -35,6 +36,8 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string>('starter');
+  const [cnpjValue, setCnpjValue] = useState('');
+  const [phoneValue, setPhoneValue] = useState('');
 
   useEffect(() => {
     const plan = searchParams.get('plan');
@@ -54,6 +57,7 @@ export default function RegisterPage() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<RegisterFormData>();
 
@@ -74,7 +78,12 @@ export default function RegisterPage() {
         localStorage.setItem('trial_start_date', new Date().toISOString());
       }
       
-      toast.success('Cadastro realizado! Você tem 14 dias grátis para testar.');
+      // Show success message with email verification notice
+      toast.success('Cadastro realizado com sucesso!', {
+        description: 'Verifique seu e-mail para confirmar sua conta. Você tem 14 dias grátis para testar.',
+        duration: 5000,
+      });
+      
       router.push('/dashboard');
     },
     onError: (error: any) => {
@@ -222,6 +231,57 @@ export default function RegisterPage() {
                   {errors.company_name.message}
                 </p>
               )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="companyCnpj">CNPJ</Label>
+                <Input
+                  id="companyCnpj"
+                  type="text"
+                  placeholder="00.000.000/0000-00"
+                  value={cnpjValue}
+                  {...register('company_cnpj', {
+                    required: 'CNPJ é obrigatório',
+                    validate: (value) => validateCNPJ(value) || 'CNPJ inválido',
+                  })}
+                  onChange={(e) => {
+                    const masked = cnpjMask(e.target.value);
+                    setCnpjValue(masked);
+                    setValue('company_cnpj', masked);
+                  }}
+                  maxLength={18}
+                />
+                {errors.company_cnpj && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {errors.company_cnpj.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="phone">Telefone</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="(11) 99999-9999"
+                  value={phoneValue}
+                  {...register('phone', {
+                    required: 'Telefone é obrigatório',
+                    validate: (value) => validatePhone(value) || 'Telefone inválido',
+                  })}
+                  onChange={(e) => {
+                    const masked = phoneMask(e.target.value);
+                    setPhoneValue(masked);
+                    setValue('phone', masked);
+                  }}
+                  maxLength={15}
+                  autoComplete="tel"
+                />
+                {errors.phone && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {errors.phone.message}
+                  </p>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>

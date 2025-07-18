@@ -138,7 +138,8 @@ class ReportViewSet(viewsets.ModelViewSet):
                 generator = ReportGenerator(report.company)
                 
                 # Gerar relatório baseado no tipo
-                buffer = generator.generate_transaction_report(
+                buffer = generator.generate_report(
+                    report_type=report.report_type,
                     start_date=report.period_start,
                     end_date=report.period_end,
                     format=report.file_format or 'pdf',
@@ -354,7 +355,8 @@ class QuickReportsView(APIView):
         # Generate report immediately
         try:
             generator = ReportGenerator(report.company)
-            buffer = generator.generate_transaction_report(
+            buffer = generator.generate_report(
+                report_type=report.report_type,
                 start_date=report.period_start,
                 end_date=report.period_end,
                 format=report.file_format or 'pdf',

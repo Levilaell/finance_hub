@@ -7,6 +7,7 @@ export interface User {
   company: Company;
   role: "owner" | "admin" | "member";
   is_active: boolean;
+  is_email_verified: boolean;
   is_two_factor_enabled: boolean;
   created_at: string;
   updated_at: string;
@@ -24,9 +25,10 @@ export interface RegisterData {
   first_name: string;
   last_name: string;
   company_name: string;
+  company_cnpj: string;
   company_type: string;
   business_sector: string;
-  phone?: string;
+  phone: string;
 }
 
 export interface AuthTokens {

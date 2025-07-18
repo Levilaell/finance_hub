@@ -516,23 +516,23 @@ class ReportGenerator:
     
     def _get_balance_at_date(self, account, date):
         """Calculate account balance at a specific date"""
-        # Get all transactions before the date
-        transactions_before = Transaction.objects.filter(
+        # Get all transactions up to (not including) the date
+        transactions = Transaction.objects.filter(
             bank_account=account,
             transaction_date__lt=date
         )
         
-        credits = transactions_before.filter(
+        credits = transactions.filter(
             transaction_type='credit'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
         
-        debits = transactions_before.filter(
+        debits = transactions.filter(
             transaction_type='debit'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
         
-        # Initial balance + credits - debits
-        initial_balance = account.balance if hasattr(account, 'balance') else Decimal('0')
-        return initial_balance + credits - debits
+        # Calculate balance as credits - debits (without initial balance)
+        # This gives us the net change from all transactions
+        return credits - debits
     
     # PDF Generation Methods
     def _generate_profit_loss_pdf(self, revenue_by_category, expenses_by_category,

@@ -712,8 +712,8 @@ class ResourceUsageAdmin(admin.ModelAdmin):
         
         return format_html(
             '<span style="color: {}; font-weight: bold;">{}</span><br/>'
-            '<small>Trans: {:.1f}% | IA: {:.1f}%</small>',
-            color, status, trans_percent, ai_percent
+            '<small>Trans: {}% | IA: {}%</small>',
+            color, status, f'{trans_percent:.1f}', f'{ai_percent:.1f}'
         )
     usage_status.short_description = 'Status de Uso'
     
@@ -731,21 +731,21 @@ class ResourceUsageAdmin(admin.ModelAdmin):
         return format_html(
             '<div style="margin: 10px 0;">'
             '<div style="margin-bottom: 10px;">'
-            '<strong>Transações:</strong> {} / {} ({:.1f}%)<br/>'
+            '<strong>Transações:</strong> {} / {} ({}%)<br/>'
             '<div style="background: #e0e0e0; height: 20px; width: 300px; border-radius: 4px;">'
             '<div style="background: #4CAF50; height: 100%; width: {}%; border-radius: 4px;"></div>'
             '</div>'
             '</div>'
             '<div>'
-            '<strong>Requisições IA:</strong> {} / {} ({:.1f}%)<br/>'
+            '<strong>Requisições IA:</strong> {} / {} ({}%)<br/>'
             '<div style="background: #e0e0e0; height: 20px; width: 300px; border-radius: 4px;">'
             '<div style="background: #2196F3; height: 100%; width: {}%; border-radius: 4px;"></div>'
             '</div>'
             '</div>'
             '</div>',
-            obj.transactions_count, plan.max_transactions, trans_percent,
+            obj.transactions_count, plan.max_transactions, f'{trans_percent:.1f}',
             trans_percent,
-            obj.total_ai_usage, plan.max_ai_requests_per_month, ai_percent,
+            obj.total_ai_usage, plan.max_ai_requests_per_month, f'{ai_percent:.1f}',
             ai_percent
         )
     usage_chart.short_description = 'Gráfico de Uso'

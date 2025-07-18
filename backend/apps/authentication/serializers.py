@@ -7,6 +7,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.companies.models import Company, SubscriptionPlan
+from apps.companies.validators import validate_cnpj, validate_phone, format_cnpj, format_phone
 
 User = get_user_model()
 
@@ -34,13 +35,15 @@ class RegisterSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(required=True)
     company_type = serializers.CharField(required=True)
     business_sector = serializers.CharField(required=True)
+    company_cnpj = serializers.CharField(required=True, validators=[validate_cnpj])
+    phone = serializers.CharField(required=True, validators=[validate_phone])
     selected_plan = serializers.CharField(required=False, default='starter')
     
     class Meta:
         model = User
         fields = (
             'email', 'password', 'password2', 'first_name', 'last_name',
-            'phone', 'company_name', 'company_type', 'business_sector', 'selected_plan'
+            'phone', 'company_name', 'company_cnpj', 'company_type', 'business_sector', 'selected_plan'
         )
         
     def validate(self, attrs):
@@ -50,10 +53,14 @@ class RegisterSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         company_name = validated_data.pop('company_name')
+        company_cnpj = validated_data.pop('company_cnpj')
         company_type = validated_data.pop('company_type')
         business_sector = validated_data.pop('business_sector')
         selected_plan_slug = validated_data.pop('selected_plan', 'starter')
         validated_data.pop('password2')
+        
+        # Format phone before saving
+        validated_data['phone'] = format_phone(validated_data['phone'])
         
         # Create user
         user = User.objects.create_user(
@@ -95,6 +102,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         Company.objects.create(
             owner=user,
             name=company_name,
+            cnpj=format_cnpj(company_cnpj),
             company_type=company_type,
             business_sector=business_sector,
             subscription_plan=selected_plan,

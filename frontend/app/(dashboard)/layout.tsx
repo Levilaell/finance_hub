@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { MainLayout } from '@/components/layouts/main-layout';
 import { PaymentSetupBanner } from '@/components/payment/payment-setup-banner';
+import { EmailVerificationBanner } from '@/components/email-verification-banner';
 import { useSubscriptionCheck } from '@/hooks/use-subscription-check';
 
 export default function DashboardLayout({
@@ -73,6 +74,9 @@ export default function DashboardLayout({
   return (
     <MainLayout>
       <div className="min-h-screen">
+        {/* Email Verification Banner */}
+        {isAuthenticated && user && <EmailVerificationBanner />}
+        
         {/* Payment Setup Banner - Will only show when needed */}
         {isAuthenticated && user && <PaymentSetupBanner />}
         

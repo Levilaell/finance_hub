@@ -5,41 +5,10 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils import timezone
 
-from .models import NotificationTemplate, Notification, NotificationPreference, NotificationLog
+from .models import Notification, NotificationPreference
 
 
-@admin.register(NotificationTemplate)
-class NotificationTemplateAdmin(admin.ModelAdmin):
-    list_display = [
-        'name', 'notification_type', 'send_email', 
-        'send_push', 'send_sms', 'is_active'
-    ]
-    list_filter = ['notification_type', 'send_email', 'send_push', 'send_sms', 'is_active']
-    search_fields = ['name', 'title_template', 'message_template']
-    ordering = ['notification_type', 'name']
-    
-    fieldsets = (
-        ('Informações Básicas', {
-            'fields': ('name', 'notification_type')
-        }),
-        ('Conteúdo', {
-            'fields': ('title_template', 'message_template')
-        }),
-        ('Canais de Notificação', {
-            'fields': ('send_email', 'send_push', 'send_sms')
-        }),
-        ('Configurações', {
-            'fields': ('is_active', 'is_system'),
-            'classes': ('collapse',)
-        }),
-    )
-    
-    readonly_fields = ['created_at', 'updated_at']
-    
-    def get_readonly_fields(self, request, obj=None):
-        if obj and obj.is_system:
-            return self.readonly_fields + ['notification_type', 'is_system']
-        return self.readonly_fields
+# NotificationTemplateAdmin removed
 
 
 @admin.register(Notification)
@@ -63,8 +32,8 @@ class NotificationAdmin(admin.ModelAdmin):
         ('Conteúdo', {
             'fields': ('title', 'message', 'notification_type', 'priority', 'action_url')
         }),
-        ('Template e Dados', {
-            'fields': ('template', 'data'),
+        ('Dados Adicionais', {
+            'fields': ('data',),
             'classes': ('collapse',)
         }),
         ('Status de Leitura', {
@@ -93,7 +62,7 @@ class NotificationAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.select_related('user', 'company', 'template')
+        return qs.select_related('user', 'company')
     
     actions = ['mark_as_read', 'mark_as_unread', 'resend_notification']
     
@@ -161,59 +130,4 @@ class NotificationPreferenceAdmin(admin.ModelAdmin):
         return qs.select_related('user')
 
 
-@admin.register(NotificationLog)
-class NotificationLogAdmin(admin.ModelAdmin):
-    list_display = [
-        'notification_display', 'channel', 'success_status',
-        'attempted_at', 'error_truncated'
-    ]
-    list_filter = ['channel', 'success', 'attempted_at']
-    search_fields = ['notification__title', 'recipient', 'error_message']
-    date_hierarchy = 'attempted_at'
-    ordering = ['-attempted_at']
-    
-    fieldsets = (
-        ('Notificação', {
-            'fields': ('notification',)
-        }),
-        ('Tentativa de Envio', {
-            'fields': ('channel', 'recipient', 'success', 'error_message')
-        }),
-        ('Informações do Provedor', {
-            'fields': ('provider', 'provider_message_id'),
-            'classes': ('collapse',)
-        }),
-        ('Metadados', {
-            'fields': ('attempted_at',)
-        }),
-    )
-    
-    readonly_fields = ['attempted_at', 'notification']
-    
-    def notification_display(self, obj):
-        return f"{obj.notification.title[:40]}..."
-    notification_display.short_description = 'Notificação'
-    
-    def success_status(self, obj):
-        if obj.success:
-            return format_html('<span style="color: green;">✓ Sucesso</span>')
-        return format_html('<span style="color: red;">✗ Falha</span>')
-    success_status.short_description = 'Status'
-    
-    def error_truncated(self, obj):
-        if obj.error_message:
-            return obj.error_message[:50] + '...' if len(obj.error_message) > 50 else obj.error_message
-        return '-'
-    error_truncated.short_description = 'Erro'
-    
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.select_related('notification', 'notification__user')
-    
-    def has_add_permission(self, request):
-        # Logs são criados automaticamente
-        return False
-    
-    def has_change_permission(self, request, obj=None):
-        # Logs não devem ser editados
-        return False
+# NotificationLogAdmin removed
