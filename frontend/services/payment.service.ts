@@ -24,13 +24,13 @@ export interface PaymentValidationResponse {
 export const paymentService = {
   // Create checkout session for immediate payment
   async createCheckoutSession(data: CheckoutSessionData): Promise<CheckoutSessionResponse> {
-    const response = await apiClient.post('/api/payments/checkout/create/', data);
+    const response = await apiClient.post<CheckoutSessionResponse>('/api/payments/checkout/create/', data);
     return response;
   },
 
   // Validate payment after returning from checkout
   async validatePayment(data: PaymentValidationData): Promise<PaymentValidationResponse> {
-    const response = await apiClient.post('/api/payments/checkout/validate/', data);
+    const response = await apiClient.post<PaymentValidationResponse>('/api/payments/checkout/validate/', data);
     return response;
   },
 };

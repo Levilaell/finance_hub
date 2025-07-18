@@ -10,7 +10,7 @@ import { ErrorMessage } from '@/components/ui/error-message';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { reportsService } from '@/services/reports.service';
-import { Report, ReportParameters, Account, Category } from '@/types';
+import { Report, ReportParameters, Account, Category, AIInsights } from '@/types';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { 
   DocumentChartBarIcon,
@@ -335,7 +335,7 @@ const CategorizedInsights: React.FC<{ insights: AIInsight[] }> = ({ insights }) 
 };
 
 const ExecutiveSummary: React.FC<{ summary: any }> = ({ summary }) => {
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     excellent: 'bg-green-100 text-green-800 border-green-300',
     healthy: 'bg-blue-100 text-blue-800 border-blue-300',
     attention_needed: 'bg-yellow-100 text-yellow-800 border-yellow-300',
@@ -394,7 +394,7 @@ export default function ReportsPage() {
   const [reportType, setReportType] = useState<string>('profit_loss');
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [exportFormat, setExportFormat] = useState<'pdf' | 'excel'>('pdf');
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'xlsx'>('pdf');
 
   // Set dates on client-side after hydration
   useEffect(() => {
@@ -464,7 +464,7 @@ export default function ReportsPage() {
     error: aiInsightsError,
     refetch: refetchAIInsights,
     dataUpdatedAt
-  } = useQuery({
+  } = useQuery<AIInsights | null>({
     queryKey: ['ai-insights', selectedPeriod],
     queryFn: () => {
       if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
@@ -477,15 +477,15 @@ export default function ReportsPage() {
     retry: 2,
     retryDelay: 1000,
     staleTime: 7 * 24 * 60 * 60 * 1000, // 7 dias em milissegundos
-    cacheTime: 7 * 24 * 60 * 60 * 1000, // Manter cache por 7 dias
+    gcTime: 7 * 24 * 60 * 60 * 1000, // Manter cache por 7 dias
     refetchOnWindowFocus: false, // Não refetch automaticamente
   });
 
   // Mutations
   const generateReportMutation = useMutation({
-    mutationFn: (params: { type: string; parameters: ReportParameters; format: 'pdf' | 'excel' }) =>
+    mutationFn: (params: { type: string; parameters: ReportParameters; format: 'pdf' | 'xlsx' | 'csv' | 'json' }) =>
       reportsService.generateReport(params.type, params.parameters, params.format),
-    onSuccess: (data) => {
+    onSuccess: (data: Report) => {
       toast.success('Relatório gerado com sucesso! Fazendo download...');
       refetchReports();
       
@@ -567,7 +567,7 @@ export default function ReportsPage() {
     generateReportMutation.mutate({ 
       type: reportType, 
       parameters, 
-      format: exportFormat === 'excel' ? 'xlsx' : exportFormat 
+      format: exportFormat 
     });
   }, [selectedPeriod, selectedAccounts, selectedCategories, reportType, exportFormat, generateReportMutation]);
 
@@ -715,7 +715,7 @@ export default function ReportsPage() {
                           fill="#8884d8"
                           dataKey="amount"
                         >
-                          {categorySpending.map((entry, index) => (
+                          {categorySpending.map((entry: any, index: number) => (
                             <Cell
                               key={`cell-${index}`}
                               fill={CHART_COLORS[index % CHART_COLORS.length]}
@@ -819,13 +819,13 @@ export default function ReportsPage() {
                   </div>
                   <div>
                     <Label>Formato de Exportação</Label>
-                    <Select value={exportFormat} onValueChange={(value: 'pdf' | 'excel') => setExportFormat(value)}>
+                    <Select value={exportFormat} onValueChange={(value: 'pdf' | 'xlsx') => setExportFormat(value)}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="pdf">PDF</SelectItem>
-                        <SelectItem value="excel">Excel</SelectItem>
+                        <SelectItem value="xlsx">Excel</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

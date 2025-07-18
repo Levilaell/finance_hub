@@ -49,23 +49,23 @@ export const billingService = {
     if (params?.status) searchParams.append('status', params.status);
     if (params?.search) searchParams.append('search', params.search);
     
-    const response = await apiClient.get(`/api/companies/billing/history/?${searchParams}`);
+    const response = await apiClient.get<BillingTransaction[]>(`/api/companies/billing/history/?${searchParams}`);
     return response;
   },
 
   async downloadInvoice(paymentId: string): Promise<{ download_url: string }> {
-    const response = await apiClient.get(`/api/companies/billing/invoices/${paymentId}/`);
+    const response = await apiClient.get<{ download_url: string }>(`/api/companies/billing/invoices/${paymentId}/`);
     return response;
   },
 
   // Payment Methods
   async getPaymentMethods(): Promise<PaymentMethod[]> {
-    const response = await apiClient.get('/api/companies/billing/payment-methods/');
+    const response = await apiClient.get<PaymentMethod[]>('/api/companies/billing/payment-methods/');
     return response;
   },
 
   async addPaymentMethod(data: AddPaymentMethodData): Promise<PaymentMethod> {
-    const response = await apiClient.post('/api/companies/billing/payment-methods/', data);
+    const response = await apiClient.post<PaymentMethod>('/api/companies/billing/payment-methods/', data);
     return response;
   },
 

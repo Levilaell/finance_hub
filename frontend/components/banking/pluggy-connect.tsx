@@ -264,7 +264,7 @@ export default function PluggyConnect({
                       {bank.name}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {bank.supports_identity ? 'Suporte completo' : 'Transações apenas'}
+                      {bank.supports_transactions ? 'Transações disponíveis' : 'Banco disponível'}
                     </p>
                   </div>
                 </div>

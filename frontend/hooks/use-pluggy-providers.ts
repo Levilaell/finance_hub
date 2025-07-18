@@ -20,8 +20,7 @@ export function usePluggyProviders() {
   const [error, setError] = useState<string | null>(null);
   const [sandboxMode, setSandboxMode] = useState(false);
 
-  useEffect(() => {
-    const fetchProviders = async () => {
+  const fetchProviders = async () => {
       try {
         setLoading(true);
         setError(null);
@@ -34,7 +33,7 @@ export function usePluggyProviders() {
         console.log('🏦 Pluggy banks response:', response);
         
         if (response.success) {
-          setProviders(response.data);
+          setProviders(response.data as any);
           setSandboxMode(response.sandbox_mode);
           console.log(`🏦 Loaded ${response.data.length} banks (sandbox: ${response.sandbox_mode})`);
         } else {
@@ -61,8 +60,9 @@ export function usePluggyProviders() {
       } finally {
         setLoading(false);
       }
-    };
+  };
 
+  useEffect(() => {
     fetchProviders();
   }, []);
 

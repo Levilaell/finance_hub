@@ -65,6 +65,8 @@ export interface Company {
   subscription_end_date?: string;
   current_month_transactions: number;
   current_month_ai_requests: number;
+  active_bank_accounts_count?: number;
+  active_users_count?: number;
   // ... outros campos
 }
 
@@ -197,33 +199,6 @@ export interface CategoryRule {
 }
 
 // Reports
-export interface Report {
-  id: string;
-  title: string;
-  report_type: string;
-  period_start: string;
-  period_end: string;
-  file_format: string;
-  is_generated: boolean;
-  created_at: string;
-  created_by_name?: string;
-  file?: string;
-  file_size?: number;
-  generation_time?: number;
-  error_message?: string;
-  parameters?: Record<string, any>;
-  filters?: Record<string, any>;
-}
-
-export interface ReportParameters {
-  start_date?: string;
-  end_date?: string;
-  accounts?: string[];
-  categories?: string[];
-  account_ids?: string[];
-  category_ids?: string[];
-  comparison_period?: "previous_period" | "previous_year";
-}
 
 export interface ReportResult {
   id: string;
@@ -312,10 +287,6 @@ export interface TransactionFilter {
   search?: string;
 }
 
-// frontend/types/index.ts
-// Add these types to your existing types file
-
-// Report Types
 export interface Report {
   id: string;
   title: string;
@@ -443,38 +414,7 @@ export interface AISummary {
   executive_takeaway?: string;
 }
 
-// Account Types (if not already defined)
-export interface Account {
-  id: string;
-  name: string;
-  bank_provider: string;
-  account_type: string;
-  account_number: string;
-  current_balance: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-// Category Types (if not already defined)
-export interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  icon: string;
-  category_type: 'income' | 'expense' | 'both';
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 // Chart Data Types
-export interface CashFlowData {
-  date: string;
-  income: number;
-  expenses: number;
-  balance: number;
-}
 
 export interface CategorySpendingData {
   category: {

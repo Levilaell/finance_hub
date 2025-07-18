@@ -183,7 +183,7 @@ export default function CategoriesPage() {
           {categoryRules.length > 0 && (
             <div className="space-y-2">
               <p className="text-sm text-gray-600 font-medium">Auto-categorization rules:</p>
-              {categoryRules.map((rule) => (
+              {categoryRules.map((rule: any) => (
                 <div key={rule.id} className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
                   {rule.field} {rule.rule_type} &ldquo;{rule.value}&rdquo;
                 </div>
@@ -239,7 +239,7 @@ export default function CategoriesPage() {
           <Select 
             name="type" 
             value={formData.type}
-            onValueChange={(value) => setFormData({ ...formData, type: value })}
+            onValueChange={(value) => setFormData({ ...formData, type: value as "income" | "expense" })}
           >
             <SelectTrigger>
               <SelectValue />

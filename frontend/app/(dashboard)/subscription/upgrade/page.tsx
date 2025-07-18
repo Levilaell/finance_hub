@@ -31,8 +31,8 @@ export default function UpgradePage() {
         return response;
       }
       // If response is an object with data property, return the data
-      if (response && typeof response === 'object' && Array.isArray(response.data)) {
-        return response.data;
+      if (response && typeof response === 'object' && 'data' in response && Array.isArray((response as any).data)) {
+        return (response as any).data;
       }
       return [];
     },
@@ -57,11 +57,11 @@ export default function UpgradePage() {
 
   // Create checkout session mutation
   const createCheckoutMutation = useMutation({
-    mutationFn: (data: { plan_id: string; billing_cycle: string }) =>
+    mutationFn: (data: { plan_slug: string; billing_cycle: 'monthly' | 'yearly' }) =>
       paymentService.createCheckoutSession(data),
     onSuccess: (data) => {
-      if (data.redirect_url) {
-        window.location.href = data.redirect_url;
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
       } else {
         toast.error('Erro ao criar sessão de pagamento');
       }
@@ -78,8 +78,8 @@ export default function UpgradePage() {
     }
 
     createCheckoutMutation.mutate({
-      plan_id: selectedPlan.id,
-      billing_cycle: billingCycle,
+      plan_slug: selectedPlan.slug,
+      billing_cycle: billingCycle as 'monthly' | 'yearly',
     });
   };
 

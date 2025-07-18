@@ -55,9 +55,9 @@ export const reportsService = {
       report_type: type,
       title: parameters.title || `${type} - ${parameters.start_date} to ${parameters.end_date}`,
       description: parameters.description || '',
-      period_start: parameters.start_date,
-      period_end: parameters.end_date,
-      file_format: format === 'excel' ? 'xlsx' : format,
+      period_start: parameters.start_date!,
+      period_end: parameters.end_date!,
+      file_format: format,
       parameters: {
         account_ids: parameters.account_ids || [],
         category_ids: parameters.category_ids || [],
@@ -226,7 +226,11 @@ export const reportsService = {
       // Retornar estrutura básica para não quebrar a UI
       return {
         insights: [],
-        predictions: {},
+        predictions: {
+          next_month_income: 0,
+          next_month_expenses: 0,
+          projected_savings: 0,
+        },
         recommendations: [],
         key_metrics: {
           health_score: 0,

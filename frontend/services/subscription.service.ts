@@ -19,13 +19,13 @@ export interface SubscriptionStatus {
 export const subscriptionService = {
   // Get all public subscription plans
   async getPublicPlans(): Promise<SubscriptionPlan[]> {
-    const response = await apiClient.get('/api/companies/public/plans/');
+    const response = await apiClient.get<SubscriptionPlan[]>('/api/companies/public/plans/');
     return response;
   },
 
   // Get current user's available plans
   async getAvailablePlans(): Promise<SubscriptionPlan[]> {
-    const response = await apiClient.get('/api/companies/subscription/plans/');
+    const response = await apiClient.get<SubscriptionPlan[]>('/api/companies/subscription/plans/');
     return response;
   },
 
@@ -43,14 +43,14 @@ export const subscriptionService = {
 
   // Get subscription status
   async getSubscriptionStatus(): Promise<SubscriptionStatus> {
-    const response = await apiClient.get('/api/payments/subscription-status/');
+    const response = await apiClient.get<SubscriptionStatus>('/api/payments/subscription-status/');
     return response;
   },
 
   // Get usage limits
   async getUsageLimits(): Promise<UsageLimits> {
     // This might be part of the company profile or a separate endpoint
-    const response = await apiClient.get('/api/companies/usage-limits/');
+    const response = await apiClient.get<UsageLimits>('/api/companies/usage-limits/');
     return response;
   },
 };

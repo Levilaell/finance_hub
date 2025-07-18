@@ -88,12 +88,8 @@ const formatTransactionDate = (dateString: string | null | undefined): string =>
   try {
     let date: Date;
     
-    // Se já for um objeto Date válido
-    if (dateString instanceof Date && !isNaN(dateString.getTime())) {
-      date = dateString;
-    }
     // Formato ISO com timezone
-    else if (dateString.includes('T')) {
+    if (dateString.includes('T')) {
       date = new Date(dateString);
     }
     // Formato YYYY-MM-DD
@@ -347,7 +343,7 @@ export default function TransactionsPage() {
       cell: (transaction: TransactionWithTags) => (
         <div className="min-w-[180px]">
           <Select
-            value={transaction.category || 'uncategorized'}
+            value={transaction.category?.id || 'uncategorized'}
             onValueChange={(value) =>
               updateCategoryMutation.mutate({ 
                 id: transaction.id, 
@@ -895,7 +891,7 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
             <DatePicker
               date={localFilters.start_date ? new Date(localFilters.start_date + 'T00:00:00') : undefined}
               onDateChange={(date) =>
-                setLocalFilters(prev => ({
+                setLocalFilters((prev: any) => ({
                   ...prev,
                   start_date: date ? date.toISOString().split('T')[0] : undefined,
                 }))
@@ -909,7 +905,7 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
             <DatePicker
               date={localFilters.end_date ? new Date(localFilters.end_date + 'T00:00:00') : undefined}
               onDateChange={(date) =>
-                setLocalFilters(prev => ({
+                setLocalFilters((prev: any) => ({
                   ...prev,
                   end_date: date ? date.toISOString().split('T')[0] : undefined,
                 }))

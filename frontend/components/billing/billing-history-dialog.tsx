@@ -51,8 +51,8 @@ export function BillingHistoryDialog({
         return response;
       }
       // If response is an object with data property, return the data
-      if (response && typeof response === 'object' && Array.isArray(response.data)) {
-        return response.data;
+      if (response && typeof response === 'object' && 'data' in response && Array.isArray((response as any).data)) {
+        return (response as any).data;
       }
       return [];
     },
@@ -95,7 +95,7 @@ export function BillingHistoryDialog({
 
   const handleExportHistory = () => {
     // Simulate export
-    const csvData = filteredTransactions?.map(t => 
+    const csvData = filteredTransactions?.map((t: any) => 
       `${t.date},${t.description},${t.amount},${t.status},${t.payment_method}`
     ).join('\n');
     
@@ -176,7 +176,7 @@ export function BillingHistoryDialog({
                   <p>Nenhuma transação encontrada</p>
                 </div>
               ) : (
-                filteredTransactions?.map((transaction) => {
+                filteredTransactions?.map((transaction: any) => {
                   const statusInfo = getStatusInfo(transaction.status);
                   
                   return (
@@ -248,8 +248,8 @@ export function BillingHistoryDialog({
                     <p className="text-lg font-semibold text-green-600">
                       {formatCurrency(
                         filteredTransactions
-                          .filter(t => t.status === 'paid')
-                          .reduce((sum, t) => sum + t.amount, 0)
+                          .filter((t: any) => t.status === 'paid')
+                          .reduce((sum: number, t: any) => sum + t.amount, 0)
                       )}
                     </p>
                   </div>

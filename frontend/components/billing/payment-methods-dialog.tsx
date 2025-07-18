@@ -56,8 +56,8 @@ export function PaymentMethodsDialog({
         return response;
       }
       // If response is an object with data property, return the data
-      if (response && typeof response === 'object' && Array.isArray(response.data)) {
-        return response.data;
+      if (response && typeof response === 'object' && 'data' in response && Array.isArray((response as any).data)) {
+        return (response as any).data;
       }
       return [];
     },
@@ -297,7 +297,7 @@ export function PaymentMethodsDialog({
 
             {/* Payment Methods List */}
             <div className="space-y-3">
-              {paymentMethods?.map((method) => (
+              {paymentMethods?.map((method: any) => (
                 <Card key={method.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
