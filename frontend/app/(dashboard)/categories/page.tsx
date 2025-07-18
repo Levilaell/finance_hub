@@ -185,7 +185,7 @@ export default function CategoriesPage() {
               <p className="text-sm text-gray-600 font-medium">Auto-categorization rules:</p>
               {categoryRules.map((rule) => (
                 <div key={rule.id} className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                  {rule.field} {rule.rule_type} "{rule.value}"
+                  {rule.field} {rule.rule_type} &ldquo;{rule.value}&rdquo;
                 </div>
               ))}
             </div>
@@ -436,7 +436,7 @@ export default function CategoriesPage() {
           <DialogHeader>
             <DialogTitle>Excluir Categoria</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{selectedCategory?.name}"? 
+              Are you sure you want to delete &ldquo;{selectedCategory?.name}&rdquo;? 
               Transactions in this category will become uncategorized.
             </DialogDescription>
           </DialogHeader>

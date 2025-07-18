@@ -265,7 +265,7 @@ const CategorizedInsights: React.FC<{ insights: AIInsight[] }> = ({ insights }) 
 };
 
 const ExecutiveSummary: React.FC<{ summary: any }> = ({ summary }) => {
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     excellent: 'bg-green-100 text-green-800 border-green-300',
     healthy: 'bg-blue-100 text-blue-800 border-blue-300',
     attention_needed: 'bg-yellow-100 text-yellow-800 border-yellow-300',
@@ -366,7 +366,7 @@ export default function AIInsightsPage() {
     retry: 2,
     retryDelay: 1000,
     staleTime: forceRefresh ? 0 : 7 * 24 * 60 * 60 * 1000, // No cache if force refresh
-    cacheTime: forceRefresh ? 0 : 7 * 24 * 60 * 60 * 1000, // No cache if force refresh
+    gcTime: forceRefresh ? 0 : 7 * 24 * 60 * 60 * 1000, // No cache if force refresh
     refetchOnWindowFocus: false, // Não refetch automaticamente
   });
 

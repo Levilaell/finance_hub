@@ -265,7 +265,7 @@ export function RulesList({ onCreateRule }: RulesListProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Rule</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the rule "{deletingRule?.name}"? 
+              Are you sure you want to delete the rule &ldquo;{deletingRule?.name}&rdquo;? 
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

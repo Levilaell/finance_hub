@@ -134,7 +134,7 @@ export default function AccountsPage() {
       }
 
       // Se chegou aqui, algo deu errado
-      throw new Error(result.message || 'Erro ao criar token de conexão');
+      throw new Error(result.data?.message || 'Erro ao criar token de conexão');
       
     } catch (error: any) {
       console.error('❌ Error connecting bank:', error);
@@ -455,7 +455,7 @@ export default function AccountsPage() {
           <DialogHeader>
             <DialogTitle>Remover Conta Bancária</DialogTitle>
             <DialogDescription>
-              Tem certeza que deseja remover a conta "{selectedAccount?.display_name}"? 
+              Tem certeza que deseja remover a conta &ldquo;{selectedAccount?.display_name}&rdquo;? 
               Esta ação não pode ser desfeita e todas as transações associadas serão mantidas no histórico.
             </DialogDescription>
           </DialogHeader>

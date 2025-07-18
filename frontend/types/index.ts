@@ -29,6 +29,7 @@ export interface RegisterData {
   company_type: string;
   business_sector: string;
   phone: string;
+  selected_plan?: string;
 }
 
 export interface AuthTokens {
