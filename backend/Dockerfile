@@ -35,6 +35,10 @@ RUN DJANGO_SECRET_KEY="dummy-key-for-collectstatic" \
     DATABASE_URL="postgres://dummy:dummy@dummy:5432/dummy" \
     python manage.py collectstatic --noinput || true
 
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Create a non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
@@ -42,5 +46,5 @@ USER appuser
 # Railway sets PORT dynamically
 EXPOSE 8000
 
-# Start command - O Railway vai passar a porta via $PORT
-CMD gunicorn core.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 4 --timeout 120
+# Use entrypoint
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
