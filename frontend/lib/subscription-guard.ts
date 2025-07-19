@@ -69,7 +69,6 @@ export class SubscriptionGuard {
     const limits: Record<string, number> = {
       'transactions': plan.max_transactions,
       'bank_accounts': plan.max_bank_accounts,
-      'users': plan.max_users,
       'ai_requests': plan.max_ai_requests_per_month,
     };
     
