@@ -3,7 +3,7 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV DJANGO_SETTINGS_MODULE=core.settings.production
+# Don't set DJANGO_SETTINGS_MODULE here - Railway will set it at runtime
 
 # Set work directory
 WORKDIR /app
@@ -30,8 +30,8 @@ COPY . /app/
 # Create necessary directories
 RUN mkdir -p /app/staticfiles /app/media /app/logs
 
-# Run collectstatic (ignore errors for Railway build)
-RUN python manage.py collectstatic --noinput || true
+# Run collectstatic with development settings (ignore errors)
+RUN DJANGO_SETTINGS_MODULE=core.settings.development python manage.py collectstatic --noinput || true
 
 # Create a non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
