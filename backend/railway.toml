@@ -2,7 +2,7 @@
 builder = "dockerfile"
 
 [deploy]
-startCommand = "DJANGO_SETTINGS_MODULE=core.settings.production python manage.py migrate && python manage.py seed_plans && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --timeout 120"
+startCommand = "python manage.py migrate && python manage.py seed_plans && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --timeout 120"
 healthcheckPath = "/api/health/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
