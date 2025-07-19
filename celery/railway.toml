@@ -1,7 +1,7 @@
 [build]
 builder = "dockerfile"
-dockerfilePath = "../backend/Dockerfile.celery"
-buildContext = "../backend"
+dockerfilePath = "./celery/Dockerfile"
+buildContext = "."
 
 [deploy]
 restartPolicyType = "on_failure"
