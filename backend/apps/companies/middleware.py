@@ -74,13 +74,14 @@ class TrialExpirationMiddleware:
         
         # Check trial expiration
         if company.subscription_status == 'trial' and company.trial_ends_at:
-            if timezone.now() > company.trial_ends_at:
+            current_time = timezone.now()
+            logger.debug(f"Checking trial for company {company.id}: Current time: {current_time}, Trial ends: {company.trial_ends_at}")
+            
+            if current_time > company.trial_ends_at:
                 # Trial expired - update status
+                logger.info(f"Trial expired for company {company.id} - {company.name}. Current: {current_time}, Trial ended: {company.trial_ends_at}")
                 company.subscription_status = 'expired'
                 company.save()
-                
-                # Log trial expiration
-                logger.info(f"Trial expired for company {company.id} - {company.name}")
                 
                 # Check if path is allowed for expired trials
                 path_allowed_when_expired = any(

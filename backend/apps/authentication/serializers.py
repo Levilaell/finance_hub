@@ -119,8 +119,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         # ALWAYS CREATE TRIAL FOR 14 DAYS - NO EXCEPTIONS
         from django.utils import timezone
         from datetime import timedelta
+        import logging
         
-        Company.objects.create(
+        logger = logging.getLogger(__name__)
+        
+        trial_end_date = timezone.now() + timedelta(days=14)
+        logger.info(f"Creating company for user {user.email} with trial ending at {trial_end_date}")
+        
+        company = Company.objects.create(
             owner=user,
             name=company_name,
             cnpj=format_cnpj(company_cnpj),
@@ -128,8 +134,10 @@ class RegisterSerializer(serializers.ModelSerializer):
             business_sector=business_sector,
             subscription_plan=selected_plan,
             subscription_status='trial',  # ALWAYS trial
-            trial_ends_at=timezone.now() + timedelta(days=14)  # ALWAYS 14 days
+            trial_ends_at=trial_end_date  # ALWAYS 14 days
         )
+        
+        logger.info(f"Company created: {company.id} - Status: {company.subscription_status} - Trial ends: {company.trial_ends_at}")
         
         return user
 
