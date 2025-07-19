@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { bankingService } from '@/services/banking.service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
-export default function BankingCallbackPage() {
+function BankingCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -172,5 +172,22 @@ export default function BankingCallbackPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function BankingCallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center space-y-4 pt-6">
+            <LoadingSpinner className="w-6 h-6" />
+            <p className="text-gray-600">Carregando...</p>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <BankingCallbackContent />
+    </Suspense>
   );
 }

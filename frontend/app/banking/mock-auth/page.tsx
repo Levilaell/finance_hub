@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Building2, AlertCircle } from 'lucide-react';
 
-export default function MockAuthPage() {
+function MockAuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [bankName, setBankName] = useState('');
@@ -115,5 +115,22 @@ export default function MockAuthPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function MockAuthPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center space-y-4 pt-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <p className="text-gray-600">Carregando...</p>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <MockAuthContent />
+    </Suspense>
   );
 }

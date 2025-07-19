@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -29,7 +29,7 @@ const planInfo: Record<string, { name: string; price: string; badge?: string }> 
   enterprise: { name: 'Empresarial', price: 'R$ 449/mês' },
 };
 
-export default function RegisterPage() {
+function RegisterContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setAuth, user } = useAuthStore();
@@ -463,5 +463,20 @@ export default function RegisterPage() {
         </CardFooter>
       </form>
     </Card>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <Card className="w-full max-w-md">
+        <CardContent className="flex flex-col items-center space-y-4 pt-6">
+          <LoadingSpinner />
+          <p className="text-sm text-muted-foreground">Carregando...</p>
+        </CardContent>
+      </Card>
+    }>
+      <RegisterContent />
+    </Suspense>
   );
 }
