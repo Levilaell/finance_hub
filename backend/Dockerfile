@@ -39,9 +39,8 @@ RUN DJANGO_SECRET_KEY="dummy-key-for-collectstatic" \
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Railway sets PORT dynamically, so we can't use it in EXPOSE
+# Railway sets PORT dynamically
 EXPOSE 8000
 
-# Remove HEALTHCHECK as Railway handles this differently
-# Use a start script or command that uses the PORT env var at runtime
+# Start command - O Railway vai passar a porta via $PORT
 CMD gunicorn core.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 4 --timeout 120
