@@ -17,30 +17,41 @@ def create_admin(request):
         return JsonResponse({'error': 'Unauthorized'})
     
     User = get_user_model()
+    email = 'levilael2@hotmail.com'
+    password = 'QWERasdf12'
     
-    # Remove TODOS os admins existentes
-    deleted_admins = []
-    for admin in User.objects.filter(is_superuser=True):
-        deleted_admins.append(admin.email)
-        admin.delete()
-    
-    # Cria o novo admin
-    new_email = 'levilael2@hotmail.com'
-    new_password = 'QWERasdf12'
-    
-    user = User.objects.create_superuser(
-        email=new_email,
-        username=new_email,
-        password=new_password,
-    )
-    
-    return JsonResponse({
-        'success': True,
-        'deleted_admins': deleted_admins,
-        'created_admin': new_email,
-        'password': new_password,
-        'admin_url': 'https://finance-backend-production-29df.up.railway.app/admin/'
-    })
+    try:
+        # Tenta pegar o usuário existente
+        user = User.objects.get(email=email)
+        # Transforma em superuser
+        user.is_superuser = True
+        user.is_staff = True
+        user.set_password(password)  # Atualiza a senha
+        user.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Existing user converted to superuser',
+            'email': email,
+            'password': password,
+            'admin_url': 'https://finance-backend-production-29df.up.railway.app/admin/'
+        })
+        
+    except User.DoesNotExist:
+        # Se não existir, cria novo
+        user = User.objects.create_superuser(
+            email=email,
+            username=email,
+            password=password,
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'New superuser created',
+            'email': email,
+            'password': password,
+            'admin_url': 'https://finance-backend-production-29df.up.railway.app/admin/'
+        })
 
 
 def api_root(request):
