@@ -35,21 +35,15 @@ export default function LoginPage() {
       return await authService.login(data);
     },
     onSuccess: (data) => {
-      console.log('Login successful, response:', data);
       if (data.requires_2fa) {
         setShow2FA(true);
         toast.success('Por favor, insira seu código 2FA');
       } else {
-        console.log('Setting auth with user:', data.user);
-        console.log('Setting auth with tokens:', data.tokens);
         setAuth(data.user, data.tokens);
         toast.success('Login realizado com sucesso!');
-        console.log('Attempting to navigate to /dashboard');
         // Add a small delay to ensure cookies are set
         setTimeout(() => {
-          console.log('Navigating after delay...');
           router.push('/dashboard');
-          console.log('router.push called');
         }, 100);
       }
     },
@@ -80,13 +74,11 @@ export default function LoginPage() {
   });
 
   const onSubmit = (data: LoginCredentials) => {
-    console.log('Form submitted with:', data);
     setLoginCredentials(data); // Store credentials for 2FA
     loginMutation.mutate(data);
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
-    console.log('Form submit event triggered');
     e.preventDefault();
     handleSubmit(onSubmit)(e);
   };

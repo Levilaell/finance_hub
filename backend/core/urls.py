@@ -9,6 +9,7 @@ from django.urls import include, path, re_path
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
+from apps.companies.health import health_check
 
 
 def api_root(request):
@@ -58,6 +59,9 @@ schema_view = get_schema_view(
 urlpatterns = [
     path('', api_root, name='api-root'),
     path('admin/', admin.site.urls),
+    
+    # Health check for deployment platforms
+    path('api/health/', health_check, name='health-check'),
     
     # API endpoints
     path('api/', api_root, name='api-root-detail'),

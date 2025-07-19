@@ -67,8 +67,6 @@ class RulesService {
   private baseUrl = '/api/categories';
 
   async getRules(): Promise<CategoryRule[]> {
-    console.log('RulesService baseUrl:', this.baseUrl);
-    console.log('Full URL:', `${this.baseUrl}/rules/`);
     const response = await apiClient.get<{ results?: CategoryRule[]; count?: number } | CategoryRule[]>(`${this.baseUrl}/rules/`);
     // Handle both paginated and non-paginated responses
     if (response && typeof response === 'object' && 'results' in response) {
@@ -78,9 +76,6 @@ class RulesService {
   }
 
   async createRule(data: CreateRuleRequest): Promise<CategoryRule> {
-    console.log('createRule baseUrl:', this.baseUrl);
-    console.log('createRule Full URL:', `${this.baseUrl}/rules/`);
-    console.log('createRule data:', data);
     return await apiClient.post(`${this.baseUrl}/rules/`, data);
   }
 

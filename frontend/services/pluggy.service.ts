@@ -157,7 +157,6 @@ class PluggyService {
       // Check if Pluggy SDK is loaded
       if (typeof window !== 'undefined' && (window as any).PluggyConnect) {
         const PluggyConnect = (window as any).PluggyConnect;
-        console.log('🔌 PluggyConnect SDK loaded successfully');
 
         const connectConfig = {
           connectToken: options.connectToken,
@@ -169,20 +168,14 @@ class PluggyService {
           countries: options.countries || ['BR'],
         };
         
-        console.log('🔌 Creating PluggyConnect with config:', {
-          ...connectConfig,
-          connectToken: connectConfig.connectToken?.substring(0, 50) + '...'
-        });
 
         const connect = new PluggyConnect(connectConfig);
 
         // Mount the widget
-        console.log('🔌 Mounting widget to container:', containerId);
         connect.init(containerId);
 
         // Handle events
         connect.onSuccess((itemData: any) => {
-          console.log('Pluggy connection successful:', itemData);
           
           // Handle the successful connection
           this.handleConnectionCallback(itemData.item.id, itemData.item.connector.name)
@@ -213,27 +206,19 @@ class PluggyService {
         });
 
         connect.onEvent((eventName: string, data: any) => {
-          console.log('Pluggy event:', eventName, data);
-          
           // Handle different events
           switch (eventName) {
             case 'OPEN':
-              console.log('Pluggy widget opened');
               break;
             case 'CLOSE':
-              console.log('Pluggy widget closed');
               break;
             case 'SELECT_CONNECTOR':
-              console.log('Connector selected:', data);
               break;
             case 'SUBMIT_CREDENTIALS':
-              console.log('Credentials submitted');
               break;
             case 'WAITING_USER_INPUT':
-              console.log('Waiting for user input (MFA, etc.)');
               break;
             case 'SUCCESS':
-              console.log('Connection successful');
               break;
             case 'ERROR':
               console.error('Connection error:', data);
@@ -274,12 +259,9 @@ class PluggyService {
       script.src = 'https://connect.pluggy.ai/js/pluggy-connect.js';
       script.async = true;
 
-      console.log('🔄 Loading Pluggy SDK from:', script.src);
 
       script.onload = () => {
-        console.log('✅ Pluggy SDK script loaded');
         if ((window as any).PluggyConnect) {
-          console.log('✅ PluggyConnect object available');
           resolve();
         } else {
           console.error('❌ PluggyConnect object not found after script load');
@@ -358,7 +340,6 @@ class PluggyService {
 
       // Initialize Pluggy Connect
       const containerId = 'pluggy-connect-container';
-      console.log('🔧 Initializing Pluggy Connect with token:', connect_token?.substring(0, 50) + '...');
       
       await this.initializeConnect(containerId, {
         connectToken: connect_token,

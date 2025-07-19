@@ -83,7 +83,6 @@ class BankingService {
   async getTransactions(
     params?: TransactionFilter & { page?: number; page_size?: number }
   ): Promise<PaginatedResponse<BankTransaction>> {
-    console.log('🔄 BankingService.getTransactions - Parâmetros recebidos:', params);
     return apiClient.get<PaginatedResponse<BankTransaction>>("/api/banking/transactions/", params);
   }
 
@@ -264,12 +263,10 @@ class BankingService {
     };
     message?: string;
   }> {
-    console.log('🔗 Connecting bank account via Pluggy with data:', data);
     
     // ✅ SEMPRE usar Pluggy para conexão bancária
     const response = await this.createPluggyConnectToken();
     
-    console.log('🔗 Pluggy connect token response:', response);
     
     return response;
   }

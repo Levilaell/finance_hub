@@ -155,7 +155,6 @@ export default function TransactionsPage() {
         page,
         page_size: pageSize 
       };
-      console.log('📡 Requisição para API com parâmetros:', params);
       return bankingService.getTransactions(params);
     },
   });
@@ -808,9 +807,6 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
   }, [filters]);
 
   const applyFilters = () => {
-    console.log('🔍 Aplicando filtros:', localFilters);
-    console.log('🔍 min_amount:', localFilters.min_amount, typeof localFilters.min_amount);
-    console.log('🔍 max_amount:', localFilters.max_amount, typeof localFilters.max_amount);
     setFilters(localFilters);
   };
 

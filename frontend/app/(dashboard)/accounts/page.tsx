@@ -104,17 +104,14 @@ export default function AccountsPage() {
   // ✅ Função simplificada - abre Pluggy Connect diretamente
   const handleConnectBank = async () => {
     try {
-      console.log('🔗 Starting Pluggy Connect...');
       toast.info('Iniciando conexão com seu banco...');
 
       const result = await bankingService.createPluggyConnectToken();
 
-      console.log('🔗 Pluggy connect token response:', result);
 
       if (result.success && result.data?.connect_token) {
         const connectToken = result.data.connect_token;
         
-        console.log('🔗 Connect token received:', connectToken.substring(0, 50) + '...');
         
         // Setup Pluggy Connect widget
         setPluggyConnectToken(connectToken);
@@ -153,11 +150,9 @@ export default function AccountsPage() {
   const handleSyncAccount = async (accountId: string) => {
     setSyncingAccountId(accountId);
     try {
-      console.log('🔄 Syncing Pluggy account:', accountId);
       
       const result = await bankingService.syncPluggyAccount(accountId);
       
-      console.log('🔄 Sync result:', result);
       
       if (result.success) {
         const transactionCount = result.data.transactions_synced;
@@ -205,7 +200,6 @@ export default function AccountsPage() {
   // ✅ Função handlePluggyCallback (mantida como está)
   const handlePluggyCallback = async (itemId: string) => {
     try {
-      console.log('🎯 Processing Pluggy callback for item:', itemId);
       
       // Get stored provider info
       const providerName = sessionStorage.getItem('pluggy_provider') || 'Banco';
@@ -213,7 +207,6 @@ export default function AccountsPage() {
       
       const response = await bankingService.handlePluggyCallback(itemId);
       
-      console.log('🎯 Callback response:', response);
       
       if (response.success && response.data) {
         const accountsCreated = response.data.accounts?.length || 0;
@@ -298,7 +291,6 @@ export default function AccountsPage() {
         <PluggyConnectModal
           connectToken={pluggyConnectToken}
           onSuccess={async (itemData) => {
-            console.log('Pluggy Connect success:', itemData);
             const itemId = itemData?.item?.id;
             
             if (itemId) {
@@ -317,7 +309,6 @@ export default function AccountsPage() {
             resetPluggyWidget();
           }}
           onClose={() => {
-            console.log('Pluggy widget closed by user');
             // Reset states if user closes without completing
             resetPluggyWidget();
           }}

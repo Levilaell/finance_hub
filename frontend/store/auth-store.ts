@@ -129,7 +129,6 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setAuth: (user, tokens) => {
-        console.log('setAuth called with:', { user, tokens });
         // Save tokens to localStorage and cookies
         if (typeof window !== "undefined") {
           localStorage.setItem("access_token", tokens.access);
@@ -139,9 +138,6 @@ export const useAuthStore = create<AuthState>()(
           document.cookie = `access_token=${tokens.access}; path=/; max-age=3600; SameSite=Lax`;
           document.cookie = `refresh_token=${tokens.refresh}; path=/; max-age=604800; SameSite=Lax`;
           
-          console.log('Cookies set, checking if they exist:');
-          console.log('document.cookie:', document.cookie);
-          console.log('localStorage access_token:', localStorage.getItem('access_token'));
         }
         
         set({
@@ -150,7 +146,6 @@ export const useAuthStore = create<AuthState>()(
           isLoading: false,
           error: null,
         });
-        console.log('State updated with isAuthenticated:', true);
       },
 
       setHasHydrated: (state) => {

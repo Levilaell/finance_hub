@@ -13,19 +13,15 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  console.log('DashboardLayout rendered');
   const { isAuthenticated, isLoading, _hasHydrated, user } = useAuthStore();
   const router = useRouter();
   
   // Use subscription check hook - but only when authenticated
   const { subscriptionStatus, isTrialExpired } = useSubscriptionCheck();
 
-  console.log('Auth state:', { isAuthenticated, isLoading, _hasHydrated });
 
   useEffect(() => {
-    console.log('Auth effect:', { isAuthenticated, isLoading, _hasHydrated });
     if (_hasHydrated && !isLoading && !isAuthenticated) {
-      console.log('Redirecting to login');
       router.push('/login');
     }
   }, [isAuthenticated, isLoading, _hasHydrated, router]);
@@ -47,14 +43,12 @@ export default function DashboardLayout({
       );
       
       if (!isOnAllowedPath) {
-        console.log('Trial expired, redirecting to subscription upgrade');
         router.push('/dashboard/subscription/upgrade');
       }
     }
   }, [isAuthenticated, isTrialExpired, router]);
 
   if (!_hasHydrated || isLoading) {
-    console.log('Showing loading');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
@@ -66,11 +60,9 @@ export default function DashboardLayout({
   }
 
   if (!isAuthenticated) {
-    console.log('Not authenticated, showing null');
     return null;
   }
 
-  console.log('Rendering children with payment banner');
   return (
     <MainLayout>
       <div className="min-h-screen">

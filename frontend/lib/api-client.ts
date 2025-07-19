@@ -250,19 +250,13 @@ class ApiClient {
     last_name: string;
     company_name?: string;
   }) {
-    console.log('Attempting registration with data:', { ...data, password: '[HIDDEN]' });
-    console.log('Full URL will be:', `${API_BASE_URL}/api/auth/register/`);
     const response = await this.client.post("/api/auth/register/", data);
-    console.log('Registration response:', response.status);
     return response.data;
   }
 
   // Generic methods
   async get<T>(url: string, params?: any): Promise<T> {
-    console.log('🌐 ApiClient.get - URL:', url);
-    console.log('🌐 ApiClient.get - Params:', params);
     const response = await this.client.get<T>(url, { params });
-    console.log('🌐 ApiClient.get - Response status:', response.status);
     return response.data;
   }
 
