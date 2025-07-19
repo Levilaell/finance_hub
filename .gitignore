@@ -94,4 +94,4 @@ celerybeat.pid
 
 # Backup files
 *.bak
-*.backup
+*.backupCELERY_ENV_VARS.txt

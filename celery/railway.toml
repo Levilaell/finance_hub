@@ -1,0 +1,8 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "../backend/Dockerfile.celery"
+buildContext = "../backend"
+
+[deploy]
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
