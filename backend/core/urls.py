@@ -12,46 +12,25 @@ from rest_framework import permissions
 from apps.companies.health import health_check
 from django.contrib.auth import get_user_model
 
-def create_admin(request):
-    if request.GET.get('secret') != 'temp-create-admin-2025':
+def seed_plans_temp(request):
+    if request.GET.get('secret') != 'temp-seed-2025':
         return JsonResponse({'error': 'Unauthorized'})
     
-    User = get_user_model()
-    email = 'levilael2@hotmail.com'
-    password = 'QWERasdf12'
+    from django.core.management import call_command
+    from io import StringIO
     
+    out = StringIO()
     try:
-        # Tenta pegar o usuário existente
-        user = User.objects.get(email=email)
-        # Transforma em superuser
-        user.is_superuser = True
-        user.is_staff = True
-        user.set_password(password)  # Atualiza a senha
-        user.save()
-        
+        call_command('seed_plans', stdout=out)
         return JsonResponse({
             'success': True,
-            'message': 'Existing user converted to superuser',
-            'email': email,
-            'password': password,
-            'admin_url': 'https://finance-backend-production-29df.up.railway.app/admin/'
+            'output': out.getvalue()
         })
-        
-    except User.DoesNotExist:
-        # Se não existir, cria novo
-        user = User.objects.create_superuser(
-            email=email,
-            username=email,
-            password=password,
-        )
-        
+    except Exception as e:
         return JsonResponse({
-            'success': True,
-            'message': 'New superuser created',
-            'email': email,
-            'password': password,
-            'admin_url': 'https://finance-backend-production-29df.up.railway.app/admin/'
-        })
+            'error': str(e)
+        }, status=500)
+
 
 
 def api_root(request):
@@ -101,7 +80,7 @@ schema_view = get_schema_view(
 urlpatterns = [
     path('', api_root, name='api-root'),
     path('admin/', admin.site.urls),
-    path('create-admin-temp/', create_admin),  # REMOVA APÓS USAR
+    path('seed-plans-temp/', seed_plans_temp),
 
     # Health check for deployment platforms
     path('api/health/', health_check, name='health-check'),
