@@ -3,7 +3,7 @@ builder = "dockerfile"
 dockerfilePath = "./backend/Dockerfile"
 
 [deploy]
-startCommand = "cd backend && python manage.py migrate && python manage.py collectstatic --noinput && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --timeout 120"
+startCommand = "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --timeout 120"
 healthcheckPath = "/admin/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
