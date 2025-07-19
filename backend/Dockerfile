@@ -3,7 +3,6 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-# Don't set DJANGO_SETTINGS_MODULE here - Railway will set it at runtime
 
 # Set work directory
 WORKDIR /app
@@ -30,19 +29,19 @@ COPY . /app/
 # Create necessary directories
 RUN mkdir -p /app/staticfiles /app/media /app/logs
 
-# Run collectstatic with development settings (ignore errors)
-RUN DJANGO_SETTINGS_MODULE=core.settings.development python manage.py collectstatic --noinput || true
+# Run collectstatic with dummy environment variables
+RUN DJANGO_SECRET_KEY="dummy-key-for-collectstatic" \
+    DJANGO_SETTINGS_MODULE=core.settings.production \
+    DATABASE_URL="postgres://dummy:dummy@dummy:5432/dummy" \
+    python manage.py collectstatic --noinput || true
 
 # Create a non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Expose port (Railway uses PORT environment variable)
-EXPOSE $PORT
+# Railway sets PORT dynamically, so we can't use it in EXPOSE
+EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:$PORT/api/health/ || exit 1
-
-# Default command (Railway overrides this with railway.toml)
-CMD gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --timeout 120
+# Remove HEALTHCHECK as Railway handles this differently
+# Use a start script or command that uses the PORT env var at runtime
+CMD gunicorn core.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 4 --timeout 120
