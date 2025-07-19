@@ -88,7 +88,6 @@ export const useBankingStore = create<BankingState>((set, get) => ({
       const accounts = data.results || (Array.isArray(data) ? data : []);
       set({ accounts, loading: false });
     } catch (error: any) {
-      console.error('Banking store - Accounts error:', error);
       set({
         error: error.message || "Failed to fetch accounts",
         loading: false,
@@ -120,13 +119,11 @@ export const useBankingStore = create<BankingState>((set, get) => ({
       const mockProviders = await import('@/data/bank-providers.json');
       set({ providers: Array.isArray(mockProviders.default) ? mockProviders.default : [] });
     } catch (error: any) {
-      console.error('Error fetching providers, using mock data:', error);
       // Use mock data as fallback
       try {
         const mockProviders = await import('@/data/bank-providers.json');
         set({ providers: Array.isArray(mockProviders.default) ? mockProviders.default : [] });
       } catch (fallbackError) {
-        console.error('Failed to load mock providers:', fallbackError);
         set({ providers: [] });
       }
     }

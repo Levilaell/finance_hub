@@ -22,7 +22,6 @@ export default function PluggyConnectPage() {
       return;
     }
 
-    console.log('🔗 Pluggy Connect Token:', connectToken.substring(0, 50) + '...');
 
     const loadPluggySDK = () => {
       return new Promise<void>((resolve, reject) => {
@@ -58,21 +57,16 @@ export default function PluggyConnectPage() {
           script.src = sdkUrls[urlIndex];
           script.async = true;
 
-          console.log(`🔄 Tentando carregar SDK da URL ${urlIndex + 1}:`, script.src);
 
           script.onload = () => {
-            console.log('✅ SDK carregado da URL:', script.src);
             if ((window as any).PluggyConnect) {
-              console.log('✅ PluggyConnect disponível');
               resolve();
             } else {
-              console.warn('⚠️ Script carregou mas PluggyConnect não está disponível');
               tryLoadSDK(urlIndex + 1);
             }
           };
 
           script.onerror = (error) => {
-            console.error(`❌ Falha ao carregar da URL ${urlIndex + 1}:`, error);
             tryLoadSDK(urlIndex + 1);
           };
 
@@ -86,20 +80,16 @@ export default function PluggyConnectPage() {
     const initializePluggyConnect = async () => {
       try {
         setIsLoading(true);
-        console.log('🔄 Carregando Pluggy SDK...');
         
         // Try to load the real SDK first
         try {
           await loadPluggySDK();
-          console.log('✅ SDK real carregado, usando Pluggy Connect');
           await initializeRealPluggyConnect();
         } catch (sdkError) {
-          console.warn('⚠️ SDK real não disponível, usando simulador de desenvolvimento:', sdkError);
           await initializeMockPluggyConnect();
         }
         
       } catch (error: any) {
-        console.error('❌ Erro ao inicializar Pluggy Connect:', error);
         setError(error.message);
         
         // Redirect back with error after 3 seconds
@@ -113,7 +103,6 @@ export default function PluggyConnectPage() {
     };
 
     const initializeRealPluggyConnect = async () => {
-      console.log('🔄 Inicializando Pluggy Connect real...');
       
       if (!connectRef.current) {
         throw new Error('Container não encontrado');
@@ -128,12 +117,10 @@ export default function PluggyConnectPage() {
         countries: ['BR'],
       });
 
-      console.log('🔌 Montando widget real...');
       connect.init('pluggy-connect-container');
 
       // Handle success
       connect.onSuccess((itemData: any) => {
-        console.log('✅ Conexão bem-sucedida:', itemData);
         const itemId = itemData?.item?.id;
         
         if (itemId) {
@@ -151,7 +138,6 @@ export default function PluggyConnectPage() {
 
       // Handle error
       connect.onError((error: any) => {
-        console.error('❌ Erro na conexão:', error);
         
         // Redirect back with error
         const callbackUrl = new URL(returnUrl, window.location.origin);
@@ -164,11 +150,9 @@ export default function PluggyConnectPage() {
 
       // Handle events
       connect.onEvent((eventName: string, data: any) => {
-        console.log('🔌 Evento Pluggy:', eventName, data);
         
         if (eventName === 'CLOSE') {
           // User closed the widget
-          console.log('ℹ️ Widget fechado pelo usuário');
           router.push(returnUrl);
         }
       });
@@ -177,7 +161,6 @@ export default function PluggyConnectPage() {
     };
 
     const initializeMockPluggyConnect = async () => {
-      console.log('🔄 Tentando usar iframe do Pluggy Connect...');
       
       const provider = searchParams.get('provider') || 'Banco de Teste';
       
@@ -218,7 +201,6 @@ export default function PluggyConnectPage() {
 
         // Listen for postMessage from iframe (Pluggy may communicate this way)
         window.addEventListener('message', (event) => {
-          console.log('📨 Mensagem recebida do iframe:', event);
           
           // Check if message is from Pluggy
           if (event.origin === 'https://connect.pluggy.ai') {
@@ -287,7 +269,6 @@ export default function PluggyConnectPage() {
         const cancelBtn = document.getElementById('mock-cancel');
 
         successBtn?.addEventListener('click', () => {
-          console.log('🎭 Simulando conexão bem-sucedida...');
           
           // Generate a mock item ID
           const mockItemId = 'mock_item_' + Date.now();
@@ -304,7 +285,6 @@ export default function PluggyConnectPage() {
         });
 
         errorBtn?.addEventListener('click', () => {
-          console.log('🎭 Simulando erro de conexão...');
           
           // Redirect back with error
           const callbackUrl = new URL(returnUrl, window.location.origin);
@@ -318,7 +298,6 @@ export default function PluggyConnectPage() {
         });
 
         cancelBtn?.addEventListener('click', () => {
-          console.log('🎭 Simulando cancelamento...');
           router.push(returnUrl);
         });
       }

@@ -134,7 +134,6 @@ export default function AccountsPage() {
       throw new Error(result.data?.message || 'Erro ao criar token de conexão');
       
     } catch (error: any) {
-      console.error('❌ Error connecting bank:', error);
       toast.error(
         error.message || 
         'Erro ao conectar com o banco. Tente novamente.'
@@ -162,7 +161,6 @@ export default function AccountsPage() {
         throw new Error('Falha na sincronização');
       }
     } catch (error: any) {
-      console.error('❌ Sync error:', error);
       toast.error('Erro ao sincronizar conta: ' + (error.message || 'Erro desconhecido'));
     } finally {
       setSyncingAccountId(null);
@@ -192,7 +190,6 @@ export default function AccountsPage() {
         throw new Error(result.message || 'Erro ao atualizar token');
       }
     } catch (error: any) {
-      console.error('Token refresh error:', error);
       toast.error(error.message || 'Erro ao atualizar token. Tente reconectar a conta.');
     }
   };
@@ -224,7 +221,6 @@ export default function AccountsPage() {
         throw new Error(response.message || 'Erro ao processar callback');
       }
     } catch (error: any) {
-      console.error('❌ Pluggy callback error:', error);
       toast.error('Erro ao finalizar conexão: ' + error.message);
       throw error;
     }
@@ -302,7 +298,6 @@ export default function AccountsPage() {
             resetPluggyWidget();
           }}
           onError={(error) => {
-            console.error('Pluggy Connect error:', error);
             toast.error(`Erro na conexão: ${error.message || 'Erro desconhecido'}`);
             
             // Reset states

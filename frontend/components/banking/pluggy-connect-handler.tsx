@@ -21,7 +21,6 @@ export function PluggyConnectHandler({ onSuccess, onError }: PluggyConnectHandle
         return;
       }
 
-      console.log('Pluggy event:', event.data);
 
       // Handle different Pluggy events
       if (event.data.type === 'item/created' || event.data.type === 'success') {

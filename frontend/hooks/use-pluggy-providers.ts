@@ -25,17 +25,14 @@ export function usePluggyProviders() {
         setLoading(true);
         setError(null);
         
-        console.log('🏦 Fetching Pluggy banks...');
         
         // ✅ USAR: endpoint Pluggy específico
         const response = await bankingService.getPluggyBanks();
         
-        console.log('🏦 Pluggy banks response:', response);
         
         if (response.success) {
           setProviders(response.data as any);
           setSandboxMode(response.sandbox_mode);
-          console.log(`🏦 Loaded ${response.data.length} banks (sandbox: ${response.sandbox_mode})`);
         } else {
           throw new Error('Failed to fetch banks from Pluggy');
         }

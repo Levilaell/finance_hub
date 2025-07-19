@@ -20,7 +20,6 @@ export function useBankProviders() {
   useEffect(() => {
     async function fetchProviders() {
       try {
-        console.log('🔄 Fetching banks from Pluggy...');
         
         // Get banks from Pluggy
         const pluggyBanks = await pluggyService.getSupportedBanks();
@@ -43,7 +42,6 @@ export function useBankProviders() {
           supports_ted: true,
         }));
         
-        console.log('✅ Loaded', mappedProviders.length, 'banks from Pluggy');
         setProviders(mappedProviders);
         
       } catch (err: any) {
@@ -51,7 +49,6 @@ export function useBankProviders() {
         setError(err.message || 'Erro ao carregar bancos');
         
         // Fallback to static banks
-        console.log('🆘 Using fallback banks');
         setProviders([
           {
             id: 200,
@@ -100,7 +97,6 @@ export function useBankProviders() {
 
   // Debug log when providers change
   useEffect(() => {
-    console.log('🏦 Providers state updated:', providers.length, 'providers');
   }, [providers]);
 
   return { providers, loading, error };

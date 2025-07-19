@@ -33,11 +33,9 @@ export function PluggyConnectWidget({
     script.src = 'https://cdn.pluggy.ai/pluggy-connect.js';
     script.async = true;
     script.onload = () => {
-      console.log('✅ Pluggy SDK loaded');
       setSdkLoaded(true);
     };
     script.onerror = () => {
-      console.error('❌ Failed to load Pluggy SDK');
       onError(new Error('Failed to load Pluggy SDK'));
     };
     
@@ -62,7 +60,6 @@ export function PluggyConnectWidget({
           const modals = document.querySelectorAll('[class*="pluggy"], [id*="pluggy"]');
           modals.forEach(modal => modal.remove());
         } catch (e) {
-          console.error('Error cleaning up Pluggy:', e);
         }
       }
     };
@@ -73,11 +70,9 @@ export function PluggyConnectWidget({
       return;
     }
 
-    console.log('🔌 Initializing Pluggy Connect with token:', connectToken.substring(0, 20) + '...');
     
     // Função wrapper para garantir que onClose sempre existe
     const handleClose = () => {
-      console.log('🚪 Pluggy Connect is closing');
       
       // Remover manualmente o widget se ele não fechar sozinho
       setTimeout(() => {
@@ -100,7 +95,6 @@ export function PluggyConnectWidget({
         includeSandbox: true, // Mudando para true já que você está em desenvolvimento
         
         onSuccess: (data: any) => {
-          console.log('✅ Pluggy Connect success:', data);
           
           const itemId = data?.item?.id || data?.itemId || data?.id;
           
@@ -113,7 +107,6 @@ export function PluggyConnectWidget({
               } 
             });
           } else {
-            console.error('❌ No itemId in success response:', data);
             toast.error('Erro: ID da conexão não encontrado');
             onError(new Error('No itemId received'));
           }
@@ -122,7 +115,6 @@ export function PluggyConnectWidget({
         },
         
         onError: (error: any) => {
-          console.log('❌ Pluggy Connect error:', error);
           
           const errorMessage = error?.message || error?.error || 'Erro ao conectar com o banco';
           toast.error(errorMessage);
@@ -141,7 +133,6 @@ export function PluggyConnectWidget({
         
         // Eventos para debug
         onEvent: (event: string, metadata: any) => {
-          console.log(`📊 Pluggy event: ${event}`, metadata);
           
           // Detectar eventos de fechamento
           if (event === 'CLOSE' || event === 'EXIT' || event === 'CANCEL') {
@@ -150,10 +141,6 @@ export function PluggyConnectWidget({
         }
       };
 
-      console.log('Creating Pluggy instance with config:', { 
-        ...config, 
-        connectToken: config.connectToken.substring(0, 20) + '...' 
-      });
       
       // Criar instância do Pluggy Connect
       pluggyInstance.current = new window.PluggyConnect(config);
@@ -167,7 +154,6 @@ export function PluggyConnectWidget({
       
       // Fallback: se o widget não fechar sozinho após alguns segundos sem atividade
       const inactivityTimer = setTimeout(() => {
-        console.log('⏰ Inactivity timeout - checking if widget is still open');
         const iframes = document.querySelectorAll('iframe[src*="pluggy"]');
         if (iframes.length === 0) {
           // Widget já foi fechado
@@ -181,7 +167,6 @@ export function PluggyConnectWidget({
       };
       
     } catch (error: any) {
-      console.error('❌ Error initializing Pluggy Connect:', error);
       toast.error('Erro ao inicializar conexão bancária');
       onError(error);
     }

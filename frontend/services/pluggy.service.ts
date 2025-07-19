@@ -57,11 +57,9 @@ class PluggyService {
         // Nested data format: { data: [...] }
         return (response as any).data;
       } else {
-        console.warn('Unexpected response format:', response);
         return [];
       }
     } catch (error) {
-      console.error('Error fetching banks from Pluggy:', error);
       throw error;
     }
   }
@@ -109,7 +107,6 @@ class PluggyService {
         accounts: (response as any).data?.accounts || []
       };
     } catch (error) {
-      console.error('Error handling Pluggy item:', error);
       throw error;
     }
   }
@@ -188,13 +185,11 @@ class PluggyService {
               resolve();
             })
             .catch((error) => {
-              console.error('Error handling Pluggy callback:', error);
               reject(error);
             });
         });
 
         connect.onError((error: any) => {
-          console.error('Pluggy connection error:', error);
           
           // Emit error event
           const event = new CustomEvent('pluggyConnectionError', {
@@ -221,7 +216,6 @@ class PluggyService {
             case 'SUCCESS':
               break;
             case 'ERROR':
-              console.error('Connection error:', data);
               break;
           }
           
@@ -264,14 +258,11 @@ class PluggyService {
         if ((window as any).PluggyConnect) {
           resolve();
         } else {
-          console.error('❌ PluggyConnect object not found after script load');
           reject(new Error('Pluggy SDK failed to load'));
         }
       };
 
       script.onerror = (error) => {
-        console.error('❌ Failed to load Pluggy SDK script:', error);
-        console.error('❌ Script src was:', script.src);
         reject(new Error('Failed to load Pluggy SDK'));
       };
 
@@ -377,7 +368,6 @@ class PluggyService {
       window.addEventListener('pluggyConnectionError', handleError);
 
     } catch (error) {
-      console.error('Error opening Pluggy Connect modal:', error);
       throw error;
     }
   }

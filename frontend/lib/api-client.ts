@@ -30,12 +30,6 @@ class ApiClient {
                               config.url?.includes('/auth/register') ||
                               config.url?.includes('/auth/refresh');
         
-        console.log('🔐 Request interceptor:', {
-          url: config.url,
-          hasToken: !!token,
-          isAuthEndpoint,
-          headers: config.headers
-        });
         
         // Only add auth header if it's NOT an auth endpoint and we have a token
         if (token && config.headers && !isAuthEndpoint) {
@@ -85,14 +79,6 @@ class ApiClient {
           }
         }
 
-        // Log error details for debugging
-        console.error('🚨 API Error:', {
-          status: error.response?.status,
-          url: error.config?.url,
-          method: error.config?.method,
-          data: error.response?.data,
-          headers: error.config?.headers
-        });
         
         // Handle other errors
         if (error.response?.status === 429) {
@@ -136,7 +122,6 @@ class ApiClient {
           }
         } else if (error.response?.status === 404) {
           // Don't show toast for 404 during development
-          console.error("Resource not found:", error.config?.url);
         } else if (error.response?.status === 500) {
           toast.error("Server error. Please try again later");
         } else if (error.message === "Network Error") {
