@@ -38,6 +38,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
+# Copy start script
+COPY --chown=nextjs:nodejs start.sh ./
+RUN chmod +x start.sh
+
 # Set environment to production
 ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
@@ -54,4 +58,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # Start the application with dumb-init
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "server.js"] 
+CMD ["./start.sh"] 
