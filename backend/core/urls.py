@@ -17,23 +17,31 @@ def create_admin(request):
         return JsonResponse({'error': 'Unauthorized'})
     
     User = get_user_model()
-    email = 'admin@caixahub.com.br'
     
-    if User.objects.filter(email=email).exists():
-        return JsonResponse({'message': 'Admin already exists'})
+    # Remove TODOS os admins existentes
+    deleted_admins = []
+    for admin in User.objects.filter(is_superuser=True):
+        deleted_admins.append(admin.email)
+        admin.delete()
     
-    User.objects.create_superuser(
-        email=email,
-        username=email,
-        password='AdminCaixa2025!',
+    # Cria o novo admin
+    new_email = 'levilael2@hotmail.com'
+    new_password = 'QWERasdf12'
+    
+    user = User.objects.create_superuser(
+        email=new_email,
+        username=new_email,
+        password=new_password,
     )
     
     return JsonResponse({
         'success': True,
-        'email': email,
-        'password': 'AdminCaixa2025!',
-        'admin_url': '/admin/'
+        'deleted_admins': deleted_admins,
+        'created_admin': new_email,
+        'password': new_password,
+        'admin_url': 'https://finance-backend-production-29df.up.railway.app/admin/'
     })
+
 
 def api_root(request):
     """API root endpoint"""
