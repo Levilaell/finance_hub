@@ -10,7 +10,30 @@ from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 from apps.companies.health import health_check
+from django.contrib.auth import get_user_model
 
+def create_admin(request):
+    if request.GET.get('secret') != 'temp-create-admin-2025':
+        return JsonResponse({'error': 'Unauthorized'})
+    
+    User = get_user_model()
+    email = 'admin@caixahub.com.br'
+    
+    if User.objects.filter(email=email).exists():
+        return JsonResponse({'message': 'Admin already exists'})
+    
+    User.objects.create_superuser(
+        email=email,
+        username=email,
+        password='AdminCaixa2025!',
+    )
+    
+    return JsonResponse({
+        'success': True,
+        'email': email,
+        'password': 'AdminCaixa2025!',
+        'admin_url': '/admin/'
+    })
 
 def api_root(request):
     """API root endpoint"""
@@ -59,7 +82,8 @@ schema_view = get_schema_view(
 urlpatterns = [
     path('', api_root, name='api-root'),
     path('admin/', admin.site.urls),
-    
+    path('create-admin-temp/', create_admin),  # REMOVA APÓS USAR
+
     # Health check for deployment platforms
     path('api/health/', health_check, name='health-check'),
     
