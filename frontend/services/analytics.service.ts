@@ -1,4 +1,4 @@
-import { apiClient } from '@/lib/api-client';
+// import { apiClient } from '@/lib/api-client';
 
 export interface PerformanceMetrics {
   total_categories: number;
@@ -126,10 +126,61 @@ export interface AnalyticsResponse {
 }
 
 class AnalyticsService {
-  private baseUrl = '/api/categories';
+  // private baseUrl = '/api/categories';
 
   async getAnalytics(periodDays: number = 30): Promise<AnalyticsResponse> {
-    return await apiClient.get(`${this.baseUrl}/analytics/?period_days=${periodDays}`);
+    // Endpoint removido - retornar dados vazios
+    return {
+      accuracy_metrics: {
+        total_categorizations: 0,
+        accuracy: 0,
+        ai_accuracy: 0,
+        rule_accuracy: 0,
+        method_breakdown: {},
+        performance_summary: {
+          total_predictions: 0,
+          correct_predictions: 0,
+          false_positives: 0,
+          false_negatives: 0,
+          precision: 0,
+          recall: 0
+        },
+        period_days: periodDays
+      },
+      ai_performance: {
+        total_categories: 0,
+        average_accuracy: 0,
+        average_precision: 0,
+        average_recall: 0,
+        average_f1_score: 0,
+        category_breakdown: [],
+        summary: {
+          total_predictions: 0,
+          correct_predictions: 0,
+          false_positives: 0,
+          false_negatives: 0,
+          overall_accuracy: 0
+        },
+        period_days: periodDays
+      },
+      rule_performance: {
+        total_rules: 0,
+        total_rule_applications: 0,
+        correct_rule_applications: 0,
+        rule_accuracy: 0,
+        rule_breakdown: [],
+        period_days: periodDays
+      },
+      category_insights: [],
+      improvement_suggestions: [],
+      recent_activity: [],
+      summary_metrics: {
+        overall_accuracy: 0,
+        auto_categorized: 0,
+        manual_reviews: 0,
+        total_categorizations: 0
+      }
+    };
   }
 
   async getPerformanceMetrics(periodDays: number = 30): Promise<PerformanceMetrics> {

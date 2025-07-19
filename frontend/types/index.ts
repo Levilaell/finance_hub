@@ -66,7 +66,6 @@ export interface Company {
   current_month_transactions: number;
   current_month_ai_requests: number;
   active_bank_accounts_count?: number;
-  active_users_count?: number;
   // ... outros campos
 }
 
@@ -79,7 +78,6 @@ export interface SubscriptionPlan {
   price_yearly: number;
   max_transactions: number;
   max_bank_accounts: number;
-  max_users: number;
   has_ai_categorization: boolean;
   enable_ai_insights: boolean;
   enable_ai_reports: boolean;

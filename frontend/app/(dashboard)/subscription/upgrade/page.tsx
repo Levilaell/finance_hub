@@ -187,10 +187,6 @@ export default function UpgradePage() {
                           <CheckIcon className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
                           <span>{plan.max_bank_accounts === -1 ? 'Contas bancárias ilimitadas' : `${plan.max_bank_accounts} contas bancárias`}</span>
                         </div>
-                        <div className="flex items-center text-sm">
-                          <CheckIcon className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                          <span>{plan.max_users === -1 ? 'Usuários ilimitados' : `${plan.max_users} usuários`}</span>
-                        </div>
                         
                         {plan.has_ai_categorization && (
                           <div className="flex items-center text-sm">

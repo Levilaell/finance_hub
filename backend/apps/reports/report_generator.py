@@ -113,7 +113,7 @@ class ReportGenerator:
         
         # Calculate revenue by category
         revenue_by_category = transactions.filter(
-            transaction_type='credit'
+            transaction_type__in=['credit', 'transfer_in', 'pix_in', 'interest']
         ).values(
             'category__name'
         ).annotate(
@@ -123,7 +123,7 @@ class ReportGenerator:
         
         # Calculate expenses by category
         expenses_by_category = transactions.filter(
-            transaction_type='debit'
+            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
         ).values(
             'category__name'
         ).annotate(
@@ -134,7 +134,7 @@ class ReportGenerator:
         # Calculate totals
         total_revenue = sum(item['total'] or 0 for item in revenue_by_category)
         total_expenses = sum(item['total'] or 0 for item in expenses_by_category)
-        gross_profit = total_revenue - total_expenses
+        gross_profit = total_revenue + total_expenses  # expenses are negative in DB, so add
         
         # Calculate monthly breakdown
         monthly_data = self._calculate_monthly_breakdown(transactions, start_date, end_date)
@@ -194,7 +194,7 @@ class ReportGenerator:
         
         # Cash flow by category
         inflows = transactions.filter(
-            transaction_type='credit'
+            transaction_type__in=['credit', 'transfer_in', 'pix_in', 'interest']
         ).values(
             'category__name'
         ).annotate(
@@ -202,7 +202,7 @@ class ReportGenerator:
         ).order_by('-total')
         
         outflows = transactions.filter(
-            transaction_type='debit'
+            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
         ).values(
             'category__name'
         ).annotate(
@@ -239,12 +239,12 @@ class ReportGenerator:
         
         # Top expenses
         top_expenses = transactions.filter(
-            transaction_type='debit'
+            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
         ).order_by('-amount')[:10]
         
         # Top income
         top_income = transactions.filter(
-            transaction_type='credit'
+            transaction_type__in=['credit', 'transfer_in', 'pix_in', 'interest']
         ).order_by('-amount')[:10]
         
         # Daily averages
@@ -261,8 +261,8 @@ class ReportGenerator:
             'bank_account__nickname'
         ).annotate(
             transaction_count=Count('id'),
-            total_credits=Sum('amount', filter=Q(transaction_type='credit')),
-            total_debits=Sum('amount', filter=Q(transaction_type='debit'))
+            total_credits=Sum('amount', filter=Q(transaction_type__in=['credit', 'transfer_in', 'pix_in', 'interest'])),
+            total_debits=Sum('amount', filter=Q(transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']))
         )
         
         if format == 'pdf':
@@ -326,21 +326,27 @@ class ReportGenerator:
         category_trends = self._calculate_category_trends(transactions, start_date, end_date)
         
         # Category comparison
-        total_expenses = transactions.filter(transaction_type='debit').aggregate(
-            total=Sum('amount')
-        )['total'] or Decimal('0')
-        
+        # Calculate total from all categories to ensure consistency
         category_data = []
+        total_all_transactions = Decimal('0')
+        
         for category in categories:
             if category.total_amount:
-                percentage = (category.total_amount / total_expenses * 100) if total_expenses > 0 else 0
                 category_data.append({
                     'category': category,
                     'total': category.total_amount,
                     'count': category.transaction_count,
                     'average': category.avg_transaction or 0,
-                    'percentage': percentage
+                    'percentage': 0  # Will be calculated after we have the total
                 })
+                total_all_transactions += abs(category.total_amount)
+        
+        # Now calculate percentages based on the actual total
+        for item in category_data:
+            item['percentage'] = (abs(item['total']) / total_all_transactions * 100) if total_all_transactions > 0 else 0
+        
+        # Use the calculated total for the report
+        total_expenses = total_all_transactions
         
         if format == 'pdf':
             return self._generate_category_analysis_pdf(
@@ -404,10 +410,14 @@ class ReportGenerator:
     
     def _calculate_summary_stats(self, transactions) -> Dict[str, Any]:
         """Calculate summary statistics for transactions"""
-        income = transactions.filter(transaction_type='credit').aggregate(
+        income = transactions.filter(
+            transaction_type__in=['credit', 'transfer_in', 'pix_in', 'interest']
+        ).aggregate(
             total=Sum('amount'), count=Count('id')
         )
-        expenses = transactions.filter(transaction_type='debit').aggregate(
+        expenses = transactions.filter(
+            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+        ).aggregate(
             total=Sum('amount'), count=Count('id')
         )
         
@@ -417,15 +427,17 @@ class ReportGenerator:
         return {
             'total_count': transactions.count(),
             'total_income': total_income,
-            'total_expenses': total_expenses,
-            'net_balance': total_income - total_expenses,
+            'total_expenses': abs(total_expenses),  # Convert to positive for display
+            'net_balance': total_income - abs(total_expenses),  # subtract absolute value of expenses
             'income_count': income['count'] or 0,
             'expense_count': expenses['count'] or 0
         }
     
     def _calculate_category_breakdown(self, transactions) -> List[Dict[str, Any]]:
         """Calculate expense breakdown by category"""
-        expenses = transactions.filter(transaction_type='debit')
+        expenses = transactions.filter(
+            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+        )
         
         category_data = expenses.values('category__name').annotate(
             total=Sum('amount'),
@@ -447,9 +459,9 @@ class ReportGenerator:
         
         for trans in transactions:
             month_key = trans.transaction_date.strftime('%Y-%m')
-            if trans.transaction_type == 'credit':
+            if trans.transaction_type in ['credit', 'transfer_in', 'pix_in', 'interest']:
                 monthly_data[month_key]['income'] += trans.amount
-            else:
+            elif trans.transaction_type in ['debit', 'transfer_out', 'pix_out', 'fee']:
                 monthly_data[month_key]['expenses'] += trans.amount
         
         # Convert to sorted list
@@ -463,7 +475,7 @@ class ReportGenerator:
                 'month_date': current,
                 'income': data['income'],
                 'expenses': data['expenses'],
-                'profit': data['income'] - data['expenses']
+                'profit': data['income'] + data['expenses']  # expenses are negative, so add them
             })
             # Move to next month
             if current.month == 12:
@@ -478,11 +490,12 @@ class ReportGenerator:
         daily_data = defaultdict(lambda: {'inflow': Decimal('0'), 'outflow': Decimal('0')})
         
         for trans in transactions:
-            day_key = trans.transaction_date
-            if trans.transaction_type == 'credit':
+            # Convert datetime to date for consistent key comparison
+            day_key = trans.transaction_date.date() if hasattr(trans.transaction_date, 'date') else trans.transaction_date
+            if trans.transaction_type in ['credit', 'transfer_in', 'pix_in', 'interest']:
                 daily_data[day_key]['inflow'] += trans.amount
-            else:
-                daily_data[day_key]['outflow'] += trans.amount
+            elif trans.transaction_type in ['debit', 'transfer_out', 'pix_out', 'fee']:
+                daily_data[day_key]['outflow'] += abs(trans.amount)
         
         # Create complete daily series
         result = []
@@ -491,7 +504,7 @@ class ReportGenerator:
         
         while current <= end_date:
             data = daily_data.get(current, {'inflow': Decimal('0'), 'outflow': Decimal('0')})
-            daily_balance = data['inflow'] - data['outflow']
+            daily_balance = data['inflow'] - data['outflow']  # outflow is positive value, so subtract
             cumulative_balance += daily_balance
             
             result.append({
@@ -510,10 +523,10 @@ class ReportGenerator:
         trends = defaultdict(lambda: defaultdict(Decimal))
         
         for trans in transactions:
-            if trans.transaction_type == 'debit':  # Only expenses for category analysis
+            if trans.transaction_type in ['debit', 'transfer_out', 'pix_out', 'fee']:  # Only expenses for category analysis
                 month_key = trans.transaction_date.strftime('%Y-%m')
                 category_name = trans.category.name if trans.category else 'Sem categoria'
-                trends[category_name][month_key] += trans.amount
+                trends[category_name][month_key] += abs(trans.amount)
         
         return dict(trends)
     
@@ -526,16 +539,16 @@ class ReportGenerator:
         )
         
         credits = transactions.filter(
-            transaction_type='credit'
+            transaction_type__in=['credit', 'transfer_in', 'pix_in', 'interest']
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
         
         debits = transactions.filter(
-            transaction_type='debit'
+            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
         
-        # Calculate balance as credits - debits (without initial balance)
+        # Calculate balance as credits + debits (debits are negative in DB)
         # This gives us the net change from all transactions
-        return credits - debits
+        return credits + debits
     
     # PDF Generation Methods
     def _generate_profit_loss_pdf(self, revenue_by_category, expenses_by_category,
@@ -567,8 +580,8 @@ class ReportGenerator:
         summary_data = [
             ['', 'Valor (R$)', '% do Total'],
             ['RECEITAS', f'{total_revenue:,.2f}', '100%'],
-            ['DESPESAS', f'-{total_expenses:,.2f}', 
-             f'-{(total_expenses/total_revenue*100):.1f}%' if total_revenue > 0 else '0%'],
+            ['DESPESAS', f'-{abs(total_expenses):,.2f}', 
+             f'{(abs(total_expenses)/total_revenue*100):.1f}%' if total_revenue > 0 else '0%'],
             ['', '', ''],
             ['LUCRO/PREJUÍZO', 
              f'{gross_profit:,.2f}',
@@ -626,10 +639,10 @@ class ReportGenerator:
             expense_data = [['Categoria', 'Valor (R$)', 'Qtd', '%']]
             
             for item in expenses_by_category:
-                percentage = (item['total'] / total_expenses * 100) if total_expenses > 0 else 0
+                percentage = (abs(item['total']) / abs(total_expenses) * 100) if total_expenses != 0 else 0
                 expense_data.append([
                     item['category__name'] or 'Sem categoria',
-                    f"-{item['total']:,.2f}",
+                    f"{item['total']:,.2f}",
                     str(item['count']),
                     f"{percentage:.1f}%"
                 ])
@@ -658,7 +671,7 @@ class ReportGenerator:
                 monthly_table_data.append([
                     month['month'],
                     f"{month['income']:,.2f}",
-                    f"{month['expenses']:,.2f}",
+                    f"-{abs(month['expenses']):,.2f}",
                     f"{month['profit']:,.2f}"
                 ])
             
@@ -666,7 +679,7 @@ class ReportGenerator:
             monthly_table_data.append([
                 'TOTAL',
                 f"{total_revenue:,.2f}",
-                f"{total_expenses:,.2f}",
+                f"-{abs(total_expenses):,.2f}",
                 f"{gross_profit:,.2f}"
             ])
             
@@ -758,14 +771,14 @@ class ReportGenerator:
         
         # Cash Flow Summary
         total_inflows = sum(item['total'] for item in inflows)
-        total_outflows = sum(item['total'] for item in outflows)
+        total_outflows = sum(abs(item['total']) for item in outflows)  # Use absolute values
         net_flow = total_inflows - total_outflows
         
         story.append(Paragraph("Resumo do Fluxo", self.styles['CustomHeading']))
         
         flow_summary = [
             ['Entradas', f'R$ {total_inflows:,.2f}'],
-            ['Saídas', f'R$ -{total_outflows:,.2f}'],
+            ['Saídas', f'R$ {total_outflows:,.2f}'],
             ['Fluxo Líquido', f'R$ {net_flow:,.2f}'],
         ]
         
@@ -814,10 +827,10 @@ class ReportGenerator:
             outflow_data = [['Categoria', 'Valor (R$)', '%']]
             
             for item in outflows[:10]:  # Top 10
-                percentage = (item['total'] / total_outflows * 100) if total_outflows > 0 else 0
+                percentage = (abs(item['total']) / abs(total_outflows) * 100) if total_outflows != 0 else 0
                 outflow_data.append([
                     item['category__name'] or 'Sem categoria',
-                    f"{item['total']:,.2f}",
+                    f"{abs(item['total']):,.2f}",
                     f"{percentage:.1f}%"
                 ])
             
@@ -906,10 +919,10 @@ class ReportGenerator:
             ['Métrica', 'Valor'],
             ['Total de Transações', f"{summary_stats['total_count']}"],
             ['Receitas', f"R$ {summary_stats['total_income']:,.2f} ({summary_stats['income_count']} transações)"],
-            ['Despesas', f"R$ -{summary_stats['total_expenses']:,.2f} ({summary_stats['expense_count']} transações)"],
+            ['Despesas', f"R$ {abs(summary_stats['total_expenses']):,.2f} ({summary_stats['expense_count']} transações)"],
             ['Resultado Líquido', f"R$ {summary_stats['net_balance']:,.2f}"],
             ['Média Diária de Receitas', f"R$ {avg_daily_income:,.2f}"],
-            ['Média Diária de Despesas', f"R$ {avg_daily_expense:,.2f}"],
+            ['Média Diária de Despesas', f"R$ {abs(avg_daily_expense):,.2f}"],
         ]
         
         metrics_table = Table(metrics_data, colWidths=[3.5*inch, 3*inch])
@@ -935,7 +948,7 @@ class ReportGenerator:
                     trans.transaction_date.strftime('%d/%m'),
                     trans.description[:40] + '...' if len(trans.description) > 40 else trans.description,
                     trans.category.name if trans.category else 'Sem categoria',
-                    f"R$ {trans.amount:,.2f}"
+                    f"R$ {abs(trans.amount):,.2f}"
                 ])
             
             expense_table = Table(expense_data, colWidths=[0.8*inch, 3*inch, 1.5*inch, 1.2*inch])
@@ -1011,13 +1024,13 @@ class ReportGenerator:
             
             # Category table
             cat_data = [['Categoria', 'Valor (R$)', 'Transações', '% do Total']]
-            total_cat_expenses = sum(item['total'] for item in category_breakdown)
+            total_cat_expenses = sum(abs(item['total']) for item in category_breakdown)
             
             for item in category_breakdown[:10]:  # Top 10
-                percentage = (item['total'] / total_cat_expenses * 100) if total_cat_expenses > 0 else 0
+                percentage = (abs(item['total']) / total_cat_expenses * 100) if total_cat_expenses > 0 else 0
                 cat_data.append([
                     item['name'],
-                    f"{item['total']:,.2f}",
+                    f"{abs(item['total']):,.2f}",
                     str(item['count']),
                     f"{percentage:.1f}%"
                 ])
@@ -1047,7 +1060,7 @@ class ReportGenerator:
                     account_name,
                     str(item['transaction_count']),
                     f"{item['total_credits'] or 0:,.2f}",
-                    f"{item['total_debits'] or 0:,.2f}"
+                    f"{abs(item['total_debits']) if item['total_debits'] else 0:,.2f}"
                 ])
             
             acc_table = Table(account_data, colWidths=[2.5*inch, 1*inch, 1.5*inch, 1.5*inch])
@@ -1130,7 +1143,7 @@ class ReportGenerator:
             
             # Use top 8 categories for pie chart
             top_categories = category_data[:8]
-            pie.data = [float(item['total']) for item in top_categories]
+            pie.data = [float(abs(item['total'])) for item in top_categories]
             pie.labels = [f"{item['category'].name} ({item['percentage']:.1f}%)" 
                          for item in top_categories]
             pie.slices.strokeWidth = 0.5
@@ -1159,9 +1172,9 @@ class ReportGenerator:
             for item in category_data:
                 detail_data.append([
                     item['category'].name,
-                    f"{item['total']:,.2f}",
+                    f"{abs(item['total']):,.2f}",
                     str(item['count']),
-                    f"{item['average']:,.2f}",
+                    f"{abs(item['average']):,.2f}",
                     f"{item['percentage']:.1f}%"
                 ])
             
@@ -1197,7 +1210,7 @@ class ReportGenerator:
                         month_date = datetime.strptime(month, '%Y-%m')
                         trend_data.append([
                             month_date.strftime('%B %Y'),
-                            f"{category_trends[cat_name][month]:,.2f}"
+                            f"{abs(category_trends[cat_name][month]):,.2f}"
                         ])
                     
                     trend_table = Table(trend_data, colWidths=[2*inch, 1.5*inch])
@@ -1392,8 +1405,8 @@ class ReportGenerator:
         sheet.write('C6', 1.0, percent_format)
         
         sheet.write('A7', 'DESPESAS')
-        sheet.write('B7', total_expenses, money_format)
-        sheet.write('C7', total_expenses / total_revenue if total_revenue > 0 else 0, percent_format)
+        sheet.write('B7', -total_expenses, money_format)
+        sheet.write('C7', (total_expenses / total_revenue) if total_revenue > 0 else 0, percent_format)
         
         sheet.write('A9', 'LUCRO/PREJUÍZO', workbook.add_format({'bold': True}))
         sheet.write('B9', gross_profit, workbook.add_format({'num_format': 'R$ #,##0.00', 'bold': True}))
@@ -1618,10 +1631,10 @@ class ReportGenerator:
         metrics = [
             ('Total de Transações', summary_stats['total_count']),
             ('Receitas', f"R$ {summary_stats['total_income']:,.2f} ({summary_stats['income_count']} transações)"),
-            ('Despesas', f"R$ {summary_stats['total_expenses']:,.2f} ({summary_stats['expense_count']} transações)"),
+            ('Despesas', f"R$ {abs(summary_stats['total_expenses']):,.2f} ({summary_stats['expense_count']} transações)"),
             ('Resultado Líquido', f"R$ {summary_stats['net_balance']:,.2f}"),
             ('Média Diária de Receitas', f"R$ {avg_daily_income:,.2f}"),
-            ('Média Diária de Despesas', f"R$ {avg_daily_expense:,.2f}"),
+            ('Média Diária de Despesas', f"R$ {abs(avg_daily_expense):,.2f}"),
         ]
         
         row = 4
@@ -1675,13 +1688,13 @@ class ReportGenerator:
             cat_sheet.write('C2', 'Transações', header_format)
             cat_sheet.write('D2', '% do Total', header_format)
             
-            total_cat_expenses = sum(item['total'] for item in category_breakdown)
+            total_cat_expenses = sum(abs(item['total']) for item in category_breakdown)
             row = 3
             
             for item in category_breakdown:
-                percentage = (item['total'] / total_cat_expenses * 100) if total_cat_expenses > 0 else 0
+                percentage = (abs(item['total']) / total_cat_expenses * 100) if total_cat_expenses > 0 else 0
                 cat_sheet.write(f'A{row}', item['name'])
-                cat_sheet.write(f'B{row}', float(item['total']), money_format)
+                cat_sheet.write(f'B{row}', float(abs(item['total'])), money_format)
                 cat_sheet.write(f'C{row}', item['count'])
                 cat_sheet.write(f'D{row}', f"{percentage:.1f}%")
                 row += 1

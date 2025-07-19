@@ -186,10 +186,6 @@ export function UpgradePlanDialog({
                             <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
                             {plan.max_bank_accounts} contas bancárias
                           </div>
-                          <div className="flex items-center text-sm">
-                            <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
-                            {plan.max_users} usuários
-                          </div>
                           
                           {plan.has_ai_categorization && (
                             <div className="flex items-center text-sm">

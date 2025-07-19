@@ -63,6 +63,7 @@ export function UsageLimitsCard() {
       limit: limits.transactions.limit,
       percentage: limits.transactions.percentage,
       unit: 'transações',
+      hasAccess: true,
     },
     {
       icon: BanknotesIcon,
@@ -71,6 +72,7 @@ export function UsageLimitsCard() {
       limit: limits.bank_accounts.limit,
       percentage: limits.bank_accounts.percentage,
       unit: 'contas',
+      hasAccess: true,
     },
     {
       icon: SparklesIcon,
@@ -79,10 +81,11 @@ export function UsageLimitsCard() {
       limit: limits.ai_requests.limit,
       percentage: limits.ai_requests.percentage,
       unit: 'requisições',
+      hasAccess: limits.ai_requests.limit > 0,
     },
   ];
 
-  const hasAnyLimitWarning = usageItems.some(item => item.percentage >= 80);
+  const hasAnyLimitWarning = usageItems.some(item => item.hasAccess && item.percentage >= 80);
 
   return (
     <Card>
@@ -111,19 +114,38 @@ export function UsageLimitsCard() {
                     <span className="font-medium">{item.title}</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-gray-600">
-                      {item.used.toLocaleString()} / {item.limit === 999999 ? '∞' : item.limit.toLocaleString()} {item.unit}
-                    </span>
-                    <Badge className={`text-xs ${status.color}`}>
-                      {status.label}
-                    </Badge>
+                    {item.hasAccess ? (
+                      <>
+                        <span className="text-gray-600">
+                          {item.used.toLocaleString()} / {item.limit === 999999 ? '∞' : item.limit.toLocaleString()} {item.unit}
+                        </span>
+                        <Badge className={`text-xs ${status.color}`}>
+                          {status.label}
+                        </Badge>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-gray-500 text-sm">
+                          Não disponível no seu plano
+                        </span>
+                        <Badge variant="outline" className="text-xs text-gray-600">
+                          Upgrade necessário
+                        </Badge>
+                      </>
+                    )}
                   </div>
                 </div>
-                <Progress 
-                  value={Math.min(item.percentage, 100)} 
-                  className="h-2"
-                  indicatorClassName={getUsageColor(item.percentage)}
-                />
+                {item.hasAccess ? (
+                  <Progress 
+                    value={Math.min(item.percentage, 100)} 
+                    className="h-2"
+                    indicatorClassName={getUsageColor(item.percentage)}
+                  />
+                ) : (
+                  <div className="h-2 w-full bg-gray-200 rounded-full">
+                    <div className="h-2 w-0 bg-gray-400 rounded-full"></div>
+                  </div>
+                )}
               </div>
             );
           })}

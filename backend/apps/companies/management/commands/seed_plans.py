@@ -18,8 +18,7 @@ class Command(BaseCommand):
                 'price_monthly': 49,
                 'price_yearly': 490,
                 'max_transactions': 500,
-                'max_bank_accounts': 2,
-                'max_users': 3,
+                'max_bank_accounts': 1,
                 'has_ai_categorization': False,  # Pluggy handles categorization
                 'enable_ai_insights': False,      # NO AI
                 'enable_ai_reports': False,       # NO AI
@@ -36,13 +35,12 @@ class Command(BaseCommand):
                 'plan_type': 'professional',
                 'price_monthly': 149,
                 'price_yearly': 1490,
-                'max_transactions': 2000,
-                'max_bank_accounts': 5,
-                'max_users': 10,
+                'max_transactions': 2500,
+                'max_bank_accounts': 3,
                 'has_ai_categorization': False,  # Pluggy handles categorization
                 'enable_ai_insights': True,       # WITH AI
                 'enable_ai_reports': True,        # WITH AI
-                'max_ai_requests_per_month': 1000,
+                'max_ai_requests_per_month': 10,
                 'has_advanced_reports': True,
                 'has_api_access': False,
                 'has_accountant_access': True,
@@ -53,11 +51,10 @@ class Command(BaseCommand):
                 'name': 'Empresarial',
                 'slug': 'enterprise',
                 'plan_type': 'enterprise',
-                'price_monthly': 449,
-                'price_yearly': 4490,
+                'price_monthly': 349,
+                'price_yearly': 3490,
                 'max_transactions': 999999,
                 'max_bank_accounts': 999,
-                'max_users': 999,
                 'has_ai_categorization': False,  # Pluggy handles categorization
                 'enable_ai_insights': True,       # WITH AI
                 'enable_ai_reports': True,        # WITH AI

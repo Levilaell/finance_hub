@@ -75,7 +75,12 @@ api.interceptors.response.use(
     
     // Handle other errors
     if (error.response?.status === 403) {
-      toast.error('Você não tem permissão para realizar esta ação');
+      // Don't show generic error for AI Insights endpoints - handled in component
+      const isAIInsightsRequest = originalRequest.url?.includes('/ai-insights') || 
+                                 originalRequest.url?.includes('/reports/ai-insights');
+      if (!isAIInsightsRequest) {
+        toast.error('Você não tem permissão para realizar esta ação');
+      }
     } else if (error.response?.status === 404) {
       toast.error('Recurso não encontrado');
     } else if (error.response?.status === 500) {

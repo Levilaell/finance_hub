@@ -44,7 +44,6 @@ class SubscriptionPlan(models.Model):
     # Limites do plano
     max_transactions = models.IntegerField(_('max transactions per month'), default=500)
     max_bank_accounts = models.IntegerField(_('max bank accounts'), default=1)
-    max_users = models.IntegerField(_('max users'), default=1)
     
     # AI Features
     has_ai_categorization = models.BooleanField(_('AI categorization'), default=True)
@@ -312,11 +311,6 @@ class Company(models.Model):
             usage_info = f"{count}/{self.subscription_plan.max_bank_accounts} contas"
             return limit_reached, usage_info
             
-        elif limit_type == 'users':
-            count = self.company_users.filter(is_active=True).count() + 1  # +1 for owner
-            limit_reached = count >= self.subscription_plan.max_users
-            usage_info = f"{count}/{self.subscription_plan.max_users} usuários"
-            return limit_reached, usage_info
             
         elif limit_type == 'ai_requests':
             limit_reached = self.current_month_ai_requests >= self.subscription_plan.max_ai_requests_per_month
@@ -341,11 +335,6 @@ class Company(models.Model):
                 return 0
             return (count / self.subscription_plan.max_bank_accounts) * 100
             
-        elif limit_type == 'users':
-            count = self.company_users.filter(is_active=True).count() + 1
-            if self.subscription_plan.max_users == 0:
-                return 0
-            return (count / self.subscription_plan.max_users) * 100
             
         elif limit_type == 'ai_requests':
             if self.subscription_plan.max_ai_requests_per_month == 0:
@@ -429,13 +418,6 @@ class Company(models.Model):
         current_count = self.bank_accounts.filter(is_active=True).count()
         return current_count < self.subscription_plan.max_bank_accounts
     
-    def can_add_user(self):
-        """Check if company can add more users"""
-        if not self.subscription_plan:
-            return False
-        
-        current_count = self.company_users.filter(is_active=True).count() + 1  # +1 for owner
-        return current_count < self.subscription_plan.max_users
     
     def get_usage_summary(self):
         """Get complete usage summary"""
@@ -443,7 +425,6 @@ class Company(models.Model):
             return None
         
         bank_accounts_count = self.bank_accounts.filter(is_active=True).count()
-        users_count = self.company_users.filter(is_active=True).count() + 1
         
         return {
             'transactions': {
@@ -456,17 +437,18 @@ class Company(models.Model):
                 'limit': self.subscription_plan.max_bank_accounts,
                 'percentage': self.get_usage_percentage('bank_accounts'),
             },
-            'users': {
-                'used': users_count,
-                'limit': self.subscription_plan.max_users,
-                'percentage': self.get_usage_percentage('users'),
-            },
             'ai_requests': {
                 'used': self.current_month_ai_requests,
                 'limit': self.subscription_plan.max_ai_requests_per_month,
                 'percentage': self.get_usage_percentage('ai_requests'),
             },
         }
+    
+    @property
+    def active_bank_accounts_count(self):
+        """Get count of active bank accounts"""
+        return self.bank_accounts.filter(is_active=True).count()
+    
     
     def save(self, *args, **kwargs):
         # Set trial end date for new companies - ALWAYS 14 DAYS

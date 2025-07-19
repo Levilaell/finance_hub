@@ -18,7 +18,7 @@ class SubscriptionPlanSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'slug', 'plan_type',
             'price_monthly', 'price_yearly',
-            'max_transactions', 'max_bank_accounts', 'max_users',
+            'max_transactions', 'max_bank_accounts',
             'has_ai_categorization', 'enable_ai_insights', 'enable_ai_reports',
             'max_ai_requests_per_month', 'has_advanced_reports',
             'has_api_access', 'has_accountant_access', 'has_priority_support',
@@ -51,12 +51,16 @@ class CompanySerializer(serializers.ModelSerializer):
             'logo', 'primary_color', 'currency', 'fiscal_year_start',
             'enable_ai_categorization', 'auto_categorize_threshold',
             'enable_notifications', 'enable_email_reports',
+            'current_month_transactions', 'current_month_ai_requests',
+            'active_bank_accounts_count',
             'created_at', 'is_active'
         ]
         read_only_fields = [
             'owner', 'subscription_status', 'trial_ends_at', 
             'next_billing_date', 'subscription_start_date', 
-            'subscription_end_date', 'created_at'
+            'subscription_end_date', 'current_month_transactions',
+            'current_month_ai_requests', 'active_bank_accounts_count',
+            'created_at'
         ]
     
     def get_owner(self, obj):

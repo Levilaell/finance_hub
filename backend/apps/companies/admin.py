@@ -38,7 +38,7 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
         ('Limites', {
             'fields': (
                 'max_transactions', 'max_bank_accounts', 
-                'max_users', 'max_ai_requests_per_month'
+                'max_ai_requests_per_month'
             )
         }),
         ('Recursos', {
@@ -67,12 +67,10 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
             '''<ul style="margin: 0; padding-left: 20px;">
                 <li>{} transações</li>
                 <li>{} contas</li>
-                <li>{} usuários</li>
                 <li>{} IA/mês</li>
             </ul>''',
             obj.max_transactions,
             obj.max_bank_accounts,
-            obj.max_users,
             obj.max_ai_requests_per_month
         )
     limits_display.short_description = 'Limites'

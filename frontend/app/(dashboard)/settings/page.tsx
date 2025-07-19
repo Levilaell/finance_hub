@@ -844,19 +844,36 @@ export default function SettingsPage() {
                     )}
 
                     {/* Plan Limits */}
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Limite de Contas Bancárias</p>
-                      <p className="font-medium">
-                        {user?.company?.subscription_plan?.max_bank_accounts || 'Ilimitado'}
-                      </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <p className="text-sm text-gray-600">Limite de Transações</p>
+                        <p className="font-medium">
+                          {user?.company?.subscription_plan?.max_transactions === 999999 
+                            ? 'Ilimitado' 
+                            : `${user?.company?.subscription_plan?.max_transactions?.toLocaleString()}/mês`}
+                        </p>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <p className="text-sm text-gray-600">Limite de Contas Bancárias</p>
+                        <p className="font-medium">
+                          {user?.company?.subscription_plan?.max_bank_accounts === 999 
+                            ? 'Ilimitado' 
+                            : user?.company?.subscription_plan?.max_bank_accounts}
+                        </p>
+                      </div>
+                      {user?.company?.subscription_plan?.enable_ai_insights && (
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Limite de IA</p>
+                          <p className="font-medium">
+                            {user?.company?.subscription_plan?.max_ai_requests_per_month === 999999 
+                              ? 'Ilimitado' 
+                              : `${user?.company?.subscription_plan?.max_ai_requests_per_month}/mês`}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Limite de Usuários</p>
-                      <p className="font-medium">
-                        {user?.company?.subscription_plan?.max_users || 'Ilimitado'}
-                      </p>
-                    </div>
+
                   </div>
                 </div>
 
@@ -878,12 +895,7 @@ export default function SettingsPage() {
                           </svg>
                           {user.company.subscription_plan.max_bank_accounts} contas bancárias
                         </li>
-                        <li className="flex items-center text-sm text-gray-700">
-                          <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          {user.company.subscription_plan.max_users} usuários
-                        </li>
+
                         {user.company.subscription_plan.has_ai_categorization && (
                           <li className="flex items-center text-sm text-gray-700">
                             <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">

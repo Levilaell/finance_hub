@@ -202,7 +202,7 @@ export const reportsService = {
     end_date: Date;
     force_refresh?: boolean;
     type?: 'comprehensive' | 'quick' | 'custom';
-  }): Promise<AIInsights> {
+  }): Promise<AIInsights | null> {
     try {
       const response = await api.get('/api/reports/ai-insights/', {
         params: {
@@ -217,7 +217,8 @@ export const reportsService = {
     } catch (error: any) {
       // Se falhar, retornar insights básicos
       if (error.response?.status === 403) {
-        throw new Error('AI insights not available in your plan');
+        // Return null instead of throwing to avoid error boundary
+        return null;
       }
       
       // Log do erro mas não falhar completamente

@@ -32,14 +32,14 @@ const plans: PricingPlan[] = [
     priceMonthly: 49,
     priceYearly: 490,
     features: [
-      '2 contas bancárias',
-      '500 transações por mês',
-      'Categorização automática via Open Banking',
-      'Relatórios avançados',
-      'Dashboard completo',
-      'Exportação PDF/Excel',
-      'Suporte prioritário',
-      'Sincronização em tempo real',
+      '🏦 1 conta bancária conectada',
+      '📊 500 transações por mês',
+      '🤖 Categorização automática',
+      '📊 Dashboard completo com gráficos',
+      '📝 Relatórios financeiros avançados',
+      '💾 Exportação PDF e Excel',
+      '🔄 Sincronização em tempo real',
+      '📞 Suporte por email',
     ],
     limitations: [
       'Sem análises por IA',
@@ -56,20 +56,22 @@ const plans: PricingPlan[] = [
     highlighted: true,
     badge: 'Mais Popular',
     features: [
-      '5 contas bancárias',
-      '2.000 transações por mês',
-      'Categorização automática via Open Banking',
+      '🏦 3 contas bancárias conectadas',
+      '📊 2.500 transações por mês',
+      '🤖 Categorização automática',
       '✨ Análises inteligentes com IA',
+      '✨ 10 consultas de IA por mês',
       '✨ Insights e recomendações personalizadas',
-      '✨ 1.000 requisições de IA por mês',
-      '✨ Relatórios com IA',
       '✨ Previsões de fluxo de caixa',
-      '✨ Alertas inteligentes',
-      'Detecção de anomalias',
-      'Otimização de despesas com IA',
+      '✨ Detecção de anomalias',
+      '✨ Otimização de despesas',
+      '📝 Relatórios financeiros avançados',
+      '📞 Suporte prioritário por WhatsApp',
     ],
     limitations: [
-      'Limite de 1.000 requisições de IA/mês',
+      'Limite de 10 consultas de IA por mês',
+      'Limite de 2.500 transações por mês',
+      'Limite de 3 contas bancárias conectadas'
     ],
   },
   {
@@ -77,18 +79,18 @@ const plans: PricingPlan[] = [
     name: 'Empresarial',
     slug: 'enterprise',
     description: 'Solução ilimitada para grandes empresas com necessidades complexas',
-    priceMonthly: 449,
-    priceYearly: 4490,
+    priceMonthly: 349,
+    priceYearly: 3490,
     features: [
-      'Contas bancárias ilimitadas',
-      'Transações ilimitadas',
-      'Categorização automática via Open Banking',
-      '✨ IA sem restrições',
+      '🏦 Contas bancárias ilimitadas',
+      '📊 Transações ilimitadas',
+      '🤖 Categorização automática',
+      '✨ IA sem restrições (consultas ilimitadas)',
       '✨ Análises avançadas ilimitadas',
       '✨ Machine Learning personalizado',
-      'Relatórios personalizados',
-      'Acesso para contador',
-      'Suporte dedicado',
+      '✨ Insights preditivos avançados',
+      '📝 Relatórios financeiros avançados',
+      '🎆 Suporte dedicado',
     ],
     limitations: [],
   },
@@ -293,19 +295,19 @@ export default function PricingPage() {
                 <tr className="border-b">
                   <td className="p-4">Transações mensais</td>
                   <td className="text-center p-4">500</td>
-                  <td className="text-center p-4 bg-primary/5 font-medium">2.000</td>
+                  <td className="text-center p-4 bg-primary/5 font-medium">2.500</td>
                   <td className="text-center p-4">Ilimitadas</td>
                 </tr>
                 <tr className="border-b">
                   <td className="p-4">Insights com IA</td>
                   <td className="text-center p-4">❌</td>
-                  <td className="text-center p-4 bg-primary/5">✅ 1.000/mês</td>
+                  <td className="text-center p-4 bg-primary/5">✅ 10/mês</td>
                   <td className="text-center p-4">✅ Ilimitado</td>
                 </tr>
                 <tr className="border-b">
                   <td className="p-4">Contas bancárias</td>
-                  <td className="text-center p-4">2</td>
-                  <td className="text-center p-4 bg-primary/5 font-medium">5</td>
+                  <td className="text-center p-4">1</td>
+                  <td className="text-center p-4 bg-primary/5 font-medium">3</td>
                   <td className="text-center p-4">Ilimitadas</td>
                 </tr>
                 <tr className="border-b">

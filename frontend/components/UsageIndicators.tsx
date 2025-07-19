@@ -288,92 +288,14 @@ export function BankAccountUsageIndicator({ company }: UsageIndicatorProps) {
   );
 }
 
-export function UserUsageIndicator({ company }: UsageIndicatorProps) {
-  const router = useRouter();
-  
-  if (!company.subscription_plan) {
-    return null;
-  }
-  
-  const usage = company.active_users_count || 1;
-  const limit = company.subscription_plan.max_users || 0;
-  const percentage = limit > 0 ? (usage / limit) * 100 : 0;
-  const remaining = limit - usage;
-  
-  // Enterprise tem usuários ilimitados
-  if (company.subscription_plan.plan_type === 'enterprise') {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Usuários
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <span className="text-sm">Ativos: {usage}</span>
-            <Badge variant="secondary" className="bg-green-100 text-green-700">
-              Ilimitado
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-  
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <Users className="h-4 w-4" />
-          Usuários
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Usuários ativos</span>
-            <span className="font-medium">{usage} / {limit}</span>
-          </div>
-          <Progress value={percentage} className="h-2" />
-          
-          {percentage >= 100 && (
-            <div className="flex items-center gap-2 text-xs text-red-600">
-              <AlertTriangle className="h-3 w-3" />
-              <span>Limite atingido!</span>
-            </div>
-          )}
-          {percentage < 100 && remaining > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Você pode adicionar mais {remaining} {remaining === 1 ? 'usuário' : 'usuários'}
-            </p>
-          )}
-          
-          {percentage >= 100 && (
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="w-full mt-2"
-              onClick={() => router.push('/pricing')}
-            >
-              <TrendingUp className="h-3 w-3 mr-1" />
-              Aumentar Limite
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+// UserUsageIndicator removed - not implemented feature
 
 // Componente combinado para mostrar todos os indicadores
 export function UsageIndicators({ company }: UsageIndicatorProps) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <TransactionUsageIndicator company={company} />
       <BankAccountUsageIndicator company={company} />
-      <UserUsageIndicator company={company} />
       <AIUsageIndicator company={company} />
     </div>
   );

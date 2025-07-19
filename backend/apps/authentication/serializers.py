@@ -6,7 +6,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.companies.models import Company, SubscriptionPlan
+from apps.companies.models import Company, SubscriptionPlan, CompanyUser
 from apps.companies.validators import validate_cnpj, validate_phone, format_cnpj, format_phone
 
 User = get_user_model()
@@ -16,6 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
     """User serializer for profile data"""
     full_name = serializers.CharField(read_only=True)
     initials = serializers.CharField(read_only=True)
+    company = serializers.SerializerMethodField()
     
     class Meta:
         model = User
@@ -23,9 +24,29 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'first_name', 'last_name',
             'full_name', 'initials', 'phone', 'avatar',
             'is_email_verified', 'is_phone_verified',
-            'preferred_language', 'timezone', 'date_of_birth'
+            'preferred_language', 'timezone', 'date_of_birth', 'company'
         )
-        read_only_fields = ('id', 'username', 'is_email_verified', 'is_phone_verified')
+        read_only_fields = ('id', 'username', 'is_email_verified', 'is_phone_verified', 'company')
+    
+    def get_company(self, obj):
+        """Get user's company data"""
+        try:
+            # Import here to avoid circular import
+            from apps.companies.serializers import CompanySerializer
+            
+            # First try to get company if user is owner
+            if hasattr(obj, 'company'):
+                return CompanySerializer(obj.company).data
+            
+            # If user is not owner, check if they're a team member
+            company_user = CompanyUser.objects.filter(user=obj, is_active=True).first()
+            if company_user:
+                return CompanySerializer(company_user.company).data
+                
+        except (AttributeError, Company.DoesNotExist):
+            pass
+        
+        return None
 
 
 class RegisterSerializer(serializers.ModelSerializer):
