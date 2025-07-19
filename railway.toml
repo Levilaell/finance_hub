@@ -1,12 +1,9 @@
 [build]
 builder = "dockerfile"
+dockerfilePath = "./backend/Dockerfile"
+buildContext = "./backend"
 
 [deploy]
-startCommand = "python manage.py migrate && python manage.py seed_plans && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --timeout 120"
-healthcheckPath = "/api/health/"
-healthcheckTimeout = 300
+startCommand = "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --timeout 120 --log-level info"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
-
-[experimental]
-nixpacks = false
