@@ -8,6 +8,9 @@ class ApiClient {
   private refreshPromise: Promise<any> | null = null;
 
   constructor() {
+    console.log("API Client - NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL);
+    console.log("API Client - Using API_BASE_URL:", API_BASE_URL);
+    
     this.client = axios.create({
       baseURL: API_BASE_URL,
       headers: {
