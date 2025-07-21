@@ -30,10 +30,14 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
             'fields': ('price_monthly', 'price_yearly'),
             'description': 'Valores em R$'
         }),
-        ('IDs de Gateway', {
-            'fields': ('stripe_price_id', 'mercadopago_plan_id'),
+        ('IDs de Gateway - Stripe', {
+            'fields': ('stripe_price_id_monthly', 'stripe_price_id_yearly'),
+            'description': 'Configure os IDs de preço do Stripe para cobrança mensal e anual'
+        }),
+        ('IDs de Gateway - MercadoPago', {
+            'fields': ('mercadopago_plan_id',),
             'classes': ('collapse',),
-            'description': 'Configure os IDs dos produtos nos gateways de pagamento'
+            'description': 'Configure os IDs dos planos no MercadoPago'
         }),
         ('Limites', {
             'fields': (
