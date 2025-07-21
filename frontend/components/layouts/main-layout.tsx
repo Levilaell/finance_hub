@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ const navigation = [
 
 export function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, logout, _hasHydrated } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
@@ -61,6 +62,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   const handleLogout = async () => {
     await logout();
+    router.push('/login');
   };
 
   return (
