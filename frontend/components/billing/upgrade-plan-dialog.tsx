@@ -261,7 +261,7 @@ export function UpgradePlanDialog({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={upgradeMutation.isPending}
+            disabled={checkoutMutation.isPending}
           >
             Cancelar
           </Button>
