@@ -51,13 +51,83 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     """Registration serializer with company creation"""
-    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
-    password2 = serializers.CharField(write_only=True, required=True)
-    company_name = serializers.CharField(required=True)
-    company_type = serializers.CharField(required=True)
-    business_sector = serializers.CharField(required=True)
-    company_cnpj = serializers.CharField(required=True, validators=[validate_cnpj])
-    phone = serializers.CharField(required=True, validators=[validate_phone])
+    email = serializers.EmailField(
+        required=True,
+        error_messages={
+            'required': 'O e-mail é obrigatório.',
+            'invalid': 'Digite um endereço de e-mail válido.',
+            'blank': 'O campo de e-mail não pode estar vazio.'
+        }
+    )
+    password = serializers.CharField(
+        write_only=True, 
+        required=True,
+        error_messages={
+            'required': 'A senha é obrigatória.',
+            'blank': 'O campo de senha não pode estar vazio.'
+        }
+    )
+    password2 = serializers.CharField(
+        write_only=True, 
+        required=True,
+        error_messages={
+            'required': 'A confirmação de senha é obrigatória.',
+            'blank': 'O campo de confirmação de senha não pode estar vazio.'
+        }
+    )
+    first_name = serializers.CharField(
+        required=True,
+        error_messages={
+            'required': 'O nome é obrigatório.',
+            'blank': 'O campo de nome não pode estar vazio.'
+        }
+    )
+    last_name = serializers.CharField(
+        required=True,
+        error_messages={
+            'required': 'O sobrenome é obrigatório.',
+            'blank': 'O campo de sobrenome não pode estar vazio.'
+        }
+    )
+    company_name = serializers.CharField(
+        required=True,
+        error_messages={
+            'required': 'O nome da empresa é obrigatório.',
+            'blank': 'O campo de nome da empresa não pode estar vazio.'
+        }
+    )
+    company_type = serializers.CharField(
+        required=True,
+        error_messages={
+            'required': 'O tipo de empresa é obrigatório.',
+            'blank': 'O campo de tipo de empresa não pode estar vazio.'
+        }
+    )
+    business_sector = serializers.CharField(
+        required=True,
+        error_messages={
+            'required': 'O setor de negócios é obrigatório.',
+            'blank': 'O campo de setor de negócios não pode estar vazio.'
+        }
+    )
+    company_cnpj = serializers.CharField(
+        required=True, 
+        validators=[validate_cnpj],
+        error_messages={
+            'required': 'O CNPJ é obrigatório.',
+            'blank': 'O campo de CNPJ não pode estar vazio.',
+            'invalid': 'CNPJ inválido. Digite apenas números (14 dígitos).'
+        }
+    )
+    phone = serializers.CharField(
+        required=True, 
+        validators=[validate_phone],
+        error_messages={
+            'required': 'O telefone é obrigatório.',
+            'blank': 'O campo de telefone não pode estar vazio.',
+            'invalid': 'Telefone inválido. Use o formato: (11) 98765-4321'
+        }
+    )
     selected_plan = serializers.CharField(required=False, default='starter')
     
     class Meta:
@@ -67,9 +137,85 @@ class RegisterSerializer(serializers.ModelSerializer):
             'phone', 'company_name', 'company_cnpj', 'company_type', 'business_sector', 'selected_plan'
         )
         
-    def validate(self, attrs):
+    def validate_email(self, value):
+        """Validação customizada para email"""
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError('Este e-mail já está cadastrado.')
+        return value
+    
+    def validate_first_name(self, value):
+        """Validação customizada para nome"""
+        if len(value.strip()) < 2:
+            raise serializers.ValidationError('O nome deve ter pelo menos 2 caracteres.')
+        if not value.replace(' ', '').isalpha():
+            raise serializers.ValidationError('O nome deve conter apenas letras.')
+        return value.strip()
+    
+    def validate_last_name(self, value):
+        """Validação customizada para sobrenome"""
+        if len(value.strip()) < 2:
+            raise serializers.ValidationError('O sobrenome deve ter pelo menos 2 caracteres.')
+        if not value.replace(' ', '').isalpha():
+            raise serializers.ValidationError('O sobrenome deve conter apenas letras.')
+        return value.strip()
+    
+    def validate_company_name(self, value):
+        """Validação customizada para nome da empresa"""
+        if len(value.strip()) < 3:
+            raise serializers.ValidationError('O nome da empresa deve ter pelo menos 3 caracteres.')
+        return value.strip()
+    
+    def validate_password(self, value):
+        """Validação customizada para senha com mensagens em português"""
+        from django.contrib.auth.password_validation import (
+            MinimumLengthValidator,
+            UserAttributeSimilarityValidator,
+            CommonPasswordValidator,
+            NumericPasswordValidator
+        )
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        
+        errors = []
+        
+        # Validação de comprimento mínimo
+        try:
+            MinimumLengthValidator(min_length=8).validate(value)
+        except DjangoValidationError:
+            errors.append('A senha deve ter pelo menos 8 caracteres.')
+        
+        # Validação de senha comum
+        try:
+            CommonPasswordValidator().validate(value)
+        except DjangoValidationError:
+            errors.append('Esta senha é muito comum. Escolha uma senha mais segura.')
+        
+        # Validação de senha numérica
+        try:
+            NumericPasswordValidator().validate(value)
+        except DjangoValidationError:
+            errors.append('A senha não pode conter apenas números.')
+        
+        # Verificações adicionais
+        if not any(char.isupper() for char in value):
+            errors.append('A senha deve conter pelo menos uma letra maiúscula.')
+        
+        if not any(char.islower() for char in value):
+            errors.append('A senha deve conter pelo menos uma letra minúscula.')
+        
+        if not any(char.isdigit() for char in value):
+            errors.append('A senha deve conter pelo menos um número.')
+        
+        if not any(char in "!@#$%^&*()_+-=[]{}|;:,.<>?" for char in value):
+            errors.append('A senha deve conter pelo menos um caractere especial (!@#$%^&* etc).')
+        
+        if errors:
+            raise serializers.ValidationError(errors)
+        
+        return value
+        
+    def validate(self, attrs)
         if attrs['password'] != attrs['password2']:
-            raise serializers.ValidationError({"password": "As senhas não coincidem."})
+            raise serializers.ValidationError({"password": "As senhas não coincidem.", "password2": "As senhas não coincidem."})
         return attrs
     
     def create(self, validated_data):

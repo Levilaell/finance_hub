@@ -16,7 +16,7 @@ def validate_cnpj(value):
     # CNPJ must have 14 digits
     if len(cnpj) != 14:
         raise ValidationError(
-            _('CNPJ deve conter 14 dígitos numéricos.'),
+            _('CNPJ deve conter exatamente 14 números. Você digitou {} números.').format(len(cnpj)),
             code='invalid_length'
         )
     
@@ -28,7 +28,7 @@ def validate_cnpj(value):
         '99999999999999'
     ]:
         raise ValidationError(
-            _('CNPJ inválido.'),
+            _('CNPJ inválido. Não use números repetidos.'),
             code='invalid'
         )
     
@@ -42,7 +42,7 @@ def validate_cnpj(value):
     
     if int(cnpj[12]) != digit1:
         raise ValidationError(
-            _('CNPJ inválido.'),
+            _('CNPJ inválido. Verifique se digitou corretamente.'),
             code='invalid'
         )
     
@@ -56,7 +56,7 @@ def validate_cnpj(value):
     
     if int(cnpj[13]) != digit2:
         raise ValidationError(
-            _('CNPJ inválido.'),
+            _('CNPJ inválido. Verifique se digitou corretamente.'),
             code='invalid'
         )
     
@@ -86,7 +86,7 @@ def validate_phone(value):
     # Brazilian phone must have 10 or 11 digits (with area code)
     if len(phone) < 10 or len(phone) > 11:
         raise ValidationError(
-            _('Telefone deve conter 10 ou 11 dígitos (com DDD).'),
+            _('Telefone deve ter 10 ou 11 números incluindo DDD. Você digitou {} números. Exemplo: (11) 98765-4321').format(len(phone)),
             code='invalid_length'
         )
     
@@ -124,14 +124,14 @@ def validate_phone(value):
     area_code = int(phone[:2])
     if area_code not in valid_area_codes:
         raise ValidationError(
-            _('Código de área (DDD) inválido.'),
+            _('DDD {} não é válido. Use um código de área brasileiro válido.').format(area_code),
             code='invalid_area_code'
         )
     
     # For mobile numbers (11 digits), the 3rd digit must be 9
     if len(phone) == 11 and phone[2] != '9':
         raise ValidationError(
-            _('Número de celular deve começar com 9 após o DDD.'),
+            _('Celular deve começar com 9 após o DDD. Exemplo: (11) 9xxxx-xxxx'),
             code='invalid_mobile'
         )
     
