@@ -7,6 +7,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     ReportViewSet,
     ReportTemplateViewSet,
+    AIAnalysisViewSet,
+    AIAnalysisTemplateViewSet,
     QuickReportsView,
     AnalyticsView,
     DashboardStatsView,
@@ -21,6 +23,8 @@ app_name = 'reports'
 router = DefaultRouter()
 router.register(r'reports', ReportViewSet, basename='report')
 router.register(r'templates', ReportTemplateViewSet, basename='report-template')
+router.register(r'ai-analyses', AIAnalysisViewSet, basename='ai-analysis')
+router.register(r'ai-templates', AIAnalysisTemplateViewSet, basename='ai-analysis-template')
 
 urlpatterns = [
     # ViewSet routes

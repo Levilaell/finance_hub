@@ -24,10 +24,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone as django_timezone
 
 from apps.banking.models import BankAccount, Transaction, TransactionCategory
-from .models import Report, ReportTemplate
+from .models import Report, ReportTemplate, AIAnalysis, AIAnalysisTemplate
 from .serializers import (
     ReportSerializer,
     ReportTemplateSerializer,
+    AIAnalysisSerializer,
+    AIAnalysisListSerializer,
+    AIAnalysisTemplateSerializer,
 )
 from .ai_service import enhanced_ai_service
 from django.utils import timezone as django_timezone
@@ -1950,5 +1953,172 @@ class AIInsightsView(APIView):
         variance = sum((s - mean) ** 2 for s in scores) / len(scores)
         
         return variance ** 0.5
+
+
+class AIAnalysisViewSet(viewsets.ModelViewSet):
+    """
+    AI Analysis management viewset
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['analysis_type', 'is_favorite', 'is_processed']
+    search_fields = ['title', 'description', 'tags']
+    ordering_fields = ['created_at', 'title', 'confidence_score', 'health_score']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        return AIAnalysis.objects.filter(
+            company=self.request.user.company
+        ).select_related('created_by')
+    
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return AIAnalysisListSerializer
+        return AIAnalysisSerializer
+    
+    def perform_create(self, serializer):
+        """Create new AI analysis"""
+        # Auto-generate title if not provided
+        if not serializer.validated_data.get('title'):
+            analysis_type = serializer.validated_data.get('analysis_type', 'general_insights')
+            period_start = serializer.validated_data.get('period_start')
+            period_end = serializer.validated_data.get('period_end')
+            
+            type_display = dict(AIAnalysis.ANALYSIS_TYPES).get(analysis_type, 'Análise')
+            title = f"{type_display} - {period_start} a {period_end}"
+            serializer.validated_data['title'] = title
+        
+        serializer.save(
+            company=self.request.user.company,
+            created_by=self.request.user
+        )
+    
+    @action(detail=False, methods=['post'])
+    def save_from_insights(self, request):
+        """Save analysis from AI insights data"""
+        try:
+            insights_data = request.data.get('insights_data', {})
+            period_start = request.data.get('period_start')
+            period_end = request.data.get('period_end')
+            title = request.data.get('title')
+            
+            if not all([insights_data, period_start, period_end]):
+                return Response({
+                    'error': 'insights_data, period_start, and period_end are required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Create AI analysis from insights data
+            ai_analysis = AIAnalysis.objects.create(
+                company=request.user.company,
+                created_by=request.user,
+                title=title or f"Análise de IA - {period_start} a {period_end}",
+                analysis_type='general_insights',
+                period_start=period_start,
+                period_end=period_end,
+                ai_response=insights_data,
+                insights=insights_data.get('insights', []),
+                recommendations=insights_data.get('recommendations', []),
+                predictions=insights_data.get('predictions', {}),
+                summary=insights_data.get('summary', {}),
+                confidence_score=insights_data.get('predictions', {}).get('confidence', 'medium') == 'high' and 90 or 70,
+                health_score=insights_data.get('key_metrics', {}).get('health_score'),
+                is_processed=True,
+                processing_time=0
+            )
+            
+            serializer = AIAnalysisSerializer(ai_analysis, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error saving AI analysis: {str(e)}")
+            return Response({
+                'error': 'Failed to save analysis'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['post'])
+    def toggle_favorite(self, request, pk=None):
+        """Toggle favorite status of analysis"""
+        analysis = self.get_object()
+        analysis.is_favorite = not analysis.is_favorite
+        analysis.save()
+        
+        return Response({
+            'is_favorite': analysis.is_favorite
+        })
+    
+    @action(detail=False, methods=['get'])
+    def favorites(self, request):
+        """Get user's favorite analyses"""
+        queryset = self.get_queryset().filter(is_favorite=True)
+        serializer = AIAnalysisListSerializer(queryset, many=True, context={'request': request})
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def recent(self, request):
+        """Get recent analyses (last 30 days)"""
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+        queryset = self.get_queryset().filter(created_at__gte=thirty_days_ago)[:10]
+        serializer = AIAnalysisListSerializer(queryset, many=True, context={'request': request})
+        return Response(serializer.data)
+
+
+class AIAnalysisTemplateViewSet(viewsets.ModelViewSet):
+    """
+    AI Analysis Template management viewset
+    """
+    serializer_class = AIAnalysisTemplateSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['analysis_type', 'is_active', 'is_public']
+    search_fields = ['name', 'description']
+    
+    def get_queryset(self):
+        queryset = AIAnalysisTemplate.objects.filter(
+            Q(company=self.request.user.company) | Q(is_public=True)
+        ).select_related('created_by')
+        
+        # Filter by active templates only
+        return queryset.filter(is_active=True)
+    
+    def perform_create(self, serializer):
+        serializer.save(
+            company=self.request.user.company,
+            created_by=self.request.user
+        )
+    
+    @action(detail=True, methods=['post'])
+    def create_analysis(self, request, pk=None):
+        """Create new analysis from template"""
+        template = self.get_object()
+        period_start = request.data.get('period_start')
+        period_end = request.data.get('period_end')
+        
+        if not all([period_start, period_end]):
+            return Response({
+                'error': 'period_start and period_end are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create analysis from template
+        analysis_data = {
+            'title': f"{template.name} - {period_start} a {period_end}",
+            'description': template.description,
+            'analysis_type': template.analysis_type,
+            'period_start': period_start,
+            'period_end': period_end,
+            'analysis_config': template.template_config,
+            'input_parameters': template.default_parameters,
+            'filters': template.default_filters,
+        }
+        
+        serializer = AIAnalysisSerializer(data=analysis_data, context={'request': request})
+        if serializer.is_valid():
+            analysis = serializer.save(
+                company=request.user.company,
+                created_by=request.user
+            )
+            return Response(AIAnalysisSerializer(analysis, context={'request': request}).data, 
+                          status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     

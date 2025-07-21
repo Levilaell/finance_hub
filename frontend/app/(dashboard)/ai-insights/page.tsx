@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { reportsService } from '@/services/reports.service';
+import { aiAnalysisService } from '@/services/ai-analysis.service';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth-store';
 import { useRouter } from 'next/navigation';
@@ -381,6 +382,22 @@ export default function AIInsightsPage() {
       setIsUpgradeRequired(false);
       // Salva os dados no cache para uso futuro
       setCachedAIData(result);
+      
+      // Salva automaticamente a análise se há dados válidos
+      if (result && result.insights && !isUpgradeRequired) {
+        try {
+          await aiAnalysisService.saveFromInsights({
+            insights_data: result,
+            period_start: selectedPeriod.start_date.toISOString().split('T')[0],
+            period_end: selectedPeriod.end_date.toISOString().split('T')[0],
+            title: `Análise de IA - ${formatDate(selectedPeriod.start_date)} a ${formatDate(selectedPeriod.end_date)}`
+          });
+        } catch (error) {
+          // Falha silenciosa - não queremos interromper o fluxo
+          console.warn('Falha ao salvar análise automaticamente:', error);
+        }
+      }
+      
       return result;
     },
     enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
