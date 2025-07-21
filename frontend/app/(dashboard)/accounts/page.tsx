@@ -41,6 +41,7 @@ import {
 import { toast } from 'sonner';
 import { bankingService } from '@/services/banking.service';
 import { PluggyConnectModal } from '@/components/banking/pluggy-connect-widget';
+import { PluggyConnectIframe } from '@/components/banking/pluggy-connect-iframe';
 import { PluggyInfoDialog } from '@/components/banking/pluggy-info-dialog';
 
 export default function AccountsPage() {
@@ -60,6 +61,7 @@ export default function AccountsPage() {
   const [pluggyConnectToken, setPluggyConnectToken] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [pluggyError, setPluggyError] = useState<string | null>(null);
+  const [useIframeMode, setUseIframeMode] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -264,6 +266,7 @@ export default function AccountsPage() {
     setPluggyConnectToken(null);
     setIsConnecting(false);
     setPluggyError(null);
+    setUseIframeMode(false);
   };
 
   // Show loading state while auth is being checked
@@ -302,46 +305,79 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Pluggy Connect Modal */}
+      {/* Pluggy Connect - Widget SDK ou Iframe */}
       {pluggyConnectToken && isConnecting && !pluggyError && (
-        <PluggyConnectModal
-          connectToken={pluggyConnectToken}
-          onSuccess={async (itemData) => {
-            console.log('Pluggy Connect Success:', itemData);
-            const itemId = itemData?.item?.id;
-            
-            if (itemId) {
-              try {
-                // Handle the callback to create bank accounts
-                await handlePluggyCallback(itemId);
-                
-                // Force refresh after successful connection
-                await fetchAccounts();
-              } catch (error) {
-                console.error('Error in handlePluggyCallback:', error);
+        useIframeMode ? (
+          <PluggyConnectIframe
+            connectToken={pluggyConnectToken}
+            onSuccess={async (itemData) => {
+              console.log('Pluggy Iframe Success:', itemData);
+              const itemId = itemData?.item?.id;
+              
+              if (itemId) {
+                try {
+                  await handlePluggyCallback(itemId);
+                  await fetchAccounts();
+                } catch (error) {
+                  console.error('Error in handlePluggyCallback:', error);
+                }
               }
-            }
-            
-            // Reset states
-            resetPluggyWidget();
-          }}
-          onError={(error) => {
-            console.error('Pluggy Connect Error:', error);
-            const errorMessage = error.message || 'Erro desconhecido';
-            setPluggyError(errorMessage);
-            toast.error(`Erro na conexão: ${errorMessage}`);
-            
-            // Reset states after a delay to show error
-            setTimeout(() => {
+              
               resetPluggyWidget();
-            }, 3000);
-          }}
-          onClose={() => {
-            console.log('Pluggy Connect Closed');
-            // Reset states if user closes without completing
-            resetPluggyWidget();
-          }}
-        />
+            }}
+            onError={(error) => {
+              console.error('Pluggy Iframe Error:', error);
+              const errorMessage = error.message || 'Erro desconhecido';
+              toast.error(`Erro na conexão: ${errorMessage}`);
+              resetPluggyWidget();
+            }}
+            onClose={() => {
+              console.log('Pluggy Iframe Closed');
+              resetPluggyWidget();
+            }}
+          />
+        ) : (
+          <PluggyConnectModal
+            connectToken={pluggyConnectToken}
+            onSuccess={async (itemData) => {
+              console.log('Pluggy Connect Success:', itemData);
+              const itemId = itemData?.item?.id;
+              
+              if (itemId) {
+                try {
+                  await handlePluggyCallback(itemId);
+                  await fetchAccounts();
+                } catch (error) {
+                  console.error('Error in handlePluggyCallback:', error);
+                }
+              }
+              
+              resetPluggyWidget();
+            }}
+            onError={(error) => {
+              console.error('Pluggy Connect Error:', error);
+              const errorMessage = error.message || 'Erro desconhecido';
+              
+              // Se falhar com SDK, tentar com iframe
+              if (errorMessage.includes('SDK') || errorMessage.includes('script')) {
+                toast.warning('Tentando modo alternativo...');
+                setUseIframeMode(true);
+                return;
+              }
+              
+              setPluggyError(errorMessage);
+              toast.error(`Erro na conexão: ${errorMessage}`);
+              
+              setTimeout(() => {
+                resetPluggyWidget();
+              }, 3000);
+            }}
+            onClose={() => {
+              console.log('Pluggy Connect Closed');
+              resetPluggyWidget();
+            }}
+          />
+        )
       )}
       
       {/* Error fallback */}

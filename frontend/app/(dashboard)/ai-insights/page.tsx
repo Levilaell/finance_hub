@@ -336,6 +336,7 @@ export default function AIInsightsPage() {
   });
   const [forceRefresh, setForceRefresh] = useState(false);
   const [isUpgradeRequired, setIsUpgradeRequired] = useState(false);
+  const [cachedAIData, setCachedAIData] = useState<any>(null);
 
   // Set dates on client-side after hydration
   useEffect(() => {
@@ -373,10 +374,13 @@ export default function AIInsightsPage() {
       // Check if result is null (403 error from service)
       if (result === null) {
         setIsUpgradeRequired(true);
-        return null;
+        // Retorna os dados em cache se existirem
+        return cachedAIData;
       }
       
       setIsUpgradeRequired(false);
+      // Salva os dados no cache para uso futuro
+      setCachedAIData(result);
       return result;
     },
     enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
@@ -445,7 +449,7 @@ export default function AIInsightsPage() {
       </div>
 
       {/* Period Selection */}
-      {!isUpgradeRequired && (
+      {
         <Card>
         <CardHeader>
           <CardTitle>Selecione o Período</CardTitle>
@@ -492,7 +496,7 @@ export default function AIInsightsPage() {
           </div>
         </CardContent>
       </Card>
-      )}
+      }
 
       {/* AI Insights Content */}
       <AIInsightsErrorBoundary>
@@ -507,25 +511,33 @@ export default function AIInsightsPage() {
                 {aiInsightsData?.predictions?.confidence && (
                   <ConfidenceIndicator level={aiInsightsData.predictions.confidence} />
                 )}
-                {!isUpgradeRequired && (
-                  <Button
-                    variant="outline"
-                    size="default"
-                    onClick={() => {
+                <Button
+                  variant="outline"
+                  size="default"
+                  onClick={() => {
+                    if (!isUpgradeRequired) {
                       // Force refetch with cache invalidation
                       setForceRefresh(true);
                       setTimeout(() => {
                         refetchAIInsights();
                       }, 100);
-                    }}
-                    disabled={aiInsightsLoading}
-                    title="Atualizar análise"
-                    className="w-full sm:w-auto"
-                  >
+                    }
+                  }}
+                  disabled={aiInsightsLoading || isUpgradeRequired}
+                  title={isUpgradeRequired ? "Limite de requisições atingido" : "Atualizar análise"}
+                  className={cn(
+                    "w-full sm:w-auto",
+                    isUpgradeRequired && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  {isUpgradeRequired && (
+                    <LockClosedIcon className="h-4 w-4" />
+                  )}
+                  {!isUpgradeRequired && (
                     <ArrowPathIcon className={cn("h-4 w-4", aiInsightsLoading && "animate-spin")} />
-                    <span className="ml-2">Atualizar</span>
-                  </Button>
-                )}
+                  )}
+                  <span className="ml-2">{isUpgradeRequired ? "Limite Atingido" : "Atualizar"}</span>
+                </Button>
               </div>
             </CardTitle>
             <CardDescription className="flex items-center justify-between">
@@ -587,8 +599,8 @@ export default function AIInsightsPage() {
                 </div>
               )}
 
-              {/* Upgrade Required State */}
-              {isUpgradeRequired && !aiInsightsLoading && (
+              {/* Upgrade Required Banner - Mostra apenas quando não há dados em cache */}
+              {isUpgradeRequired && !aiInsightsLoading && !aiInsightsData && (
                 <div className="text-center py-12">
                   <div className="max-w-md mx-auto">
                     <div className="mb-6">
@@ -690,6 +702,38 @@ export default function AIInsightsPage() {
                     <ArrowPathIcon className="h-4 w-4 mr-2" />
                     Tentar Novamente
                   </Button>
+                </div>
+              )}
+
+              {/* Banner de limite atingido quando há dados em cache */}
+              {isUpgradeRequired && aiInsightsData && (
+                <div className="mb-6 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <LockClosedIcon className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-medium text-yellow-900">Limite de requisições atingido</h4>
+                      <p className="text-sm text-yellow-800 mt-1">
+                        Você atingiu o limite mensal de análises com IA. Faça upgrade para continuar atualizando seus insights.
+                      </p>
+                      <div className="flex gap-3 mt-3">
+                        <Button 
+                          size="sm"
+                          onClick={() => router.push('/pricing')}
+                          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                        >
+                          🚀 Fazer Upgrade
+                        </Button>
+                        <Button 
+                          size="sm"
+                          variant="outline"
+                          onClick={() => router.push('/settings?tab=billing')}
+                          className="border-yellow-300 text-yellow-800 hover:bg-yellow-50"
+                        >
+                          Ver Planos
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 

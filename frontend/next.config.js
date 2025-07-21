@@ -24,6 +24,27 @@ const nextConfig = {
           },
         ],
       },
+      {
+        // Aplicar CSP mais permissiva para páginas que usam Pluggy
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.pluggy.ai https://*.pluggy.ai",
+              "style-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai",
+              "img-src 'self' data: blob: https://*.pluggy.ai https://*.pluggycdn.com",
+              "font-src 'self' data:",
+              "connect-src 'self' https://*.pluggy.ai https://api.pluggy.ai",
+              "frame-src 'self' https://*.pluggy.ai https://connect.pluggy.ai",
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'"
+            ].join('; ')
+          },
+        ],
+      },
     ]
   },
 }

@@ -701,12 +701,19 @@ export default function SettingsPage() {
 
                   {/* Action Buttons */}
                   {subscriptionStatus.requires_payment_setup && (
-                    <div className="pt-4">
+                    <div className="pt-4 space-y-2">
+                      <Button 
+                        onClick={() => setUpgradePlanDialogOpen(true)}
+                        className="w-full"
+                      >
+                        Escolher Plano e Configurar Pagamento
+                      </Button>
                       <Button 
                         onClick={() => setPaymentMethodsDialogOpen(true)}
                         className="w-full"
+                        variant="outline"
                       >
-                        Configurar Pagamento
+                        Apenas Adicionar Método de Pagamento
                       </Button>
                     </div>
                   )}

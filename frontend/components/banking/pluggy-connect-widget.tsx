@@ -63,7 +63,12 @@ export function PluggyConnectWidget({
     document.body.appendChild(script);
 
     return () => {
-      // Cleanup
+      // Cleanup timeout
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+      }
+      
+      // Cleanup script
       if (script.parentNode) {
         script.parentNode.removeChild(script);
       }
@@ -81,6 +86,7 @@ export function PluggyConnectWidget({
           const modals = document.querySelectorAll('[class*="pluggy"], [id*="pluggy"]');
           modals.forEach(modal => modal.remove());
         } catch (e) {
+          console.error('[Pluggy] Erro no cleanup:', e);
         }
       }
     };
@@ -168,6 +174,13 @@ export function PluggyConnectWidget({
       
       // Criar instância do Pluggy Connect
       console.log('[Pluggy] Criando instância do PluggyConnect...');
+      console.log('[Pluggy] window.PluggyConnect:', window.PluggyConnect);
+      
+      // Verificar se PluggyConnect está disponível
+      if (typeof window.PluggyConnect !== 'function') {
+        throw new Error('PluggyConnect não é uma função. Tipo: ' + typeof window.PluggyConnect);
+      }
+      
       pluggyInstance.current = new window.PluggyConnect(config);
       console.log('[Pluggy] Instância criada:', pluggyInstance.current);
       

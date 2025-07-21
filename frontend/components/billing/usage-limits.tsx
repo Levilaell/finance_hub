@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -14,9 +15,11 @@ import {
 import { UsageLimits } from '@/types';
 import { subscriptionService } from '@/services/subscription.service';
 import { useAuthStore } from '@/store/auth-store';
+import { UpgradePlanDialog } from './upgrade-plan-dialog';
 
 export function UsageLimitsCard() {
   const { user } = useAuthStore();
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   
   const { data: limits, isLoading } = useQuery({
     queryKey: ['usage-limits'],
@@ -157,12 +160,23 @@ export function UsageLimitsCard() {
               Você está se aproximando dos limites do seu plano. 
               Considere fazer upgrade para continuar crescendo sem interrupções.
             </p>
-            <Button size="sm" className="w-full">
+            <Button 
+              size="sm" 
+              className="w-full"
+              onClick={() => setShowUpgradeDialog(true)}
+            >
               Fazer Upgrade
             </Button>
           </div>
         )}
       </CardContent>
+      
+      {/* Upgrade Plan Dialog */}
+      <UpgradePlanDialog
+        open={showUpgradeDialog}
+        onOpenChange={setShowUpgradeDialog}
+        currentPlan={user?.company?.subscription_plan}
+      />
     </Card>
   );
 }

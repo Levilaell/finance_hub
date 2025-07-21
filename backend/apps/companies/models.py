@@ -657,8 +657,11 @@ class ResourceUsage(models.Model):
     def get_or_create_current_month(cls, company):
         """Get or create usage record for current month"""
         from django.utils import timezone
+        from apps.banking.models import Transaction
+        
         now = timezone.now()
         month_start = now.replace(day=1).date()
+        month_start_datetime = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
         usage, created = cls.objects.get_or_create(
             company=company,
@@ -669,4 +672,21 @@ class ResourceUsage(models.Model):
                 'reports_generated': 0
             }
         )
+        
+        # Always recalculate transaction count to ensure accuracy
+        actual_count = Transaction.objects.filter(
+            bank_account__company=company,
+            transaction_date__gte=month_start_datetime
+        ).count()
+        
+        # Update if different
+        if usage.transactions_count != actual_count:
+            usage.transactions_count = actual_count
+            usage.save(update_fields=['transactions_count'])
+            
+            # Also update company counter
+            if company.current_month_transactions != actual_count:
+                company.current_month_transactions = actual_count
+                company.save(update_fields=['current_month_transactions'])
+        
         return usage
