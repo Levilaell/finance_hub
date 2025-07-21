@@ -151,9 +151,8 @@ class PluggyTransactionSyncService:
             # Update account balance
             await self._update_account_balance(account)
             
-            # Update transaction counter if new transactions were added
-            if total_transactions > 0:
-                await self._update_transaction_counter(account, total_transactions)
+            # Always update transaction counter to ensure accuracy
+            await self._update_transaction_counter(account, total_transactions)
             
             logger.info(f"✅ Synced {total_transactions} transactions for Pluggy account {account_info['id']}")
             
@@ -484,35 +483,52 @@ class PluggyTransactionSyncService:
             from apps.companies.models import Company, ResourceUsage
             from apps.banking.models import Transaction
             from django.utils import timezone
+            from datetime import datetime
             
             company = account.company
             if not company:
                 logger.warning(f"⚠️ No company found for account {account.id}")
                 return
             
-            # Count transactions for current month based on transaction_date
-            month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            # Get current month start
+            now = timezone.now()
+            month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            
+            # Count ALL transactions for current month based on transaction_date
+            # This ensures we have the correct total even if transactions were imported out of order
             current_month_count = Transaction.objects.filter(
                 bank_account__company=company,
                 transaction_date__gte=month_start
             ).count()
             
+            logger.info(f"📊 Recalculating transaction counter for {company.name}")
+            logger.info(f"   - Previous count: {company.current_month_transactions}")
+            logger.info(f"   - New total count: {current_month_count}")
+            logger.info(f"   - New transactions in this sync: {new_transactions}")
+            
             # Update company counter with actual count
-            company.current_month_transactions = current_month_count
-            company.save(update_fields=['current_month_transactions'])
+            if company.current_month_transactions != current_month_count:
+                company.current_month_transactions = current_month_count
+                company.save(update_fields=['current_month_transactions'])
+                logger.info(f"✅ Updated company counter to {current_month_count}")
             
             # Update ResourceUsage with actual count
             usage = ResourceUsage.get_or_create_current_month(company)
-            usage.transactions_count = current_month_count
-            usage.save(update_fields=['transactions_count'])
-            
-            logger.info(f"📊 Updated transaction counter to {current_month_count} for company {company.name}")
-            logger.info(f"📈 Sync added {new_transactions} new transactions")
+            if usage.transactions_count != current_month_count:
+                usage.transactions_count = current_month_count
+                usage.save(update_fields=['transactions_count'])
+                logger.info(f"✅ Updated ResourceUsage counter to {current_month_count}")
             
             # Check if limit reached
             limit_reached, usage_info = company.check_plan_limits('transactions')
             if limit_reached:
                 logger.warning(f"⚠️ Transaction limit reached for company {company.name}: {usage_info}")
+            elif company.subscription_plan:
+                usage_percentage = company.get_usage_percentage('transactions')
+                if usage_percentage >= 90:
+                    logger.warning(f"⚠️ High usage alert: {usage_percentage:.1f}% of transaction limit used")
+                elif usage_percentage >= 80:
+                    logger.info(f"📈 Usage at {usage_percentage:.1f}% of transaction limit")
         
         await update_counter()
 

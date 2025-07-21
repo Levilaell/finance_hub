@@ -157,6 +157,48 @@ class EmailService:
             context=context,
             recipient_list=[user.email]
         )
+    
+    @staticmethod
+    def send_usage_limit_warning(email: str, company_name: str, limit_type: str, percentage: int, current: int, limit: int) -> bool:
+        """Send usage limit warning notification"""
+        context = {
+            'company_name': company_name,
+            'limit_type': limit_type,
+            'percentage': percentage,
+            'current': current,
+            'limit': limit,
+            'remaining': limit - current,
+            'upgrade_url': f"{settings.FRONTEND_URL}/settings/subscription",
+            'site_name': 'CaixaHub',
+            'support_email': 'suporte@caixahub.com.br'
+        }
+        
+        return EmailService.send_email(
+            subject=f'Aviso: {percentage}% do limite de {limit_type} atingido',
+            template_name='usage_limit_warning',
+            context=context,
+            recipient_list=[email]
+        )
+    
+    @staticmethod
+    def send_limit_reached_notification(email: str, company_name: str, limit_type: str, current: int, limit: int) -> bool:
+        """Send limit reached notification"""
+        context = {
+            'company_name': company_name,
+            'limit_type': limit_type,
+            'current': current,
+            'limit': limit,
+            'upgrade_url': f"{settings.FRONTEND_URL}/settings/subscription",
+            'site_name': 'CaixaHub',
+            'support_email': 'suporte@caixahub.com.br'
+        }
+        
+        return EmailService.send_email(
+            subject=f'Limite de {limit_type} atingido',
+            template_name='limit_reached',
+            context=context,
+            recipient_list=[email]
+        )
 
 
 # Celery tasks for async email sending
