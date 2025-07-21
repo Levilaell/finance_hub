@@ -97,17 +97,27 @@ class UserAdmin(BaseUserAdmin):
     
     def company_display(self, obj):
         """Display user's companies"""
+        company_links = []
+        
+        # Check if user is owner of a company
+        if hasattr(obj, 'company'):
+            url = reverse('admin:companies_company_change', args=[obj.company.id])
+            link = format_html('<a href="{}">{} (Proprietário)</a>', url, obj.company.name)
+            company_links.append(link)
+        
+        # Check if user is member of other companies
         companies = obj.company_memberships.filter(is_active=True).select_related('company')
-        if companies:
-            company_links = []
-            for cu in companies[:3]:  # Show max 3 companies
+        for cu in companies[:3]:  # Show max 3 companies
+            if not hasattr(obj, 'company') or cu.company.id != obj.company.id:
                 url = reverse('admin:companies_company_change', args=[cu.company.id])
-                link = format_html('<a href="{}">{}</a>', url, cu.company.name)
+                role = cu.role.capitalize() if hasattr(cu, 'role') else 'Membro'
+                link = format_html('<a href="{}">{} ({})</a>', url, cu.company.name, role)
                 company_links.append(link)
-            
-            if companies.count() > 3:
-                company_links.append(f'... (+{companies.count() - 3})')
-            
+        
+        if companies.count() > 3:
+            company_links.append(f'... (+{companies.count() - 3})')
+        
+        if company_links:
             return format_html(', '.join(company_links))
         return format_html('<span style="color: gray;">Sem empresa</span>')
     company_display.short_description = 'Empresas'
