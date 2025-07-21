@@ -1,0 +1,2 @@
+# Stripe payment processing
+stripe>=5.0.0

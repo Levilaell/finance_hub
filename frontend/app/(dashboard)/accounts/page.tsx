@@ -97,7 +97,14 @@ export default function AccountsPage() {
   }, [fetchAccounts]);
 
   useEffect(() => {
+    console.log('[AccountsPage] useEffect triggered', {
+      isAuthenticated,
+      pathname: window.location.pathname,
+      search: window.location.search
+    });
+
     if (!isAuthenticated) {
+      console.log('[AccountsPage] Not authenticated, redirecting to login');
       router.push('/login');
       return;
     }
@@ -113,13 +120,23 @@ export default function AccountsPage() {
     const error = urlParams.get('error');
     const status = urlParams.get('status');
     
+    console.log('[AccountsPage] URL params:', {
+      itemId,
+      error,
+      status,
+      providerName
+    });
+    
     if (itemId && status === 'success') {
       // Success - item was created
       const provider = providerName || 'Banco';
       toast.success(`Conta ${provider} conectada com sucesso!`);
       
       // Handle the callback to create bank accounts
-      handlePluggyCallback(itemId);
+      handlePluggyCallback(itemId).catch(err => {
+        console.error('[AccountsPage] Error in handlePluggyCallback:', err);
+        toast.error('Erro ao processar conexão bancária');
+      });
       
       // Clear the stored values and URL parameters
       sessionStorage.removeItem('pluggy_provider');
@@ -312,28 +329,38 @@ export default function AccountsPage() {
           <PluggyConnectIframe
             connectToken={pluggyConnectToken}
             onSuccess={async (itemData) => {
-              console.log('Pluggy Iframe Success:', itemData);
-              const itemId = itemData?.item?.id;
+              console.log('[AccountsPage] Pluggy Iframe Success:', itemData);
+              const itemId = itemData?.item?.id || itemData?.itemId;
               
               if (itemId) {
                 try {
-                  await handlePluggyCallback(itemId);
+                  console.log('[AccountsPage] Calling handlePluggyCallback with itemId:', itemId);
+                  const result = await handlePluggyCallback(itemId);
+                  console.log('[AccountsPage] handlePluggyCallback result:', result);
+                  
                   await fetchAccounts();
+                  
+                  // Force page refresh to ensure UI updates
+                  window.location.reload();
                 } catch (error) {
-                  console.error('Error in handlePluggyCallback:', error);
+                  console.error('[AccountsPage] Error in handlePluggyCallback:', error);
+                  toast.error('Erro ao processar conexão bancária');
                 }
+              } else {
+                console.error('[AccountsPage] No itemId found in iframe success response:', itemData);
+                toast.error('Erro: ID da conexão não encontrado');
               }
               
               resetPluggyWidget();
             }}
             onError={(error) => {
-              console.error('Pluggy Iframe Error:', error);
+              console.error('[AccountsPage] Pluggy Iframe Error:', error);
               const errorMessage = error.message || 'Erro desconhecido';
               toast.error(`Erro na conexão: ${errorMessage}`);
               resetPluggyWidget();
             }}
             onClose={() => {
-              console.log('Pluggy Iframe Closed');
+              console.log('[AccountsPage] Pluggy Iframe Closed without success');
               resetPluggyWidget();
             }}
           />
@@ -341,22 +368,32 @@ export default function AccountsPage() {
           <PluggyConnectModal
             connectToken={pluggyConnectToken}
             onSuccess={async (itemData) => {
-              console.log('Pluggy Connect Success:', itemData);
-              const itemId = itemData?.item?.id;
+              console.log('[AccountsPage] Pluggy Connect Success:', itemData);
+              const itemId = itemData?.item?.id || itemData?.itemId;
               
               if (itemId) {
                 try {
-                  await handlePluggyCallback(itemId);
+                  console.log('[AccountsPage] Calling handlePluggyCallback with itemId:', itemId);
+                  const result = await handlePluggyCallback(itemId);
+                  console.log('[AccountsPage] handlePluggyCallback result:', result);
+                  
                   await fetchAccounts();
+                  
+                  // Force page refresh to ensure UI updates
+                  window.location.reload();
                 } catch (error) {
-                  console.error('Error in handlePluggyCallback:', error);
+                  console.error('[AccountsPage] Error in handlePluggyCallback:', error);
+                  toast.error('Erro ao processar conexão bancária');
                 }
+              } else {
+                console.error('[AccountsPage] No itemId found in success response:', itemData);
+                toast.error('Erro: ID da conexão não encontrado');
               }
               
               resetPluggyWidget();
             }}
             onError={(error) => {
-              console.error('Pluggy Connect Error:', error);
+              console.error('[AccountsPage] Pluggy Connect Error:', error);
               const errorMessage = error.message || 'Erro desconhecido';
               
               // Se falhar com SDK, tentar com iframe
@@ -374,7 +411,7 @@ export default function AccountsPage() {
               }, 3000);
             }}
             onClose={() => {
-              console.log('Pluggy Connect Closed');
+              console.log('[AccountsPage] Pluggy Connect Closed without success');
               resetPluggyWidget();
             }}
           />

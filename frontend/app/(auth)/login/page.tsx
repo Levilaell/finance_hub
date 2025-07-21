@@ -239,10 +239,6 @@ export default function LoginPage() {
             <Link 
               href="/register" 
               className="text-primary hover:underline"
-              onClick={(e) => {
-                e.preventDefault();
-                router.push('/register');
-              }}
             >
               Cadastre-se
             </Link>
