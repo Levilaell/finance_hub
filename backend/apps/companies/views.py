@@ -31,6 +31,7 @@ class SubscriptionPlansView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = SubscriptionPlanSerializer
     queryset = SubscriptionPlan.objects.filter(is_active=True).order_by('price_monthly')
+    pagination_class = None  # Disable pagination for subscription plans
 
 
 class UpgradeSubscriptionView(APIView):

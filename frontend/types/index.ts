@@ -70,7 +70,7 @@ export interface Company {
 }
 
 export interface SubscriptionPlan {
-  id: string;
+  id: number;
   name: string;
   slug: string;
   plan_type: 'free' | 'starter' | 'professional' | 'enterprise';
@@ -86,7 +86,7 @@ export interface SubscriptionPlan {
   has_api_access: boolean;
   has_accountant_access: boolean;
   has_priority_support: boolean;
-  yearly_discount?: number;
+  yearly_discount: number;
 }
 
 export interface UsageLimits {
