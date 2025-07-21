@@ -19,14 +19,14 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements from backend
-COPY ./backend/requirements.txt /app/
+COPY ../backend/requirements.txt /app/
 
 # Install Python dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 # Copy project from backend
-COPY ./backend /app/
+COPY ../backend /app/
 
 # Create a non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
