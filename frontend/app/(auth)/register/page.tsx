@@ -45,10 +45,8 @@ function RegisterContent() {
       setSelectedPlan(plan);
     }
     
-    // If user is already authenticated, redirect to upgrade page
-    if (user && plan) {
-      router.push(`/dashboard/subscription/upgrade?plan=${plan}`);
-    } else if (user) {
+    // If user is already authenticated, redirect to dashboard
+    if (user) {
       router.push('/dashboard');
     }
   }, [searchParams, user, router]);
