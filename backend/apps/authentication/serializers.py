@@ -165,6 +165,26 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('O nome da empresa deve ter pelo menos 3 caracteres.')
         return value.strip()
     
+    def validate_company_cnpj(self, value):
+        """Validação customizada para CNPJ incluindo duplicação"""
+        from apps.companies.models import Company
+        from apps.companies.validators import validate_cnpj as cnpj_validator
+        
+        # Primeiro valida o formato
+        try:
+            cnpj_validator(value)
+        except serializers.ValidationError:
+            raise
+        
+        # Depois verifica se já existe
+        from apps.companies.validators import format_cnpj
+        formatted_cnpj = format_cnpj(value)
+        
+        if Company.objects.filter(cnpj=formatted_cnpj).exists():
+            raise serializers.ValidationError('Este CNPJ já está cadastrado.')
+        
+        return value
+    
     def validate_password(self, value):
         """Validação customizada para senha com mensagens em português"""
         from django.contrib.auth.password_validation import (

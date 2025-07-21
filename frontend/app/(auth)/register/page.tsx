@@ -87,6 +87,8 @@ function RegisterContent() {
       router.push('/dashboard');
     },
     onError: (error: any) => {
+      console.error('Erro no registro:', error.response?.data);
+      
       // Verificar se há erros de campo específicos
       const fieldErrors = error.response?.data?.error?.field_errors;
       
@@ -96,20 +98,28 @@ function RegisterContent() {
           .map(([field, errors]: [string, any]) => {
             const fieldName = field === 'email' ? 'E-mail' :
                            field === 'password' ? 'Senha' :
+                           field === 'password2' ? 'Confirmação de senha' :
                            field === 'company_cnpj' ? 'CNPJ' :
                            field === 'phone' ? 'Telefone' :
                            field === 'first_name' ? 'Nome' :
                            field === 'last_name' ? 'Sobrenome' :
-                           field === 'company_name' ? 'Empresa' : field;
+                           field === 'company_name' ? 'Empresa' :
+                           field === 'company_type' ? 'Tipo de empresa' :
+                           field === 'business_sector' ? 'Setor' : field;
             return `${fieldName}: ${errors[0]}`;
           })
           .join('\n');
         
         toast.error(errorMessages);
+      } else if (error.response?.status === 500) {
+        // Erro 500 - servidor
+        toast.error('Erro no servidor. Por favor, tente novamente ou entre em contato com o suporte.');
       } else {
         // Mensagem genérica
         const errorMessage = error.response?.data?.error?.message || 
+                           error.response?.data?.message ||
                            error.response?.data?.detail || 
+                           error.message ||
                            'Falha no cadastro';
         toast.error(errorMessage);
       }
