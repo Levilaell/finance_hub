@@ -26,16 +26,37 @@ export function PluggyConnectWidget({
   const [sdkLoaded, setSdkLoaded] = useState(false);
   const pluggyInstance = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Carregar o SDK da Pluggy
+    console.log('[Pluggy] Iniciando carregamento do SDK...');
+    
+    // Timeout de segurança - 10 segundos para carregar o SDK
+    loadTimeoutRef.current = setTimeout(() => {
+      if (!sdkLoaded) {
+        console.error('[Pluggy] Timeout ao carregar SDK');
+        toast.error('Timeout ao carregar Pluggy SDK. Tente novamente.');
+        onError(new Error('Timeout loading Pluggy SDK'));
+      }
+    }, 10000);
+    
     const script = document.createElement('script');
     script.src = 'https://cdn.pluggy.ai/pluggy-connect.js';
     script.async = true;
     script.onload = () => {
+      console.log('[Pluggy] SDK carregado com sucesso');
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+      }
       setSdkLoaded(true);
     };
-    script.onerror = () => {
+    script.onerror = (error) => {
+      console.error('[Pluggy] Erro ao carregar SDK:', error);
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+      }
+      toast.error('Erro ao carregar Pluggy SDK. Verifique sua conexão.');
       onError(new Error('Failed to load Pluggy SDK'));
     };
     
@@ -67,10 +88,11 @@ export function PluggyConnectWidget({
 
   useEffect(() => {
     if (!sdkLoaded || !connectToken || !window.PluggyConnect) {
+      console.log('[Pluggy] Aguardando condições:', { sdkLoaded, hasToken: !!connectToken, hasPluggyConnect: !!window.PluggyConnect });
       return;
     }
 
-    
+    console.log('[Pluggy] Todas as condições atendidas, inicializando widget...');
     // Função wrapper para garantir que onClose sempre existe
     const handleClose = () => {
       
@@ -90,6 +112,7 @@ export function PluggyConnectWidget({
     
     try {
       // Configuração do Pluggy Connect
+      console.log('[Pluggy] Criando configuração do widget...');
       const config = {
         connectToken: connectToken,
         includeSandbox: true, // Mudando para true já que você está em desenvolvimento
@@ -141,15 +164,23 @@ export function PluggyConnectWidget({
         }
       };
 
+      console.log('[Pluggy] Configuração criada:', config);
       
       // Criar instância do Pluggy Connect
+      console.log('[Pluggy] Criando instância do PluggyConnect...');
       pluggyInstance.current = new window.PluggyConnect(config);
+      console.log('[Pluggy] Instância criada:', pluggyInstance.current);
       
       // Abrir o widget
       if (pluggyInstance.current.init && typeof pluggyInstance.current.init === 'function') {
+        console.log('[Pluggy] Chamando init()...');
         pluggyInstance.current.init();
       } else if (pluggyInstance.current.open && typeof pluggyInstance.current.open === 'function') {
+        console.log('[Pluggy] Chamando open()...');
         pluggyInstance.current.open();
+      } else {
+        console.error('[Pluggy] Nenhum método de abertura encontrado:', pluggyInstance.current);
+        throw new Error('Pluggy widget não possui método init() ou open()');
       }
       
       // Fallback: se o widget não fechar sozinho após alguns segundos sem atividade
@@ -167,7 +198,8 @@ export function PluggyConnectWidget({
       };
       
     } catch (error: any) {
-      toast.error('Erro ao inicializar conexão bancária');
+      console.error('[Pluggy] Erro ao inicializar widget:', error);
+      toast.error('Erro ao inicializar conexão bancária: ' + (error.message || 'Erro desconhecido'));
       onError(error);
     }
   }, [sdkLoaded, connectToken, onSuccess, onError, onClose]);

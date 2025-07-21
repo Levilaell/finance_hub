@@ -16,6 +16,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { subscriptionService } from '@/services/subscription.service';
+import { paymentService } from '@/services/payment.service';
 import { formatCurrency } from '@/utils/billing.utils';
 import { SubscriptionPlan } from '@/types';
 import { CheckIcon } from '@heroicons/react/24/outline';
@@ -52,18 +53,20 @@ export function UpgradePlanDialog({
     enabled: open,
   });
 
-  // Upgrade subscription mutation
-  const upgradeMutation = useMutation({
-    mutationFn: (data: { plan_id: string; billing_cycle: string }) =>
-      subscriptionService.upgradeSubscription(data),
-    onSuccess: () => {
-      toast.success('Plano atualizado com sucesso!');
-      onOpenChange(false);
-      // Refresh user data
-      window.location.reload();
+  // Create checkout session mutation
+  const checkoutMutation = useMutation({
+    mutationFn: (data: { plan_slug: string; billing_cycle: 'monthly' | 'yearly' }) =>
+      paymentService.createCheckoutSession(data),
+    onSuccess: (response) => {
+      // Redirect to Stripe checkout
+      if (response.checkout_url) {
+        window.location.href = response.checkout_url;
+      } else {
+        toast.error('Erro ao criar sessão de pagamento');
+      }
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar plano');
+      toast.error(error.response?.data?.error || 'Erro ao processar pagamento');
     },
   });
 
@@ -73,8 +76,9 @@ export function UpgradePlanDialog({
       return;
     }
 
-    upgradeMutation.mutate({
-      plan_id: selectedPlan.id,
+    // Create checkout session with Stripe
+    checkoutMutation.mutate({
+      plan_slug: selectedPlan.slug,
       billing_cycle: billingCycle,
     });
   };
@@ -263,12 +267,12 @@ export function UpgradePlanDialog({
           </Button>
           <Button
             onClick={handleUpgrade}
-            disabled={!selectedPlan || upgradeMutation.isPending}
+            disabled={!selectedPlan || checkoutMutation.isPending}
           >
-            {upgradeMutation.isPending ? (
+            {checkoutMutation.isPending ? (
               <LoadingSpinner />
             ) : (
-              'Confirmar Upgrade'
+              'Continuar para Pagamento'
             )}
           </Button>
         </DialogFooter>

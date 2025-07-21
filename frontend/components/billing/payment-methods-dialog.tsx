@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { billingService, PaymentMethod } from '@/services/billing.service';
+import { paymentService } from '@/services/payment.service';
+import { subscriptionService } from '@/services/subscription.service';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +26,7 @@ import {
   CheckIcon,
   StarIcon
 } from '@heroicons/react/24/outline';
+import { UpgradePlanDialog } from './upgrade-plan-dialog';
 
 
 interface PaymentMethodsDialogProps {
@@ -36,6 +39,7 @@ export function PaymentMethodsDialog({
   onOpenChange
 }: PaymentMethodsDialogProps) {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [newCardData, setNewCardData] = useState({
     number: '',
     exp_month: '',
@@ -368,9 +372,31 @@ export function PaymentMethodsDialog({
                 Não armazenamos informações completas do cartão.
               </p>
             </div>
+
+            {/* Quick Action - Add card and choose plan */}
+            {paymentMethods?.length === 0 && (
+              <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+                <p className="text-sm font-medium text-blue-900 mb-2">
+                  Configure seu método de pagamento e escolha um plano
+                </p>
+                <Button 
+                  onClick={() => setShowUpgradeDialog(true)}
+                  className="w-full"
+                  variant="default"
+                >
+                  Adicionar Cartão e Escolher Plano
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </DialogContent>
+      
+      {/* Upgrade Plan Dialog */}
+      <UpgradePlanDialog
+        open={showUpgradeDialog}
+        onOpenChange={setShowUpgradeDialog}
+      />
     </Dialog>
   );
 }

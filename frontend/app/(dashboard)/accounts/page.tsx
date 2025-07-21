@@ -59,6 +59,7 @@ export default function AccountsPage() {
   const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
   const [pluggyConnectToken, setPluggyConnectToken] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [pluggyError, setPluggyError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -262,6 +263,7 @@ export default function AccountsPage() {
   const resetPluggyWidget = () => {
     setPluggyConnectToken(null);
     setIsConnecting(false);
+    setPluggyError(null);
   };
 
   // Show loading state while auth is being checked
@@ -301,7 +303,7 @@ export default function AccountsPage() {
   return (
     <div className="space-y-6">
       {/* Pluggy Connect Modal */}
-      {pluggyConnectToken && isConnecting && (
+      {pluggyConnectToken && isConnecting && !pluggyError && (
         <PluggyConnectModal
           connectToken={pluggyConnectToken}
           onSuccess={async (itemData) => {
@@ -325,10 +327,14 @@ export default function AccountsPage() {
           }}
           onError={(error) => {
             console.error('Pluggy Connect Error:', error);
-            toast.error(`Erro na conexão: ${error.message || 'Erro desconhecido'}`);
+            const errorMessage = error.message || 'Erro desconhecido';
+            setPluggyError(errorMessage);
+            toast.error(`Erro na conexão: ${errorMessage}`);
             
-            // Reset states
-            resetPluggyWidget();
+            // Reset states after a delay to show error
+            setTimeout(() => {
+              resetPluggyWidget();
+            }, 3000);
           }}
           onClose={() => {
             console.log('Pluggy Connect Closed');
@@ -336,6 +342,17 @@ export default function AccountsPage() {
             resetPluggyWidget();
           }}
         />
+      )}
+      
+      {/* Error fallback */}
+      {pluggyError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md">
+            <h3 className="text-lg font-semibold text-red-600 mb-2">Erro ao conectar banco</h3>
+            <p className="text-gray-700 mb-4">{pluggyError}</p>
+            <Button onClick={resetPluggyWidget}>Fechar</Button>
+          </div>
+        </div>
       )}
       
       {/* Header */}
