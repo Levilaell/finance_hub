@@ -445,6 +445,39 @@ class DashboardView(APIView):
             count=Count('id')
         ).order_by('-total')[:5]
         
+        # Get usage limits data
+        from apps.companies.models import ResourceUsage
+        
+        usage_record = ResourceUsage.get_or_create_current_month(company)
+        plan = company.subscription_plan
+        
+        # Build usage limits info
+        if plan:
+            usage_limits = {
+                'transactions': {
+                    'limit': plan.max_transactions,
+                    'used': usage_record.transactions_count,
+                    'percentage': round((usage_record.transactions_count / plan.max_transactions * 100), 1) if plan.max_transactions != 999999 else 0
+                },
+                'bank_accounts': {
+                    'limit': plan.max_bank_accounts,
+                    'used': accounts.count(),
+                    'percentage': round((accounts.count() / plan.max_bank_accounts * 100), 1) if plan.max_bank_accounts != 999 else 0
+                },
+                'ai_requests': {
+                    'limit': plan.max_ai_requests_per_month,
+                    'used': usage_record.total_ai_usage,
+                    'percentage': round((usage_record.total_ai_usage / plan.max_ai_requests_per_month * 100), 1) if plan.max_ai_requests_per_month != 999999 else 0
+                }
+            }
+        else:
+            # Default limits for free/trial
+            usage_limits = {
+                'transactions': {'limit': 100, 'used': usage_record.transactions_count, 'percentage': round((usage_record.transactions_count / 100 * 100), 1)},
+                'bank_accounts': {'limit': 2, 'used': accounts.count(), 'percentage': round((accounts.count() / 2 * 100), 1)},
+                'ai_requests': {'limit': 10, 'used': usage_record.total_ai_usage, 'percentage': round((usage_record.total_ai_usage / 10 * 100), 1)}
+            }
+        
         data = {
             'current_balance': total_balance,
             'monthly_income': income,
@@ -454,6 +487,7 @@ class DashboardView(APIView):
             'top_categories': top_categories,
             'accounts_count': accounts.count(),
             'transactions_count': transactions.count(),
+            'usage_limits': usage_limits,  # Added usage limits data
         }
         
         return Response(data)
