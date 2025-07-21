@@ -18,7 +18,7 @@ click-repl==0.3.0
 cron-descriptor==1.4.5
 distro==1.9.0
 Django==5.0.1
-django-celery-beat==2.7.0
+django-celery-beat==2.7.0 
 django-celery-results==2.5.1
 django-cors-headers==4.3.1
 django-debug-toolbar==4.2.0
