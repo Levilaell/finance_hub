@@ -214,9 +214,12 @@ class PluggyTransactionSyncService:
                 logger.info(f"⚠️ Long gap ({days_since_sync} days), using 30 days")
                 return (timezone.now() - timedelta(days=30)).date()
             else:
-                # Incremental normal
-                logger.info(f"🔄 Incremental sync, {days_since_sync} days since last sync")
-                return (last_sync - timedelta(days=1)).date()
+                # Incremental normal - sempre buscar pelo menos 3 dias
+                # para garantir que não perdemos transações com data retroativa
+                min_days_back = 3
+                days_back = max(days_since_sync + 1, min_days_back)
+                logger.info(f"🔄 Incremental sync, {days_since_sync} days since last sync, fetching {days_back} days")
+                return (timezone.now() - timedelta(days=days_back)).date()
 
     async def _get_accounts_to_sync(self, company_id: int = None) -> List[BankAccount]:
         """Get Pluggy accounts that need synchronization"""
