@@ -4,6 +4,7 @@ Payment URLs
 from django.urls import path
 from . import views
 from .debug_views import PaymentDebugView
+from .temp_update_view import UpdateStripePricesView
 
 app_name = 'payments'
 
@@ -21,4 +22,7 @@ urlpatterns = [
     
     # Debug endpoint (remove in production)
     path('debug/', PaymentDebugView.as_view(), name='payment-debug'),
+    
+    # TEMPORARY - REMOVE AFTER USE
+    path('update-stripe-prices/', UpdateStripePricesView.as_view(), name='update-stripe-prices'),
 ]
