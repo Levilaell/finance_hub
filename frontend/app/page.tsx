@@ -22,18 +22,18 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <BanknotesIcon className="h-8 w-8 text-primary" />
-              <h1 className="text-2xl font-bold text-foreground">CaixaHub</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">CaixaHub</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <Link href="/pricing" className="text-muted-foreground hover:text-foreground">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <Link href="/pricing" className="hidden sm:inline text-muted-foreground hover:text-foreground">
                 Planos
               </Link>
-              <Button variant="ghost" asChild>
+              <Button variant="ghost" asChild className="text-sm sm:text-base">
                 <Link href="/login">
                   Entrar
                 </Link>
               </Button>
-              <Button asChild>
+              <Button asChild className="text-sm sm:text-base">
                 <Link href="/pricing">
                   Começar Grátis
                 </Link>
@@ -76,7 +76,7 @@ export default function Home() {
               </Button>
             </div>
 
-            <div className="flex items-center justify-center space-x-8 pt-8 text-sm text-muted-foreground">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 pt-8 text-sm text-muted-foreground">
               <div className="flex items-center space-x-2">
                 <CheckCircleIcon className="h-5 w-5 text-green-500" />
                 <span>Grátis para começar</span>

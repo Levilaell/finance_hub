@@ -1,5 +1,6 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { toast } from "sonner";
+import { RegisterData } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -231,13 +232,7 @@ class ApiClient {
     }
   }
 
-  async register(data: {
-    email: string;
-    password: string;
-    first_name: string;
-    last_name: string;
-    company_name?: string;
-  }) {
+  async register(data: RegisterData) {
     const response = await this.client.post("/api/auth/register/", data);
     return response.data;
   }
