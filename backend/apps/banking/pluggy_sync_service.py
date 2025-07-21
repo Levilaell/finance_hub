@@ -152,7 +152,11 @@ class PluggyTransactionSyncService:
             await self._update_account_balance(account)
             
             # Always update transaction counter to ensure accuracy
-            await self._update_transaction_counter(account, total_transactions)
+            logger.info(f"📊 Calling _update_transaction_counter for account {account.id}")
+            try:
+                await self._update_transaction_counter(account, total_transactions)
+            except Exception as e:
+                logger.error(f"❌ Error updating transaction counter: {e}", exc_info=True)
             
             logger.info(f"✅ Synced {total_transactions} transactions for Pluggy account {account_info['id']}")
             

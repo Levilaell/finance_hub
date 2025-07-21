@@ -403,13 +403,40 @@ class PluggySyncAccountView(APIView):
             logger.info(f"✅ Sync completed for account {account_id}: {result}")
             
             if result.get('status') == 'success':
+                # Force update counters after sync
+                from apps.companies.models import ResourceUsage
+                from apps.banking.models import Transaction
+                from django.utils import timezone
+                
+                try:
+                    # Recalculate and update counters
+                    month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                    current_month_count = Transaction.objects.filter(
+                        bank_account__company=company,
+                        transaction_date__gte=month_start
+                    ).count()
+                    
+                    # Update company counter
+                    company.current_month_transactions = current_month_count
+                    company.save(update_fields=['current_month_transactions'])
+                    
+                    # Update ResourceUsage
+                    usage = ResourceUsage.get_or_create_current_month(company)
+                    usage.transactions_count = current_month_count
+                    usage.save(update_fields=['transactions_count'])
+                    
+                    logger.info(f"✅ Forced counter update: {current_month_count} transactions for {company.name}")
+                except Exception as e:
+                    logger.error(f"❌ Error updating counters: {e}")
+                
                 return Response({
                     'success': True,
                     'data': {
                         'message': f'Sincronização concluída com sucesso',
                         'transactions_synced': result.get('transactions', 0),
                         'status': result.get('status'),
-                        'sandbox_mode': sandbox_mode
+                        'sandbox_mode': sandbox_mode,
+                        'usage_updated': True
                     }
                 })
             else:
