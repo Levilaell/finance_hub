@@ -87,10 +87,32 @@ function RegisterContent() {
       router.push('/dashboard');
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.errors
-        ? Object.values(error.response.data.errors).flat().join(', ')
-        : error.response?.data?.detail || 'Falha no cadastro';
-      toast.error(errorMessage);
+      // Verificar se há erros de campo específicos
+      const fieldErrors = error.response?.data?.error?.field_errors;
+      
+      if (fieldErrors) {
+        // Mostrar primeiro erro de cada campo
+        const errorMessages = Object.entries(fieldErrors)
+          .map(([field, errors]: [string, any]) => {
+            const fieldName = field === 'email' ? 'E-mail' :
+                           field === 'password' ? 'Senha' :
+                           field === 'company_cnpj' ? 'CNPJ' :
+                           field === 'phone' ? 'Telefone' :
+                           field === 'first_name' ? 'Nome' :
+                           field === 'last_name' ? 'Sobrenome' :
+                           field === 'company_name' ? 'Empresa' : field;
+            return `${fieldName}: ${errors[0]}`;
+          })
+          .join('\n');
+        
+        toast.error(errorMessages);
+      } else {
+        // Mensagem genérica
+        const errorMessage = error.response?.data?.error?.message || 
+                           error.response?.data?.detail || 
+                           'Falha no cadastro';
+        toast.error(errorMessage);
+      }
     },
   });
 
