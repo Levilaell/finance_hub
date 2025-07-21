@@ -45,7 +45,7 @@ import { PluggyInfoDialog } from '@/components/banking/pluggy-info-dialog';
 
 export default function AccountsPage() {
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { 
     accounts, 
     loading, 
@@ -264,10 +264,23 @@ export default function AccountsPage() {
     setIsConnecting(false);
   };
 
-  if (loading && accounts.length === 0) {
+  // Show loading state while auth is being checked
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <LoadingSpinner />
+      </div>
+    );
+  }
+
+  // Show loading state while accounts are being fetched
+  if (loading && accounts.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <LoadingSpinner />
+          <p className="mt-4 text-gray-600">Carregando contas bancárias...</p>
+        </div>
       </div>
     );
   }
@@ -280,6 +293,11 @@ export default function AccountsPage() {
     );
   }
 
+  // Ensure component returns something valid
+  if (!isAuthenticated) {
+    return null; // Layout will handle redirect
+  }
+
   return (
     <div className="space-y-6">
       {/* Pluggy Connect Modal */}
@@ -287,23 +305,33 @@ export default function AccountsPage() {
         <PluggyConnectModal
           connectToken={pluggyConnectToken}
           onSuccess={async (itemData) => {
+            console.log('Pluggy Connect Success:', itemData);
             const itemId = itemData?.item?.id;
             
             if (itemId) {
-              // Handle the callback to create bank accounts
-              await handlePluggyCallback(itemId);
+              try {
+                // Handle the callback to create bank accounts
+                await handlePluggyCallback(itemId);
+                
+                // Force refresh after successful connection
+                await fetchAccounts();
+              } catch (error) {
+                console.error('Error in handlePluggyCallback:', error);
+              }
             }
             
             // Reset states
             resetPluggyWidget();
           }}
           onError={(error) => {
+            console.error('Pluggy Connect Error:', error);
             toast.error(`Erro na conexão: ${error.message || 'Erro desconhecido'}`);
             
             // Reset states
             resetPluggyWidget();
           }}
           onClose={() => {
+            console.log('Pluggy Connect Closed');
             // Reset states if user closes without completing
             resetPluggyWidget();
           }}
