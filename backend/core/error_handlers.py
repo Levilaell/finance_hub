@@ -18,7 +18,15 @@ from rest_framework.exceptions import (
     PermissionDenied as DRFPermissionDenied, Throttled, ValidationError as DRFValidationError
 )
 
-from apps.banking.open_banking_client import OpenBankingError, AuthenticationError, APIError
+# Open banking errors will be added when the module is created
+class OpenBankingError(Exception):
+    pass
+
+class AuthenticationError(OpenBankingError):
+    pass
+
+class APIError(OpenBankingError):
+    pass
 
 logger = logging.getLogger(__name__)
 

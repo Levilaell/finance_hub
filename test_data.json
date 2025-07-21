@@ -1,0 +1,12 @@
+{
+  "email": "teste@teste.com",
+  "password": "Teste123!",
+  "password2": "Teste123!",
+  "first_name": "Teste",
+  "last_name": "Teste",
+  "phone": "(11) 98765-4321",
+  "company_name": "Teste",
+  "company_cnpj": "11.222.333/0001-81",
+  "company_type": "ltda",
+  "business_sector": "tecnologia"
+}

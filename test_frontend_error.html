@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste de Erro de Registro</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid red;
+            background: #fee;
+        }
+        .success {
+            color: green;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid green;
+            background: #efe;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            overflow-x: auto;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Teste de Resposta de Erro do Backend</h1>
+    
+    <button onclick="testLocalhost()">Testar Localhost</button>
+    <button onclick="testProduction()">Testar Produção</button>
+    
+    <div id="result"></div>
+
+    <script>
+        async function testRegistration(url) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Testando...</p>';
+            
+            const testData = {
+                email: "teste@teste.com",
+                password: "SenhaForte123!",
+                password2: "SenhaForte123!",
+                first_name: "Teste",
+                last_name: "Teste",
+                phone: "(11) 98765-4321",
+                company_name: "Teste",
+                company_cnpj: "11.222.333/0001-81",
+                company_type: "ltda",
+                business_sector: "tecnologia"
+            };
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    mode: 'cors',
+                    credentials: 'include',
+                    body: JSON.stringify(testData)
+                });
+                
+                const responseText = await response.text();
+                let responseData;
+                
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch (e) {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <h3>Erro ao parsear JSON</h3>
+                            <p>Status: ${response.status}</p>
+                            <p>Response Text:</p>
+                            <pre>${responseText}</pre>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                resultDiv.innerHTML = `
+                    <h2>Resultado do Teste</h2>
+                    <p><strong>URL:</strong> ${url}</p>
+                    <p><strong>Status:</strong> ${response.status}</p>
+                    <p><strong>Response Headers:</strong></p>
+                    <pre>${JSON.stringify(Object.fromEntries(response.headers), null, 2)}</pre>
+                    <p><strong>Response Body:</strong></p>
+                    <pre>${JSON.stringify(responseData, null, 2)}</pre>
+                `;
+                
+                // Processar erro
+                if (!response.ok && responseData.error) {
+                    resultDiv.innerHTML += '<h3>Erros Detectados:</h3>';
+                    
+                    if (responseData.error.field_errors) {
+                        resultDiv.innerHTML += '<div class="error"><h4>Erros por Campo:</h4>';
+                        
+                        for (const [field, errors] of Object.entries(responseData.error.field_errors)) {
+                            resultDiv.innerHTML += `<p><strong>${field}:</strong> ${errors.join(', ')}</p>`;
+                        }
+                        
+                        resultDiv.innerHTML += '</div>';
+                    } else {
+                        resultDiv.innerHTML += `<div class="error"><p>${responseData.error.message}</p></div>`;
+                    }
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>Erro de Rede</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function testLocalhost() {
+            testRegistration('http://localhost:8000/api/auth/register/');
+        }
+        
+        function testProduction() {
+            testRegistration('https://finance-backend-production-29df.up.railway.app/api/auth/register/');
+        }
+    </script>
+</body>
+</html>

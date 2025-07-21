@@ -97,25 +97,8 @@ class RegisterView(generics.CreateAPIView):
         logger.info(f"Registration attempt from {request.META.get('REMOTE_ADDR')} with data: {log_data}")
         
         serializer = self.get_serializer(data=request.data)
-        
-        if not serializer.is_valid():
-            logger.error(f"Registration validation failed: {serializer.errors}")
-            return Response({
-                'error': {
-                    'message': 'Erro de validação nos dados fornecidos.',
-                    'field_errors': serializer.errors
-                }
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            user = serializer.save()
-        except Exception as e:
-            logger.error(f"Error creating user: {str(e)}")
-            return Response({
-                'error': {
-                    'message': 'Erro ao criar usuário. Por favor, tente novamente.'
-                }
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
         
         # Generate tokens
         refresh = RefreshToken.for_user(user)
