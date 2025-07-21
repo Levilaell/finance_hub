@@ -131,7 +131,47 @@ class StripeGateway(PaymentGateway):
             logger.error(f"Error canceling Stripe subscription: {e}")
             raise
     
-
+    def update_subscription(self, subscription_id: str, new_plan_id: str) -> Dict[str, Any]:
+        """Update subscription to a new plan"""
+        try:
+            # Retrieve current subscription
+            subscription = self.stripe.Subscription.retrieve(subscription_id)
+            
+            # Get the subscription item ID (assuming single item subscription)
+            if not subscription.items or not subscription.items.data:
+                raise ValueError("Subscription has no items")
+            
+            subscription_item_id = subscription.items.data[0].id
+            
+            # Update the subscription with new price
+            updated_subscription = self.stripe.Subscription.modify(
+                subscription_id,
+                items=[{
+                    'id': subscription_item_id,
+                    'price': new_plan_id,
+                }],
+                proration_behavior='always_invoice',  # Criar fatura para diferença
+                expand=['latest_invoice.payment_intent']
+            )
+            
+            # Se houver uma fatura pendente, retornar o payment intent
+            payment_intent_secret = None
+            if (updated_subscription.latest_invoice and 
+                hasattr(updated_subscription.latest_invoice, 'payment_intent') and
+                updated_subscription.latest_invoice.payment_intent):
+                payment_intent_secret = updated_subscription.latest_invoice.payment_intent.client_secret
+            
+            return {
+                'subscription_id': updated_subscription.id,
+                'status': updated_subscription.status,
+                'new_price_id': new_plan_id,
+                'client_secret': payment_intent_secret,
+                'requires_payment': payment_intent_secret is not None,
+                'data': updated_subscription
+            }
+        except Exception as e:
+            logger.error(f"Error updating Stripe subscription: {e}")
+            raise
 
     def create_payment_method(self, customer_id: str, payment_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a payment method for Stripe customer"""

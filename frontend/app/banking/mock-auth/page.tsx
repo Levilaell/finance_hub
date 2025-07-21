@@ -67,7 +67,7 @@ function MockAuthContent() {
               {bankName}
             </h2>
             <p className="text-gray-600 text-sm">
-              A aplicação Finance Management está solicitando acesso às suas informações bancárias.
+              A aplicação CaixaHub está solicitando acesso às suas informações bancárias.
             </p>
           </div>
 

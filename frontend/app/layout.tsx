@@ -6,7 +6,7 @@ import { Providers } from './providers'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Finance Management',
+  title: 'CaixaHub',
   description: 'Gestão financeira para SMEs brasileiras',
 }
 

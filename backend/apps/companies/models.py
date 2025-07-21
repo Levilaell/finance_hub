@@ -29,15 +29,12 @@ class SubscriptionPlan(models.Model):
     plan_type = models.CharField(_('plan type'), max_length=20, choices=PLAN_TYPES)
     trial_days = models.IntegerField(default=14)
 
-    # Gateway IDs
-    stripe_price_id = models.CharField(_('Stripe price ID'), max_length=255, blank=True)
+    # Gateway IDs - Stripe
+    stripe_price_id_monthly = models.CharField(_('Stripe monthly price ID'), max_length=255, blank=True, help_text='price_xxx do Stripe para cobrança mensal')
+    stripe_price_id_yearly = models.CharField(_('Stripe yearly price ID'), max_length=255, blank=True, help_text='price_xxx do Stripe para cobrança anual')
+    
+    # Gateway IDs - MercadoPago  
     mercadopago_plan_id = models.CharField(_('MercadoPago plan ID'), max_length=255, blank=True)
-    gateway_plan_id = models.CharField(
-        _('payment gateway plan ID'), 
-        max_length=255, 
-        blank=True,
-        help_text='ID do plano/preço no gateway de pagamento (Stripe/MercadoPago)'
-    )
     price_monthly = models.DecimalField(_('monthly price'), max_digits=8, decimal_places=2)
     price_yearly = models.DecimalField(_('yearly price'), max_digits=8, decimal_places=2)
     

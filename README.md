@@ -1,4 +1,4 @@
-# Finance Management Application
+# CaixaHub
 
 A comprehensive personal finance management system with AI-powered insights, budgeting tools, and financial reporting.
 

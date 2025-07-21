@@ -72,11 +72,38 @@ class CreateCheckoutSessionView(APIView):
                 import stripe
                 stripe.api_key = settings.STRIPE_SECRET_KEY
                 
+                # Selecionar o ID de preço correto baseado no ciclo de cobrança
+                if billing_cycle == 'yearly':
+                    price_id = plan.stripe_price_id_yearly
+                else:
+                    price_id = plan.stripe_price_id_monthly
+                
+                if not price_id:
+                    return Response({
+                        'error': f'Stripe price ID not configured for {billing_cycle} billing'
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+                # Criar cliente no Stripe se não existir
+                customer_id = request.user.payment_customer_id
+                if not customer_id:
+                    customer = stripe.Customer.create(
+                        email=request.user.email,
+                        name=request.user.full_name,
+                        metadata={
+                            'user_id': request.user.id,
+                            'company_id': company.id
+                        }
+                    )
+                    customer_id = customer.id
+                    # Salvar o ID do cliente no usuário
+                    request.user.payment_customer_id = customer_id
+                    request.user.save()
+                
                 session = stripe.checkout.Session.create(
-                    customer=request.user.payment_customer_id,
+                    customer=customer_id,
                     payment_method_types=['card'],
                     line_items=[{
-                        'price': plan.stripe_price_id,
+                        'price': price_id,
                         'quantity': 1,
                     }],
                     mode='subscription',

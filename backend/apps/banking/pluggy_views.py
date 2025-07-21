@@ -561,7 +561,7 @@ async def process_webhook_event(event_type: str, event_data: dict) -> dict:
                     )
                     
                     sync_service = PluggyTransactionSyncService()
-                    await sync_service.sync_account(account.id)
+                    await sync_service.sync_account_transactions(account)
                     
                     result['message'] = f'Synced new transactions for account {account_id}'
                 except BankAccount.DoesNotExist:
@@ -614,8 +614,16 @@ def pluggy_webhook(request):
         
         logger.info(f"Received authenticated Pluggy webhook: {event_type}")
         
-        # Process webhook asynchronously
-        result = asyncio.run(process_webhook_event(event_type, event_data))
+        # Process webhook using the new handler
+        from .webhook_handler import PluggyWebhookHandler
+        handler = PluggyWebhookHandler()
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(handler.process_event(event_type, event_data))
+        finally:
+            loop.close()
         
         if result['success']:
             return Response({
@@ -629,7 +637,7 @@ def pluggy_webhook(request):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     except Exception as e:
-        logger.error(f"Error processing Pluggy webhook: {e}")
+        logger.error(f"Error processing Pluggy webhook: {e}", exc_info=True)
         return Response(
             {'error': 'Webhook processing failed'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
