@@ -476,6 +476,45 @@ class PluggyTransactionSyncService:
         
         await mark_error()
         logger.warning(f"⚠️ Marked Pluggy account {account.id} as {error_type}")
+    
+    async def _update_transaction_counter(self, account: BankAccount, new_transactions: int):
+        """Update company transaction counter after sync"""
+        @sync_to_async
+        def update_counter():
+            from apps.companies.models import Company, ResourceUsage
+            from apps.banking.models import Transaction
+            from django.utils import timezone
+            
+            company = account.company
+            if not company:
+                logger.warning(f"⚠️ No company found for account {account.id}")
+                return
+            
+            # Count transactions for current month based on transaction_date
+            month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            current_month_count = Transaction.objects.filter(
+                bank_account__company=company,
+                transaction_date__gte=month_start
+            ).count()
+            
+            # Update company counter with actual count
+            company.current_month_transactions = current_month_count
+            company.save(update_fields=['current_month_transactions'])
+            
+            # Update ResourceUsage with actual count
+            usage = ResourceUsage.get_or_create_current_month(company)
+            usage.transactions_count = current_month_count
+            usage.save(update_fields=['transactions_count'])
+            
+            logger.info(f"📊 Updated transaction counter to {current_month_count} for company {company.name}")
+            logger.info(f"📈 Sync added {new_transactions} new transactions")
+            
+            # Check if limit reached
+            limit_reached, usage_info = company.check_plan_limits('transactions')
+            if limit_reached:
+                logger.warning(f"⚠️ Transaction limit reached for company {company.name}: {usage_info}")
+        
+        await update_counter()
 
 
 # Global service instance
