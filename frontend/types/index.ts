@@ -74,8 +74,8 @@ export interface SubscriptionPlan {
   name: string;
   slug: string;
   plan_type: 'free' | 'starter' | 'professional' | 'enterprise';
-  price_monthly: number;
-  price_yearly: number;
+  price_monthly: string | number;
+  price_yearly: string | number;
   max_transactions: number;
   max_bank_accounts: number;
   has_ai_categorization: boolean;

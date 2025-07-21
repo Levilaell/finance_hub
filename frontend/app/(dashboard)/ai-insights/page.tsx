@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -12,6 +12,16 @@ import { aiAnalysisService } from '@/services/ai-analysis.service';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth-store';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorMessage } from '@/components/ui/error-message';
 import { 
   SparklesIcon,
   ExclamationTriangleIcon,
@@ -321,6 +331,192 @@ const QUICK_PERIODS = [
   { id: 'last_12_months', label: 'Últimos 12 Meses', icon: ArrowTrendingUpIcon },
   { id: 'all_time', label: 'Todo Período', icon: BanknotesIcon },
 ];
+
+// Saved AI Analyses Component
+function AIAnalysesSection() {
+  const [selectedAnalysisType, setSelectedAnalysisType] = useState<string>('all');
+  const [showFavorites, setShowFavorites] = useState(false);
+  const router = useRouter();
+
+  // Query for AI analyses
+  const { 
+    data: aiAnalyses, 
+    isLoading: aiAnalysesLoading, 
+    error: aiAnalysesError,
+    refetch: refetchAnalyses
+  } = useQuery({
+    queryKey: ['ai-analyses', selectedAnalysisType, showFavorites],
+    queryFn: async () => {
+      const params: any = {};
+      if (selectedAnalysisType !== 'all') {
+        params.analysis_type = selectedAnalysisType;
+      }
+      if (showFavorites) {
+        return await aiAnalysisService.getFavorites();
+      }
+      const result = await aiAnalysisService.list(params);
+      return result.results || result;
+    }
+  });
+
+  // Toggle favorite mutation
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: (id: number) => aiAnalysisService.toggleFavorite(id),
+    onSuccess: () => {
+      refetchAnalyses();
+      toast.success('Favorito atualizado!');
+    },
+    onError: () => {
+      toast.error('Erro ao atualizar favorito');
+    }
+  });
+
+  const analysisTypes = [
+    { value: 'all', label: 'Todas as Análises' },
+    { value: 'financial_health', label: 'Saúde Financeira' },
+    { value: 'cash_flow_prediction', label: 'Previsão de Fluxo de Caixa' },
+    { value: 'expense_optimization', label: 'Otimização de Gastos' },
+    { value: 'revenue_analysis', label: 'Análise de Receita' },
+    { value: 'general_insights', label: 'Insights Gerais' },
+  ];
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center">
+            <SparklesIcon className="h-5 w-5 mr-2" />
+            Análises Salvas
+          </div>
+          <div className="flex gap-2">
+            <Select value={selectedAnalysisType} onValueChange={setSelectedAnalysisType}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {analysisTypes.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    {type.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant={showFavorites ? "default" : "outline"}
+              onClick={() => setShowFavorites(!showFavorites)}
+              size="sm"
+            >
+              <CheckCircleIcon className="h-4 w-4 mr-1" />
+              {showFavorites ? 'Todos' : 'Favoritos'}
+            </Button>
+          </div>
+        </CardTitle>
+        <CardDescription>
+          Acesse suas análises de IA geradas anteriormente
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {aiAnalysesLoading ? (
+          <div className="flex justify-center py-8">
+            <LoadingSpinner />
+          </div>
+        ) : aiAnalysesError ? (
+          <ErrorMessage 
+            title="Erro ao carregar análises"
+            message="Tente novamente mais tarde"
+          />
+        ) : aiAnalyses && aiAnalyses.length > 0 ? (
+          <div className="space-y-3">
+            {aiAnalyses.map((analysis: any) => (
+              <div
+                key={analysis.id}
+                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center space-x-4 flex-1">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <SparklesIcon className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium">{analysis.title}</h3>
+                      {analysis.is_favorite && (
+                        <CheckCircleIcon className="h-4 w-4 text-yellow-500" />
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-4 text-sm text-gray-600">
+                      <span className="flex items-center">
+                        <CalendarIcon className="h-4 w-4 mr-1" />
+                        {formatDate(analysis.period_start)} - {formatDate(analysis.period_end)}
+                      </span>
+                      <span className="flex items-center">
+                        <ClockIcon className="h-4 w-4 mr-1" />
+                        {analysis.days_since_created === 0 ? 'Hoje' : 
+                         analysis.days_since_created === 1 ? 'Ontem' :
+                         `${analysis.days_since_created} dias atrás`}
+                      </span>
+                      <span className="px-2 py-1 bg-gray-100 rounded text-xs">
+                        {analysis.analysis_type_display}
+                      </span>
+                      {analysis.confidence_score && (
+                        <span className="flex items-center text-green-600">
+                          <LightBulbIcon className="h-4 w-4 mr-1" />
+                          {analysis.confidence_score}% confiança
+                        </span>
+                      )}
+                    </div>
+                    {analysis.summary_text && (
+                      <p className="text-sm text-gray-600 mt-1 line-clamp-1">{analysis.summary_text}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleFavoriteMutation.mutate(analysis.id)}
+                    disabled={toggleFavoriteMutation.isPending}
+                  >
+                    <CheckCircleIcon className={cn(
+                      "h-4 w-4",
+                      analysis.is_favorite ? "text-yellow-500" : "text-gray-400"
+                    )} />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Atualizar o período selecionado e forçar atualização
+                      const params = new URLSearchParams({
+                        period_start: analysis.period_start,
+                        period_end: analysis.period_end,
+                        analysis_id: analysis.id
+                      });
+                      router.push(`/ai-insights?${params.toString()}`);
+                      // Recarregar a página para garantir que os dados sejam atualizados
+                      window.location.reload();
+                    }}
+                  >
+                    <SparklesIcon className="h-4 w-4 mr-1" />
+                    Ver
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={SparklesIcon}
+            title="Nenhuma análise salva"
+            description={showFavorites ? 
+              "Você ainda não tem análises favoritas. Marque suas análises como favoritas para vê-las aqui." :
+              "Suas análises de IA aparecerão aqui automaticamente após serem geradas."
+            }
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function AIInsightsPage() {
   // Hooks
@@ -932,6 +1128,9 @@ export default function AIInsightsPage() {
           </CardContent>
         </Card>
       </AIInsightsErrorBoundary>
+
+      {/* Saved AI Analyses Section */}
+      <AIAnalysesSection />
     </div>
   );
 }

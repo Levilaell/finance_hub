@@ -73,18 +73,23 @@ export function UpgradePlanDialog({
   };
 
   const getPrice = (plan: SubscriptionPlan) => {
-    return billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly;
+    const yearly = typeof plan.price_yearly === 'string' ? parseFloat(plan.price_yearly) : plan.price_yearly;
+    const monthly = typeof plan.price_monthly === 'string' ? parseFloat(plan.price_monthly) : plan.price_monthly;
+    return billingCycle === 'yearly' ? yearly : monthly;
   };
 
   const getDiscount = (plan: SubscriptionPlan) => {
-    const monthlyTotal = plan.price_monthly * 12;
-    const yearlyPrice = plan.price_yearly;
-    return Math.round(((monthlyTotal - yearlyPrice) / monthlyTotal) * 100);
+    const monthly = typeof plan.price_monthly === 'string' ? parseFloat(plan.price_monthly) : plan.price_monthly;
+    const yearly = typeof plan.price_yearly === 'string' ? parseFloat(plan.price_yearly) : plan.price_yearly;
+    const monthlyTotal = monthly * 12;
+    return Math.round(((monthlyTotal - yearly) / monthlyTotal) * 100);
   };
 
   const isPlanUpgrade = (plan: SubscriptionPlan) => {
     if (!currentPlan) return true;
-    return plan.price_monthly > currentPlan.price_monthly;
+    const planMonthly = typeof plan.price_monthly === 'string' ? parseFloat(plan.price_monthly) : plan.price_monthly;
+    const currentMonthly = typeof currentPlan.price_monthly === 'string' ? parseFloat(currentPlan.price_monthly) : currentPlan.price_monthly;
+    return planMonthly > currentMonthly;
   };
 
   return (
@@ -95,6 +100,14 @@ export function UpgradePlanDialog({
           <DialogDescription>
             Escolha o plano ideal para suas necessidades e desbloqueie mais recursos.
           </DialogDescription>
+          {/* Trial Note */}
+          {!currentPlan && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-700 font-medium text-center">
+                ✓ 14 dias grátis para testar • Cancele quando quiser
+              </p>
+            </div>
+          )}
         </DialogHeader>
 
         {plansLoading ? (
@@ -132,7 +145,8 @@ export function UpgradePlanDialog({
                 const isSelected = selectedPlan?.id === plan.id;
                 const discount = billingCycle === 'yearly' ? getDiscount(plan) : 0;
 
-                if (!isUpgrade && !isCurrentPlan) return null;
+                // Show all plans if user has no current plan (trial), or only upgrades if they do
+                if (currentPlan && !isUpgrade && !isCurrentPlan) return null;
 
                 return (
                   <Card
@@ -156,6 +170,13 @@ export function UpgradePlanDialog({
                       <div className="text-center space-y-4">
                         <h3 className="text-lg font-semibold">{plan.name}</h3>
                         
+                        {/* Descrição do plano */}
+                        <p className="text-sm text-gray-600">
+                          {plan.plan_type === 'starter' && 'Ideal para empresas em crescimento que precisam de controle financeiro'}
+                          {plan.plan_type === 'professional' && 'Solução completa com IA para automação e insights'}
+                          {plan.plan_type === 'enterprise' && 'Para grandes empresas com necessidades complexas'}
+                        </p>
+                        
                         <div>
                           <div className="text-3xl font-bold text-blue-600">
                             {formatCurrency(getPrice(plan))}
@@ -171,41 +192,120 @@ export function UpgradePlanDialog({
                         </div>
 
                         <div className="space-y-2 text-left">
-                          <div className="flex items-center text-sm">
-                            <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
-                            {plan.max_transactions} transações/mês
-                          </div>
-                          <div className="flex items-center text-sm">
-                            <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
-                            {plan.max_bank_accounts} contas bancárias
-                          </div>
-                          
-                          {plan.has_ai_categorization && (
-                            <div className="flex items-center text-sm">
-                              <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
-                              Categorização com IA
-                            </div>
+                          {/* Recursos principais baseados no plano */}
+                          {plan.plan_type === 'starter' && (
+                            <>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                🏦 1 conta bancária conectada
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                📊 500 transações por mês
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                🤖 Categorização automática
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                📊 Dashboard completo com gráficos
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                📝 Relatórios financeiros avançados
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                💾 Exportação PDF e Excel
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                🔄 Sincronização em tempo real
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                📞 Suporte por email
+                              </div>
+                            </>
                           )}
                           
-                          {plan.has_advanced_reports && (
-                            <div className="flex items-center text-sm">
-                              <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
-                              Relatórios avançados
-                            </div>
+                          {plan.plan_type === 'professional' && (
+                            <>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                🏦 3 contas bancárias conectadas
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                📊 2.500 transações por mês
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                🤖 Categorização automática
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-purple-500 mr-2" />
+                                ✨ Análises inteligentes com IA
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-purple-500 mr-2" />
+                                ✨ 10 consultas de IA por mês
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-purple-500 mr-2" />
+                                ✨ Insights e recomendações
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-purple-500 mr-2" />
+                                ✨ Previsões de fluxo de caixa
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                📝 Relatórios avançados
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                📞 Suporte prioritário WhatsApp
+                              </div>
+                            </>
                           )}
                           
-                          {plan.has_api_access && (
-                            <div className="flex items-center text-sm">
-                              <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
-                              Acesso à API
-                            </div>
-                          )}
-                          
-                          {plan.has_accountant_access && (
-                            <div className="flex items-center text-sm">
-                              <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
-                              Acesso para contador
-                            </div>
+                          {plan.plan_type === 'enterprise' && (
+                            <>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                🏦 Contas bancárias ilimitadas
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                📊 Transações ilimitadas
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                🤖 Categorização automática
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-purple-500 mr-2" />
+                                ✨ IA sem restrições (ilimitada)
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-purple-500 mr-2" />
+                                ✨ Análises avançadas ilimitadas
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-purple-500 mr-2" />
+                                ✨ Machine Learning personalizado
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-purple-500 mr-2" />
+                                ✨ Insights preditivos avançados
+                              </div>
+                              <div className="flex items-center text-sm">
+                                <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                                🎆 Suporte dedicado
+                              </div>
+                            </>
                           )}
                         </div>
 
@@ -237,7 +337,12 @@ export function UpgradePlanDialog({
                   <p>Valor: <strong>{formatCurrency(getPrice(selectedPlan))}/{billingCycle === 'yearly' ? 'ano' : 'mês'}</strong></p>
                   {billingCycle === 'yearly' && (
                     <p className="text-green-700">
-                      Você economizará <strong>{formatCurrency(selectedPlan.price_monthly * 12 - selectedPlan.price_yearly)}</strong> por ano!
+                      {(() => {
+                        const monthly = typeof selectedPlan.price_monthly === 'string' ? parseFloat(selectedPlan.price_monthly) : selectedPlan.price_monthly;
+                        const yearly = typeof selectedPlan.price_yearly === 'string' ? parseFloat(selectedPlan.price_yearly) : selectedPlan.price_yearly;
+                        const savings = monthly * 12 - yearly;
+                        return <>Você economizará <strong>{formatCurrency(savings)}</strong> por ano!</>;
+                      })()}
                     </p>
                   )}
                 </div>
