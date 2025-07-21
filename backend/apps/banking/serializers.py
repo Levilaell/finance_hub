@@ -41,7 +41,8 @@ class BankAccountSerializer(serializers.ModelSerializer):
             'account_number', 'account_digit', 'masked_account', 'display_name',
             'account_name', 'current_balance', 'available_balance', 'nickname',
             'is_primary', 'is_active', 'status', 'last_sync_at',
-            'last_sync_status', 'transaction_count', 'created_at', 'updated_at'
+            'last_sync_status', 'transaction_count', 'created_at', 'updated_at',
+            'external_id', 'pluggy_item_id'  # Temporarily add these fields
         ]
         read_only_fields = [
             'id', 'current_balance', 'available_balance', 'last_sync_at',
