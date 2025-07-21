@@ -7,23 +7,23 @@ ENV PYTHONUNBUFFERED=1
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies in smaller chunks to avoid timeouts
+RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     python3-dev \
-    musl-dev \
     libpq-dev \
-    curl \
-    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements from backend
 COPY ../backend/requirements.txt /app/
 
 # Install Python dependencies
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+RUN pip install --upgrade pip --no-cache-dir
+RUN pip install -r requirements.txt --no-cache-dir
 
 # Copy project from backend
 COPY ../backend /app/
