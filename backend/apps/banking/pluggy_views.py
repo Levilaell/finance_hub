@@ -5,6 +5,9 @@ import logging
 from typing import Dict, Any
 from decimal import Decimal
 import asyncio
+import hmac
+import hashlib
+import json
 
 from django.conf import settings
 from rest_framework import permissions, status
@@ -17,6 +20,7 @@ from django_ratelimit.decorators import ratelimit
 from .models import BankAccount, BankProvider
 from .pluggy_client import PluggyClient, PluggyAuthenticationError
 from .serializers import BankAccountSerializer
+from .pluggy_sync_service import PluggyTransactionSyncService
 
 logger = logging.getLogger(__name__)
 
@@ -455,39 +459,174 @@ class PluggySyncAccountView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+def verify_pluggy_webhook_signature(payload: bytes, signature: str) -> bool:
+    """
+    Verify the webhook signature from Pluggy
+    
+    Args:
+        payload: The raw request body
+        signature: The signature from the X-Pluggy-Signature header
+        
+    Returns:
+        bool: True if signature is valid, False otherwise
+    """
+    webhook_secret = getattr(settings, 'PLUGGY_WEBHOOK_SECRET', '')
+    
+    if not webhook_secret:
+        logger.warning("PLUGGY_WEBHOOK_SECRET not configured")
+        return False
+    
+    try:
+        # Calculate expected signature
+        expected_signature = hmac.new(
+            webhook_secret.encode('utf-8'),
+            payload,
+            hashlib.sha256
+        ).hexdigest()
+        
+        # Compare signatures
+        return hmac.compare_digest(expected_signature, signature)
+    except Exception as e:
+        logger.error(f"Error verifying webhook signature: {e}")
+        return False
+
+
+async def process_webhook_event(event_type: str, event_data: dict) -> dict:
+    """
+    Process webhook events asynchronously
+    
+    Args:
+        event_type: Type of webhook event
+        event_data: Event payload data
+        
+    Returns:
+        dict: Processing result
+    """
+    result = {'success': True, 'message': ''}
+    
+    try:
+        if event_type == 'item/created':
+            item_id = event_data.get('id')
+            logger.info(f"Pluggy item created: {item_id}")
+            result['message'] = f'Item {item_id} created successfully'
+            
+        elif event_type == 'item/updated':
+            item_id = event_data.get('id')
+            status_val = event_data.get('status')
+            logger.info(f"Pluggy item {item_id} updated: {status_val}")
+            
+            # If item is now active, sync all accounts
+            if status_val == 'ACTIVE':
+                accounts = BankAccount.objects.filter(
+                    pluggy_item_id=item_id,
+                    is_active=True
+                )
+                
+                if accounts.exists():
+                    sync_service = PluggyTransactionSyncService()
+                    for account in accounts:
+                        try:
+                            await sync_service.sync_account(account.id)
+                            logger.info(f"Synced account {account.id} after item update")
+                        except Exception as e:
+                            logger.error(f"Failed to sync account {account.id}: {e}")
+                            
+            result['message'] = f'Item {item_id} updated to {status_val}'
+            
+        elif event_type == 'item/error':
+            item_id = event_data.get('id')
+            error = event_data.get('error')
+            logger.warning(f"Pluggy item {item_id} error: {error}")
+            
+            # Mark accounts as having errors
+            BankAccount.objects.filter(
+                pluggy_item_id=item_id
+            ).update(
+                sync_status='error',
+                sync_error_message=error.get('message', 'Unknown error')
+            )
+            
+            result['message'] = f'Item {item_id} error recorded'
+            
+        elif event_type == 'transactions/created':
+            account_id = event_data.get('accountId')
+            if account_id:
+                logger.info(f"New transactions for Pluggy account {account_id}")
+                
+                # Find and sync the account
+                try:
+                    account = BankAccount.objects.get(
+                        external_id=account_id,
+                        is_active=True
+                    )
+                    
+                    sync_service = PluggyTransactionSyncService()
+                    await sync_service.sync_account(account.id)
+                    
+                    result['message'] = f'Synced new transactions for account {account_id}'
+                except BankAccount.DoesNotExist:
+                    logger.warning(f"Account {account_id} not found for transaction sync")
+                    result['success'] = False
+                    result['message'] = f'Account {account_id} not found'
+                    
+        else:
+            logger.info(f"Unhandled webhook event type: {event_type}")
+            result['message'] = f'Event {event_type} received but not processed'
+            
+    except Exception as e:
+        logger.error(f"Error processing webhook event {event_type}: {e}")
+        result['success'] = False
+        result['message'] = str(e)
+        
+    return result
+
+
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def pluggy_webhook(request):
     """Handle Pluggy webhooks for real-time updates"""
     try:
-        # TODO: Implement webhook signature verification
+        # Verify webhook signature
+        signature = request.META.get('HTTP_X_PLUGGY_SIGNATURE', '')
+        
+        # Get raw body for signature verification
+        raw_body = request.body
+        
+        # Verify signature if webhook secret is configured
+        if getattr(settings, 'PLUGGY_WEBHOOK_SECRET', ''):
+            if not signature:
+                logger.warning("Missing X-Pluggy-Signature header")
+                return Response(
+                    {'error': 'Missing signature'}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+                
+            if not verify_pluggy_webhook_signature(raw_body, signature):
+                logger.warning("Invalid webhook signature")
+                return Response(
+                    {'error': 'Invalid signature'}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+        
+        # Parse event data
         event_type = request.data.get('event') or request.data.get('type')
         event_data = request.data.get('data', {})
-
-        logger.info(f"Received Pluggy webhook: {event_type}")
-
-        # Handle different webhook events
-        if event_type == 'item/created':
-            item_id = event_data.get('id')
-            logger.info(f"Pluggy item created: {item_id}")
-
-        elif event_type == 'item/updated':
-            item_id = event_data.get('id')
-            status_val = event_data.get('status')
-            logger.info(f"Pluggy item {item_id} updated: {status_val}")
-
-        elif event_type == 'item/error':
-            item_id = event_data.get('id')
-            error = event_data.get('error')
-            logger.warning(f"Pluggy item {item_id} error: {error}")
-
-        elif event_type == 'transactions/created':
-            account_id = event_data.get('accountId')
-            if account_id:
-                logger.info(f"New transactions for Pluggy account {account_id}")
-                # TODO: Trigger sync for this account
-
-        return Response({'status': 'received'}, status=status.HTTP_200_OK)
+        
+        logger.info(f"Received authenticated Pluggy webhook: {event_type}")
+        
+        # Process webhook asynchronously
+        result = asyncio.run(process_webhook_event(event_type, event_data))
+        
+        if result['success']:
+            return Response({
+                'status': 'received',
+                'message': result['message']
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'status': 'error',
+                'message': result['message']
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     except Exception as e:
         logger.error(f"Error processing Pluggy webhook: {e}")

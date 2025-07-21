@@ -90,7 +90,7 @@ export function PluggyConnectWidget({
         }
       }
     };
-  }, []);
+  }, [onError, sdkLoaded]);
 
   useEffect(() => {
     if (!sdkLoaded || !connectToken || !window.PluggyConnect) {

@@ -51,7 +51,7 @@ export default function PaymentSuccessPage() {
   
   useEffect(() => {
     validatePaymentMutation.mutate();
-  }, []);
+  }, [validatePaymentMutation]);
   
   const getStatusContent = () => {
     switch (paymentStatus) {

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useAuthStore } from '@/store/auth-store';
 import { useBankingStore } from '@/store/banking-store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -63,6 +64,38 @@ export default function AccountsPage() {
   const [pluggyError, setPluggyError] = useState<string | null>(null);
   const [useIframeMode, setUseIframeMode] = useState(false);
 
+  // ✅ Função handlePluggyCallback (mantida como está)
+  const handlePluggyCallback = useCallback(async (itemId: string) => {
+    try {
+      
+      // Get stored provider info
+      const providerName = sessionStorage.getItem('pluggy_provider') || 'Banco';
+      const bankCode = sessionStorage.getItem('pluggy_bank_code') || '';
+      
+      const response = await bankingService.handlePluggyCallback(itemId);
+      
+      
+      if (response.success && response.data) {
+        const accountsCreated = response.data.accounts?.length || 0;
+        toast.success(`🎉 ${accountsCreated} conta(s) conectada(s) com sucesso!`);
+        
+        // Clear stored data
+        sessionStorage.removeItem('pluggy_provider');
+        sessionStorage.removeItem('pluggy_bank_code');
+        
+        // Refresh accounts list
+        fetchAccounts();
+        
+        return response.data;
+      } else {
+        throw new Error(response.message || 'Erro ao processar callback');
+      }
+    } catch (error: any) {
+      toast.error('Erro ao finalizar conexão: ' + error.message);
+      throw error;
+    }
+  }, [fetchAccounts]);
+
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/login');
@@ -102,7 +135,7 @@ export default function AccountsPage() {
       sessionStorage.removeItem('pluggy_bank_code');
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchAccounts, handlePluggyCallback, router]);
 
   // ✅ Função simplificada - abre Pluggy Connect diretamente
   const handleConnectBank = async () => {
@@ -194,38 +227,6 @@ export default function AccountsPage() {
       }
     } catch (error: any) {
       toast.error(error.message || 'Erro ao atualizar token. Tente reconectar a conta.');
-    }
-  };
-
-  // ✅ Função handlePluggyCallback (mantida como está)
-  const handlePluggyCallback = async (itemId: string) => {
-    try {
-      
-      // Get stored provider info
-      const providerName = sessionStorage.getItem('pluggy_provider') || 'Banco';
-      const bankCode = sessionStorage.getItem('pluggy_bank_code') || '';
-      
-      const response = await bankingService.handlePluggyCallback(itemId);
-      
-      
-      if (response.success && response.data) {
-        const accountsCreated = response.data.accounts?.length || 0;
-        toast.success(`🎉 ${accountsCreated} conta(s) conectada(s) com sucesso!`);
-        
-        // Clear stored data
-        sessionStorage.removeItem('pluggy_provider');
-        sessionStorage.removeItem('pluggy_bank_code');
-        
-        // Refresh accounts list
-        fetchAccounts();
-        
-        return response.data;
-      } else {
-        throw new Error(response.message || 'Erro ao processar callback');
-      }
-    } catch (error: any) {
-      toast.error('Erro ao finalizar conexão: ' + error.message);
-      throw error;
     }
   };
 
@@ -421,10 +422,12 @@ export default function AccountsPage() {
                     <div className="space-y-1">
                       <CardTitle className="text-lg flex items-center gap-2">
                         {account.provider?.logo_url ? (
-                          <img 
+                          <Image 
                             src={account.provider.logo_url} 
                             alt={account.provider.name}
-                            className="h-6 w-6 object-contain"
+                            width={24}
+                            height={24}
+                            className="object-contain"
                           />
                         ) : (
                           <BuildingLibraryIcon className="h-6 w-6 text-gray-400" />

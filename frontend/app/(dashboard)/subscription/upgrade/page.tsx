@@ -77,8 +77,8 @@ export default function UpgradePage() {
   };
 
   const getDiscount = (plan: SubscriptionPlan) => {
-    const monthlyTotal = plan.price_monthly * 12;
-    const yearlyPrice = plan.price_yearly;
+    const monthlyTotal = Number(plan.price_monthly) * 12;
+    const yearlyPrice = Number(plan.price_yearly);
     return Math.round(((monthlyTotal - yearlyPrice) / monthlyTotal) * 100);
   };
 
@@ -155,7 +155,7 @@ export default function UpgradePage() {
                       
                       <div>
                         <div className="text-3xl font-bold text-blue-600">
-                          {formatCurrency(getPrice(plan))}
+                          {formatCurrency(Number(getPrice(plan)))}
                         </div>
                         <div className="text-sm text-gray-600">
                           por {billingCycle === 'yearly' ? 'ano' : 'mês'}
@@ -229,10 +229,10 @@ export default function UpgradePage() {
               <h4 className="font-medium text-blue-900 mb-3 text-lg">Resumo da Assinatura</h4>
               <div className="text-sm text-blue-800 space-y-2">
                 <p>Plano selecionado: <strong>{selectedPlan.name}</strong></p>
-                <p>Valor: <strong>{formatCurrency(getPrice(selectedPlan))}/{billingCycle === 'yearly' ? 'ano' : 'mês'}</strong></p>
+                <p>Valor: <strong>{formatCurrency(Number(getPrice(selectedPlan)))}/{billingCycle === 'yearly' ? 'ano' : 'mês'}</strong></p>
                 {billingCycle === 'yearly' && (
                   <p className="text-green-700">
-                    Você economizará <strong>{formatCurrency(selectedPlan.price_monthly * 12 - selectedPlan.price_yearly)}</strong> por ano!
+                    Você economizará <strong>{formatCurrency(Number(selectedPlan.price_monthly) * 12 - Number(selectedPlan.price_yearly))}</strong> por ano!
                   </p>
                 )}
               </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -750,7 +751,7 @@ export default function SettingsPage() {
                         <p className="font-medium">{user?.company?.subscription_plan?.name || 'Período de Teste'}</p>
                         <p className="text-sm text-gray-600">
                           {user?.company?.subscription_plan?.price_monthly 
-                            ? `${formatCurrency(user.company.subscription_plan.price_monthly)}/mês`
+                            ? `${formatCurrency(Number(user.company.subscription_plan.price_monthly))}/mês`
                             : 'Sem cobrança durante o período de teste'
                           }
                         </p>
@@ -1113,7 +1114,7 @@ export default function SettingsPage() {
           <div className="space-y-4 py-4">
             {qrCode && (
               <div className="flex justify-center">
-                <img src={qrCode} alt="2FA QR Code" className="w-48 h-48" />
+                <Image src={qrCode} alt="2FA QR Code" width={192} height={192} />
               </div>
             )}
             <div>

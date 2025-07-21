@@ -34,6 +34,7 @@ import {
   BanknotesIcon,
   ArrowPathIcon,
   LockClosedIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 
 // Types

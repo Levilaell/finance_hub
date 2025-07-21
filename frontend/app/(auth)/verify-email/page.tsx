@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { authService } from "@/services/auth.service";
 import { Button } from "@/components/ui/button";
@@ -17,16 +17,7 @@ function VerifyEmailContent() {
   const [verified, setVerified] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (token) {
-      verifyEmail(token);
-    } else {
-      setVerifying(false);
-      setError("Token de verificação não encontrado");
-    }
-  }, [token]);
-
-  const verifyEmail = async (verificationToken: string) => {
+  const verifyEmail = useCallback(async (verificationToken: string) => {
     try {
       await authService.verifyEmail(verificationToken);
       setVerified(true);
@@ -42,7 +33,16 @@ function VerifyEmailContent() {
     } finally {
       setVerifying(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    if (token) {
+      verifyEmail(token);
+    } else {
+      setVerifying(false);
+      setError("Token de verificação não encontrado");
+    }
+  }, [token, verifyEmail]);
 
   return (
     <div className="flex min-h-screen items-center justify-center">

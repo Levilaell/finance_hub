@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -33,14 +33,62 @@ export default function PluggyConnect({
   const [selectedBank, setSelectedBank] = useState<PluggyBank | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadSupportedBanks();
-    setupEventListeners();
+  const handleConnectionSuccess = useCallback((event: any) => {
+    const { accounts } = event.detail;
+    setConnecting(false);
+    
+    toast.success(`${accounts?.length || 0} conta(s) conectada(s) com sucesso!`);
+    
+    if (onConnectionSuccess) {
+      onConnectionSuccess(accounts);
+    }
+  }, [onConnectionSuccess]);
 
-    return () => {
-      removeEventListeners();
-    };
+  const handleConnectionError = useCallback((event: any) => {
+    const { error } = event.detail;
+    setConnecting(false);
+    
+    console.error('Pluggy connection error:', error);
+    toast.error('Falha na conexão com o banco');
+    
+    if (onConnectionError) {
+      onConnectionError(error);
+    }
+  }, [onConnectionError]);
+
+  const handlePluggyEvent = useCallback((event: any) => {
+    const { eventName, data } = event.detail;
+    
+    switch (eventName) {
+      case 'OPEN':
+        setConnecting(true);
+        break;
+      case 'CLOSE':
+        setConnecting(false);
+        break;
+      case 'SUBMIT_CREDENTIALS':
+        toast.loading('Validando credenciais...', { id: 'pluggy-auth' });
+        break;
+      case 'SUCCESS':
+        toast.dismiss('pluggy-auth');
+        break;
+      case 'ERROR':
+        toast.dismiss('pluggy-auth');
+        break;
+    }
   }, []);
+
+  const setupEventListeners = useCallback(() => {
+    window.addEventListener('pluggyConnectionSuccess', handleConnectionSuccess);
+    window.addEventListener('pluggyConnectionError', handleConnectionError);
+    window.addEventListener('pluggyEvent', handlePluggyEvent);
+  }, [handleConnectionSuccess, handleConnectionError, handlePluggyEvent]);
+
+  const removeEventListeners = useCallback(() => {
+    window.removeEventListener('pluggyConnectionSuccess', handleConnectionSuccess);
+    window.removeEventListener('pluggyConnectionError', handleConnectionError);
+    window.removeEventListener('pluggyEvent', handlePluggyEvent);
+  }, [handleConnectionSuccess, handleConnectionError, handlePluggyEvent]);
 
   const loadSupportedBanks = async () => {
     try {
@@ -63,62 +111,14 @@ export default function PluggyConnect({
     }
   };
 
-  const setupEventListeners = () => {
-    window.addEventListener('pluggyConnectionSuccess', handleConnectionSuccess);
-    window.addEventListener('pluggyConnectionError', handleConnectionError);
-    window.addEventListener('pluggyEvent', handlePluggyEvent);
-  };
+  useEffect(() => {
+    loadSupportedBanks();
+    setupEventListeners();
 
-  const removeEventListeners = () => {
-    window.removeEventListener('pluggyConnectionSuccess', handleConnectionSuccess);
-    window.removeEventListener('pluggyConnectionError', handleConnectionError);
-    window.removeEventListener('pluggyEvent', handlePluggyEvent);
-  };
-
-  const handleConnectionSuccess = (event: any) => {
-    const { accounts } = event.detail;
-    setConnecting(false);
-    
-    toast.success(`${accounts?.length || 0} conta(s) conectada(s) com sucesso!`);
-    
-    if (onConnectionSuccess) {
-      onConnectionSuccess(accounts);
-    }
-  };
-
-  const handleConnectionError = (event: any) => {
-    const { error } = event.detail;
-    setConnecting(false);
-    
-    console.error('Pluggy connection error:', error);
-    toast.error('Falha na conexão com o banco');
-    
-    if (onConnectionError) {
-      onConnectionError(error);
-    }
-  };
-
-  const handlePluggyEvent = (event: any) => {
-    const { eventName, data } = event.detail;
-    
-    switch (eventName) {
-      case 'OPEN':
-        setConnecting(true);
-        break;
-      case 'CLOSE':
-        setConnecting(false);
-        break;
-      case 'SUBMIT_CREDENTIALS':
-        toast.loading('Validando credenciais...', { id: 'pluggy-auth' });
-        break;
-      case 'SUCCESS':
-        toast.dismiss('pluggy-auth');
-        break;
-      case 'ERROR':
-        toast.dismiss('pluggy-auth');
-        break;
-    }
-  };
+    return () => {
+      removeEventListeners();
+    };
+  }, [removeEventListeners, setupEventListeners]);
 
   const connectWithBank = async (bank?: PluggyBank) => {
     try {
