@@ -34,8 +34,10 @@ export default function PaymentSuccessPage() {
       
       if (data.status === 'success') {
         toast.success('Pagamento confirmado! Sua assinatura está ativa.');
+        
+        // Force reload to update all cached data including auth context
         setTimeout(() => {
-          router.push('/dashboard');
+          window.location.href = '/dashboard';
         }, 3000);
       } else if (data.status === 'pending') {
         toast.info('Pagamento pendente. Você receberá uma confirmação por email.');
