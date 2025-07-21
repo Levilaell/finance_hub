@@ -78,22 +78,22 @@ class AIAnalysisService {
       next: string | null;
       previous: string | null;
     }>(`${this.baseUrl}/`, { params });
-    return response.data;
+    return response;
   }
 
   async get(id: number) {
     const response = await apiClient.get<AIAnalysis>(`${this.baseUrl}/${id}/`);
-    return response.data;
+    return response;
   }
 
   async create(data: Partial<AIAnalysis>) {
     const response = await apiClient.post<AIAnalysis>(`${this.baseUrl}/`, data);
-    return response.data;
+    return response;
   }
 
   async update(id: number, data: Partial<AIAnalysis>) {
     const response = await apiClient.patch<AIAnalysis>(`${this.baseUrl}/${id}/`, data);
-    return response.data;
+    return response;
   }
 
   async delete(id: number) {
@@ -103,22 +103,22 @@ class AIAnalysisService {
   // Special endpoints
   async saveFromInsights(data: SaveFromInsightsRequest) {
     const response = await apiClient.post<AIAnalysis>(`${this.baseUrl}/save_from_insights/`, data);
-    return response.data;
+    return response;
   }
 
   async toggleFavorite(id: number) {
     const response = await apiClient.post<{ is_favorite: boolean }>(`${this.baseUrl}/${id}/toggle_favorite/`);
-    return response.data;
+    return response;
   }
 
   async getFavorites() {
     const response = await apiClient.get<AIAnalysis[]>(`${this.baseUrl}/favorites/`);
-    return response.data;
+    return response;
   }
 
   async getRecent() {
     const response = await apiClient.get<AIAnalysis[]>(`${this.baseUrl}/recent/`);
-    return response.data;
+    return response;
   }
 
   // Templates CRUD
@@ -129,22 +129,22 @@ class AIAnalysisService {
     search?: string;
   }) {
     const response = await apiClient.get<AIAnalysisTemplate[]>(`${this.templatesUrl}/`, { params });
-    return response.data;
+    return response;
   }
 
   async getTemplate(id: number) {
     const response = await apiClient.get<AIAnalysisTemplate>(`${this.templatesUrl}/${id}/`);
-    return response.data;
+    return response;
   }
 
   async createTemplate(data: Partial<AIAnalysisTemplate>) {
     const response = await apiClient.post<AIAnalysisTemplate>(`${this.templatesUrl}/`, data);
-    return response.data;
+    return response;
   }
 
   async updateTemplate(id: number, data: Partial<AIAnalysisTemplate>) {
     const response = await apiClient.patch<AIAnalysisTemplate>(`${this.templatesUrl}/${id}/`, data);
-    return response.data;
+    return response;
   }
 
   async deleteTemplate(id: number) {
@@ -156,7 +156,7 @@ class AIAnalysisService {
       period_start,
       period_end
     });
-    return response.data;
+    return response;
   }
 }
 
