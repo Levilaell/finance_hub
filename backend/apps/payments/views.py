@@ -280,15 +280,36 @@ class CheckSubscriptionStatusView(APIView):
 @permission_classes([AllowAny])  # Webhooks don't use auth
 def stripe_webhook(request):
     """Handle Stripe webhooks"""
+    import stripe
+    
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    
+    logger.info(f"Stripe webhook received - Signature present: {bool(sig_header)}")
+    
     try:
+        # Verify webhook signature
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+        
+        logger.info(f"Stripe webhook event: {event['type']} - ID: {event['id']}")
+        
+        # Process the event
         payment_service = PaymentService(gateway_name='stripe')
         result = payment_service.handle_webhook(request)
         
-        logger.info(f"Stripe webhook processed: {result['event_type']}")
+        logger.info(f"Stripe webhook processed successfully: {result['event_type']}")
         return Response({'status': 'success'})
         
+    except ValueError as e:
+        logger.error(f"Invalid payload: {e}")
+        return Response({'error': 'Invalid payload'}, status=400)
+    except stripe.error.SignatureVerificationError as e:
+        logger.error(f"Invalid signature: {e}")
+        return Response({'error': 'Invalid signature'}, status=400)
     except Exception as e:
-        logger.error(f"Stripe webhook error: {e}")
+        logger.error(f"Stripe webhook error: {e}", exc_info=True)
         return Response(
             {'error': str(e)},
             status=status.HTTP_400_BAD_REQUEST

@@ -637,19 +637,29 @@ class PaymentService:
         session = data['object']
         metadata = session.get('metadata', {})
         
+        logger.info(f"Processing checkout.session.completed - Session ID: {session.get('id')}")
+        logger.info(f"Metadata: {metadata}")
+        
         # Get company and plan from metadata
         company_id = metadata.get('company_id')
         plan_id = metadata.get('plan_id')
         billing_cycle = metadata.get('billing_cycle', 'monthly')
         user_id = metadata.get('user_id')
         
+        logger.info(f"Extracted - Company: {company_id}, Plan: {plan_id}, Cycle: {billing_cycle}")
+        
         if not company_id or not plan_id:
             logger.error(f"Missing metadata in checkout session: {session['id']}")
+            logger.error(f"Full session data: {session}")
             return
         
         try:
             company = Company.objects.get(id=company_id)
             plan = SubscriptionPlan.objects.get(id=plan_id)
+            
+            logger.info(f"Found company: {company.name} (ID: {company.id})")
+            logger.info(f"Found plan: {plan.name} (ID: {plan.id})")
+            logger.info(f"Previous status: {company.subscription_status}")
             
             # Update company subscription
             company.subscription_plan = plan
@@ -667,8 +677,11 @@ class PaymentService:
             
             company.save()
             
+            logger.info(f"Company updated - New status: {company.subscription_status}")
+            logger.info(f"Subscription ID: {company.subscription_id}")
+            
             # Create payment history
-            PaymentHistory.objects.create(
+            payment = PaymentHistory.objects.create(
                 company=company,
                 subscription_plan=plan,
                 transaction_type='subscription',
@@ -681,10 +694,15 @@ class PaymentService:
                 stripe_payment_intent_id=session.get('payment_intent')
             )
             
-            logger.info(f"Subscription activated for company {company.name}")
+            logger.info(f"Payment history created - ID: {payment.id}")
+            logger.info(f"✅ Subscription activated for company {company.name}")
             
-        except (Company.DoesNotExist, SubscriptionPlan.DoesNotExist) as e:
-            logger.error(f"Error processing checkout completed: {e}")
+        except Company.DoesNotExist:
+            logger.error(f"Company not found with ID: {company_id}")
+        except SubscriptionPlan.DoesNotExist:
+            logger.error(f"Plan not found with ID: {plan_id}")
+        except Exception as e:
+            logger.error(f"Unexpected error processing checkout: {e}", exc_info=True)
     
     def _handle_payment_event(self, event_type: str, data: Dict[str, Any]):
         """Handle payment-related events"""

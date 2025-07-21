@@ -20,10 +20,12 @@ def test_production_sync(email, password, account_id=None):
         return
     
     tokens = login_response.json()
-    access_token = tokens.get('access')
+    print(f"Response: {tokens}")
+    access_token = tokens.get('tokens', {}).get('access') or tokens.get('access') or tokens.get('token')
     
     if not access_token:
         print("❌ No access token received")
+        print(f"Full response: {tokens}")
         return
     
     print("✅ Login successful")
@@ -41,11 +43,22 @@ def test_production_sync(email, password, account_id=None):
         print(f"❌ Failed to get accounts: {accounts_response.status_code}")
         return
     
-    accounts = accounts_response.json()
+    accounts_data = accounts_response.json()
+    # Handle paginated response
+    if isinstance(accounts_data, dict) and 'results' in accounts_data:
+        accounts = accounts_data['results']
+    elif isinstance(accounts_data, list):
+        accounts = accounts_data
+    else:
+        accounts = []
+    
     print(f"✅ Found {len(accounts)} accounts")
     
     # Show accounts
     for acc in accounts:
+        if isinstance(acc, str):
+            print(f"Unexpected string: {acc}")
+            continue
         print(f"\nAccount ID: {acc.get('id')}")
         print(f"  Bank: {acc.get('bank_name', 'N/A')}")
         print(f"  Balance: R$ {acc.get('current_balance', 0)}")
