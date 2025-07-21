@@ -138,7 +138,8 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/hour',
         'user': '1000/hour'
-    }
+    },
+    'EXCEPTION_HANDLER': 'core.error_handlers.custom_exception_handler'
 }
 
 # JWT Settings

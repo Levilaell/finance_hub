@@ -15,6 +15,7 @@ from .views import (
     Setup2FAView,
     Enable2FAView,
     Disable2FAView,
+    DebugRegisterView,
 )
 
 app_name = 'authentication'
@@ -22,6 +23,7 @@ app_name = 'authentication'
 urlpatterns = [
     # Authentication
     path('register/', RegisterView.as_view(), name='register'),
+    path('register/debug/', DebugRegisterView.as_view(), name='register_debug'),
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),

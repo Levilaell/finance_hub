@@ -42,6 +42,40 @@ from .utils import (
 User = get_user_model()
 
 
+class DebugRegisterView(APIView):
+    """Temporary debug endpoint for registration validation"""
+    permission_classes = (AllowAny,)
+    
+    def post(self, request):
+        """Debug endpoint to test registration validation"""
+        from .serializers import RegisterSerializer
+        import json
+        
+        # Log incoming data
+        logger = logging.getLogger(__name__)
+        logger.info(f"Debug: Received data: {json.dumps(request.data, indent=2)}")
+        
+        # Test serializer validation
+        serializer = RegisterSerializer(data=request.data)
+        
+        if not serializer.is_valid():
+            return Response({
+                'status': 'validation_failed',
+                'errors': serializer.errors,
+                'received_data': request.data,
+                'debug_info': {
+                    'fields_with_errors': list(serializer.errors.keys()),
+                    'total_errors': sum(len(errors) for errors in serializer.errors.values())
+                }
+            }, status=status.HTTP_200_OK)  # Return 200 for debug
+        
+        return Response({
+            'status': 'validation_passed',
+            'message': 'All validations passed successfully',
+            'validated_data': serializer.validated_data
+        }, status=status.HTTP_200_OK)
+
+
 @method_decorator(ratelimit(key='ip', rate='5/m', method='POST'), name='dispatch')
 class RegisterView(generics.CreateAPIView):
     """User registration with company creation"""
@@ -50,9 +84,38 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     
     def create(self, request, *args, **kwargs):
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Mask sensitive data for logging
+        log_data = request.data.copy()
+        if 'password' in log_data:
+            log_data['password'] = '***'
+        if 'password2' in log_data:
+            log_data['password2'] = '***'
+        
+        logger.info(f"Registration attempt from {request.META.get('REMOTE_ADDR')} with data: {log_data}")
+        
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
+        
+        if not serializer.is_valid():
+            logger.error(f"Registration validation failed: {serializer.errors}")
+            return Response({
+                'error': {
+                    'message': 'Erro de validação nos dados fornecidos.',
+                    'field_errors': serializer.errors
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = serializer.save()
+        except Exception as e:
+            logger.error(f"Error creating user: {str(e)}")
+            return Response({
+                'error': {
+                    'message': 'Erro ao criar usuário. Por favor, tente novamente.'
+                }
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         # Generate tokens
         refresh = RefreshToken.for_user(user)
