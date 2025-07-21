@@ -30,6 +30,9 @@ class CreateCheckoutSessionView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
+            # Log for debugging
+            logger.info(f"Checkout request - Plan: {plan_slug}, Cycle: {billing_cycle}, User: {request.user.email}")
+            
             # Get the plan
             plan = SubscriptionPlan.objects.get(slug=plan_slug, is_active=True)
             
@@ -86,36 +89,50 @@ class CreateCheckoutSessionView(APIView):
                 # Criar cliente no Stripe se não existir
                 customer_id = request.user.payment_customer_id
                 if not customer_id:
-                    customer = stripe.Customer.create(
-                        email=request.user.email,
-                        name=request.user.full_name,
-                        metadata={
-                            'user_id': request.user.id,
-                            'company_id': company.id
-                        }
+                    try:
+                        customer = stripe.Customer.create(
+                            email=request.user.email,
+                            name=request.user.full_name or request.user.email,
+                            metadata={
+                                'user_id': request.user.id,
+                                'company_id': company.id
+                            }
+                        )
+                        customer_id = customer.id
+                        # Salvar o ID do cliente no usuário
+                        request.user.payment_customer_id = customer_id
+                        request.user.save(update_fields=['payment_customer_id'])
+                    except Exception as e:
+                        logger.error(f"Error creating Stripe customer: {e}")
+                        return Response({
+                            'error': 'Failed to create customer in payment gateway',
+                            'detail': str(e)
+                        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+                try:
+                    session = stripe.checkout.Session.create(
+                        customer=customer_id,
+                        payment_method_types=['card'],
+                        line_items=[{
+                            'price': price_id,
+                            'quantity': 1,
+                        }],
+                        mode='subscription',
+                        success_url=checkout_data['success_url'],
+                        cancel_url=checkout_data['cancel_url'],
+                        metadata=checkout_data['metadata']
                     )
-                    customer_id = customer.id
-                    # Salvar o ID do cliente no usuário
-                    request.user.payment_customer_id = customer_id
-                    request.user.save()
-                
-                session = stripe.checkout.Session.create(
-                    customer=customer_id,
-                    payment_method_types=['card'],
-                    line_items=[{
-                        'price': price_id,
-                        'quantity': 1,
-                    }],
-                    mode='subscription',
-                    success_url=checkout_data['success_url'],
-                    cancel_url=checkout_data['cancel_url'],
-                    metadata=checkout_data['metadata']
-                )
-                
-                return Response({
-                    'checkout_url': session.url,
-                    'session_id': session.id
-                })
+                    
+                    return Response({
+                        'checkout_url': session.url,
+                        'session_id': session.id
+                    })
+                except stripe.error.StripeError as e:
+                    logger.error(f"Stripe error creating checkout session: {e}")
+                    return Response({
+                        'error': 'Failed to create checkout session',
+                        'detail': str(e)
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 
             elif payment_service.gateway_name == 'mercadopago':
                 # For MercadoPago, create a preference

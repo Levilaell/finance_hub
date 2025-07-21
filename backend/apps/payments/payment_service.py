@@ -597,7 +597,9 @@ class PaymentService:
         event_type = event_data['event_type']
         
         # Stripe events
-        if 'subscription' in event_type:
+        if event_type == 'checkout.session.completed':
+            self._handle_checkout_completed(event_data['data'])
+        elif 'subscription' in event_type:
             self._handle_subscription_event(event_type, event_data['data'])
         elif 'payment_intent' in event_type:
             self._handle_payment_event(event_type, event_data['data'])
@@ -628,6 +630,62 @@ class PaymentService:
         except Company.DoesNotExist:
             logger.warning(f"Company not found for subscription {subscription_id}")
     
+    def _handle_checkout_completed(self, data: Dict[str, Any]):
+        """Handle checkout.session.completed event"""
+        from apps.companies.models import Company, SubscriptionPlan
+        
+        session = data['object']
+        metadata = session.get('metadata', {})
+        
+        # Get company and plan from metadata
+        company_id = metadata.get('company_id')
+        plan_id = metadata.get('plan_id')
+        billing_cycle = metadata.get('billing_cycle', 'monthly')
+        user_id = metadata.get('user_id')
+        
+        if not company_id or not plan_id:
+            logger.error(f"Missing metadata in checkout session: {session['id']}")
+            return
+        
+        try:
+            company = Company.objects.get(id=company_id)
+            plan = SubscriptionPlan.objects.get(id=plan_id)
+            
+            # Update company subscription
+            company.subscription_plan = plan
+            company.subscription_status = 'active'
+            company.billing_cycle = billing_cycle
+            company.subscription_id = session.get('subscription')
+            company.subscription_start_date = timezone.now()
+            
+            # Calculate next billing date
+            if billing_cycle == 'yearly':
+                company.next_billing_date = timezone.now().date() + timedelta(days=365)
+            else:
+                next_month = timezone.now().date().replace(day=1) + timedelta(days=32)
+                company.next_billing_date = next_month.replace(day=1)
+            
+            company.save()
+            
+            # Create payment history
+            PaymentHistory.objects.create(
+                company=company,
+                subscription_plan=plan,
+                transaction_type='subscription',
+                amount=plan.price_yearly if billing_cycle == 'yearly' else plan.price_monthly,
+                currency='BRL',
+                status='paid',
+                description=f'Assinatura {plan.name} - Ciclo {billing_cycle}',
+                transaction_date=timezone.now(),
+                paid_at=timezone.now(),
+                stripe_payment_intent_id=session.get('payment_intent')
+            )
+            
+            logger.info(f"Subscription activated for company {company.name}")
+            
+        except (Company.DoesNotExist, SubscriptionPlan.DoesNotExist) as e:
+            logger.error(f"Error processing checkout completed: {e}")
+    
     def _handle_payment_event(self, event_type: str, data: Dict[str, Any]):
         """Handle payment-related events"""
         # Implement payment event handling
@@ -635,8 +693,48 @@ class PaymentService:
     
     def _handle_invoice_event(self, event_type: str, data: Dict[str, Any]):
         """Handle invoice-related events"""
-        # Implement invoice event handling
-        pass
+        from apps.companies.models import Company
+        
+        invoice = data['object']
+        
+        if event_type == 'invoice.payment_succeeded':
+            # Payment successful - ensure subscription is active
+            subscription_id = invoice.get('subscription')
+            if subscription_id:
+                try:
+                    company = Company.objects.get(subscription_id=subscription_id)
+                    company.subscription_status = 'active'
+                    company.save()
+                    
+                    # Log payment
+                    PaymentHistory.objects.create(
+                        company=company,
+                        subscription_plan=company.subscription_plan,
+                        transaction_type='subscription',
+                        amount=Decimal(invoice['amount_paid']) / 100,  # Convert from cents
+                        currency='BRL',
+                        status='paid',
+                        description=f'Pagamento recorrente - {company.subscription_plan.name}',
+                        transaction_date=timezone.now(),
+                        paid_at=timezone.now(),
+                        stripe_invoice_id=invoice['id']
+                    )
+                except Company.DoesNotExist:
+                    logger.warning(f"Company not found for subscription {subscription_id}")
+                    
+        elif event_type == 'invoice.payment_failed':
+            # Payment failed - update subscription status
+            subscription_id = invoice.get('subscription')
+            if subscription_id:
+                try:
+                    company = Company.objects.get(subscription_id=subscription_id)
+                    company.subscription_status = 'past_due'
+                    company.save()
+                    
+                    # TODO: Send email notification about failed payment
+                    
+                except Company.DoesNotExist:
+                    logger.warning(f"Company not found for subscription {subscription_id}")
 
     def update_subscription(self, company, new_plan, billing_cycle='monthly'):
         """Update subscription with proration"""
