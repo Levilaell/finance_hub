@@ -151,6 +151,10 @@ class PluggyTransactionSyncService:
             # Update account balance
             await self._update_account_balance(account)
             
+            # Update transaction counter if new transactions were added
+            if total_transactions > 0:
+                await self._update_transaction_counter(account, total_transactions)
+            
             logger.info(f"✅ Synced {total_transactions} transactions for Pluggy account {account_info['id']}")
             
             return {
