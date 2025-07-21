@@ -194,6 +194,17 @@ def custom_exception_handler(exc, context):
             status=status.HTTP_400_BAD_REQUEST
         )
     
+    # Handle DRF validation errors
+    if isinstance(exc, DRFValidationError):
+        return Response(
+            format_error_response(
+                'validation_error',
+                'Erro de validação nos dados fornecidos.',
+                field_errors=exc.detail
+            ),
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
     # Handle permission errors
     if isinstance(exc, (PermissionDenied, DRFPermissionDenied)):
         return Response(
