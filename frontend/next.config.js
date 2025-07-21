@@ -36,7 +36,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai",
               "img-src 'self' data: blob: https://*.pluggy.ai https://*.pluggycdn.com",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.pluggy.ai https://api.pluggy.ai",
+              "connect-src 'self' https://*.pluggy.ai https://api.pluggy.ai https://finance-backend-production-29df.up.railway.app",
               "frame-src 'self' https://*.pluggy.ai https://connect.pluggy.ai",
               "frame-ancestors 'none'",
               "base-uri 'self'",
