@@ -13,7 +13,9 @@ from apps.companies.health import health_check
 from django.contrib.auth import get_user_model
 
 def seed_plans_temp(request):
-    if request.GET.get('secret') != 'temp-seed-2025':
+    from django.conf import settings
+    required_secret = getattr(settings, 'SEED_PLANS_SECRET', None)
+    if not required_secret or request.GET.get('secret') != required_secret:
         return JsonResponse({'error': 'Unauthorized'})
     
     from django.core.management import call_command

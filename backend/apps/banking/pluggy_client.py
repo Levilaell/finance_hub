@@ -4,6 +4,8 @@ Replaces Open Banking Brasil with Pluggy's unified API
 """
 import asyncio
 import logging
+import time
+import random
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from urllib.parse import urlencode
@@ -33,6 +35,61 @@ class PluggyAPIError(PluggyError):
 class PluggyRateLimitError(PluggyError):
     """Rate limit exceeded"""
     pass
+
+
+def is_retryable_error(status_code: int, error_response: dict = None) -> bool:
+    """Determine if an error is retryable"""
+    # Retryable HTTP status codes
+    retryable_codes = {429, 500, 502, 503, 504}
+    if status_code in retryable_codes:
+        return True
+    
+    # Check for specific Pluggy error codes that are retryable
+    if error_response and isinstance(error_response, dict):
+        error_code = error_response.get('code', '')
+        retryable_error_codes = {
+            'ITEM_NOT_READY',
+            'ITEM_UPDATING',
+            'TEMPORARY_ERROR',
+            'BANK_UNAVAILABLE'
+        }
+        if error_code in retryable_error_codes:
+            return True
+    
+    return False
+
+
+async def retry_with_backoff(func, max_retries: int = 3, base_delay: float = 1.0):
+    """Retry a function with exponential backoff"""
+    last_exception = None
+    
+    for attempt in range(max_retries + 1):
+        try:
+            return await func()
+        except (httpx.TimeoutException, httpx.ConnectError, PluggyRateLimitError) as e:
+            last_exception = e
+            if attempt == max_retries:
+                break
+                
+            # Exponential backoff with jitter
+            delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+            logger.warning(f"Attempt {attempt + 1} failed, retrying in {delay:.2f}s: {e}")
+            await asyncio.sleep(delay)
+            
+        except PluggyAPIError as e:
+            # Only retry if the error is retryable
+            if not hasattr(e, 'is_retryable') or not e.is_retryable:
+                raise
+                
+            last_exception = e
+            if attempt == max_retries:
+                break
+                
+            delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+            logger.warning(f"Attempt {attempt + 1} failed with retryable error, retrying in {delay:.2f}s: {e}")
+            await asyncio.sleep(delay)
+    
+    raise last_exception
 
 
 class PluggyClient:

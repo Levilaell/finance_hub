@@ -137,7 +137,14 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/hour',
-        'user': '1000/hour'
+        'user': '1000/hour',
+        'login': '5/minute',
+        'register': '3/minute', 
+        'password_reset': '5/hour',
+        'ai_requests': '10/minute',
+        'bank_sync': '20/hour',
+        'payment_operations': '30/hour',
+        'webhook': '200/hour'
     },
     'EXCEPTION_HANDLER': 'core.error_handlers.custom_exception_handler'
 }

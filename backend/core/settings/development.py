@@ -129,6 +129,9 @@ MERCADOPAGO_WEBHOOK_SECRET = config('MERCADOPAGO_WEBHOOK_SECRET', default='')
 # Trial Period Settings
 TRIAL_PERIOD_DAYS = config('TRIAL_PERIOD_DAYS', default=14, cast=int)
 
+# Security - Admin endpoints
+SEED_PLANS_SECRET = config('SEED_PLANS_SECRET', default='')
+
 # Billing Configuration
 ENABLE_AUTO_RENEWAL = config('ENABLE_AUTO_RENEWAL', default=True, cast=bool)
 PAYMENT_RETRY_ATTEMPTS = config('PAYMENT_RETRY_ATTEMPTS', default=3, cast=int)

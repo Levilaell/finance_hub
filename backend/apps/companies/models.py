@@ -257,6 +257,22 @@ class Company(models.Model):
         db_table = 'companies'
         verbose_name = _('Company')
         verbose_name_plural = _('Companies')
+        indexes = [
+            # Subscription and billing queries
+            models.Index(fields=['subscription_plan', 'subscription_status']),
+            models.Index(fields=['subscription_status', 'trial_ends_at']),
+            models.Index(fields=['next_billing_date', 'subscription_status']),
+            
+            # Usage tracking queries  
+            models.Index(fields=['last_usage_reset', 'is_active']),
+            models.Index(fields=['current_month_transactions', 'subscription_plan']),
+            models.Index(fields=['current_month_ai_requests', 'subscription_plan']),
+            
+            # Business queries
+            models.Index(fields=['cnpj']),  # Already unique but good for lookups
+            models.Index(fields=['is_active', 'created_at']),
+            models.Index(fields=['company_type', 'business_sector']),
+        ]
     
     def __str__(self):
         return self.name
@@ -601,6 +617,22 @@ class PaymentHistory(models.Model):
         verbose_name = _('Payment History')
         verbose_name_plural = _('Payment History')
         ordering = ['-transaction_date']
+        indexes = [
+            # Company payment history queries
+            models.Index(fields=['company', 'transaction_date']),
+            models.Index(fields=['company', 'status', 'transaction_date']),
+            models.Index(fields=['company', 'transaction_type']),
+            
+            # Payment processing queries
+            models.Index(fields=['stripe_payment_intent_id']),
+            models.Index(fields=['stripe_invoice_id']),
+            models.Index(fields=['mercadopago_payment_id']),
+            models.Index(fields=['invoice_number']),
+            models.Index(fields=['status', 'transaction_date']),
+            
+            # Reconciliation queries
+            models.Index(fields=['created_at', 'status']),
+        ]
     
     def __str__(self):
         return f"{self.company.name} - {self.description} - {self.get_status_display()}"

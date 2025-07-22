@@ -1,4 +1,5 @@
 from django.urls import path
+from django.conf import settings
 
 from .views import (
     ChangePasswordView,
@@ -23,7 +24,6 @@ app_name = 'authentication'
 urlpatterns = [
     # Authentication
     path('register/', RegisterView.as_view(), name='register'),
-    path('register/debug/', DebugRegisterView.as_view(), name='register_debug'),
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),
@@ -46,3 +46,9 @@ urlpatterns = [
     path('2fa/enable/', Enable2FAView.as_view(), name='enable_2fa'),
     path('2fa/disable/', Disable2FAView.as_view(), name='disable_2fa'),
 ]
+
+# Debug endpoints only in development
+if settings.DEBUG:
+    urlpatterns += [
+        path('register/debug/', DebugRegisterView.as_view(), name='register_debug'),
+    ]

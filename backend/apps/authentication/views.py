@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
@@ -77,12 +78,24 @@ class DebugRegisterView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+# Custom throttle classes  
+class LoginRateThrottle(AnonRateThrottle):
+    scope = 'login'
+
+class RegisterRateThrottle(AnonRateThrottle):
+    scope = 'register'
+
+class PasswordResetRateThrottle(AnonRateThrottle):
+    scope = 'password_reset'
+
+
 @method_decorator(ratelimit(key='ip', rate='5/m', method='POST'), name='dispatch')
 class RegisterView(generics.CreateAPIView):
     """User registration with company creation"""
     queryset = User.objects.all()
     permission_classes = (AllowAny,)
     serializer_class = RegisterSerializer
+    throttle_classes = [RegisterRateThrottle]
     
     def create(self, request, *args, **kwargs):
         import logging
@@ -134,6 +147,7 @@ class LoginView(APIView):
     """User login"""
     permission_classes = (AllowAny,)
     serializer_class = LoginSerializer
+    throttle_classes = [LoginRateThrottle]
     
     def post(self, request):
         serializer = self.serializer_class(data=request.data)

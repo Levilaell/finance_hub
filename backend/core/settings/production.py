@@ -22,9 +22,17 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
 
 # Database - Correção principal aqui!
 import dj_database_url
+
+DATABASE_URL = config('DATABASE_URL', default=None)
+if not DATABASE_URL:
+    raise ValueError(
+        "DATABASE_URL environment variable is required in production. "
+        "Please set it to your PostgreSQL connection string."
+    )
+
 DATABASES = {
     'default': dj_database_url.config(
-        default=config('DATABASE_URL'),
+        default=DATABASE_URL,
         conn_max_age=600,
         conn_health_checks=True,
     )
