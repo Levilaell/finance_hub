@@ -61,17 +61,17 @@ class BankAccountAdmin(admin.ModelAdmin):
         ('🔌 Integração Pluggy', {
             'fields': (
                 'pluggy_connection_status', 'external_id', 'pluggy_item_id',
-                'pluggy_item_status_info', 'sync_status', 'sync_error_message'
+                'pluggy_item_status_info'
             ),
             'description': 'Status da conexão com a Pluggy. Items ACTIVE recebem webhooks automáticos.'
         }),
         ('Configurações', {
-            'fields': ('is_primary', 'is_active', 'status', 'last_sync_at', 'sync_frequency')
+            'fields': ('is_primary', 'is_active', 'status', 'last_sync_at', 'sync_frequency', 'token_expires_at')
         }),
     )
     
     readonly_fields = [
-        'last_sync_at', 'created_at', 'updated_at', 
+        'last_sync_at', 'created_at', 'updated_at', 'token_expires_at',
         'pluggy_connection_status', 'pluggy_item_status_info'
     ]
     
