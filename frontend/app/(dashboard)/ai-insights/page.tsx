@@ -1174,7 +1174,7 @@ export default function AIInsightsPage() {
                     Gere Sua Primeira Análise com IA
                   </h3>
                   <p className="text-gray-500 mb-6">
-                    Clique no botão "Gerar Análise com IA" acima para obter insights inteligentes sobre o período selecionado.
+                    Clique no botão &quot;Gerar Análise com IA&quot; acima para obter insights inteligentes sobre o período selecionado.
                   </p>
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
                     <strong>Dica:</strong> Nossa IA analisará suas transações e fornecerá insights valiosos sobre padrões de gastos, oportunidades de economia e previsões financeiras.
