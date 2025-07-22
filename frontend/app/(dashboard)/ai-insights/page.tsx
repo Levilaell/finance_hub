@@ -36,6 +36,7 @@ import {
   LockClosedIcon,
   ClockIcon,
   BookmarkIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 
 // Types
@@ -373,6 +374,18 @@ function AIAnalysesSection() {
     }
   });
 
+  // Delete analysis mutation
+  const deleteAnalysisMutation = useMutation({
+    mutationFn: (id: number) => aiAnalysisService.delete(id),
+    onSuccess: () => {
+      refetchAnalyses();
+      toast.success('Análise excluída com sucesso!');
+    },
+    onError: () => {
+      toast.error('Erro ao excluir análise');
+    }
+  });
+
   // Listen for refetch event
   useEffect(() => {
     const handleRefetch = () => {
@@ -491,6 +504,7 @@ function AIAnalysesSection() {
                     size="sm"
                     onClick={() => toggleFavoriteMutation.mutate(analysis.id)}
                     disabled={toggleFavoriteMutation.isPending}
+                    title={analysis.is_favorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
                   >
                     <CheckCircleIcon className={cn(
                       "h-4 w-4",
@@ -507,6 +521,20 @@ function AIAnalysesSection() {
                   >
                     <SparklesIcon className="h-4 w-4 mr-1" />
                     Ver Detalhes
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (confirm(`Tem certeza que deseja excluir a análise "${analysis.title}"?`)) {
+                        deleteAnalysisMutation.mutate(analysis.id);
+                      }
+                    }}
+                    disabled={deleteAnalysisMutation.isPending}
+                    title="Excluir análise"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <TrashIcon className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
