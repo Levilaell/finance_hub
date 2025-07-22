@@ -863,9 +863,15 @@ class PaymentService:
             return self.create_subscription(company, new_plan, billing_cycle)
         
         try:
-            # Get correct price ID
+            # Get correct price ID based on billing cycle
             if self.gateway_name == 'stripe':
-                price_id = new_plan.stripe_price_id
+                if billing_cycle == 'yearly':
+                    price_id = new_plan.stripe_price_id_yearly
+                else:
+                    price_id = new_plan.stripe_price_id_monthly
+                    
+                if not price_id:
+                    raise ValueError(f"Stripe price ID not configured for {billing_cycle} billing")
             else:
                 price_id = new_plan.mercadopago_plan_id
             

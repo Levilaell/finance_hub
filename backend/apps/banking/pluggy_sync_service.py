@@ -72,7 +72,12 @@ class PluggyTransactionSyncService:
             raise
     
     async def sync_account_transactions(self, account: BankAccount) -> Dict[str, Any]:
-        """Sync transactions for a specific Pluggy account"""
+        """Sync transactions for a specific Pluggy account
+        
+        IMPORTANTE: A API da Pluggy pode ter um delay de alguns minutos para disponibilizar
+        transações muito recentes. Por isso, usamos janelas de tempo maiores em syncs frequentes
+        para garantir que pegamos todas as transações, mesmo as que foram processadas com delay.
+        """
         try:
             # Get account info asynchronously
             account_info = await self._get_account_info(account)
@@ -207,19 +212,26 @@ class PluggyTransactionSyncService:
             
             return (timezone.now() - timedelta(days=days)).date()
         else:
-            # SYNC INCREMENTAL: 1 dia de overlap
+            # SYNC INCREMENTAL: janela maior para capturar transações recentes
             days_since_sync = (timezone.now() - last_sync).days
+            hours_since_sync = (timezone.now() - last_sync).total_seconds() / 3600
             
             if days_since_sync > 30:
                 # Se muito tempo sem sync, buscar 30 dias para não perder nada
                 logger.info(f"⚠️ Long gap ({days_since_sync} days), using 30 days")
                 return (timezone.now() - timedelta(days=30)).date()
+            elif hours_since_sync < 24:
+                # SYNC MUITO RECENTE: usar janela otimizada para capturar transações
+                # que podem ter delay na API da Pluggy (geralmente alguns minutos)
+                days_back = 2  # 2 dias é suficiente para cobrir delays e timezone
+                logger.info(f"🔄 Recent sync ({hours_since_sync:.1f} hours ago), using {days_back} days to catch delayed transactions")
+                return (timezone.now() - timedelta(days=days_back)).date()
             else:
-                # Incremental normal - sempre buscar pelo menos 5 dias
+                # Incremental normal - sempre buscar pelo menos 3 dias
                 # para garantir que não perdemos transações com data retroativa
                 # e considerar problemas de timezone (UTC vs Brasil)
-                min_days_back = 5  # Aumentado de 3 para 5
-                days_back = max(days_since_sync + 2, min_days_back)  # +2 ao invés de +1
+                min_days_back = 3  # 3 dias cobre finais de semana e feriados
+                days_back = max(days_since_sync + 1, min_days_back)  # +1 dia de overlap
                 logger.info(f"🔄 Incremental sync, {days_since_sync} days since last sync, fetching {days_back} days")
                 return (timezone.now() - timedelta(days=days_back)).date()
 

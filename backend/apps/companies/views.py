@@ -35,7 +35,7 @@ class SubscriptionPlansView(generics.ListAPIView):
 
 
 class UpgradeSubscriptionView(APIView):
-    """Upgrade company subscription"""
+    """Upgrade/Downgrade company subscription"""
     permission_classes = [permissions.IsAuthenticated]
     
     def post(self, request):
@@ -68,40 +68,77 @@ class UpgradeSubscriptionView(APIView):
             return Response({
                 'error': 'User is not associated with any company'
             }, status=status.HTTP_400_BAD_REQUEST)
+            
         new_plan = SubscriptionPlan.objects.get(
             id=serializer.validated_data['plan_id']
         )
+        billing_cycle = serializer.validated_data.get('billing_cycle', company.billing_cycle or 'monthly')
         
-        # Update subscription
-        company.subscription_plan = new_plan
-        company.subscription_status = 'active'
-        company.save()
+        # Check if it's actually a change
+        if company.subscription_plan and company.subscription_plan.id == new_plan.id and company.billing_cycle == billing_cycle:
+            return Response({
+                'error': 'Already on this plan with same billing cycle'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Integrate with payment provider
+        # Check if user has active subscription
+        if company.subscription_status not in ['active', 'trialing']:
+            return Response({
+                'error': 'No active subscription to update. Please create a new subscription.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         from apps.payments.payment_service import PaymentService
+        payment_service = PaymentService()
+        
+        # Calculate proration
+        proration = payment_service.calculate_proration(
+            company, new_plan, billing_cycle
+        )
+        
+        logger.info(f"Upgrade/Downgrade - Company: {company.id}, Current: {company.subscription_plan.name}, New: {new_plan.name}")
+        logger.info(f"Proration: {proration}")
         
         try:
-            payment_service = PaymentService()
-            result = payment_service.create_subscription(company, new_plan)
-            
-            # Return payment intent for frontend to complete
-            return Response({
-                'message': 'Subscription upgrade initiated',
-                'new_plan': SubscriptionPlanSerializer(new_plan).data,
-                'payment_intent': result.get('client_secret'),  # For Stripe
-                'payment_url': result.get('init_point'),  # For MercadoPago
-                'subscription_id': result['subscription_id']
-            })
+            if company.subscription_id:
+                # Existing subscription - update with payment provider
+                result = payment_service.update_subscription(
+                    company, new_plan, billing_cycle
+                )
+                
+                # Log the change
+                from ..companies.models import PaymentHistory
+                PaymentHistory.objects.create(
+                    company=company,
+                    subscription_plan=new_plan,
+                    transaction_type='plan_change',
+                    amount=abs(proration['net_amount']),
+                    currency='BRL',
+                    status='pending' if proration['net_amount'] > 0 else 'completed',
+                    description=f"{'Upgrade' if proration['net_amount'] > 0 else 'Downgrade'} de {proration['current_plan']} para {proration['new_plan']}",
+                    transaction_date=timezone.now()
+                )
+                
+                return Response({
+                    'message': f"Subscription {'upgraded' if proration['net_amount'] > 0 else 'downgraded'} successfully",
+                    'new_plan': SubscriptionPlanSerializer(new_plan).data,
+                    'proration': proration,
+                    'payment_required': proration['net_amount'] > 0,
+                    'credit_applied': proration['net_amount'] < 0,
+                    'amount': abs(proration['net_amount'])
+                })
+            else:
+                # No subscription ID but active status - need to create checkout
+                # This can happen for manual activations or legacy data
+                return Response({
+                    'error': 'Subscription ID not found. Please contact support or create a new subscription.',
+                    'redirect': '/settings'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
         except Exception as e:
-            logger.error(f"Payment error: {e}")
+            logger.error(f"Upgrade/Downgrade error: {e}", exc_info=True)
             return Response({
-                'error': 'Payment processing failed. Please try again.'
+                'error': 'Failed to update subscription. Please try again.',
+                'detail': str(e) if settings.DEBUG else None
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        return Response({
-            'message': 'Subscription upgraded successfully',
-            'new_plan': SubscriptionPlanSerializer(new_plan).data
-        })
 
 
 class CancelSubscriptionView(APIView):
