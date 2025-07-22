@@ -670,6 +670,13 @@ class PaymentService:
         logger.info(f"Metadata: {metadata}")
         logger.info("="*50)
         
+        # Validate metadata
+        from .security_fixes import WebhookSecurity
+        if not WebhookSecurity.validate_metadata(metadata):
+            logger.error(f"Invalid metadata in checkout session: {session['id']}")
+            logger.error(f"Metadata received: {metadata}")
+            return
+        
         # Get company and plan from metadata
         company_id = metadata.get('company_id')
         plan_id = metadata.get('plan_id')
@@ -677,11 +684,6 @@ class PaymentService:
         user_id = metadata.get('user_id')
         
         logger.info(f"Extracted - Company: {company_id}, Plan: {plan_id}, Cycle: {billing_cycle}")
-        
-        if not company_id or not plan_id:
-            logger.error(f"Missing metadata in checkout session: {session['id']}")
-            logger.error(f"Full session data: {session}")
-            return
         
         try:
             company = Company.objects.get(id=company_id)
@@ -1047,6 +1049,9 @@ class PaymentService:
             
             logger.warning(f"Payment failed for company {company.id}")
             
+            # Send alert for failed payment
+            self._send_payment_failure_alert(company, charge)
+            
         except User.DoesNotExist:
             logger.error(f"User not found for customer {customer_id}")
         except Exception as e:
@@ -1078,6 +1083,34 @@ class PaymentService:
             logger.error(f"Company not found for subscription {subscription_id}")
         except Exception as e:
             logger.error(f"Error handling trial ending notification: {e}", exc_info=True)
+    
+    def _send_payment_failure_alert(self, company, charge_data: Dict[str, Any]):
+        """Send alerts for payment failures"""
+        try:
+            # Email to company owner
+            from apps.notifications.email_service import EmailService
+            email_service = EmailService()
+            
+            email_service.send_payment_failed_notification(
+                email=company.owner.email,
+                company_name=company.name,
+                owner_name=company.owner.get_full_name(),
+                amount=Decimal(charge_data['amount']) / 100,
+                failure_reason=charge_data.get('failure_message', 'Erro no processamento do pagamento'),
+                last_four=charge_data.get('payment_method_details', {}).get('card', {}).get('last4', '****')
+            )
+            
+            # Alert to admin (could be Slack, Discord, etc)
+            logger.critical(f"PAYMENT FAILURE ALERT - Company: {company.name} (ID: {company.id}), Amount: {charge_data['amount']/100} {charge_data['currency']}")
+            
+            # You could add more alert channels here:
+            # - Slack webhook
+            # - Discord notification
+            # - SMS alert
+            # - Create admin task
+            
+        except Exception as e:
+            logger.error(f"Error sending payment failure alert: {e}", exc_info=True)
     
     def cancel_subscription(self, subscription_id: str, immediately: bool = False) -> Dict[str, Any]:
         """Cancel subscription in payment gateway"""

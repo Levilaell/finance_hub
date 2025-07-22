@@ -162,3 +162,74 @@ class SubscriptionValidation:
             'net_amount': round(charge - credit, 2),
             'days_remaining': days_remaining
         }
+
+
+class WebhookRetry:
+    """Retry logic for webhook processing"""
+    
+    @staticmethod
+    def retry_with_backoff(func, max_retries: int = 3, base_delay: int = 1):
+        """Retry function with exponential backoff"""
+        import time
+        
+        for attempt in range(max_retries):
+            try:
+                return func()
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    logger.error(f"Max retries reached for {func.__name__}: {e}")
+                    raise
+                
+                delay = base_delay * (2 ** attempt)  # Exponential backoff
+                logger.warning(f"Attempt {attempt + 1} failed, retrying in {delay}s: {e}")
+                time.sleep(delay)
+        
+        return None
+
+
+class UsageLimitsCache:
+    """Cache for usage limits to reduce database queries"""
+    
+    @staticmethod
+    def get_cached_limits(company_id: int) -> Dict[str, Any]:
+        """Get cached usage limits"""
+        cache_key = f"usage_limits:{company_id}"
+        cached = cache.get(cache_key)
+        
+        if cached:
+            return cached
+        
+        # Fetch from database if not cached
+        from apps.companies.models import Company
+        try:
+            company = Company.objects.select_related('subscription_plan').get(id=company_id)
+            limits = {
+                'transactions': {
+                    'used': company.current_month_transactions,
+                    'limit': company.subscription_plan.max_transactions if company.subscription_plan else 0,
+                    'unlimited': company.subscription_plan.max_transactions == 999999 if company.subscription_plan else False
+                },
+                'ai_requests': {
+                    'used': company.current_month_ai_requests,
+                    'limit': company.subscription_plan.max_ai_requests_per_month if company.subscription_plan else 0,
+                    'unlimited': company.subscription_plan.max_ai_requests_per_month == 999999 if company.subscription_plan else False
+                },
+                'bank_accounts': {
+                    'used': company.active_bank_accounts_count,
+                    'limit': company.subscription_plan.max_bank_accounts if company.subscription_plan else 0,
+                    'unlimited': company.subscription_plan.max_bank_accounts == 999 if company.subscription_plan else False
+                }
+            }
+            
+            # Cache for 5 minutes
+            cache.set(cache_key, limits, 300)
+            return limits
+            
+        except Company.DoesNotExist:
+            return {}
+    
+    @staticmethod
+    def invalidate_cache(company_id: int):
+        """Invalidate cached limits when usage changes"""
+        cache_key = f"usage_limits:{company_id}"
+        cache.delete(cache_key)
