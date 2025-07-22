@@ -1,9 +1,10 @@
 // frontend/hooks/usePlanLimits.ts
 'use client';
 
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
+import { Button } from '@/components/ui/button';
 
 interface LimitError {
   error: string;
@@ -21,7 +22,6 @@ interface LimitError {
 }
 
 export function usePlanLimits() {
-  const { toast } = useToast();
   const router = useRouter();
   
   const handleLimitError = useCallback((error: LimitError | any) => {
@@ -58,25 +58,18 @@ export function usePlanLimits() {
     };
     
     // Mostrar toast com ação
-    toast({
-      title: message.title,
+    toast.error(message.title, {
       description: message.description,
-      variant: 'destructive',
-      action: (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            router.push(error.redirect || '/dashboard/subscription/upgrade');
-          }}
-        >
-          {message.action}
-        </Button>
-      ),
+      action: {
+        label: message.action,
+        onClick: () => {
+          router.push(error.redirect || '/dashboard/subscription/upgrade');
+        }
+      },
     });
     
     return true;
-  }, [toast, router]);
+  }, [router]);
   
   const checkCanProceed = useCallback((
     type: 'transactions' | 'bank_accounts' | 'ai_requests',
@@ -112,7 +105,6 @@ export function usePlanLimits() {
 // Hook para interceptar respostas de API e tratar erros de limite
 export function useApiWithLimits() {
   const { handleLimitError } = usePlanLimits();
-  const { toast } = useToast();
   
   const apiCall = useCallback(async <T,>(
     fn: () => Promise<T>,
@@ -127,10 +119,7 @@ export function useApiWithLimits() {
       const result = await fn();
       
       if (options?.showSuccessToast) {
-        toast({
-          title: 'Sucesso',
-          description: options.successMessage || 'Operação realizada com sucesso',
-        });
+        toast.success(options.successMessage || 'Operação realizada com sucesso');
       }
       
       options?.onSuccess?.(result);
@@ -141,19 +130,13 @@ export function useApiWithLimits() {
       
       // Se não for erro de limite, mostra erro genérico
       if (!isLimitError) {
-        toast({
-          title: 'Erro',
-          description: error.response?.data?.message || error.message || 'Ocorreu um erro',
-          variant: 'destructive',
-        });
+        toast.error(error.response?.data?.message || error.message || 'Ocorreu um erro');
       }
       
       options?.onError?.(error);
       return null;
     }
-  }, [handleLimitError, toast]);
+  }, [handleLimitError]);
   
   return { apiCall };
 }
-
-import { Button } from '@/components/ui/button';
