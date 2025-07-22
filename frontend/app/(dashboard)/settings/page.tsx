@@ -981,12 +981,15 @@ export default function SettingsPage() {
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <Button 
-                    className="w-full sm:w-auto"
-                    onClick={() => setUpgradePlanDialogOpen(true)}
-                  >
-                    Fazer Upgrade
-                  </Button>
+                  {/* Only show upgrade button if not on enterprise plan */}
+                  {user?.company?.subscription_plan?.plan_type !== 'enterprise' && (
+                    <Button 
+                      className="w-full sm:w-auto"
+                      onClick={() => setUpgradePlanDialogOpen(true)}
+                    >
+                      Fazer Upgrade
+                    </Button>
+                  )}
                   <Button 
                     variant="outline" 
                     className="w-full sm:w-auto"

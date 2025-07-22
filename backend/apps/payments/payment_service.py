@@ -669,11 +669,26 @@ class PaymentService:
             company.subscription_start_date = timezone.now()
             
             # Calculate next billing date
+            current_date = timezone.now().date()
             if billing_cycle == 'yearly':
-                company.next_billing_date = timezone.now().date() + timedelta(days=365)
+                # Add exactly one year
+                try:
+                    company.next_billing_date = current_date.replace(year=current_date.year + 1)
+                except ValueError:
+                    # Handle February 29 in leap years
+                    company.next_billing_date = current_date.replace(year=current_date.year + 1, day=28)
             else:
-                next_month = timezone.now().date().replace(day=1) + timedelta(days=32)
-                company.next_billing_date = next_month.replace(day=1)
+                # Add exactly one month
+                if current_date.month == 12:
+                    company.next_billing_date = current_date.replace(year=current_date.year + 1, month=1)
+                else:
+                    try:
+                        company.next_billing_date = current_date.replace(month=current_date.month + 1)
+                    except ValueError:
+                        # Handle days that don't exist in next month (e.g., Jan 31 -> Feb 28/29)
+                        next_month = current_date.month + 1
+                        company.next_billing_date = current_date.replace(month=next_month, day=1) + timedelta(days=31)
+                        company.next_billing_date = company.next_billing_date.replace(day=1) - timedelta(days=1)
             
             company.save()
             
@@ -689,10 +704,37 @@ class PaymentService:
                 currency='BRL',
                 status='paid',
                 description=f'Assinatura {plan.name} - Ciclo {billing_cycle}',
+                invoice_number=f'INV-{timezone.now().strftime("%Y%m")}-{company.id:04d}',
                 transaction_date=timezone.now(),
                 paid_at=timezone.now(),
-                stripe_payment_intent_id=session.get('payment_intent')
+                stripe_payment_intent_id=session.get('payment_intent'),
+                payment_method_display='Cartão de Crédito'
             )
+            
+            # Create payment method from session data if available
+            if session.get('payment_method_details'):
+                payment_details = session['payment_method_details']
+                if payment_details.get('card'):
+                    card = payment_details['card']
+                    # Check if payment method already exists
+                    existing_method = PaymentMethod.objects.filter(
+                        company=company,
+                        last_four=card.get('last4'),
+                        is_active=True
+                    ).first()
+                    
+                    if not existing_method:
+                        PaymentMethod.objects.create(
+                            company=company,
+                            payment_type='credit_card',
+                            card_brand=card.get('brand', '').upper(),
+                            last_four=card.get('last4'),
+                            exp_month=card.get('exp_month'),
+                            exp_year=card.get('exp_year'),
+                            stripe_payment_method_id=session.get('payment_method'),
+                            is_default=True,
+                            is_active=True
+                        )
             
             logger.info(f"Payment history created - ID: {payment.id}")
             logger.info(f"✅ Subscription activated for company {company.name}")
