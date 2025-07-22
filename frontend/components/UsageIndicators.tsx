@@ -1,6 +1,7 @@
 // frontend/components/UsageIndicators.tsx
 'use client';
 
+import { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -15,6 +16,7 @@ import {
   Zap
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/store/auth-store';
 import type { Company } from '@/types';
 
 interface UsageIndicatorProps {
@@ -291,7 +293,29 @@ export function BankAccountUsageIndicator({ company }: UsageIndicatorProps) {
 // UserUsageIndicator removed - not implemented feature
 
 // Componente combinado para mostrar todos os indicadores
-export function UsageIndicators({ company }: UsageIndicatorProps) {
+export function UsageIndicators({ company: initialCompany }: UsageIndicatorProps) {
+  const { user, fetchUser } = useAuthStore();
+  
+  // Use the most up-to-date company data
+  const company = user?.company || initialCompany;
+  
+  useEffect(() => {
+    // Listen for subscription updates
+    const handleSubscriptionUpdate = async () => {
+      try {
+        await fetchUser();
+      } catch (error) {
+        console.error('Error fetching updated user data:', error);
+      }
+    };
+    
+    window.addEventListener('subscription-updated', handleSubscriptionUpdate);
+    
+    return () => {
+      window.removeEventListener('subscription-updated', handleSubscriptionUpdate);
+    };
+  }, [fetchUser]);
+  
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <TransactionUsageIndicator company={company} />

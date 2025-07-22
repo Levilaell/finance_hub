@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -61,6 +61,7 @@ import {
   BanknotesIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
+import { useSubscriptionUpdates } from '@/hooks/useSubscriptionUpdates';
 
 interface ProfileForm {
   first_name: string;
@@ -81,7 +82,10 @@ interface DeleteAccountForm {
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
-  const { user, updateUser } = useAuthStore();
+  const { user, updateUser, fetchUser } = useAuthStore();
+  
+  // Listen for subscription updates
+  useSubscriptionUpdates();
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -124,11 +128,24 @@ export default function SettingsPage() {
   const { subscriptionStatus, isLoading: isLoadingSubscription } = useSubscriptionCheck();
 
   // Usage limits query
-  const { data: usageLimits, isLoading: isLoadingLimits } = useQuery({
+  const { data: usageLimits, isLoading: isLoadingLimits, refetch: refetchLimits } = useQuery({
     queryKey: ['usage-limits'],
     queryFn: () => subscriptionService.getUsageLimits(),
     refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
   });
+  
+  // Listen for subscription update events
+  useEffect(() => {
+    const handleSubscriptionUpdate = async () => {
+      await fetchUser();
+      await refetchLimits();
+      queryClient.invalidateQueries({ queryKey: ['subscription-status'] });
+      queryClient.invalidateQueries({ queryKey: ['performance-metrics'] });
+    };
+    
+    window.addEventListener('subscription-updated', handleSubscriptionUpdate);
+    return () => window.removeEventListener('subscription-updated', handleSubscriptionUpdate);
+  }, [fetchUser, refetchLimits, queryClient]);
 
   // Performance metrics query
   const { data: performanceMetrics, isLoading: isLoadingMetrics } = useQuery({

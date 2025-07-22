@@ -11,6 +11,7 @@ import { ErrorMessage } from '@/components/ui/error-message';
 import { HydrationBoundary } from '@/components/hydration-boundary';
 import Link from 'next/link';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { useSubscriptionUpdates } from '@/hooks/useSubscriptionUpdates';
 import { 
   ArrowUpIcon, 
   ArrowDownIcon,
@@ -23,6 +24,7 @@ import {
   ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline';
 import { UsageIndicators } from '@/components/UsageIndicators';
+import { RefreshDataButton } from '@/components/RefreshDataButton';
 
 interface DashboardData {
   current_balance: number;
@@ -134,6 +136,9 @@ export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Listen for subscription updates
+  useSubscriptionUpdates();
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -160,6 +165,17 @@ export default function DashboardPage() {
     fetchDashboardData();
     fetchAccounts();
   }, [isAuthenticated, fetchAccounts, router, fetchDashboardData]);
+  
+  // Refetch dashboard data when subscription is updated
+  useEffect(() => {
+    const handleUpdate = () => {
+      fetchDashboardData();
+      fetchAccounts();
+    };
+    
+    window.addEventListener('subscription-updated', handleUpdate);
+    return () => window.removeEventListener('subscription-updated', handleUpdate);
+  }, [fetchDashboardData, fetchAccounts]);
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
@@ -207,13 +223,17 @@ export default function DashboardPage() {
     <HydrationBoundary>
       <div className="space-y-6">
         {/* Welcome Section */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Olá, {user?.first_name || user?.email?.split('@')[0]}! 👋
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Aqui está o resumo da sua situação financeira
-          </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Olá, {user?.first_name || user?.email?.split('@')[0]}! 👋
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Aqui está o resumo da sua situação financeira
+            </p>
+          </div>
+          {/* Temporary refresh button */}
+          <RefreshDataButton />
         </div>
 
       {/* Main Stats */}

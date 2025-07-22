@@ -2,17 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { CheckCircleIcon, XCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { paymentService } from '@/services/payment.service';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/store/auth-store';
 
 export default function PaymentSuccessPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const { fetchUser } = useAuthStore();
   const [paymentStatus, setPaymentStatus] = useState<'checking' | 'success' | 'pending' | 'failed'>('checking');
   
   const validatePaymentMutation = useMutation({
@@ -29,16 +32,36 @@ export default function PaymentSuccessPage() {
         payment_id: paymentId || undefined,
       });
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       setPaymentStatus(data.status);
       
       if (data.status === 'success') {
         toast.success('Pagamento confirmado! Sua assinatura está ativa.');
         
-        // Force reload to update all cached data including auth context
-        setTimeout(() => {
+        // Clear all caches and force refresh user data
+        try {
+          // Clear localStorage and sessionStorage
+          localStorage.clear();
+          sessionStorage.clear();
+          
+          // Clear React Query cache
+          queryClient.clear();
+          
+          // Force fetch fresh user data
+          await fetchUser();
+          
+          // Dispatch event to notify all components
+          window.dispatchEvent(new CustomEvent('subscription-updated'));
+          
+          // Force reload to ensure all components are refreshed
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 2000);
+        } catch (error) {
+          console.error('Error refreshing data:', error);
+          // Still redirect even if refresh fails
           window.location.href = '/dashboard';
-        }, 3000);
+        }
       } else if (data.status === 'pending') {
         toast.info('Pagamento pendente. Você receberá uma confirmação por email.');
       } else {

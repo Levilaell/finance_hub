@@ -10,6 +10,7 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -206,7 +207,17 @@ class ProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
     
     def get_object(self):
-        return self.request.user
+        # Force refresh from database to ensure latest data
+        return User.objects.select_related('company__subscription_plan').get(pk=self.request.user.pk)
+    
+    @method_decorator(never_cache)
+    def get(self, request, *args, **kwargs):
+        """Override to add cache headers"""
+        response = super().get(request, *args, **kwargs)
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response
 
 
 class ChangePasswordView(generics.UpdateAPIView):

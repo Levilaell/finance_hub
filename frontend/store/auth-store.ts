@@ -97,6 +97,13 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: null,
           });
+          
+          // Force update of all related data after subscription change
+          if (typeof window !== 'undefined') {
+            // Invalidate any cached data
+            const event = new CustomEvent('subscription-updated', { detail: { user } });
+            window.dispatchEvent(event);
+          }
         } catch (error) {
           set({
             user: null,
