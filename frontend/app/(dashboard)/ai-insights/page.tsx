@@ -35,7 +35,6 @@ import {
   ArrowPathIcon,
   LockClosedIcon,
   ClockIcon,
-  BookmarkIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
 
@@ -441,7 +440,7 @@ function AIAnalysesSection() {
           </div>
         </CardTitle>
         <CardDescription>
-          Acesse suas análises de IA geradas anteriormente
+          Todas as análises de IA são salvas automaticamente e podem ser acessadas aqui
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -543,7 +542,7 @@ function AIAnalysesSection() {
         ) : (
           <EmptyState
             icon={SparklesIcon}
-            title="Nenhuma análise salva"
+            title="Nenhuma análise encontrada"
             description={showFavorites ? 
               "Você ainda não tem análises favoritas. Marque suas análises como favoritas para vê-las aqui." :
               "Suas análises de IA aparecerão aqui automaticamente após serem geradas."
@@ -584,30 +583,6 @@ export default function AIInsightsPage() {
     });
   }, []);
 
-  // Mutation para salvar análise
-  const saveAnalysisMutation = useMutation({
-    mutationFn: async () => {
-      if (!aiInsightsData || !selectedPeriod.start_date || !selectedPeriod.end_date) {
-        throw new Error('Dados insuficientes para salvar análise');
-      }
-      
-      return await aiAnalysisService.saveFromInsights({
-        insights_data: aiInsightsData,
-        period_start: selectedPeriod.start_date.toISOString().split('T')[0],
-        period_end: selectedPeriod.end_date.toISOString().split('T')[0],
-        title: `Análise de IA - ${formatDate(selectedPeriod.start_date)} a ${formatDate(selectedPeriod.end_date)}`
-      });
-    },
-    onSuccess: () => {
-      toast.success('Análise salva com sucesso!');
-      // Refetch análises salvas
-      window.dispatchEvent(new Event('refetch-ai-analyses'));
-    },
-    onError: (error) => {
-      console.error('Erro ao salvar análise:', error);
-      toast.error('Erro ao salvar análise');
-    }
-  });
 
   // Query
   const { 
@@ -645,7 +620,26 @@ export default function AIInsightsPage() {
       // Salva os dados no cache para uso futuro
       setCachedAIData(result);
       
-      // Removido salvamento automático - agora será feito apenas sob demanda do usuário
+      // Salva automaticamente a análise se há dados válidos
+      if (result && result.insights && !isUpgradeRequired) {
+        try {
+          await aiAnalysisService.saveFromInsights({
+            insights_data: result,
+            period_start: selectedPeriod.start_date.toISOString().split('T')[0],
+            period_end: selectedPeriod.end_date.toISOString().split('T')[0],
+            title: `Análise de IA - ${formatDate(selectedPeriod.start_date)} a ${formatDate(selectedPeriod.end_date)}`
+          });
+          
+          // Dispara evento para atualizar lista de análises salvas
+          window.dispatchEvent(new Event('refetch-ai-analyses'));
+          
+          // Feedback visual opcional
+          toast.success('Análise salva automaticamente!');
+        } catch (error) {
+          // Falha silenciosa - não queremos interromper o fluxo
+          console.warn('Falha ao salvar análise automaticamente:', error);
+        }
+      }
       
       return result;
     },
@@ -797,20 +791,6 @@ export default function AIInsightsPage() {
               <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                 {aiInsightsData?.predictions?.confidence && (
                   <ConfidenceIndicator level={aiInsightsData.predictions.confidence} />
-                )}
-                {aiInsightsData && (
-                  <Button
-                    variant="outline"
-                    size="default"
-                    onClick={() => saveAnalysisMutation.mutate()}
-                    disabled={saveAnalysisMutation.isPending}
-                    className="w-full sm:w-auto"
-                  >
-                    <BookmarkIcon className="h-4 w-4" />
-                    <span className="ml-2">
-                      {saveAnalysisMutation.isPending ? 'Salvando...' : 'Salvar Análise'}
-                    </span>
-                  </Button>
                 )}
                 <Button
                   variant="outline"
@@ -1205,7 +1185,7 @@ export default function AIInsightsPage() {
                     Clique no botão &quot;Gerar Análise com IA&quot; acima para obter insights inteligentes sobre o período selecionado.
                   </p>
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-                    <strong>Dica:</strong> Nossa IA analisará suas transações e fornecerá insights valiosos sobre padrões de gastos, oportunidades de economia e previsões financeiras.
+                    <strong>Dica:</strong> Nossa IA analisará suas transações e fornecerá insights valiosos sobre padrões de gastos, oportunidades de economia e previsões financeiras. As análises são salvas automaticamente após serem geradas.
                   </div>
                 </div>
               )}
