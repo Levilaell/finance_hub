@@ -41,10 +41,10 @@ class BankAccountAdmin(admin.ModelAdmin):
     list_display = [
         'display_name', 'company_name', 'bank_provider',
         'account_type', 'current_balance_display',
-        'is_active', 'last_sync_display'
+        'pluggy_status_display', 'is_active', 'last_sync_display'
     ]
     list_filter = ['account_type', 'is_active', 'status', 'bank_provider', 'created_at']
-    search_fields = ['nickname', 'account_number', 'company__name']
+    search_fields = ['nickname', 'account_number', 'company__name', 'external_id', 'pluggy_item_id']
     date_hierarchy = 'created_at'
     ordering = ['-created_at']
     
@@ -58,19 +58,22 @@ class BankAccountAdmin(admin.ModelAdmin):
         ('Saldos', {
             'fields': ('current_balance', 'available_balance')
         }),
-        ('Conexão Open Banking', {
+        ('🔌 Integração Pluggy', {
             'fields': (
-                'external_id', 'pluggy_item_id',
-                'token_expires_at', 'status'
+                'pluggy_connection_status', 'external_id', 'pluggy_item_id',
+                'pluggy_item_status_info', 'sync_status', 'sync_error_message'
             ),
-            'classes': ('collapse',)
+            'description': 'Status da conexão com a Pluggy. Items ACTIVE recebem webhooks automáticos.'
         }),
         ('Configurações', {
-            'fields': ('is_primary', 'is_active', 'last_sync_at', 'sync_frequency')
+            'fields': ('is_primary', 'is_active', 'status', 'last_sync_at', 'sync_frequency')
         }),
     )
     
-    readonly_fields = ['last_sync_at', 'created_at', 'updated_at']
+    readonly_fields = [
+        'last_sync_at', 'created_at', 'updated_at', 
+        'pluggy_connection_status', 'pluggy_item_status_info'
+    ]
     
     def company_name(self, obj):
         return obj.company.name
@@ -94,6 +97,50 @@ class BankAccountAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('company', 'bank_provider')
+    
+    def pluggy_status_display(self, obj):
+        """Mostra status da conexão Pluggy"""
+        if not obj.pluggy_item_id:
+            return format_html('<span style="color: gray;">Não conectado</span>')
+        
+        # TODO: Buscar status real do item via API
+        # Por enquanto, mostrar se tem IDs
+        if obj.external_id and obj.pluggy_item_id:
+            return format_html(
+                '<span style="color: orange;" title="Item ID: {}">⚡ Conectado</span>',
+                obj.pluggy_item_id[:8]
+            )
+        return format_html('<span style="color: red;">❌ Erro</span>')
+    pluggy_status_display.short_description = 'Pluggy'
+    
+    def pluggy_connection_status(self, obj):
+        """Status detalhado da conexão Pluggy"""
+        if not obj.pluggy_item_id:
+            return "Não conectado à Pluggy"
+        
+        return format_html(
+            '<strong>✅ Conectado</strong><br>'
+            'External ID: <code>{}</code><br>'
+            'Item ID: <code>{}</code>',
+            obj.external_id or 'N/A',
+            obj.pluggy_item_id or 'N/A'
+        )
+    pluggy_connection_status.short_description = 'Status da Conexão'
+    
+    def pluggy_item_status_info(self, obj):
+        """Informações sobre o status do item"""
+        if not obj.pluggy_item_id:
+            return "—"
+        
+        # TODO: Implementar chamada à API para pegar status real
+        return format_html(
+            '<div style="background: #f0f0f0; padding: 10px; border-radius: 5px;">'
+            '<strong>⚠️ Status do Item: UPDATED</strong><br>'
+            '<small>Items com status UPDATED não recebem webhooks automáticos.<br>'
+            'Para ativar webhooks, reconecte a conta autorizando "Atualização Automática".</small>'
+            '</div>'
+        )
+    pluggy_item_status_info.short_description = 'Informações do Item Pluggy'
 
 
 @admin.register(TransactionCategory)
