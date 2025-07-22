@@ -138,12 +138,49 @@ class CancelSubscriptionView(APIView):
                 'error': 'No active subscription to cancel'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Update subscription status
-        company.subscription_status = 'cancelled'
-        company.save()
+        if not company.subscription_id:
+            return Response({
+                'error': 'No subscription ID found'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Handle cancellation with payment provider
         from apps.payments.payment_service import PaymentService
+        
+        try:
+            payment_service = PaymentService()
+            
+            # Cancel at end of billing period by default
+            immediately = request.data.get('immediately', False)
+            result = payment_service.cancel_subscription(company.subscription_id, immediately)
+            
+            if result['success']:
+                # Update local status
+                if immediately:
+                    company.subscription_status = 'cancelled'
+                    company.subscription_end_date = timezone.now()
+                else:
+                    company.subscription_status = 'cancelling'
+                    # Will be cancelled at period end
+                company.save()
+                
+                logger.info(f"Subscription cancelled for company {company.id}")
+                
+                return Response({
+                    'message': 'Subscription cancelled successfully',
+                    'cancel_at_period_end': not immediately,
+                    'end_date': result.get('current_period_end')
+                })
+            else:
+                return Response({
+                    'error': 'Failed to cancel subscription',
+                    'detail': result.get('error')
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            logger.error(f"Error cancelling subscription: {e}")
+            return Response({
+                'error': 'Failed to cancel subscription'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         try:
             payment_service = PaymentService()

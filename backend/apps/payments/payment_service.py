@@ -11,6 +11,7 @@ from ..companies.models import PaymentHistory
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -593,20 +594,43 @@ class PaymentService:
         return event_data
     
     def _process_webhook_event(self, event_data: Dict[str, Any]):
-        """Process webhook events"""
+        """Process webhook events with idempotency check"""
         event_type = event_data['event_type']
+        event_id = event_data.get('event_id')
         
-        # Stripe events
-        if event_type == 'checkout.session.completed':
-            self._handle_checkout_completed(event_data['data'])
-        elif 'subscription' in event_type:
-            self._handle_subscription_event(event_type, event_data['data'])
-        elif 'payment_intent' in event_type:
-            self._handle_payment_event(event_type, event_data['data'])
-        elif 'invoice' in event_type:
-            self._handle_invoice_event(event_type, event_data['data'])
+        # Check idempotency
+        if event_id:
+            cache_key = f"webhook_processed:{event_type}:{event_id}"
+            if cache.get(cache_key):
+                logger.info(f"Duplicate webhook event ignored: {event_id}")
+                return
+            # Mark as processed for 24 hours
+            cache.set(cache_key, True, 86400)
         
-        # Add more event handlers as needed
+        # Process with atomic transaction
+        try:
+            with transaction.atomic():
+                # Stripe events
+                if event_type == 'checkout.session.completed':
+                    self._handle_checkout_completed(event_data['data'])
+                elif 'subscription' in event_type:
+                    self._handle_subscription_event(event_type, event_data['data'])
+                elif 'payment_intent' in event_type:
+                    self._handle_payment_event(event_type, event_data['data'])
+                elif 'invoice' in event_type:
+                    self._handle_invoice_event(event_type, event_data['data'])
+                elif event_type == 'payment_method.attached':
+                    self._handle_payment_method_attached(event_data['data'])
+                elif event_type == 'charge.failed':
+                    self._handle_charge_failed(event_data['data'])
+                elif event_type == 'customer.subscription.trial_will_end':
+                    self._handle_subscription_trial_will_end(event_data['data'])
+        except Exception as e:
+            logger.error(f"Error processing webhook {event_type}: {e}", exc_info=True)
+            # Remove from cache so it can be retried
+            if event_id:
+                cache.delete(f"webhook_processed:{event_type}:{event_id}")
+            raise
     
     def _handle_subscription_event(self, event_type: str, data: Dict[str, Any]):
         """Handle subscription-related events"""
@@ -637,8 +661,14 @@ class PaymentService:
         session = data['object']
         metadata = session.get('metadata', {})
         
-        logger.info(f"Processing checkout.session.completed - Session ID: {session.get('id')}")
+        # Detailed logging for audit
+        logger.info("="*50)
+        logger.info(f"CHECKOUT COMPLETED - Session ID: {session.get('id')}")
+        logger.info(f"Customer: {session.get('customer')}")
+        logger.info(f"Amount: {session.get('amount_total')/100} {session.get('currency', '').upper()}")
+        logger.info(f"Payment Status: {session.get('payment_status')}")
         logger.info(f"Metadata: {metadata}")
+        logger.info("="*50)
         
         # Get company and plan from metadata
         company_id = metadata.get('company_id')
@@ -692,8 +722,13 @@ class PaymentService:
             
             company.save()
             
-            logger.info(f"Company updated - New status: {company.subscription_status}")
-            logger.info(f"Subscription ID: {company.subscription_id}")
+            # Audit log
+            logger.info(f"SUBSCRIPTION ACTIVATED:")
+            logger.info(f"  Company: {company.name} (ID: {company.id})")
+            logger.info(f"  Plan: {plan.name} ({billing_cycle})")
+            logger.info(f"  Status: {company.subscription_status}")
+            logger.info(f"  Subscription ID: {company.subscription_id}")
+            logger.info(f"  Next Billing: {company.next_billing_date}")
             
             # Create payment history
             payment = PaymentHistory.objects.create(
@@ -711,33 +746,56 @@ class PaymentService:
                 payment_method_display='Cartão de Crédito'
             )
             
-            # Create payment method from session data if available
-            if session.get('payment_method_details'):
-                payment_details = session['payment_method_details']
-                if payment_details.get('card'):
-                    card = payment_details['card']
-                    # Check if payment method already exists
-                    existing_method = PaymentMethod.objects.filter(
-                        company=company,
-                        last_four=card.get('last4'),
-                        is_active=True
-                    ).first()
+            # Fetch expanded session details to get payment method
+            if self.gateway_name == 'stripe':
+                try:
+                    import stripe
+                    stripe.api_key = settings.STRIPE_SECRET_KEY
                     
-                    if not existing_method:
-                        PaymentMethod.objects.create(
-                            company=company,
-                            payment_type='credit_card',
-                            card_brand=card.get('brand', '').upper(),
-                            last_four=card.get('last4'),
-                            exp_month=card.get('exp_month'),
-                            exp_year=card.get('exp_year'),
-                            stripe_payment_method_id=session.get('payment_method'),
-                            is_default=True,
-                            is_active=True
-                        )
+                    # Retrieve session with expanded payment intent
+                    full_session = stripe.checkout.Session.retrieve(
+                        session.get('id'),
+                        expand=['payment_intent.payment_method']
+                    )
+                    
+                    if full_session.payment_intent and hasattr(full_session.payment_intent, 'payment_method'):
+                        payment_method = full_session.payment_intent.payment_method
+                        if payment_method and hasattr(payment_method, 'card'):
+                            card = payment_method.card
+                            
+                            # Check if payment method already exists
+                            existing_method = PaymentMethod.objects.filter(
+                                company=company,
+                                stripe_payment_method_id=payment_method.id,
+                                is_active=True
+                            ).first()
+                            
+                            if not existing_method:
+                                PaymentMethod.objects.create(
+                                    company=company,
+                                    payment_type='credit_card',
+                                    card_brand=card.brand.upper() if card.brand else 'UNKNOWN',
+                                    last_four=card.last4,
+                                    exp_month=card.exp_month,
+                                    exp_year=card.exp_year,
+                                    stripe_payment_method_id=payment_method.id,
+                                    is_default=True,
+                                    is_active=True
+                                )
+                                logger.info(f"PAYMENT METHOD SAVED:")
+                                logger.info(f"  Company: {company.name}")
+                                logger.info(f"  Brand: {card.brand}")
+                                logger.info(f"  Last 4: {card.last4}")
+                                logger.info(f"  Exp: {card.exp_month}/{card.exp_year}")
+                except Exception as e:
+                    logger.error(f"PAYMENT METHOD ERROR: Failed to save for company {company.id}", exc_info=True)
             
-            logger.info(f"Payment history created - ID: {payment.id}")
-            logger.info(f"✅ Subscription activated for company {company.name}")
+            logger.info(f"PAYMENT HISTORY CREATED:")
+            logger.info(f"  ID: {payment.id}")
+            logger.info(f"  Amount: {payment.amount} {payment.currency}")
+            logger.info(f"  Invoice: {payment.invoice_number}")
+            logger.info(f"✅ CHECKOUT COMPLETE: Subscription activated for {company.name}")
+            logger.info("="*50)
             
         except Company.DoesNotExist:
             logger.error(f"Company not found with ID: {company_id}")
@@ -904,3 +962,219 @@ class PaymentService:
                     
             except Exception as e:
                 logger.error(f"Error checking payment status for company {company.id}: {e}")
+    
+    def _handle_payment_method_attached(self, data: Dict[str, Any]):
+        """Handle when a payment method is attached to customer"""
+        from apps.companies.models import PaymentMethod
+        from apps.authentication.models import User
+        
+        payment_method = data['object']
+        customer_id = payment_method.get('customer')
+        
+        if not customer_id:
+            logger.warning("Payment method attached without customer ID")
+            return
+            
+        try:
+            user = User.objects.get(payment_customer_id=customer_id)
+            company = user.company
+            
+            # Check if payment method already exists
+            if PaymentMethod.objects.filter(
+                stripe_payment_method_id=payment_method['id']
+            ).exists():
+                logger.info(f"Payment method {payment_method['id']} already exists")
+                return
+            
+            # Save payment method details
+            card = payment_method.get('card', {})
+            PaymentMethod.objects.create(
+                company=company,
+                payment_type='credit_card',
+                card_brand=card.get('brand', '').upper(),
+                last_four=card.get('last4'),
+                exp_month=card.get('exp_month'),
+                exp_year=card.get('exp_year'),
+                stripe_payment_method_id=payment_method['id'],
+                is_default=not PaymentMethod.objects.filter(
+                    company=company, 
+                    is_default=True
+                ).exists(),
+                is_active=True
+            )
+            
+            logger.info(f"Payment method saved for company {company.id}")
+            
+        except User.DoesNotExist:
+            logger.error(f"User not found for customer {customer_id}")
+        except Exception as e:
+            logger.error(f"Error saving payment method: {e}", exc_info=True)
+    
+    def _handle_charge_failed(self, data: Dict[str, Any]):
+        """Handle failed payment attempts"""
+        from apps.companies.models import Company, PaymentHistory
+        from apps.authentication.models import User
+        
+        charge = data['object']
+        customer_id = charge.get('customer')
+        
+        if not customer_id:
+            logger.warning("Charge failed without customer ID")
+            return
+            
+        try:
+            user = User.objects.get(payment_customer_id=customer_id)
+            company = user.company
+            
+            # Record failed payment
+            PaymentHistory.objects.create(
+                company=company,
+                subscription_plan=company.subscription_plan,
+                transaction_type='charge',
+                amount=Decimal(charge['amount']) / 100,
+                currency=charge['currency'].upper(),
+                status='failed',
+                description=f'Falha na cobrança - {charge.get("failure_message", "Erro desconhecido")}',
+                transaction_date=timezone.now(),
+                stripe_payment_intent_id=charge.get('payment_intent')
+            )
+            
+            # Update subscription status if needed
+            if company.subscription_status == 'active':
+                company.subscription_status = 'past_due'
+                company.save()
+                logger.warning(f"Company {company.id} marked as past_due due to failed payment")
+            
+            logger.warning(f"Payment failed for company {company.id}")
+            
+        except User.DoesNotExist:
+            logger.error(f"User not found for customer {customer_id}")
+        except Exception as e:
+            logger.error(f"Error handling failed charge: {e}", exc_info=True)
+    
+    def _handle_subscription_trial_will_end(self, data: Dict[str, Any]):
+        """Handle trial ending soon notification"""
+        from apps.companies.models import Company
+        from apps.notifications.email_service import EmailService
+        
+        subscription = data['object']
+        subscription_id = subscription['id']
+        
+        try:
+            company = Company.objects.get(subscription_id=subscription_id)
+            
+            # Send trial ending email
+            email_service = EmailService()
+            email_service.send_trial_ending_email(
+                email=company.owner.email,
+                company_name=company.name,
+                owner_name=company.owner.get_full_name(),
+                days_remaining=3  # Stripe sends this 3 days before
+            )
+            
+            logger.info(f"Trial ending notification sent for company {company.id}")
+            
+        except Company.DoesNotExist:
+            logger.error(f"Company not found for subscription {subscription_id}")
+        except Exception as e:
+            logger.error(f"Error handling trial ending notification: {e}", exc_info=True)
+    
+    def cancel_subscription(self, subscription_id: str, immediately: bool = False) -> Dict[str, Any]:
+        """Cancel subscription in payment gateway"""
+        try:
+            if self.gateway_name == 'stripe':
+                import stripe
+                stripe.api_key = settings.STRIPE_SECRET_KEY
+                
+                # Cancel at period end by default, or immediately if specified
+                subscription = stripe.Subscription.modify(
+                    subscription_id,
+                    cancel_at_period_end=not immediately
+                )
+                
+                if immediately:
+                    subscription = stripe.Subscription.delete(subscription_id)
+                
+                return {
+                    'success': True,
+                    'cancelled_at': subscription.get('canceled_at'),
+                    'cancel_at_period_end': subscription.get('cancel_at_period_end'),
+                    'current_period_end': subscription.get('current_period_end')
+                }
+            
+            elif self.gateway_name == 'mercadopago':
+                # MercadoPago cancellation logic
+                result = self.gateway.mp.subscription().update(
+                    subscription_id,
+                    {'status': 'cancelled'}
+                )
+                
+                return {
+                    'success': result['status'] == 200,
+                    'data': result.get('response', {})
+                }
+            
+            else:
+                raise ValueError(f"Cancellation not implemented for {self.gateway_name}")
+                
+        except Exception as e:
+            logger.error(f"Error cancelling subscription {subscription_id}: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def calculate_proration(self, company, new_plan, billing_cycle='monthly') -> Dict[str, Any]:
+        """Calculate proration for plan changes"""
+        from decimal import Decimal
+        
+        if not company.next_billing_date or not company.subscription_plan:
+            return {
+                'credit': Decimal('0'),
+                'charge': Decimal('0'),
+                'net_amount': Decimal('0'),
+                'days_remaining': 0
+            }
+        
+        # Calculate days remaining in current period
+        today = timezone.now().date()
+        days_remaining = (company.next_billing_date - today).days
+        
+        if days_remaining <= 0:
+            return {
+                'credit': Decimal('0'),
+                'charge': Decimal('0'),
+                'net_amount': Decimal('0'),
+                'days_remaining': 0
+            }
+        
+        # Get current plan price
+        current_price = company.subscription_plan.price_monthly
+        if company.billing_cycle == 'yearly':
+            current_price = company.subscription_plan.price_yearly / 12
+        
+        # Get new plan price
+        new_price = new_plan.price_monthly
+        if billing_cycle == 'yearly':
+            new_price = new_plan.price_yearly / 12
+        
+        # Calculate daily rates
+        days_in_month = 30  # Simplification
+        current_daily_rate = current_price / days_in_month
+        new_daily_rate = new_price / days_in_month
+        
+        # Calculate credit for unused time on current plan
+        credit = current_daily_rate * days_remaining
+        
+        # Calculate charge for new plan
+        charge = new_daily_rate * days_remaining
+        
+        return {
+            'credit': round(credit, 2),
+            'charge': round(charge, 2),
+            'net_amount': round(charge - credit, 2),
+            'days_remaining': days_remaining,
+            'current_plan': company.subscription_plan.name,
+            'new_plan': new_plan.name,
+            'billing_cycle': billing_cycle
+        }

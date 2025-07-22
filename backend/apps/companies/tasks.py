@@ -167,3 +167,40 @@ def send_usage_notifications(self):
     except Exception as e:
         logger.error(f"Error sending usage notifications: {str(e)}")
         raise self.retry(exc=e, countdown=60, max_retries=3)
+
+
+@shared_task(bind=True)
+def check_trial_expirations(self):
+    """
+    Check and handle trial expirations
+    Runs daily to update expired trials and send notifications
+    """
+    try:
+        from apps.payments.payment_service import PaymentService
+        
+        # Use payment service to handle trial checks
+        payment_service = PaymentService()
+        payment_service.check_trial_expiration()
+        
+        # Also check for trials that need status update
+        now = timezone.now()
+        expired_count = 0
+        
+        # Find companies with expired trials that haven't been updated
+        expired_trials = Company.objects.filter(
+            subscription_status='trial',
+            trial_ends_at__lt=now
+        )
+        
+        for company in expired_trials:
+            company.subscription_status = 'expired'
+            company.save()
+            expired_count += 1
+            logger.info(f"Updated expired trial status for company {company.name} (ID: {company.id})")
+        
+        logger.info(f"Trial expiration check completed. Updated {expired_count} companies")
+        return f"Updated {expired_count} expired trials"
+        
+    except Exception as e:
+        logger.error(f"Error checking trial expirations: {str(e)}")
+        raise self.retry(exc=e, countdown=60, max_retries=3)

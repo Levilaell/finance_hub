@@ -4,6 +4,7 @@ Middleware para verificar status de trial e assinatura
 from django.utils import timezone
 from django.http import JsonResponse
 from django.urls import resolve
+from django.core.cache import cache
 from rest_framework import status
 import logging
 
@@ -72,16 +73,13 @@ class TrialExpirationMiddleware:
                 # No company found, allow request
                 return self.get_response(request)
         
-        # Check trial expiration
+        # Check trial expiration (don't update status here, let Celery task handle it)
         if company.subscription_status == 'trial' and company.trial_ends_at:
             current_time = timezone.now()
-            logger.debug(f"Checking trial for company {company.id}: Current time: {current_time}, Trial ends: {company.trial_ends_at}")
             
             if current_time > company.trial_ends_at:
-                # Trial expired - update status
-                logger.info(f"Trial expired for company {company.id} - {company.name}. Current: {current_time}, Trial ended: {company.trial_ends_at}")
-                company.subscription_status = 'expired'
-                company.save()
+                # Trial expired but not yet updated by task
+                logger.debug(f"Trial expired for company {company.id} but status not yet updated")
                 
                 # Check if path is allowed for expired trials
                 path_allowed_when_expired = any(
@@ -129,6 +127,22 @@ class TrialExpirationMiddleware:
             
             # Check AI request limit
             if ('ai' in path.lower() or 'insight' in path.lower() or 'categorize' in path.lower()) and request.method == 'POST':
+                # Rate limiting check first
+                rate_limit_key = f"rate_limit:{request.user.id}:ai_request"
+                rate_limit_count = cache.get(rate_limit_key, 0)
+                
+                # Allow max 10 AI requests per minute
+                if rate_limit_count >= 10:
+                    return JsonResponse({
+                        'error': 'rate_limit_exceeded',
+                        'message': 'Muitas requisições. Por favor, aguarde um momento.',
+                        'retry_after': 60
+                    }, status=429)
+                
+                # Increment rate limit counter
+                cache.set(rate_limit_key, rate_limit_count + 1, 60)
+                
+                # Check monthly limit
                 if company.subscription_plan.max_ai_requests_per_month > 0:
                     if company.current_month_ai_requests >= company.subscription_plan.max_ai_requests_per_month:
                         return JsonResponse({
