@@ -88,6 +88,19 @@ class PluggyTransactionSyncService:
                 logger.warning(f"❌ No Pluggy account ID for account {account_info['id']}")
                 return {'account_id': account_info['id'], 'status': 'no_external_id', 'transactions': 0}
             
+            # Try to sync item first if available
+            pluggy_item_id = await sync_to_async(lambda: account.pluggy_item_id)()
+            if pluggy_item_id:
+                try:
+                    logger.info(f"🔄 Triggering Pluggy item sync for item {pluggy_item_id}")
+                    async with PluggyClient() as client:
+                        sync_result = await client.sync_item(pluggy_item_id)
+                        logger.info(f"✅ Item sync triggered: {sync_result.get('status', 'unknown')}")
+                        # Wait a bit for sync to process
+                        await asyncio.sleep(2)
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not trigger item sync: {e}")
+            
             # Determine sync date range
             sync_from = self._get_sync_from_date_safe(account_info)
             # Buscar 1 dia no futuro para pegar transações com timezone issues

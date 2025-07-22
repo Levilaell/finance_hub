@@ -45,7 +45,7 @@ app.conf.beat_schedule = {
         }
     },
     'reset-monthly-usage': {
-        'task': 'apps.companies.tasks.reset_monthly_usage_counters',
+        'task': 'apps.companies.tasks.reset_monthly_usage',
         'schedule': crontab(day_of_month=1, hour=0, minute=0),  # 1st of each month at midnight
         'options': {
             'expires': 60 * 60 * 6,  # Expire after 6 hours if not executed
@@ -61,6 +61,13 @@ app.conf.beat_schedule = {
     'check-usage-limits': {
         'task': 'apps.companies.tasks.check_usage_limits',
         'schedule': crontab(minute=0, hour='*/6'),  # Every 6 hours
+        'options': {
+            'expires': 60 * 60 * 2,  # Expire after 2 hours if not executed
+        }
+    },
+    'verify-usage-counters': {
+        'task': 'apps.companies.tasks.verify_usage_counters',
+        'schedule': crontab(hour=3, minute=0),  # Daily at 3 AM
         'options': {
             'expires': 60 * 60 * 2,  # Expire after 2 hours if not executed
         }

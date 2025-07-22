@@ -35,6 +35,7 @@ import {
   ArrowPathIcon,
   LockClosedIcon,
   ClockIcon,
+  BookmarkIcon,
 } from '@heroicons/react/24/outline';
 
 // Types
@@ -372,6 +373,20 @@ function AIAnalysesSection() {
     }
   });
 
+  // Listen for refetch event
+  useEffect(() => {
+    const handleRefetch = () => {
+      if (refetchAnalyses) {
+        refetchAnalyses();
+      }
+    };
+    
+    window.addEventListener('refetch-ai-analyses', handleRefetch);
+    return () => {
+      window.removeEventListener('refetch-ai-analyses', handleRefetch);
+    };
+  }, [refetchAnalyses]);
+
   const analysisTypes = [
     { value: 'all', label: 'Todas as Análises' },
     { value: 'financial_health', label: 'Saúde Financeira' },
@@ -486,19 +501,12 @@ function AIAnalysesSection() {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      // Atualizar o período selecionado e forçar atualização
-                      const params = new URLSearchParams({
-                        period_start: analysis.period_start,
-                        period_end: analysis.period_end,
-                        analysis_id: analysis.id
-                      });
-                      router.push(`/ai-insights?${params.toString()}`);
-                      // Recarregar a página para garantir que os dados sejam atualizados
-                      window.location.reload();
+                      // Navegar para a análise específica sem recarregar a página
+                      router.push(`/ai-insights/${analysis.id}`);
                     }}
                   >
                     <SparklesIcon className="h-4 w-4 mr-1" />
-                    Ver
+                    Ver Detalhes
                   </Button>
                 </div>
               </div>
@@ -535,6 +543,7 @@ export default function AIInsightsPage() {
   const [forceRefresh, setForceRefresh] = useState(false);
   const [isUpgradeRequired, setIsUpgradeRequired] = useState(false);
   const [cachedAIData, setCachedAIData] = useState<any>(null);
+  const [shouldFetchAnalysis, setShouldFetchAnalysis] = useState(false);
 
   // Set dates on client-side after hydration
   useEffect(() => {
@@ -546,6 +555,31 @@ export default function AIInsightsPage() {
       end_date: now,
     });
   }, []);
+
+  // Mutation para salvar análise
+  const saveAnalysisMutation = useMutation({
+    mutationFn: async () => {
+      if (!aiInsightsData || !selectedPeriod.start_date || !selectedPeriod.end_date) {
+        throw new Error('Dados insuficientes para salvar análise');
+      }
+      
+      return await aiAnalysisService.saveFromInsights({
+        insights_data: aiInsightsData,
+        period_start: selectedPeriod.start_date.toISOString().split('T')[0],
+        period_end: selectedPeriod.end_date.toISOString().split('T')[0],
+        title: `Análise de IA - ${formatDate(selectedPeriod.start_date)} a ${formatDate(selectedPeriod.end_date)}`
+      });
+    },
+    onSuccess: () => {
+      toast.success('Análise salva com sucesso!');
+      // Refetch análises salvas
+      window.dispatchEvent(new Event('refetch-ai-analyses'));
+    },
+    onError: (error) => {
+      console.error('Erro ao salvar análise:', error);
+      toast.error('Erro ao salvar análise');
+    }
+  });
 
   // Query
   const { 
@@ -569,6 +603,9 @@ export default function AIInsightsPage() {
         setForceRefresh(false);
       }
       
+      // Reset shouldFetchAnalysis after use
+      setShouldFetchAnalysis(false);
+      
       // Check if result is null (403 error from service)
       if (result === null) {
         setIsUpgradeRequired(true);
@@ -580,24 +617,11 @@ export default function AIInsightsPage() {
       // Salva os dados no cache para uso futuro
       setCachedAIData(result);
       
-      // Salva automaticamente a análise se há dados válidos
-      if (result && result.insights && !isUpgradeRequired) {
-        try {
-          await aiAnalysisService.saveFromInsights({
-            insights_data: result,
-            period_start: selectedPeriod.start_date.toISOString().split('T')[0],
-            period_end: selectedPeriod.end_date.toISOString().split('T')[0],
-            title: `Análise de IA - ${formatDate(selectedPeriod.start_date)} a ${formatDate(selectedPeriod.end_date)}`
-          });
-        } catch (error) {
-          // Falha silenciosa - não queremos interromper o fluxo
-          console.warn('Falha ao salvar análise automaticamente:', error);
-        }
-      }
+      // Removido salvamento automático - agora será feito apenas sob demanda do usuário
       
       return result;
     },
-    enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
+    enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date && shouldFetchAnalysis,
     retry: (failureCount, error: any) => {
       // Don't retry on 403 errors
       if (error?.response?.status === 403) return false;
@@ -708,6 +732,27 @@ export default function AIInsightsPage() {
               />
             </div>
           </div>
+          <div className="mt-4 flex justify-center">
+            <Button
+              onClick={() => {
+                if (selectedPeriod.start_date && selectedPeriod.end_date) {
+                  setShouldFetchAnalysis(true);
+                  // Força refetch imediato
+                  setTimeout(() => {
+                    refetchAIInsights();
+                  }, 100);
+                } else {
+                  toast.error('Por favor, selecione as datas inicial e final');
+                }
+              }}
+              disabled={!selectedPeriod.start_date || !selectedPeriod.end_date || aiInsightsLoading}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold px-8"
+              size="lg"
+            >
+              <SparklesIcon className="h-5 w-5 mr-2" />
+              {aiInsightsLoading ? 'Gerando Análise...' : 'Gerar Análise com IA'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
       }
@@ -725,6 +770,20 @@ export default function AIInsightsPage() {
                 {aiInsightsData?.predictions?.confidence && (
                   <ConfidenceIndicator level={aiInsightsData.predictions.confidence} />
                 )}
+                {aiInsightsData && (
+                  <Button
+                    variant="outline"
+                    size="default"
+                    onClick={() => saveAnalysisMutation.mutate()}
+                    disabled={saveAnalysisMutation.isPending}
+                    className="w-full sm:w-auto"
+                  >
+                    <BookmarkIcon className="h-4 w-4" />
+                    <span className="ml-2">
+                      {saveAnalysisMutation.isPending ? 'Salvando...' : 'Salvar Análise'}
+                    </span>
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="default"
@@ -732,6 +791,7 @@ export default function AIInsightsPage() {
                     if (!isUpgradeRequired) {
                       // Force refetch with cache invalidation
                       setForceRefresh(true);
+                      setShouldFetchAnalysis(true);
                       setTimeout(() => {
                         refetchAIInsights();
                       }, 100);
@@ -1106,13 +1166,29 @@ export default function AIInsightsPage() {
                 </div>
               )}
 
-              {/* Empty State - No Period Selected */}
-              {!aiInsightsData && !aiInsightsLoading && (!selectedPeriod.start_date || !selectedPeriod.end_date) && (
-                <div className="text-center py-8">
-                  <SparklesIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-500">Selecione um período para ver insights com IA</p>
+              {/* Empty State - No Analysis Generated */}
+              {!aiInsightsData && !aiInsightsLoading && selectedPeriod.start_date && selectedPeriod.end_date && (
+                <div className="text-center py-12">
+                  <SparklesIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Gere Sua Primeira Análise com IA
+                  </h3>
+                  <p className="text-gray-500 mb-6">
+                    Clique no botão "Gerar Análise com IA" acima para obter insights inteligentes sobre o período selecionado.
+                  </p>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+                    <strong>Dica:</strong> Nossa IA analisará suas transações e fornecerá insights valiosos sobre padrões de gastos, oportunidades de economia e previsões financeiras.
+                  </div>
                 </div>
               )}
+
+              {/* Empty State - No Period Selected */}
+              {!selectedPeriod.start_date || !selectedPeriod.end_date ? (
+                <div className="text-center py-8">
+                  <CalendarIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-500">Selecione um período para começar</p>
+                </div>
+              ) : null}
 
               {/* AI Badge */}
               {aiInsightsData && (

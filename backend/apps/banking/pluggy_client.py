@@ -227,6 +227,27 @@ class PluggyClient:
             logger.error(f"Error updating item {item_id}: {e}")
             raise PluggyAPIError(f"Failed to update item: {e}")
     
+    async def sync_item(self, item_id: str) -> Dict[str, Any]:
+        """Force item sync to get latest data from bank"""
+        try:
+            await self._ensure_authenticated()
+            
+            # Trigger sync by sending empty PATCH request
+            response = await self.client.patch(
+                f"{self.base_url}/items/{item_id}",
+                json={},  # Empty body triggers sync
+                headers=self._get_headers()
+            )
+            
+            if response.status_code != 200:
+                raise PluggyAPIError(f"Failed to sync item: {response.text}")
+            
+            return response.json()
+            
+        except Exception as e:
+            logger.error(f"Error syncing item {item_id}: {e}")
+            raise PluggyAPIError(f"Failed to sync item: {e}")
+    
     async def delete_item(self, item_id: str) -> bool:
         """Delete an item (disconnect bank)"""
         try:

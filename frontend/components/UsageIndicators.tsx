@@ -55,7 +55,7 @@ export function AIUsageIndicator({ company }: UsageIndicatorProps) {
   
   if (company.subscription_plan.plan_type === 'professional') {
     const usage = company.current_month_ai_requests || 0;
-    const limit = company.subscription_plan.max_ai_requests_per_month || 1000;
+    const limit = company.subscription_plan.max_ai_requests_per_month || 10;
     const percentage = (usage / limit) * 100;
     const remaining = limit - usage;
     

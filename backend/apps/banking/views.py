@@ -67,10 +67,24 @@ class BankAccountViewSet(viewsets.ModelViewSet):
             company=company
         ).select_related('bank_provider').order_by('-created_at')
     
+    @requires_plan_feature('add_bank_account')
     def perform_create(self, serializer):
         """Set company when creating bank account"""
         try:
             company = self.request.user.company
+            
+            # Check if can add more bank accounts
+            if not company.can_add_bank_account():
+                limit = company.subscription_plan.max_bank_accounts if company.subscription_plan else 0
+                raise ValidationError({
+                    'error': 'limit_reached',
+                    'message': f'Você atingiu o limite de {limit} contas bancárias do seu plano.',
+                    'limit_type': 'bank_accounts',
+                    'current': company.active_bank_accounts_count,
+                    'limit': limit,
+                    'redirect': '/dashboard/subscription/upgrade'
+                })
+            
             serializer.save(company=company)
         except AttributeError:
             from rest_framework.exceptions import ValidationError
@@ -117,8 +131,6 @@ class BankAccountViewSet(viewsets.ModelViewSet):
             ).aggregate(latest=Max('last_sync_at'))['latest']
         })
 
-
-from apps.companies.decorators import requires_plan_feature
 
 class TransactionViewSet(viewsets.ModelViewSet):
     """

@@ -39,10 +39,6 @@ class User(AbstractUser):
     two_factor_secret = models.CharField(_('2FA secret'), max_length=32, blank=True)
     backup_codes = models.JSONField(_('backup codes'), default=list, blank=True)
     
-    # Payment fields
-    payment_customer_id = models.CharField(_('payment customer ID'), max_length=255, blank=True, null=True)
-    payment_gateway = models.CharField(_('payment gateway'), max_length=50, blank=True, null=True)
-    
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
     

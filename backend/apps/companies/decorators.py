@@ -44,24 +44,42 @@ def requires_plan_feature(feature_name):
                         'suggested_plan': suggested_plan
                     }, status=status.HTTP_429_TOO_MANY_REQUESTS)
             
-            elif feature_name == 'create_bank_account':
+            elif feature_name == 'create_bank_account' or feature_name == 'add_bank_account':
                 if not company.can_add_bank_account():
                     current_count = company.bank_accounts.filter(is_active=True).count()
                     limit = company.subscription_plan.max_bank_accounts if company.subscription_plan else 0
                     
                     return Response({
                         'error': f'Limite de contas bancárias atingido ({current_count}/{limit})',
-                        'upgrade_required': True,
-                        'current_plan': company.subscription_plan.name if company.subscription_plan else 'Nenhum'
-                    }, status=status.HTTP_403_FORBIDDEN)
-            
-            elif feature_name == 'ai_insights':
-                can_use_ai, message = company.can_use_ai_insight()
-                if not can_use_ai:
-                    return Response({
-                        'error': message,
+                        'limit_type': 'bank_accounts',
+                        'current': current_count,
+                        'limit': limit,
                         'upgrade_required': True,
                         'current_plan': company.subscription_plan.name if company.subscription_plan else 'Nenhum',
+                        'suggested_plan': 'professional' if company.subscription_plan and company.subscription_plan.plan_type == 'starter' else 'enterprise',
+                        'redirect': '/dashboard/subscription/upgrade'
+                    }, status=status.HTTP_403_FORBIDDEN)
+            
+            elif feature_name == 'ai_insights' or feature_name == 'use_ai':
+                can_use_ai, message = company.can_use_ai_insight()
+                if not can_use_ai:
+                    # Incrementar contador mesmo quando bloqueado (para tracking)
+                    if company.subscription_plan and company.subscription_plan.max_ai_requests_per_month > 0:
+                        usage_info = {
+                            'current': company.current_month_ai_requests,
+                            'limit': company.subscription_plan.max_ai_requests_per_month,
+                            'remaining': max(0, company.subscription_plan.max_ai_requests_per_month - company.current_month_ai_requests)
+                        }
+                    else:
+                        usage_info = None
+                    
+                    return Response({
+                        'error': message,
+                        'limit_type': 'ai_requests',
+                        'usage_info': usage_info,
+                        'upgrade_required': True,
+                        'current_plan': company.subscription_plan.name if company.subscription_plan else 'Nenhum',
+                        'suggested_plan': 'professional' if company.subscription_plan and company.subscription_plan.plan_type == 'starter' else 'enterprise',
                         'feature_required': 'AI Insights'
                     }, status=status.HTTP_403_FORBIDDEN)
             
