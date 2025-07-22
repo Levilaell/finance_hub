@@ -85,9 +85,10 @@ class PluggyTransactionSyncService:
             
             # Determine sync date range
             sync_from = self._get_sync_from_date_safe(account_info)
-            sync_to = datetime.now().date()
+            # Buscar 1 dia no futuro para pegar transações com timezone issues
+            sync_to = (datetime.now() + timedelta(days=1)).date()
             
-            logger.info(f"📅 Syncing transactions from {sync_from} to {sync_to}")
+            logger.info(f"📅 Syncing transactions from {sync_from} to {sync_to} (incluindo 1 dia futuro para timezone)")
             
             # Fetch and save transactions
             total_transactions = 0
@@ -214,10 +215,11 @@ class PluggyTransactionSyncService:
                 logger.info(f"⚠️ Long gap ({days_since_sync} days), using 30 days")
                 return (timezone.now() - timedelta(days=30)).date()
             else:
-                # Incremental normal - sempre buscar pelo menos 3 dias
+                # Incremental normal - sempre buscar pelo menos 5 dias
                 # para garantir que não perdemos transações com data retroativa
-                min_days_back = 3
-                days_back = max(days_since_sync + 1, min_days_back)
+                # e considerar problemas de timezone (UTC vs Brasil)
+                min_days_back = 5  # Aumentado de 3 para 5
+                days_back = max(days_since_sync + 2, min_days_back)  # +2 ao invés de +1
                 logger.info(f"🔄 Incremental sync, {days_since_sync} days since last sync, fetching {days_back} days")
                 return (timezone.now() - timedelta(days=days_back)).date()
 
