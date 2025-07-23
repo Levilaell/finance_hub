@@ -44,6 +44,9 @@ class PluggyWebhookHandler:
             elif event_type == 'transactions/created':
                 result = await self._handle_transactions_created(event_data)
                 
+            elif event_type == 'item/waiting_user_action':
+                result = await self._handle_item_waiting_user_action(event_data)
+                
             else:
                 logger.info(f"Unhandled webhook event type: {event_type}")
                 result['message'] = f'Event {event_type} received but not processed'
@@ -157,3 +160,23 @@ class PluggyWebhookHandler:
         except Exception as e:
             logger.error(f"Error syncing transactions for account {account_id}: {e}", exc_info=True)
             return {'success': False, 'message': str(e)}
+    
+    async def _handle_item_waiting_user_action(self, event_data: dict) -> dict:
+        """Handle item waiting for user action event"""
+        item_id = event_data.get('id')
+        logger.warning(f"Pluggy item {item_id} requires user action")
+        
+        # Update all accounts with this item to reflect authentication needed
+        await sync_to_async(
+            BankAccount.objects.filter(
+                pluggy_item_id=item_id
+            ).update
+        )(
+            sync_status='waiting_user_action',
+            sync_error_message='Reautenticação necessária - faça login novamente no banco'
+        )
+        
+        # TODO: Send notification to user about reauth needed
+        logger.info(f"Updated accounts for item {item_id} to waiting_user_action status")
+        
+        return {'success': True, 'message': f'Item {item_id} requires user reauthentication'}

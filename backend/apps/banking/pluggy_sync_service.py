@@ -114,15 +114,10 @@ class PluggyTransactionSyncService:
                                 'transactions': 0
                             }
                         elif item_status == 'OUTDATED':
-                            # Try to update the item when it's outdated
-                            logger.info(f"🔄 Item is OUTDATED, triggering update...")
-                            try:
-                                update_result = await client.sync_item(pluggy_item_id)
-                                logger.info(f"✅ Item update triggered successfully")
-                                # Wait a bit for the update to process
-                                await asyncio.sleep(3)
-                            except Exception as e:
-                                logger.warning(f"⚠️ Could not update outdated item: {e}")
+                            # Don't try to update OUTDATED items automatically
+                            # as it may trigger WAITING_USER_ACTION
+                            logger.warning(f"⚠️ Item is OUTDATED but continuing with sync")
+                            logger.info(f"📝 Note: New transactions may not be available until item is updated")
                 except Exception as e:
                     logger.warning(f"⚠️ Could not check item status: {e}")
             
