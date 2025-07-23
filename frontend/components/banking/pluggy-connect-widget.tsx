@@ -8,6 +8,7 @@ interface PluggyConnectWidgetProps {
   onSuccess: (itemData: any) => void;
   onError: (error: any) => void;
   onClose?: () => void;
+  updateItem?: string; // Add support for reconnection
 }
 
 // Declaração global para o SDK da Pluggy
@@ -21,7 +22,8 @@ export function PluggyConnectWidget({
   connectToken,
   onSuccess,
   onError,
-  onClose
+  onClose,
+  updateItem
 }: PluggyConnectWidgetProps) {
   const [sdkLoaded, setSdkLoaded] = useState(false);
   const pluggyInstance = useRef<any>(null);
@@ -122,6 +124,7 @@ export function PluggyConnectWidget({
       const config = {
         connectToken: connectToken,
         includeSandbox: true, // Mudando para true já que você está em desenvolvimento
+        ...(updateItem && { updateItem }), // Include updateItem for reconnection
         
         onSuccess: (data: any) => {
           
@@ -226,7 +229,8 @@ export function PluggyConnectModal({
   connectToken,
   onSuccess,
   onError,
-  onClose
+  onClose,
+  updateItem
 }: PluggyConnectWidgetProps) {
   const [isOpen, setIsOpen] = useState(true);
   
@@ -271,6 +275,7 @@ export function PluggyConnectModal({
               handleClose();
             }}
             onClose={handleClose}
+            updateItem={updateItem}
           />
         </div>
       </div>

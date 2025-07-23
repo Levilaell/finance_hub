@@ -9,13 +9,15 @@ interface PluggyConnectIframeProps {
   onSuccess: (itemData: any) => void;
   onError: (error: any) => void;
   onClose: () => void;
+  updateItem?: string;
 }
 
 export function PluggyConnectIframe({
   connectToken,
   onSuccess,
   onError,
-  onClose
+  onClose,
+  updateItem
 }: PluggyConnectIframeProps) {
   const [iframeUrl, setIframeUrl] = useState<string>('');
 
@@ -27,6 +29,10 @@ export function PluggyConnectIframe({
     const params = new URLSearchParams({
       connectToken: connectToken,
     });
+    
+    if (updateItem) {
+      params.append('updateItem', updateItem);
+    }
     
     const url = `${baseUrl}?${params.toString()}`;
     console.log('[Pluggy Iframe] URL criada:', url);

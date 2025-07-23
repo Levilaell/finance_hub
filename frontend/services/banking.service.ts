@@ -234,9 +234,33 @@ class BankingService {
       pluggy_status: string;
       last_update: string;
       sandbox_mode: boolean;
+      needs_reconnection?: boolean;
+      reconnection_message?: string;
     };
   }> {
     return apiClient.get(`/api/banking/pluggy/accounts/${accountId}/status/`);
+  }
+
+  /**
+   * Reconnect Pluggy account
+   */
+  async reconnectPluggyAccount(accountId: string): Promise<{
+    success: boolean;
+    data: {
+      connect_token: string;
+      connect_url: string;
+      item_id: string;
+      sandbox_mode: boolean;
+      expires_at?: string;
+      message?: string;
+      sandbox_credentials?: {
+        user: string;
+        password: string;
+        token: string;
+      };
+    };
+  }> {
+    return apiClient.post(`/api/banking/pluggy/accounts/${accountId}/reconnect/`);
   }
 
   // ===== NOVA FUNÇÃO PARA CONECTAR BANCO VIA PLUGGY =====

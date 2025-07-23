@@ -63,6 +63,8 @@ export default function AccountsPage() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [pluggyError, setPluggyError] = useState<string | null>(null);
   const [useIframeMode, setUseIframeMode] = useState(false);
+  const [reconnectingAccountId, setReconnectingAccountId] = useState<string | null>(null);
+  const [reconnectError, setReconnectError] = useState<{accountId: string; message: string} | null>(null);
 
   // ✅ Função handlePluggyCallback (mantida como está)
   const handlePluggyCallback = useCallback(async (itemId: string) => {
@@ -198,7 +200,7 @@ export default function AccountsPage() {
     }
   };
 
-  // ✅ Função handleSyncAccount (mantida como está)
+  // ✅ Função handleSyncAccount com detecção de WAITING_USER_ACTION
   const handleSyncAccount = async (accountId: string) => {
     setSyncingAccountId(accountId);
     try {
@@ -214,9 +216,57 @@ export default function AccountsPage() {
         throw new Error('Falha na sincronização');
       }
     } catch (error: any) {
-      toast.error('Erro ao sincronizar conta: ' + (error.message || 'Erro desconhecido'));
+      // Check if it's a WAITING_USER_ACTION error
+      if (error.response?.data?.error_code === 'WAITING_USER_ACTION') {
+        setReconnectError({
+          accountId,
+          message: error.response.data.message || 'O banco está solicitando que você faça login novamente.'
+        });
+        toast.warning('Reconexão necessária para continuar sincronizando');
+      } else {
+        toast.error('Erro ao sincronizar conta: ' + (error.message || 'Erro desconhecido'));
+      }
     } finally {
       setSyncingAccountId(null);
+    }
+  };
+
+  // ✅ Função para reconectar conta
+  const handleReconnectAccount = async (accountId: string) => {
+    setReconnectingAccountId(accountId);
+    try {
+      toast.info('Gerando token de reconexão...');
+      
+      const result = await bankingService.reconnectPluggyAccount(accountId);
+      
+      if (result.success && result.data?.connect_token) {
+        const { connect_token, item_id } = result.data;
+        
+        // Show sandbox credentials if in sandbox mode
+        if (result.data.sandbox_mode && result.data.sandbox_credentials) {
+          const creds = result.data.sandbox_credentials;
+          toast.info(
+            `🧪 Modo Sandbox - Use as credenciais: ${creds.user} / ${creds.password} / ${creds.token}`,
+            { duration: 15000 }
+          );
+        }
+        
+        // Setup Pluggy Connect widget for reconnection
+        setPluggyConnectToken(connect_token);
+        setIsConnecting(true);
+        setReconnectError(null);
+        
+        // Store item_id for updateItem parameter
+        sessionStorage.setItem('pluggy_update_item', item_id);
+        
+        toast.success('Abrindo Pluggy Connect para reconexão...');
+      } else {
+        throw new Error(result.data?.message || 'Erro ao gerar token de reconexão');
+      }
+    } catch (error: any) {
+      toast.error('Erro ao reconectar conta: ' + (error.message || 'Erro desconhecido'));
+    } finally {
+      setReconnectingAccountId(null);
     }
   };
 
@@ -328,6 +378,7 @@ export default function AccountsPage() {
         useIframeMode ? (
           <PluggyConnectIframe
             connectToken={pluggyConnectToken}
+            updateItem={sessionStorage.getItem('pluggy_update_item') || undefined}
             onSuccess={async (itemData) => {
               console.log('[AccountsPage] Pluggy Iframe Success:', itemData);
               const itemId = itemData?.item?.id || itemData?.itemId;
@@ -362,11 +413,14 @@ export default function AccountsPage() {
             onClose={() => {
               console.log('[AccountsPage] Pluggy Iframe Closed without success');
               resetPluggyWidget();
+              // Clear update item after use
+              sessionStorage.removeItem('pluggy_update_item');
             }}
           />
         ) : (
           <PluggyConnectModal
             connectToken={pluggyConnectToken}
+            updateItem={sessionStorage.getItem('pluggy_update_item') || undefined}
             onSuccess={async (itemData) => {
               console.log('[AccountsPage] Pluggy Connect Success:', itemData);
               const itemId = itemData?.item?.id || itemData?.itemId;
@@ -391,6 +445,8 @@ export default function AccountsPage() {
               }
               
               resetPluggyWidget();
+              // Clear update item after use
+              sessionStorage.removeItem('pluggy_update_item');
             }}
             onError={(error) => {
               console.error('[AccountsPage] Pluggy Connect Error:', error);
@@ -413,6 +469,8 @@ export default function AccountsPage() {
             onClose={() => {
               console.log('[AccountsPage] Pluggy Connect Closed without success');
               resetPluggyWidget();
+              // Clear update item after use
+              sessionStorage.removeItem('pluggy_update_item');
             }}
           />
         )
@@ -505,28 +563,40 @@ export default function AccountsPage() {
                       </span>
                     </div>
 
+                    {/* Warning for sync errors */}
+                    {account.status === 'sync_error' && (
+                      <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                        <p className="text-sm text-yellow-800 flex items-center">
+                          <ArrowPathIcon className="h-4 w-4 mr-2" />
+                          Reconexão necessária para sincronizar
+                        </p>
+                      </div>
+                    )}
+
                     {/* Actions */}
                     <div className="flex space-x-2">
                       {account.status === 'sync_error' && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleRefreshToken(account.id)}
+                          onClick={() => handleSyncAccount(account.id)}
                           className="text-orange-600 hover:text-orange-700"
                         >
-                          <ArrowPathIcon className="h-4 w-4 mr-1" />
-                          Renovar Token
+                          <LinkIcon className="h-4 w-4 mr-1" />
+                          Reconectar
                         </Button>
                       )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSyncAccount(account.id)}
-                        disabled={isSyncing || account.status === 'sync_error'}
-                      >
-                        <ArrowPathIcon className={`h-4 w-4 mr-1 ${isSyncing ? 'animate-spin' : ''}`} />
-                        {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
-                      </Button>
+                      {account.status !== 'sync_error' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSyncAccount(account.id)}
+                          disabled={isSyncing}
+                        >
+                          <ArrowPathIcon className={`h-4 w-4 mr-1 ${isSyncing ? 'animate-spin' : ''}`} />
+                          {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -578,6 +648,53 @@ export default function AccountsPage() {
               onClick={handleDeleteAccount}
             >
               Remover Conta
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reconnection Required Dialog */}
+      <Dialog open={!!reconnectError} onOpenChange={() => setReconnectError(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reconexão Necessária</DialogTitle>
+            <DialogDescription>
+              {reconnectError?.message || 'O banco está solicitando que você faça login novamente. Isso é normal e acontece periodicamente por questões de segurança.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <p className="text-sm text-blue-800">
+                Seus dados e transações anteriores serão mantidos. Após reconectar, a sincronização continuará normalmente.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setReconnectError(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (reconnectError?.accountId) {
+                  handleReconnectAccount(reconnectError.accountId);
+                }
+              }}
+              disabled={reconnectingAccountId === reconnectError?.accountId}
+            >
+              {reconnectingAccountId === reconnectError?.accountId ? (
+                <>
+                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                  Gerando token...
+                </>
+              ) : (
+                <>
+                  <LinkIcon className="h-4 w-4 mr-2" />
+                  Reconectar Conta
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
