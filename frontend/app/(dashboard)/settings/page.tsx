@@ -284,7 +284,14 @@ export default function SettingsPage() {
     user?.company?.subscription_end_date || null
   );
   const subscriptionStatusInfo = getSubscriptionStatusInfo(user?.company?.subscription_status || 'trialing');
-  const showUpgradePrompt = shouldShowUpgradePrompt(user?.company?.subscription_status || 'trialing', trialInfo);
+  
+  // Don't show trial info if user has active paid subscription
+  const isActiveSubscription = user?.company?.subscription_status === 'active' && 
+                              user?.company?.subscription_plan?.price_monthly && 
+                              Number(user?.company?.subscription_plan?.price_monthly) > 0;
+  
+  const showTrialInfo = !isActiveSubscription && trialInfo.isActive;
+  const showUpgradePrompt = !isActiveSubscription && shouldShowUpgradePrompt(user?.company?.subscription_status || 'trialing', trialInfo);
 
   return (
     <div className="space-y-6">
@@ -677,7 +684,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  {/* Trial Info */}
+                  {/* Trial Info - only show if not active subscription */}
                   {subscriptionStatus.subscription_status === 'trial' && (
                     <div className="p-4 bg-blue-50 rounded-lg">
                       <p className="text-sm text-blue-800">
@@ -774,11 +781,13 @@ export default function SettingsPage() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <span className={`px-2 py-1 text-xs rounded-full ${subscriptionStatusInfo.color}`}>
-                          {subscriptionStatusInfo.label}
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          isActiveSubscription ? 'bg-green-100 text-green-800' : subscriptionStatusInfo.color
+                        }`}>
+                          {isActiveSubscription ? 'Ativa' : subscriptionStatusInfo.label}
                         </span>
                         <p className="text-xs text-gray-500 mt-1">
-                          {subscriptionStatusInfo.description}
+                          {isActiveSubscription ? 'Assinatura paga ativa' : subscriptionStatusInfo.description}
                         </p>
                       </div>
                     </div>
@@ -786,7 +795,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Trial Information */}
-                {trialInfo.isActive && (
+                {showTrialInfo && (
                   <div className={`border p-4 rounded-lg ${
                     trialInfo.isExpiringSoon 
                       ? 'bg-orange-50 border-orange-200' 
@@ -839,6 +848,29 @@ export default function SettingsPage() {
                   </div>
                 )}
 
+                {/* Payment Method Status */}
+                {isActiveSubscription && (
+                  <div className="bg-green-50 border border-green-200 p-4 rounded-lg mb-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <CheckCircleIcon className="h-5 w-5 text-green-600 mr-2" />
+                        <div>
+                          <p className="font-medium text-green-800">Método de Pagamento Configurado</p>
+                          <p className="text-sm text-green-700">Sua cobrança está configurada e ativa</p>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setPaymentMethodsDialogOpen(true)}
+                        className="text-green-700 border-green-300 hover:bg-green-100"
+                      >
+                        Gerenciar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Billing Information */}
                 <div>
                   <h3 className="font-medium mb-3">Informações de Cobrança</h3>
@@ -873,7 +905,8 @@ export default function SettingsPage() {
                       <div className="bg-gray-50 p-4 rounded-lg">
                         <p className="text-sm text-gray-600">Limite de Transações</p>
                         <p className="font-medium">
-                          {user?.company?.subscription_plan?.max_transactions === 999999 
+                          {!user?.company?.subscription_plan?.max_transactions || 
+                           user?.company?.subscription_plan?.max_transactions >= 100000 
                             ? 'Ilimitado' 
                             : `${user?.company?.subscription_plan?.max_transactions?.toLocaleString()}/mês`}
                         </p>
@@ -881,7 +914,8 @@ export default function SettingsPage() {
                       <div className="bg-gray-50 p-4 rounded-lg">
                         <p className="text-sm text-gray-600">Limite de Contas Bancárias</p>
                         <p className="font-medium">
-                          {user?.company?.subscription_plan?.max_bank_accounts === 999 
+                          {!user?.company?.subscription_plan?.max_bank_accounts ||
+                           user?.company?.subscription_plan?.max_bank_accounts >= 100 
                             ? 'Ilimitado' 
                             : user?.company?.subscription_plan?.max_bank_accounts}
                         </p>
@@ -890,7 +924,8 @@ export default function SettingsPage() {
                         <div className="bg-gray-50 p-4 rounded-lg">
                           <p className="text-sm text-gray-600">Limite de IA</p>
                           <p className="font-medium">
-                            {user?.company?.subscription_plan?.max_ai_requests_per_month === 999999 
+                            {!user?.company?.subscription_plan?.max_ai_requests_per_month ||
+                             user?.company?.subscription_plan?.max_ai_requests_per_month >= 100000 
                               ? 'Ilimitado' 
                               : `${user?.company?.subscription_plan?.max_ai_requests_per_month}/mês`}
                           </p>
@@ -912,13 +947,19 @@ export default function SettingsPage() {
                           <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
-                          Até {user.company.subscription_plan.max_transactions} transações/mês
+                          {!user.company.subscription_plan.max_transactions || 
+                           user.company.subscription_plan.max_transactions >= 100000
+                            ? 'Transações ilimitadas'
+                            : `Até ${user.company.subscription_plan.max_transactions.toLocaleString()} transações/mês`}
                         </li>
                         <li className="flex items-center text-sm text-gray-700">
                           <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
-                          {user.company.subscription_plan.max_bank_accounts} contas bancárias
+                          {!user.company.subscription_plan.max_bank_accounts ||
+                           user.company.subscription_plan.max_bank_accounts >= 100
+                            ? 'Contas bancárias ilimitadas'
+                            : `${user.company.subscription_plan.max_bank_accounts} contas bancárias`}
                         </li>
 
                         {user.company.subscription_plan.has_ai_categorization && (

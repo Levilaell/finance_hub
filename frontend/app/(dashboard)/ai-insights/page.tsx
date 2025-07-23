@@ -41,6 +41,7 @@ import {
   GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { ScenarioSimulator } from '@/components/ai-insights/scenario-simulator';
 import { MarketBenchmarking } from '@/components/ai-insights/market-benchmarking';
 import { ContextInput, BusinessContext } from '@/components/ai-insights/context-input';
