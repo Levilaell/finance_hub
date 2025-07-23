@@ -95,8 +95,8 @@ class TrialExpirationMiddleware:
                         'redirect': '/dashboard/subscription/upgrade'
                     }, status=status.HTTP_402_PAYMENT_REQUIRED)
         
-        # Check if subscription is expired or suspended
-        if company.subscription_status in ['expired', 'suspended']:
+        # Check if subscription is expired, suspended, or cancelled
+        if company.subscription_status in ['expired', 'suspended', 'cancelled']:
             # Check if path is allowed for expired subscriptions
             path_allowed_when_expired = any(
                 path.startswith(p) for p in self.ALLOWED_EXPIRED_PATHS
@@ -104,11 +104,17 @@ class TrialExpirationMiddleware:
             
             # Block access to most features
             if path.startswith('/api/') and not path_allowed_when_expired:
+                messages = {
+                    'expired': 'Sua assinatura expirou. Renove para continuar.',
+                    'suspended': 'Sua assinatura está suspensa. Entre em contato com o suporte.',
+                    'cancelled': 'Sua assinatura foi cancelada. Reative para continuar usando o sistema.'
+                }
+                
                 return JsonResponse({
                     'error': 'subscription_inactive',
-                    'message': 'Sua assinatura está inativa. Por favor, regularize para continuar.',
+                    'message': messages.get(company.subscription_status, 'Sua assinatura está inativa. Por favor, regularize para continuar.'),
                     'subscription_status': company.subscription_status,
-                    'redirect': '/dashboard/subscription'
+                    'redirect': '/dashboard/subscription-blocked'
                 }, status=status.HTTP_402_PAYMENT_REQUIRED)
         
         # Check usage limits for active subscriptions

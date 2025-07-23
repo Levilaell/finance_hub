@@ -17,7 +17,7 @@ export default function DashboardLayout({
   const router = useRouter();
   
   // Use subscription check hook - but only when authenticated
-  const { subscriptionStatus, isTrialExpired } = useSubscriptionCheck();
+  const { subscriptionStatus, isTrialExpired, isLoading: isLoadingSubscription } = useSubscriptionCheck();
 
 
   useEffect(() => {
@@ -26,27 +26,36 @@ export default function DashboardLayout({
     }
   }, [isAuthenticated, isLoading, _hasHydrated, router]);
 
-  // Handle trial expiration redirect
+  // Handle subscription blocking - more strict approach
   useEffect(() => {
-    if (isAuthenticated && isTrialExpired) {
-      // Check if user is on allowed pages
+    if (isAuthenticated && subscriptionStatus && !isLoadingSubscription) {
       const currentPath = window.location.pathname;
-      const allowedPaths = [
-        '/dashboard/subscription',
-        '/dashboard/billing',
-        '/dashboard/settings',
-        '/settings'
-      ];
       
-      const isOnAllowedPath = allowedPaths.some(path => 
-        currentPath.startsWith(path)
-      );
+      // Check if subscription is blocked
+      const isBlocked = subscriptionStatus.subscription_status === 'expired' ||
+                       subscriptionStatus.subscription_status === 'cancelled' ||
+                       subscriptionStatus.subscription_status === 'suspended' ||
+                       (subscriptionStatus.subscription_status === 'trial' && subscriptionStatus.trial_days_left <= 0);
       
-      if (!isOnAllowedPath) {
-        router.push('/dashboard/subscription/upgrade');
+      if (isBlocked) {
+        // Only allow access to subscription/billing pages and blocked page
+        const allowedPaths = [
+          '/dashboard/subscription',
+          '/dashboard/subscription-blocked',
+          '/settings'
+        ];
+        
+        const isOnAllowedPath = allowedPaths.some(path => 
+          currentPath.startsWith(path)
+        );
+        
+        // If not on allowed path, redirect to blocked page
+        if (!isOnAllowedPath) {
+          router.push('/dashboard/subscription-blocked');
+        }
       }
     }
-  }, [isAuthenticated, isTrialExpired, router]);
+  }, [isAuthenticated, subscriptionStatus, isLoadingSubscription, router]);
 
   if (!_hasHydrated || isLoading) {
     return (

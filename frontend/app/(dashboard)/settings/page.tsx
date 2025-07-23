@@ -112,6 +112,7 @@ export default function SettingsPage() {
   const [upgradePlanDialogOpen, setUpgradePlanDialogOpen] = useState(false);
   const [billingHistoryDialogOpen, setBillingHistoryDialogOpen] = useState(false);
   const [paymentMethodsDialogOpen, setPaymentMethodsDialogOpen] = useState(false);
+  const [cancelSubscriptionDialogOpen, setCancelSubscriptionDialogOpen] = useState(false);
 
   const profileForm = useForm<ProfileForm>({
     defaultValues: {
@@ -250,6 +251,21 @@ export default function SettingsPage() {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.error || 'Falha ao deletar conta');
+    },
+  });
+
+  const cancelSubscriptionMutation = useMutation({
+    mutationFn: () => subscriptionService.cancelSubscription(),
+    onSuccess: () => {
+      toast.success('Assinatura cancelada com sucesso');
+      setCancelSubscriptionDialogOpen(false);
+      // Refresh user data and invalidate queries
+      fetchUser();
+      queryClient.invalidateQueries({ queryKey: ['subscription-status'] });
+      queryClient.invalidateQueries({ queryKey: ['current-user'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Falha ao cancelar assinatura');
     },
   });
 
@@ -1045,6 +1061,16 @@ export default function SettingsPage() {
                   >
                     Gerenciar Pagamentos
                   </Button>
+                  {/* Show cancel button only for active paid subscriptions */}
+                  {isActiveSubscription && (
+                    <Button 
+                      variant="destructive" 
+                      className="w-full sm:w-auto"
+                      onClick={() => setCancelSubscriptionDialogOpen(true)}
+                    >
+                      Cancelar Assinatura
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -1281,6 +1307,51 @@ export default function SettingsPage() {
         open={paymentMethodsDialogOpen}
         onOpenChange={setPaymentMethodsDialogOpen}
       />
+
+      {/* Cancel Subscription Dialog */}
+      <Dialog open={cancelSubscriptionDialogOpen} onOpenChange={setCancelSubscriptionDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Cancelar Assinatura</DialogTitle>
+            <DialogDescription>
+              Você está prestes a cancelar sua assinatura. Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+              <h4 className="font-medium text-yellow-800 mb-2">O que acontecerá:</h4>
+              <ul className="text-sm text-yellow-700 space-y-1">
+                <li>• Sua assinatura será cancelada imediatamente</li>
+                <li>• Você perderá acesso aos recursos premium</li>
+                <li>• Seus dados serão mantidos por 30 dias</li>
+                <li>• Você pode reativar a qualquer momento</li>
+              </ul>
+            </div>
+            <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+              <p className="text-sm text-red-800">
+                <strong>Importante:</strong> Esta ação cancelará imediatamente sua assinatura e você perderá acesso 
+                aos recursos premium. Você pode reativar sua assinatura a qualquer momento.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCancelSubscriptionDialogOpen(false)}
+              disabled={cancelSubscriptionMutation.isPending}
+            >
+              Manter Assinatura
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => cancelSubscriptionMutation.mutate()}
+              disabled={cancelSubscriptionMutation.isPending}
+            >
+              {cancelSubscriptionMutation.isPending ? <LoadingSpinner /> : 'Confirmar Cancelamento'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Account Dialog */}
       <Dialog open={deleteAccountDialogOpen} onOpenChange={setDeleteAccountDialogOpen}>
