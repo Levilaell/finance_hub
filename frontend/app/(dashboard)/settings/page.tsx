@@ -301,13 +301,17 @@ export default function SettingsPage() {
   );
   const subscriptionStatusInfo = getSubscriptionStatusInfo(user?.company?.subscription_status || 'trialing');
   
-  // Don't show trial info if user has active paid subscription
+  // Don't show trial info if user has active paid subscription or cancelled/expired
   const isActiveSubscription = user?.company?.subscription_status === 'active' && 
                               user?.company?.subscription_plan?.price_monthly && 
                               Number(user?.company?.subscription_plan?.price_monthly) > 0;
   
-  const showTrialInfo = !isActiveSubscription && trialInfo.isActive;
-  const showUpgradePrompt = !isActiveSubscription && shouldShowUpgradePrompt(user?.company?.subscription_status || 'trialing', trialInfo);
+  const isCancelledOrExpired = ['cancelled', 'canceled', 'cancelling', 'expired', 'suspended'].includes(
+    user?.company?.subscription_status || ''
+  );
+  
+  const showTrialInfo = !isActiveSubscription && !isCancelledOrExpired && trialInfo.isActive;
+  const showUpgradePrompt = !isActiveSubscription && !isCancelledOrExpired && shouldShowUpgradePrompt(user?.company?.subscription_status || 'trialing', trialInfo);
 
   return (
     <div className="space-y-6">
@@ -700,8 +704,9 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  {/* Trial Info - only show if not active subscription */}
-                  {subscriptionStatus.subscription_status === 'trial' && (
+                  {/* Trial Info - only show if trial and not cancelled */}
+                  {subscriptionStatus.subscription_status === 'trial' && 
+                   !isCancelledOrExpired && (
                     <div className="p-4 bg-blue-50 rounded-lg">
                       <p className="text-sm text-blue-800">
                         {subscriptionStatus.trial_days_left > 0 ? (
@@ -715,6 +720,26 @@ export default function SettingsPage() {
                           Data de expiração: {new Date(subscriptionStatus.trial_ends_at).toLocaleDateString('pt-BR')}
                         </p>
                       )}
+                    </div>
+                  )}
+
+                  {/* Cancelled subscription info */}
+                  {isCancelledOrExpired && (
+                    <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                      <p className="text-sm text-orange-800">
+                        <strong>
+                          {user?.company?.subscription_status === 'cancelling' 
+                            ? 'Cancelamento em processo' 
+                            : 'Assinatura cancelada'
+                          }
+                        </strong>
+                      </p>
+                      <p className="text-xs text-orange-600 mt-1">
+                        {user?.company?.subscription_status === 'cancelling' 
+                          ? 'Suas cobranças futuras foram interrompidas'
+                          : 'Você pode reativar sua assinatura a qualquer momento'
+                        }
+                      </p>
                     </div>
                   )}
 
@@ -887,37 +912,65 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                {/* Billing Information */}
-                <div>
-                  <h3 className="font-medium mb-3">Informações de Cobrança</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Next Billing Date */}
-                    {billingInfo.nextBillingDate && (
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <p className="text-sm text-gray-600">Próxima Cobrança</p>
-                        <p className="font-medium">
-                          {formatDate(billingInfo.nextBillingDate)}
-                        </p>
-                        {billingInfo.daysUntilNextBilling && billingInfo.daysUntilNextBilling > 0 && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            em {billingInfo.daysUntilNextBilling} {billingInfo.daysUntilNextBilling === 1 ? 'dia' : 'dias'}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Subscription Start Date */}
-                    {billingInfo.subscriptionStartDate && (
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <p className="text-sm text-gray-600">Assinatura Iniciada</p>
-                        <p className="font-medium">
-                          {formatDate(billingInfo.subscriptionStartDate)}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Plan Limits */}
+                {/* Billing Information - Hide for cancelled subscriptions */}
+                {!isCancelledOrExpired && (
+                  <div>
+                    <h3 className="font-medium mb-3">Informações de Cobrança</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Next Billing Date */}
+                      {billingInfo.nextBillingDate && (
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Próxima Cobrança</p>
+                          <p className="font-medium">
+                            {formatDate(billingInfo.nextBillingDate)}
+                          </p>
+                          {billingInfo.daysUntilNextBilling && billingInfo.daysUntilNextBilling > 0 && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              em {billingInfo.daysUntilNextBilling} {billingInfo.daysUntilNextBilling === 1 ? 'dia' : 'dias'}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Subscription Start Date */}
+                      {billingInfo.subscriptionStartDate && (
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Assinatura Iniciada</p>
+                          <p className="font-medium">
+                            {formatDate(billingInfo.subscriptionStartDate)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Cancelled subscription message */}
+                {isCancelledOrExpired && (
+                  <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
+                    <h3 className="font-medium text-orange-800 mb-2">
+                      {user?.company?.subscription_status === 'cancelling' ? 'Cancelamento em Processo' : 'Assinatura Cancelada'}
+                    </h3>
+                    <p className="text-sm text-orange-700">
+                      {user?.company?.subscription_status === 'cancelling' 
+                        ? 'Sua assinatura está sendo cancelada. As cobranças futuras foram interrompidas.'
+                        : 'Sua assinatura foi cancelada. Você pode reativar a qualquer momento.'
+                      }
+                    </p>
+                    <div className="mt-3">
+                      <Button 
+                        size="sm"
+                        onClick={() => setUpgradePlanDialogOpen(true)}
+                        className="bg-orange-600 hover:bg-orange-700"
+                      >
+                        Reativar Assinatura
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Plan Limits */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="bg-gray-50 p-4 rounded-lg">
                         <p className="text-sm text-gray-600">Limite de Transações</p>
                         <p className="font-medium">
@@ -1069,6 +1122,16 @@ export default function SettingsPage() {
                       onClick={() => setCancelSubscriptionDialogOpen(true)}
                     >
                       Cancelar Assinatura
+                    </Button>
+                  )}
+                  
+                  {/* Show reactivate button for cancelled subscriptions */}
+                  {isCancelledOrExpired && (
+                    <Button 
+                      className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+                      onClick={() => setUpgradePlanDialogOpen(true)}
+                    >
+                      Reativar Assinatura
                     </Button>
                   )}
                 </div>

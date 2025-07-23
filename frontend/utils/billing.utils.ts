@@ -78,6 +78,11 @@ export function getSubscriptionStatusInfo(status: string) {
       color: 'bg-blue-100 text-blue-800',
       description: 'Você está no período de teste gratuito'
     },
+    trial: {
+      label: 'Período de Teste',
+      color: 'bg-blue-100 text-blue-800',
+      description: 'Você está no período de teste gratuito'
+    },
     past_due: {
       label: 'Em Atraso',
       color: 'bg-red-100 text-red-800',
@@ -87,6 +92,26 @@ export function getSubscriptionStatusInfo(status: string) {
       label: 'Cancelada',
       color: 'bg-gray-100 text-gray-800',
       description: 'Assinatura cancelada'
+    },
+    cancelled: {
+      label: 'Cancelada',
+      color: 'bg-gray-100 text-gray-800',
+      description: 'Assinatura cancelada'
+    },
+    cancelling: {
+      label: 'Cancelando',
+      color: 'bg-orange-100 text-orange-800',
+      description: 'Assinatura sendo cancelada'
+    },
+    expired: {
+      label: 'Expirada',
+      color: 'bg-red-100 text-red-800',
+      description: 'Assinatura expirada'
+    },
+    suspended: {
+      label: 'Suspensa',
+      color: 'bg-red-100 text-red-800',
+      description: 'Assinatura suspensa'
     },
     unpaid: {
       label: 'Não Paga',
