@@ -134,31 +134,67 @@ class PluggyWebhookHandler:
     
     async def _handle_transactions_created(self, event_data: dict) -> dict:
         """Handle transactions created event"""
-        account_id = event_data.get('accountId')
-        if not account_id:
-            return {'success': False, 'message': 'No accountId provided'}
+        # Try different possible locations for accountId
+        account_id = event_data.get('accountId') or event_data.get('account_id')
         
-        logger.info(f"New transactions for Pluggy account {account_id}")
+        # If not in event_data, it might be an item_id
+        item_id = event_data.get('itemId') or event_data.get('item_id') or event_data.get('id')
         
-        # Find account using sync_to_async
+        if not account_id and not item_id:
+            logger.error(f"No accountId or itemId in webhook data: {event_data}")
+            return {'success': False, 'message': 'No accountId or itemId provided'}
+        
+        # Find accounts to sync
+        accounts_to_sync = []
+        
         try:
-            account = await sync_to_async(
-                BankAccount.objects.get
-            )(
-                external_id=account_id,
-                is_active=True
-            )
+            if account_id:
+                logger.info(f"New transactions for Pluggy account {account_id}")
+                # Find by external_id (account ID)
+                account = await sync_to_async(
+                    BankAccount.objects.get
+                )(
+                    external_id=account_id,
+                    is_active=True
+                )
+                accounts_to_sync = [account]
+            elif item_id:
+                logger.info(f"New transactions for Pluggy item {item_id}")
+                # Find all accounts for this item
+                accounts = await sync_to_async(
+                    lambda: list(BankAccount.objects.filter(
+                        pluggy_item_id=item_id,
+                        is_active=True
+                    ))
+                )()
+                accounts_to_sync = accounts
             
-            # Sync transactions
-            await self.sync_service.sync_account_transactions(account)
+            if not accounts_to_sync:
+                logger.warning(f"No active accounts found for webhook data: {event_data}")
+                return {'success': False, 'message': 'No active accounts found'}
             
-            return {'success': True, 'message': f'Synced new transactions for account {account_id}'}
+            # Sync all related accounts
+            sync_results = []
+            for account in accounts_to_sync:
+                try:
+                    await self.sync_service.sync_account_transactions(account)
+                    sync_results.append(f"Account {account.id}: success")
+                    logger.info(f"✅ Synced transactions for account {account.id}")
+                except Exception as e:
+                    sync_results.append(f"Account {account.id}: failed - {str(e)}")
+                    logger.error(f"❌ Failed to sync account {account.id}: {e}")
+            
+            return {
+                'success': True, 
+                'message': f'Processed {len(accounts_to_sync)} accounts',
+                'details': sync_results
+            }
             
         except BankAccount.DoesNotExist:
-            logger.warning(f"Account {account_id} not found for transaction sync")
-            return {'success': False, 'message': f'Account {account_id} not found'}
+            logger.warning(f"Account not found for webhook data: {event_data}")
+            return {'success': False, 'message': 'Account not found'}
         except Exception as e:
-            logger.error(f"Error syncing transactions for account {account_id}: {e}", exc_info=True)
+            logger.error(f"Error processing transactions webhook: {e}", exc_info=True)
             return {'success': False, 'message': str(e)}
     
     async def _handle_item_waiting_user_action(self, event_data: dict) -> dict:

@@ -393,46 +393,11 @@ class PluggySyncAccountView(APIView):
             import asyncio
             
             async def sync_account():
-                # Check if we should force item update
-                # Only do it for accounts that haven't been updated recently
-                # to avoid triggering WAITING_USER_ACTION status
-                if account.pluggy_item_id:
-                    async with PluggyClient() as client:
-                        try:
-                            # Check current item status first
-                            item = await client.get_item(account.pluggy_item_id)
-                            current_status = item.get('status')
-                            updated_at = item.get('updatedAt')
-                            
-                            logger.info(f"📋 Current item status: {current_status}, last updated: {updated_at}")
-                            
-                            # Only force update if:
-                            # 1. Status is ACTIVE or UPDATED (not WAITING_USER_ACTION)
-                            # 2. Last update was more than 1 hour ago
-                            should_force_update = False
-                            
-                            if current_status in ['ACTIVE', 'UPDATED'] and updated_at:
-                                from datetime import datetime, timezone
-                                last_update = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
-                                hours_since_update = (datetime.now(timezone.utc) - last_update).total_seconds() / 3600
-                                
-                                if hours_since_update > 1:
-                                    should_force_update = True
-                                    logger.info(f"📊 Item hasn't been updated in {hours_since_update:.1f} hours, will force update")
-                                else:
-                                    logger.info(f"✅ Item was updated {hours_since_update:.1f} hours ago, skipping force update")
-                            
-                            if should_force_update:
-                                update_result = await pluggy_sync_service.force_item_update(account.pluggy_item_id)
-                                if update_result.get('success'):
-                                    logger.info(f"✅ Item update triggered successfully")
-                                    # Wait a reasonable time for update to start
-                                    await asyncio.sleep(5)
-                            
-                        except Exception as e:
-                            logger.warning(f"⚠️ Error checking item status: {e}")
+                # Direct sync without forcing item update
+                # This avoids triggering WAITING_USER_ACTION status
+                logger.info(f"📊 Starting direct transaction sync for account {account.id}")
                 
-                # Always proceed with sync to get whatever transactions are available
+                # Just sync transactions with expanded date range
                 return await pluggy_sync_service.sync_account_transactions(account)
             
             # Run async sync
@@ -664,6 +629,7 @@ def pluggy_webhook(request):
         event_data = request.data.get('data', {})
         
         logger.info(f"Received authenticated Pluggy webhook: {event_type}")
+        logger.info(f"Webhook payload: {json.dumps(request.data, indent=2)}")
         
         # Process webhook using the new handler
         from .webhook_handler import PluggyWebhookHandler

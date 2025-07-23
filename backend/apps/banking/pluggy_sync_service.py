@@ -303,10 +303,10 @@ class PluggyTransactionSyncService:
                 logger.info(f"⚠️ Long gap ({days_since_sync} days), using 30 days")
                 return (timezone.now() - timedelta(days=30)).date()
             elif hours_since_sync < 24:
-                # SYNC MUITO RECENTE: usar janela otimizada para capturar transações
-                # que podem ter delay na API da Pluggy (geralmente alguns minutos)
-                days_back = 2  # 2 dias é suficiente para cobrir delays e timezone
-                logger.info(f"🔄 Recent sync ({hours_since_sync:.1f} hours ago), using {days_back} days to catch delayed transactions")
+                # SYNC MUITO RECENTE: usar janela MAIOR para garantir que pegamos transações
+                # A Pluggy pode ter delay significativo para disponibilizar transações recentes
+                days_back = 7  # Aumentado para 7 dias para garantir que não perdemos transações
+                logger.info(f"🔄 Recent sync ({hours_since_sync:.1f} hours ago), using {days_back} days window to ensure we catch all transactions")
                 return (timezone.now() - timedelta(days=days_back)).date()
             else:
                 # Incremental normal - sempre buscar pelo menos 3 dias
