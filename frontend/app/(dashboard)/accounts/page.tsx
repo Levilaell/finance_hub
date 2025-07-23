@@ -200,50 +200,14 @@ export default function AccountsPage() {
     }
   };
 
-  // ✅ Função handleSyncAccount com detecção de WAITING_USER_ACTION
+  // ✅ Função handleSyncAccount - sempre abre Pluggy Connect para garantir atualização
   const handleSyncAccount = async (accountId: string) => {
-    setSyncingAccountId(accountId);
-    try {
-      
-      const result = await bankingService.syncPluggyAccount(accountId);
-      
-      
-      if (result.success) {
-        const transactionCount = result.data.transactions_synced;
-        const message = result.data.message || `${transactionCount} transações sincronizadas`;
-        
-        // Mostrar mensagem apropriada baseada no resultado
-        if (transactionCount === 0 && result.data.days_searched) {
-          toast.info(`📊 ${message} (últimos ${result.data.days_searched} dias verificados)`);
-          
-          // Se há sugestão de reconexão, mostrar
-          if (result.data.suggestion) {
-            toast.warning(result.data.suggestion, { duration: 6000 });
-          }
-        } else if (transactionCount > 0) {
-          toast.success(`✅ ${transactionCount} transações sincronizadas`);
-        } else {
-          toast.info(`📊 ${message}`);
-        }
-        
-        fetchAccounts(); // Refresh accounts list
-      } else {
-        throw new Error('Falha na sincronização');
-      }
-    } catch (error: any) {
-      // Check if it's a WAITING_USER_ACTION error
-      if (error.response?.data?.error_code === 'WAITING_USER_ACTION') {
-        setReconnectError({
-          accountId,
-          message: error.response.data.message || 'O banco está solicitando que você faça login novamente.'
-        });
-        toast.warning('Reconexão necessária para continuar sincronizando');
-      } else {
-        toast.error('Erro ao sincronizar conta: ' + (error.message || 'Erro desconhecido'));
-      }
-    } finally {
-      setSyncingAccountId(null);
-    }
+    // Sempre abrir Pluggy Connect para reconectar/atualizar o Item
+    toast.info('Abrindo conexão com o banco para sincronizar...');
+    await handleReconnectAccount(accountId);
+    
+    // Após fechar o Pluggy Connect, a sincronização será feita automaticamente
+    // pelo callback de sucesso
   };
 
   // ✅ Função para reconectar conta
@@ -273,8 +237,10 @@ export default function AccountsPage() {
         
         // Store item_id for updateItem parameter
         sessionStorage.setItem('pluggy_update_item', item_id);
+        // Store account ID for automatic sync after reconnection
+        sessionStorage.setItem('pluggy_reconnecting_account', accountId);
         
-        toast.success('Abrindo Pluggy Connect para reconexão...');
+        toast.success('Abrindo Pluggy Connect para atualizar conexão...');
       } else {
         throw new Error(result.data?.message || 'Erro ao gerar token de reconexão');
       }
@@ -400,6 +366,49 @@ export default function AccountsPage() {
               
               if (itemId) {
                 try {
+                  // Se é uma atualização de item (reconexão), sincronizar automaticamente
+                  const updateItemId = sessionStorage.getItem('pluggy_update_item');
+                  const reconnectingAccount = sessionStorage.getItem('pluggy_reconnecting_account');
+                  
+                  if (updateItemId && reconnectingAccount) {
+                    console.log('[AccountsPage] Item updated via iframe, syncing automatically...');
+                    
+                    // Limpar dados de reconexão
+                    sessionStorage.removeItem('pluggy_update_item');
+                    sessionStorage.removeItem('pluggy_reconnecting_account');
+                    
+                    // Fechar widget
+                    resetPluggyWidget();
+                    
+                    // Aguardar um momento para o Item ser processado
+                    toast.success('Conexão atualizada! Sincronizando transações...');
+                    
+                    setTimeout(async () => {
+                      try {
+                        // Sincronizar conta
+                        const result = await bankingService.syncPluggyAccount(reconnectingAccount);
+                        
+                        if (result.success) {
+                          const transactionCount = result.data.transactions_synced;
+                          if (transactionCount > 0) {
+                            toast.success(`✅ ${transactionCount} transações sincronizadas`);
+                          } else {
+                            toast.info('Nenhuma transação nova encontrada');
+                          }
+                        }
+                        
+                        // Atualizar lista de contas
+                        await fetchAccounts();
+                      } catch (error) {
+                        console.error('[AccountsPage] Error syncing after reconnection:', error);
+                        toast.error('Erro ao sincronizar após reconexão');
+                      }
+                    }, 2000); // Aguardar 2 segundos para o Item ser processado
+                    
+                    return;
+                  }
+                  
+                  // Fluxo normal de nova conexão
                   console.log('[AccountsPage] Calling handlePluggyCallback with itemId:', itemId);
                   const result = await handlePluggyCallback(itemId);
                   console.log('[AccountsPage] handlePluggyCallback result:', result);
@@ -418,6 +427,9 @@ export default function AccountsPage() {
               }
               
               resetPluggyWidget();
+              // Clear update item after use
+              sessionStorage.removeItem('pluggy_update_item');
+              sessionStorage.removeItem('pluggy_reconnecting_account');
             }}
             onError={(error) => {
               console.error('[AccountsPage] Pluggy Iframe Error:', error);
@@ -430,6 +442,7 @@ export default function AccountsPage() {
               resetPluggyWidget();
               // Clear update item after use
               sessionStorage.removeItem('pluggy_update_item');
+              sessionStorage.removeItem('pluggy_reconnecting_account');
             }}
           />
         ) : (
@@ -442,6 +455,49 @@ export default function AccountsPage() {
               
               if (itemId) {
                 try {
+                  // Se é uma atualização de item (reconexão), sincronizar automaticamente
+                  const updateItemId = sessionStorage.getItem('pluggy_update_item');
+                  const reconnectingAccount = sessionStorage.getItem('pluggy_reconnecting_account');
+                  
+                  if (updateItemId && reconnectingAccount) {
+                    console.log('[AccountsPage] Item updated, syncing automatically...');
+                    
+                    // Limpar dados de reconexão
+                    sessionStorage.removeItem('pluggy_update_item');
+                    sessionStorage.removeItem('pluggy_reconnecting_account');
+                    
+                    // Fechar widget
+                    resetPluggyWidget();
+                    
+                    // Aguardar um momento para o Item ser processado
+                    toast.success('Conexão atualizada! Sincronizando transações...');
+                    
+                    setTimeout(async () => {
+                      try {
+                        // Sincronizar conta
+                        const result = await bankingService.syncPluggyAccount(reconnectingAccount);
+                        
+                        if (result.success) {
+                          const transactionCount = result.data.transactions_synced;
+                          if (transactionCount > 0) {
+                            toast.success(`✅ ${transactionCount} transações sincronizadas`);
+                          } else {
+                            toast.info('Nenhuma transação nova encontrada');
+                          }
+                        }
+                        
+                        // Atualizar lista de contas
+                        await fetchAccounts();
+                      } catch (error) {
+                        console.error('[AccountsPage] Error syncing after reconnection:', error);
+                        toast.error('Erro ao sincronizar após reconexão');
+                      }
+                    }, 2000); // Aguardar 2 segundos para o Item ser processado
+                    
+                    return;
+                  }
+                  
+                  // Fluxo normal de nova conexão
                   console.log('[AccountsPage] Calling handlePluggyCallback with itemId:', itemId);
                   const result = await handlePluggyCallback(itemId);
                   console.log('[AccountsPage] handlePluggyCallback result:', result);
@@ -462,6 +518,7 @@ export default function AccountsPage() {
               resetPluggyWidget();
               // Clear update item after use
               sessionStorage.removeItem('pluggy_update_item');
+              sessionStorage.removeItem('pluggy_reconnecting_account');
             }}
             onError={(error) => {
               console.error('[AccountsPage] Pluggy Connect Error:', error);
@@ -486,6 +543,7 @@ export default function AccountsPage() {
               resetPluggyWidget();
               // Clear update item after use
               sessionStorage.removeItem('pluggy_update_item');
+              sessionStorage.removeItem('pluggy_reconnecting_account');
             }}
           />
         )
