@@ -393,20 +393,46 @@ class PluggySyncAccountView(APIView):
             import asyncio
             
             async def sync_account():
-                # Force item update before syncing
+                # Check if we should force item update
+                # Only do it for accounts that haven't been updated recently
+                # to avoid triggering WAITING_USER_ACTION status
                 if account.pluggy_item_id:
-                    update_result = await pluggy_sync_service.force_item_update(account.pluggy_item_id)
-                    if update_result.get('success'):
-                        logger.info(f"✅ Item update triggered successfully, status: {update_result.get('status')}")
-                        # Wait longer for Pluggy to complete the update
-                        # The update process can take 10-30 seconds
-                        logger.info("⏳ Waiting 15 seconds for Pluggy to fetch new transactions...")
-                        await asyncio.sleep(15)
-                    else:
-                        logger.warning(f"⚠️ Could not force item update: {update_result.get('message', update_result.get('error'))}")
-                        # Continue with sync anyway
+                    async with PluggyClient() as client:
+                        try:
+                            # Check current item status first
+                            item = await client.get_item(account.pluggy_item_id)
+                            current_status = item.get('status')
+                            updated_at = item.get('updatedAt')
+                            
+                            logger.info(f"📋 Current item status: {current_status}, last updated: {updated_at}")
+                            
+                            # Only force update if:
+                            # 1. Status is ACTIVE or UPDATED (not WAITING_USER_ACTION)
+                            # 2. Last update was more than 1 hour ago
+                            should_force_update = False
+                            
+                            if current_status in ['ACTIVE', 'UPDATED'] and updated_at:
+                                from datetime import datetime, timezone
+                                last_update = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+                                hours_since_update = (datetime.now(timezone.utc) - last_update).total_seconds() / 3600
+                                
+                                if hours_since_update > 1:
+                                    should_force_update = True
+                                    logger.info(f"📊 Item hasn't been updated in {hours_since_update:.1f} hours, will force update")
+                                else:
+                                    logger.info(f"✅ Item was updated {hours_since_update:.1f} hours ago, skipping force update")
+                            
+                            if should_force_update:
+                                update_result = await pluggy_sync_service.force_item_update(account.pluggy_item_id)
+                                if update_result.get('success'):
+                                    logger.info(f"✅ Item update triggered successfully")
+                                    # Wait a reasonable time for update to start
+                                    await asyncio.sleep(5)
+                            
+                        except Exception as e:
+                            logger.warning(f"⚠️ Error checking item status: {e}")
                 
-                # Now sync transactions
+                # Always proceed with sync to get whatever transactions are available
                 return await pluggy_sync_service.sync_account_transactions(account)
             
             # Run async sync
@@ -459,11 +485,21 @@ class PluggySyncAccountView(APIView):
                     }
                 })
             else:
-                return Response({
-                    'success': False,
-                    'error': f"Sync failed: {result.get('error', 'Unknown error')}",
-                    'details': result
-                }, status=status.HTTP_400_BAD_REQUEST)
+                # Check if it's a waiting_user_action status
+                if result.get('status') == 'waiting_user_action':
+                    return Response({
+                        'success': False,
+                        'error': 'Reautenticação necessária',
+                        'error_code': 'WAITING_USER_ACTION',
+                        'message': 'O banco está solicitando que você faça login novamente. Por favor, reconecte sua conta.',
+                        'details': result
+                    }, status=status.HTTP_403_FORBIDDEN)
+                else:
+                    return Response({
+                        'success': False,
+                        'error': f"Sync failed: {result.get('error', result.get('message', 'Unknown error'))}",
+                        'details': result
+                    }, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
             logger.error(f"❌ Error syncing Pluggy account {account_id}: {e}", exc_info=True)
