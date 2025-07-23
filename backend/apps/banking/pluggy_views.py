@@ -393,25 +393,30 @@ class PluggySyncAccountView(APIView):
             import asyncio
             
             async def sync_account():
-                # IMPORTANTE: Para obter transações novas, precisamos forçar update do Item
-                # Mas apenas se o item estiver em status que permite update
+                # NOTA: NÃO forçamos update do Item para evitar WAITING_USER_ACTION
+                # Em vez disso, usamos uma janela de tempo maior para capturar transações
                 logger.info(f"📊 Starting sync for account {account.id}")
                 
-                # Primeiro, tentar forçar update do Item se possível
+                # Verificar status do Item antes de sincronizar
                 if account.pluggy_item_id:
-                    logger.info(f"🔄 Tentando forçar update do Item {account.pluggy_item_id}")
-                    update_result = await pluggy_sync_service.force_item_update(account.pluggy_item_id)
-                    
-                    if update_result.get('success'):
-                        logger.info(f"✅ Item update triggered successfully")
-                        # Aguardar um pouco para a Pluggy processar
-                        await asyncio.sleep(3)
-                    else:
-                        logger.warning(f"⚠️ Could not force item update: {update_result.get('message', 'Unknown error')}")
-                        # Continuar mesmo assim, pode haver transações pendentes
+                    try:
+                        async with PluggyClient() as client:
+                            item = await client.get_item(account.pluggy_item_id)
+                            item_status = item.get('status')
+                            logger.info(f"📋 Current item status: {item_status}")
+                            
+                            if item_status == 'WAITING_USER_ACTION':
+                                logger.warning(f"⚠️ Item already requires user action, cannot sync")
+                                return {
+                                    'account_id': account.id,
+                                    'status': 'waiting_user_action',
+                                    'message': 'Item requires user authentication'
+                                }
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not check item status: {e}")
                 
-                # Agora sincronizar as transações
-                return await pluggy_sync_service.sync_account_transactions(account)
+                # Sincronizar transações com janela de tempo expandida para sync manual
+                return await pluggy_sync_service.sync_account_transactions(account, force_extended_window=True)
             
             # Run async sync
             loop = asyncio.new_event_loop()

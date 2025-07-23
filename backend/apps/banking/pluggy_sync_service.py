@@ -114,7 +114,7 @@ class PluggyTransactionSyncService:
                 'error': str(e)
             }
     
-    async def sync_account_transactions(self, account: BankAccount) -> Dict[str, Any]:
+    async def sync_account_transactions(self, account: BankAccount, force_extended_window: bool = False) -> Dict[str, Any]:
         """Sync transactions for a specific Pluggy account
         
         IMPORTANTE: A API da Pluggy pode ter um delay de alguns minutos para disponibilizar
@@ -165,7 +165,7 @@ class PluggyTransactionSyncService:
                     logger.warning(f"⚠️ Could not check item status: {e}")
             
             # Determine sync date range
-            sync_from = self._get_sync_from_date_safe(account_info)
+            sync_from = self._get_sync_from_date_safe(account_info, force_extended_window)
             # Buscar 1 dia no futuro para pegar transações com timezone issues
             sync_to = (timezone.now() + timedelta(days=1)).date()
             
@@ -278,7 +278,7 @@ class PluggyTransactionSyncService:
             'last_sync_at': account_with_provider.last_sync_at
         }
     
-    def _get_sync_from_date_safe(self, account_info: Dict) -> datetime.date:
+    def _get_sync_from_date_safe(self, account_info: Dict, force_extended_window: bool = False) -> datetime.date:
         """Determine the date to sync from using account info dict"""
         last_sync = account_info.get('last_sync_at')
         
@@ -297,6 +297,12 @@ class PluggyTransactionSyncService:
             # SYNC INCREMENTAL: janela maior para capturar transações recentes
             days_since_sync = (timezone.now() - last_sync).days
             hours_since_sync = (timezone.now() - last_sync).total_seconds() / 3600
+            
+            # Se forçar janela estendida (sync manual), usar período maior
+            if force_extended_window:
+                days_back = 30  # Sempre buscar 30 dias em sync manual
+                logger.info(f"🔄 Manual sync requested, using extended {days_back} days window")
+                return (timezone.now() - timedelta(days=days_back)).date()
             
             if days_since_sync > 30:
                 # Se muito tempo sem sync, buscar 30 dias para não perder nada
