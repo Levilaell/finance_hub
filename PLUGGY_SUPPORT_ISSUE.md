@@ -125,28 +125,6 @@ if item_status == 'OUTDATED':
 - Tenta sincronizar no nosso app
 - Recebe mensagem "0 transações sincronizadas"
 - Precisa reconectar a conta manualmente para ver transações novas
-- Experiência ruim e confusa
-
-## Informações Adicionais
-
-- **Item ID**: a0beeaac-806b-410f-b814-fbb8fe517d54
-- **Account ID**: 0414b113-227f-472c-aae2-b48bf4b4f0d1
-- **Connector**: Inter
-- **Última atualização bem-sucedida**: Primeira conexão
-- **Webhooks configurados**: Sim, recebendo corretamente
-
-## Logs Completos
-
-Posso fornecer logs completos de:
-- Tentativas de atualização do Item
-- Webhooks recebidos
-- Consultas de transações antes/depois
-- Estados do Item ao longo do tempo
 
 Agradeço qualquer orientação sobre como melhorar a experiência de sincronização incremental.
 
-## Contato
-
-**Email**: [seu-email]
-**Client ID**: [seu-client-id]
-**Ambiente**: Produção
