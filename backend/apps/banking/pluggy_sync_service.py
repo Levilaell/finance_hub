@@ -94,12 +94,8 @@ class PluggyTransactionSyncService:
                         'message': f'Item must be ACTIVE or UPDATED to force update, current status: {current_status}'
                     }
                 
-                # Send empty PATCH to trigger update
-                update_response = await client._make_request(
-                    'PATCH',
-                    f'/items/{item_id}',
-                    json={}
-                )
+                # Use the sync_item method to trigger update
+                update_response = await client.sync_item(item_id)
                 
                 new_status = update_response.get('status')
                 logger.info(f"✅ Item update triggered, new status: {new_status}")

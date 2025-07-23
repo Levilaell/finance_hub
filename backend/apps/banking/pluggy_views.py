@@ -397,9 +397,11 @@ class PluggySyncAccountView(APIView):
                 if account.pluggy_item_id:
                     update_result = await pluggy_sync_service.force_item_update(account.pluggy_item_id)
                     if update_result.get('success'):
-                        logger.info(f"✅ Item update triggered successfully")
-                        # Wait a bit for Pluggy to start processing
-                        await asyncio.sleep(3)
+                        logger.info(f"✅ Item update triggered successfully, status: {update_result.get('status')}")
+                        # Wait longer for Pluggy to complete the update
+                        # The update process can take 10-30 seconds
+                        logger.info("⏳ Waiting 15 seconds for Pluggy to fetch new transactions...")
+                        await asyncio.sleep(15)
                     else:
                         logger.warning(f"⚠️ Could not force item update: {update_result.get('message', update_result.get('error'))}")
                         # Continue with sync anyway
