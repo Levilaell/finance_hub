@@ -516,6 +516,8 @@ class PluggySyncAccountView(APIView):
                         'error': 'Reautenticação necessária',
                         'error_code': 'WAITING_USER_ACTION',
                         'message': 'O banco está solicitando que você faça login novamente. Por favor, reconecte sua conta.',
+                        'reconnection_required': True,
+                        'reconnection_url': f'/api/banking/pluggy/accounts/{account_id}/reconnect/',
                         'details': result
                     }, status=status.HTTP_403_FORBIDDEN)
                 else:
@@ -778,21 +780,63 @@ class PluggyAccountStatusView(APIView):
                 company=company
             )
 
+            # Get real-time status from Pluggy
+            item_status = None
+            item_error = None
+            needs_reconnection = False
+            
+            if account.pluggy_item_id:
+                try:
+                    async def get_item_status():
+                        async with PluggyClient() as client:
+                            item = await client.get_item(account.pluggy_item_id)
+                            return item
+                    
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        item_data = loop.run_until_complete(get_item_status())
+                        item_status = item_data.get('status')
+                        item_error = item_data.get('error')
+                        
+                        # Check if needs reconnection
+                        needs_reconnection = item_status in ['WAITING_USER_ACTION', 'LOGIN_ERROR', 'OUTDATED']
+                    finally:
+                        loop.close()
+                        
+                except Exception as e:
+                    logger.error(f"Error getting item status: {e}")
+                    item_status = 'UNKNOWN'
+
             sandbox_mode = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
 
-            return Response({
+            response_data = {
                 'success': True,
                 'data': {
                     'account_id': account.id,
                     'external_id': account.external_id,
                     'status': account.status,
+                    'item_status': item_status,
+                    'item_error': item_error,
+                    'needs_reconnection': needs_reconnection,
                     'last_sync': account.last_sync_at,
                     'balance': float(account.current_balance or 0),
-                    'pluggy_status': 'active' if account.is_active else 'inactive',
                     'last_update': account.updated_at,
                     'sandbox_mode': sandbox_mode
                 }
-            })
+            }
+            
+            # Add reconnection message if needed
+            if needs_reconnection:
+                messages = {
+                    'WAITING_USER_ACTION': 'O banco está solicitando que você faça login novamente para continuar sincronizando.',
+                    'LOGIN_ERROR': 'Suas credenciais bancárias expiraram. Por favor, reconecte sua conta.',
+                    'OUTDATED': 'A conexão com o banco está desatualizada. Reconecte para sincronizar transações recentes.'
+                }
+                response_data['data']['reconnection_message'] = messages.get(item_status, 'Reconexão necessária.')
+                response_data['data']['reconnection_url'] = f'/api/banking/pluggy/accounts/{account.id}/reconnect/'
+
+            return Response(response_data)
 
         except BankAccount.DoesNotExist:
             return Response({
@@ -804,4 +848,93 @@ class PluggyAccountStatusView(APIView):
             return Response({
                 'success': False,
                 'error': 'Failed to get account status'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@method_decorator(ratelimit(key='user', rate='5/h', method='POST'), name='dispatch')
+class PluggyReconnectAccountView(APIView):
+    """Reconnect a Pluggy account that needs user action"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, account_id):
+        """Generate reconnection token for Pluggy Connect"""
+        try:
+            company = request.user.company
+
+            account = BankAccount.objects.get(
+                id=account_id,
+                company=company
+            )
+
+            if not account.pluggy_item_id:
+                return Response({
+                    'success': False,
+                    'error': 'Account is not connected via Pluggy'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Check current item status
+            async def check_and_create_token():
+                async with PluggyClient() as client:
+                    # Get current item status
+                    item = await client.get_item(account.pluggy_item_id)
+                    item_status = item.get('status')
+                    
+                    logger.info(f"🔄 Reconnection requested for item {account.pluggy_item_id}, status: {item_status}")
+                    
+                    # Create connect token for update
+                    token_data = await client.create_connect_token(account.pluggy_item_id)
+                    
+                    return {
+                        'item_status': item_status,
+                        'token_data': token_data
+                    }
+            
+            # Run async function
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(check_and_create_token())
+            finally:
+                loop.close()
+            
+            connect_token = result['token_data'].get('accessToken')
+            item_status = result['item_status']
+            sandbox_mode = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
+            
+            response_data = {
+                'success': True,
+                'data': {
+                    'connect_token': connect_token,
+                    'connect_url': getattr(settings, 'PLUGGY_CONNECT_URL', 'https://connect.pluggy.ai'),
+                    'item_id': account.pluggy_item_id,
+                    'current_status': item_status,
+                    'sandbox_mode': sandbox_mode,
+                    'expires_at': result['token_data'].get('expiresAt'),
+                    'message': 'Use este token para reconectar sua conta bancária'
+                }
+            }
+            
+            # Add sandbox credentials if in sandbox mode
+            if sandbox_mode:
+                response_data['data']['sandbox_credentials'] = {
+                    'user': 'user-ok',
+                    'password': 'password-ok',
+                    'token': '123456'
+                }
+            
+            logger.info(f"✅ Reconnection token created for account {account_id}")
+            
+            return Response(response_data)
+
+        except BankAccount.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Account not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error creating reconnection token for account {account_id}: {e}")
+            return Response({
+                'success': False,
+                'error': 'Failed to create reconnection token',
+                'details': str(e) if settings.DEBUG else None
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

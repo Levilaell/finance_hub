@@ -8,7 +8,7 @@ from . import views
 from .pluggy_views import (
     PluggyBankProvidersView, PluggyConnectTokenView, PluggyItemCallbackView,
     PluggySyncAccountView, pluggy_webhook, PluggyDisconnectAccountView,
-    PluggyAccountStatusView
+    PluggyAccountStatusView, PluggyReconnectAccountView
 )
 
 app_name = 'banking'
@@ -43,6 +43,7 @@ urlpatterns = [
     path('pluggy/accounts/<int:account_id>/sync/', PluggySyncAccountView.as_view(), name='pluggy-sync'),
     path('pluggy/accounts/<int:account_id>/disconnect/', PluggyDisconnectAccountView.as_view(), name='pluggy-disconnect'),
     path('pluggy/accounts/<int:account_id>/status/', PluggyAccountStatusView.as_view(), name='pluggy-status'),
+    path('pluggy/accounts/<int:account_id>/reconnect/', PluggyReconnectAccountView.as_view(), name='pluggy-reconnect'),
     
     # Webhooks
     path('pluggy/webhook/', pluggy_webhook, name='pluggy-webhook'),
