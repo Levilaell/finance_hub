@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   BellIcon,
@@ -71,30 +71,201 @@ export function ProactiveInsightsSystem({
     successRate: 0
   });
 
-  // Gerar insights proativos baseados em análise em tempo real
+  // Gerar insights proativos baseados em análise avançada em tempo real
   useEffect(() => {
     const generateProactiveInsights = () => {
       const newInsights: ProactiveInsight[] = [];
       
-      // Análise de tendências
-      if (financialData?.expenses > financialData?.income * 0.9) {
+      // 1. Análise de Tendências Avançada com Machine Learning Simulado
+      const currentRatio = financialData?.expenses / financialData?.income;
+      const healthScore = financialData?.key_metrics?.health_score || 70;
+      const monthlyTrend = financialData?.monthly_trend || [];
+      
+      // Análise de volatilidade nos últimos meses
+      if (monthlyTrend.length >= 3) {
+        const recentProfit = monthlyTrend.slice(-3).map((m: any) => m.profit);
+        const avgProfit = recentProfit.reduce((a: number, b: number) => a + b, 0) / recentProfit.length;
+        const volatility = Math.sqrt(recentProfit.reduce((acc: number, profit: number) => acc + Math.pow(profit - avgProfit, 2), 0) / recentProfit.length);
+        
+        if (volatility > avgProfit * 0.3) {
+          newInsights.push({
+            id: 'high-volatility-detected',
+            type: 'alert',
+            priority: 'high',
+            title: 'Alta Volatilidade nos Resultados Detectada',
+            description: `Seus lucros variaram ${(volatility / avgProfit * 100).toFixed(0)}% nos últimos 3 meses. Isso indica instabilidade operacional que precisa ser investigada.`,
+            metric: {
+              value: `${(volatility / avgProfit * 100).toFixed(0)}%`,
+              change: volatility,
+              trend: 'up'
+            },
+            action: {
+              label: 'Análise de Estabilidade',
+              handler: () => toast.info('Abrindo análise detalhada de estabilidade...')
+            },
+            timeframe: 'Últimos 3 meses',
+            impact: 'Alto risco de continuidade',
+            category: 'risk_management',
+            isNew: true
+          });
+        }
+      }
+      
+      // 2. Análise Preditiva de Fluxo de Caixa
+      if (monthlyTrend.length >= 6) {
+        const cashFlowTrend = monthlyTrend.slice(-6).map((m: any) => m.income - m.expenses);
+        const isDecreasing = cashFlowTrend.every((value: number, index: number) => index === 0 || value <= cashFlowTrend[index - 1]);
+        
+        if (isDecreasing) {
+          const projectedNext3Months = cashFlowTrend[cashFlowTrend.length - 1] * 3;
+          newInsights.push({
+            id: 'declining-cashflow-trend',
+            type: 'prediction',
+            priority: 'critical',
+            title: 'Tendência Decrescente de Fluxo de Caixa',
+            description: `Seu fluxo de caixa está em declínio consistente há 6 meses. Projeção indica déficit de ${formatCurrency(Math.abs(projectedNext3Months))} nos próximos 3 meses.`,
+            metric: {
+              value: formatCurrency(projectedNext3Months),
+              trend: 'down'
+            },
+            action: {
+              label: 'Plano de Contingência',
+              handler: () => toast.error('Criando plano de contingência urgente...')
+            },
+            timeframe: 'Próximos 3 meses',
+            impact: 'Risco de insolvência',
+            category: 'cash_flow',
+            isNew: true
+          });
+        }
+      }
+      
+      // 3. Análise Comparativa com Benchmarks do Setor
+      const industry = businessContext?.industry || 'services';
+      const industryBenchmarks = {
+        'technology': { avgMargin: 22.4, avgGrowth: 24.8 },
+        'retail': { avgMargin: 7.8, avgGrowth: 11.2 },
+        'services': { avgMargin: 14.6, avgGrowth: 17.3 },
+        'manufacturing': { avgMargin: 12.0, avgGrowth: 10.0 },
+        'food': { avgMargin: 10.0, avgGrowth: 15.0 }
+      };
+      
+      const benchmark = industryBenchmarks[industry as keyof typeof industryBenchmarks] || industryBenchmarks.services;
+      const currentMargin = ((financialData?.income - financialData?.expenses) / financialData?.income) * 100;
+      
+      if (currentMargin < benchmark.avgMargin * 0.7) {
         newInsights.push({
-          id: 'high-expense-ratio',
-          type: 'alert',
+          id: 'underperforming-margin',
+          type: 'opportunity',
           priority: 'high',
-          title: 'Despesas próximas do limite crítico',
-          description: 'Suas despesas estão consumindo 90% da receita. Ação imediata necessária.',
+          title: 'Margem Abaixo do Potencial do Setor',
+          description: `Sua margem de ${currentMargin.toFixed(1)}% está ${(benchmark.avgMargin - currentMargin).toFixed(1)} pontos abaixo da média do setor ${industry}. Isso representa oportunidade de ${formatCurrency((benchmark.avgMargin - currentMargin) / 100 * financialData?.income)} em lucros adicionais.`,
           metric: {
-            value: `${((financialData.expenses / financialData.income) * 100).toFixed(0)}%`,
-            trend: 'up'
+            value: `${currentMargin.toFixed(1)}%`,
+            change: benchmark.avgMargin - currentMargin,
+            trend: 'down'
           },
           action: {
-            label: 'Ver plano de redução',
-            handler: () => toast.info('Abrindo plano de redução de custos...')
+            label: 'Estratégias de Otimização',
+            handler: () => toast.info('Carregando estratégias específicas do setor...')
           },
-          category: 'financial_health',
+          impact: `Potencial de ${formatCurrency((benchmark.avgMargin - currentMargin) / 100 * financialData?.income)} em lucros`,
+          category: 'optimization',
           isNew: true
         });
+      }
+      
+      // 4. Detecção de Anomalias em Categorias de Despesas
+      const topCategories = financialData?.top_expense_categories || [];
+      if (topCategories.length > 0) {
+        const topCategory = topCategories[0];
+        if (topCategory.percentage > 40) {
+          newInsights.push({
+            id: `category-concentration-${topCategory.name}`,
+            type: 'alert',
+            priority: 'medium',
+            title: 'Concentração Excessiva de Gastos',
+            description: `A categoria "${topCategory.name}" representa ${topCategory.percentage.toFixed(0)}% do total de despesas. Esta concentração cria risco operacional e dificulta o controle de custos.`,
+            metric: {
+              value: `${topCategory.percentage.toFixed(0)}%`,
+              trend: 'stable'
+            },
+            action: {
+              label: 'Plano de Diversificação',
+              handler: () => toast.info('Criando plano de diversificação de despesas...')
+            },
+            impact: 'Redução de risco operacional',
+            category: 'risk_management',
+            isNew: true
+          });
+        }
+      }
+
+      // 5. Análise de Sazonalidade Inteligente
+      if (businessContext?.seasonality && monthlyTrend.length >= 12) {
+        const currentMonth = new Date().getMonth();
+        const seasonalMonths = [10, 11, 0]; // Nov, Dez, Jan - típica sazonalidade
+        
+        if (seasonalMonths.includes(currentMonth)) {
+          const seasonalBoost = monthlyTrend.filter((_: any, index: number) => 
+            seasonalMonths.includes((new Date().getMonth() - monthlyTrend.length + index + 12) % 12)
+          );
+          
+          if (seasonalBoost.length > 0) {
+            const avgSeasonal = seasonalBoost.reduce((acc: number, month: any) => acc + month.income, 0) / seasonalBoost.length;
+            const avgNormal = (monthlyTrend.reduce((acc: number, month: any) => acc + month.income, 0) - seasonalBoost.reduce((acc: number, month: any) => acc + month.income, 0)) / (monthlyTrend.length - seasonalBoost.length);
+            const seasonalLift = ((avgSeasonal - avgNormal) / avgNormal) * 100;
+            
+            newInsights.push({
+              id: 'seasonal-opportunity',
+              type: 'opportunity',
+              priority: 'high',
+              title: 'Período Sazonal de Alta Performance',
+              description: `Análise histórica indica aumento médio de ${seasonalLift.toFixed(0)}% na receita durante este período. Projeta-se receita adicional de ${formatCurrency((seasonalLift / 100) * financialData?.income)}.`,
+              metric: {
+                value: `+${seasonalLift.toFixed(0)}%`,
+                trend: 'up'
+              },
+              action: {
+                label: 'Maximizar Oportunidade',
+                handler: () => toast.success('Carregando estratégias sazonais...')
+              },
+              timeframe: 'Próximos 90 dias',
+              impact: `Potencial de ${formatCurrency((seasonalLift / 100) * financialData?.income)} adicional`,
+              category: 'seasonal',
+              isNew: true
+            });
+          }
+        }
+      }
+      
+      // 6. Análise Crítica de Burn Rate (para startups/crescimento)
+      if (financialData?.expenses > financialData?.income) {
+        const burnRate = financialData.expenses - financialData.income;
+        const currentBalance = financialData?.balance || 0;
+        const monthsOfRunway = currentBalance / burnRate;
+        
+        if (monthsOfRunway < 6 && monthsOfRunway > 0) {
+          newInsights.push({
+            id: 'critical-runway',
+            type: 'alert',
+            priority: 'critical',
+            title: 'Runway Crítico: Ação Urgente Necessária',
+            description: `Com o burn rate atual de ${formatCurrency(burnRate)}/mês, você tem apenas ${monthsOfRunway.toFixed(1)} meses de operação. É essencial implementar medidas de contenção ou buscar novos recursos imediatamente.`,
+            metric: {
+              value: `${monthsOfRunway.toFixed(1)} meses`,
+              trend: 'down'
+            },
+            action: {
+              label: 'Plano de Emergência',
+              handler: () => toast.error('Ativando protocolo de emergência financeira...')
+            },
+            impact: 'Sobrevivência da empresa',
+            category: 'critical',
+            isNew: true,
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // Expira em 24h para forçar ação
+          });
+        }
       }
       
       // Oportunidades baseadas em padrões

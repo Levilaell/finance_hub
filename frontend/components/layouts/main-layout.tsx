@@ -257,7 +257,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           <div className="px-6 py-4 sm:px-8 lg:px-10">
             <div className="flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
               <div className="text-sm text-muted-foreground">
-                © 2024 CaixaHub. Todos os direitos reservados.
+                © 2025 CaixaHub. Todos os direitos reservados.
               </div>
               <div className="flex space-x-4 text-sm text-muted-foreground">
                 <Link href="/terms" className="hover:text-foreground transition-colors">

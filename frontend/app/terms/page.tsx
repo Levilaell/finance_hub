@@ -228,7 +228,7 @@ export default function TermsOfService() {
               </Link>
             </div>
             <div className="text-sm text-muted-foreground">
-              © 2024 CaixaHub. Todos os direitos reservados.
+              © 2025 CaixaHub. Todos os direitos reservados.
             </div>
           </div>
         </div>

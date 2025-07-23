@@ -226,7 +226,7 @@ export function EnhancedScenarioSimulator({
     }
   });
 
-  // Calcular métricas avançadas
+  // Calcular métricas avançadas com fórmulas financeiras precisas
   const advancedMetrics = useMemo(() => {
     const baseIncome = currentData.income;
     const baseExpenses = currentData.expenses;
@@ -235,61 +235,160 @@ export function EnhancedScenarioSimulator({
     const newExpenses = baseExpenses * (1 + expenseAdjustment / 100);
     const monthlyProfit = newIncome - newExpenses;
     
-    // Calcular ponto de equilíbrio
-    const fixedCosts = newExpenses * 0.6; // Estimativa
-    const variableCostRatio = 0.4;
+    // Estimativa mais precisa de custos fixos vs variáveis baseada na categoria
+    const categories = currentData.categories || [];
+    let fixedCostsRatio = 0.4; // Default
+    
+    if (categories.length > 0) {
+      const totalCategorized = categories.reduce((sum, cat) => sum + cat.amount, 0);
+      const fixedCategories = ['Aluguel', 'Folha de Pagamento', 'Seguros', 'Software', 'Infraestrutura'];
+      const fixedAmount = categories
+        .filter(cat => fixedCategories.some(fixed => cat.name.includes(fixed)))
+        .reduce((sum, cat) => sum + cat.amount, 0);
+      
+      fixedCostsRatio = totalCategorized > 0 ? fixedAmount / totalCategorized : 0.4;
+    }
+    
+    const fixedCosts = newExpenses * fixedCostsRatio;
+    const variableCosts = newExpenses * (1 - fixedCostsRatio);
+    const variableCostRatio = variableCosts / newIncome;
     const contributionMargin = 1 - variableCostRatio;
-    const breakEvenPoint = fixedCosts / contributionMargin;
     
-    // Calcular ROI
-    const investment = Math.abs(newExpenses - baseExpenses);
-    const returns = Math.max(0, monthlyProfit - (baseIncome - baseExpenses));
-    const roi = investment > 0 ? (returns / investment) * 100 : 0;
+    // Break-even point mais preciso
+    const breakEvenRevenue = fixedCosts / contributionMargin;
+    const breakEvenUnits = breakEvenRevenue / (newIncome / 1); // Assumindo 1 "unidade" por receita
     
-    // Score de risco baseado em múltiplos fatores
-    const volatility = Math.abs(incomeAdjustment) + Math.abs(expenseAdjustment);
-    const leverageRatio = newExpenses / newIncome;
-    const riskScore = Math.min(100, (volatility * 0.5) + (leverageRatio * 50));
+    // ROI calculation with proper investment definition
+    const additionalExpenses = Math.max(0, newExpenses - baseExpenses);
+    const additionalRevenue = Math.max(0, newIncome - baseIncome);
+    const netInvestment = additionalExpenses - (additionalRevenue * variableCostRatio);
+    const monthlyReturn = monthlyProfit - (baseIncome - baseExpenses);
+    const roi = netInvestment > 0 ? (monthlyReturn * 12 / netInvestment) * 100 : 0;
     
-    // Projeções avançadas com sazonalidade
+    // Score de risco mais sofisticado
+    const operatingLeverage = contributionMargin > 0 ? (newIncome - variableCosts) / monthlyProfit : 1;
+    const financialLeverage = newExpenses / Math.max(1, monthlyProfit);
+    const volatilityRisk = (Math.abs(incomeAdjustment) + Math.abs(expenseAdjustment)) / 2;
+    const marginSafety = monthlyProfit > 0 ? (monthlyProfit / newIncome) * 100 : -100;
+    
+    const riskScore = Math.min(100, Math.max(0, 
+      (volatilityRisk * 0.3) + 
+      (Math.min(financialLeverage * 10, 50) * 0.4) + 
+      (Math.max(0, 50 - marginSafety) * 0.3)
+    ));
+    
+    // Projeções avançadas com múltiplos fatores
     const projections: any[] = [];
+    const baseGrowthRate = (predictions?.growth_rate || 5) / 100 / 12; // Mensal
+    const inflationRate = 0.065 / 12; // 6.5% anual IPCA
+    const marketVolatility = 0.15; // 15% de volatilidade do mercado
+    
     for (let i = 0; i < timeHorizon; i++) {
-      const seasonalFactor = 1 + (Math.sin((i + new Date().getMonth()) * Math.PI / 6) * 0.1);
-      const growthFactor = Math.pow(1 + (predictions?.growth_rate || 0) / 100 / 12, i);
+      // Sazonalidade mais realista baseada no setor
+      const monthIndex = (new Date().getMonth() + i) % 12;
+      let seasonalFactor = 1;
+      
+      if (businessContext?.industry === 'retail') {
+        // Varejo tem picos em nov/dez e baixas em jan/fev
+        const retailSeasonality = [0.8, 0.7, 0.9, 1.0, 1.0, 1.1, 1.0, 1.0, 1.0, 1.1, 1.4, 1.6];
+        seasonalFactor = retailSeasonality[monthIndex];
+      } else if (businessContext?.industry === 'services') {
+        // Serviços mais estável, baixa no fim do ano
+        const servicesSeasonality = [0.9, 0.95, 1.0, 1.05, 1.1, 1.1, 1.0, 1.0, 1.05, 1.1, 0.95, 0.85];
+        seasonalFactor = servicesSeasonality[monthIndex];
+      }
+      
+      // Crescimento composto com volatilidade
+      const volatilityFactor = 1 + (Math.random() - 0.5) * marketVolatility;
+      const growthFactor = Math.pow(1 + baseGrowthRate, i) * volatilityFactor;
+      
+      // Curva de aprendizado e eficiência
+      const efficiencyGain = Math.min(1.2, 1 + (i * 0.005)); // Melhoria gradual de eficiência
       
       const monthIncome = newIncome * growthFactor * seasonalFactor;
-      const monthExpenses = newExpenses * (1 + 0.02 / 12) ** i; // Inflação
+      const monthExpenses = (fixedCosts + variableCosts * growthFactor * seasonalFactor / efficiencyGain) * Math.pow(1 + inflationRate, i);
+      const monthProfit = monthIncome - monthExpenses;
+      
+      // Métricas avançadas por mês
+      const cumulativeCashFlow = (projections[i - 1]?.cumulativeCashFlow || 0) + monthProfit;
+      const monthlyMargin = monthIncome > 0 ? (monthProfit / monthIncome) * 100 : 0;
       
       projections.push({
         month: i + 1,
         monthName: new Date(Date.now() + i * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR', { month: 'short' }),
         income: monthIncome,
         expenses: monthExpenses,
-        profit: monthIncome - monthExpenses,
-        accumulated: (projections[i - 1]?.accumulated || 0) + (monthIncome - monthExpenses),
-        breakEven: monthIncome >= monthExpenses
+        profit: monthProfit,
+        accumulated: cumulativeCashFlow,
+        cumulativeCashFlow,
+        margin: monthlyMargin,
+        breakEven: monthIncome >= monthExpenses,
+        seasonalFactor,
+        growthRate: i > 0 ? ((monthIncome / (projections[i-1]?.income || monthIncome)) - 1) * 100 : 0
       });
     }
     
-    // Análise de sensibilidade
-    const sensitivityAnalysis = [
-      { factor: 'Receita -10%', impact: (newIncome * 0.9 - newExpenses) - monthlyProfit },
-      { factor: 'Despesas +10%', impact: (newIncome - newExpenses * 1.1) - monthlyProfit },
-      { factor: 'Ambos -5%', impact: (newIncome * 0.95 - newExpenses * 1.05) - monthlyProfit }
+    // Análise de sensibilidade mais abrangente
+    const sensitivityScenarios = [
+      { factor: 'Receita -10%', incomeChange: -0.1, expenseChange: 0 },
+      { factor: 'Receita +15%', incomeChange: 0.15, expenseChange: 0 },
+      { factor: 'Despesas +10%', incomeChange: 0, expenseChange: 0.1 },
+      { factor: 'Despesas -15%', incomeChange: 0, expenseChange: -0.15 },
+      { factor: 'Cenário Otimista', incomeChange: 0.2, expenseChange: -0.1 },
+      { factor: 'Cenário Pessimista', incomeChange: -0.15, expenseChange: 0.15 },
+      { factor: 'Inflação Alta', incomeChange: 0.05, expenseChange: 0.12 },
+      { factor: 'Recessão', incomeChange: -0.25, expenseChange: 0.05 }
     ];
+    
+    const sensitivityAnalysis = sensitivityScenarios.map(scenario => {
+      const scenarioIncome = newIncome * (1 + scenario.incomeChange);
+      const scenarioExpenses = newExpenses * (1 + scenario.expenseChange);
+      const scenarioProfit = scenarioIncome - scenarioExpenses;
+      const impact = scenarioProfit - monthlyProfit;
+      
+      return {
+        factor: scenario.factor,
+        impact,
+        percentageChange: monthlyProfit !== 0 ? (impact / Math.abs(monthlyProfit)) * 100 : 0,
+        newProfit: scenarioProfit,
+        riskLevel: impact < -monthlyProfit * 0.5 ? 'high' : impact < 0 ? 'medium' : 'low'
+      };
+    });
+    
+    // Métricas financeiras avançadas
+    const workingCapital = monthlyProfit * 2; // Assumindo 2 meses de capital de giro necessário
+    const debtServiceCapacity = monthlyProfit * 0.3; // 30% do lucro para pagamento de financiamentos
+    const reinvestmentRate = Math.max(0, monthlyProfit * 0.2); // 20% para reinvestimento
+    const distributionCapacity = monthlyProfit - reinvestmentRate; // Disponível para distribuição
+    
+    // Análise de valuation simplificada
+    const terminalValueMultiple = 10; // 10x lucro anual para valuation
+    const projectedAnnualProfit = projections.reduce((sum, month) => sum + month.profit, 0);
+    const estimatedValuation = projectedAnnualProfit * terminalValueMultiple;
     
     return {
       monthlyProfit,
       yearlyProfit: monthlyProfit * 12,
-      breakEvenPoint,
+      breakEvenPoint: breakEvenRevenue,
+      breakEvenUnits,
       roi,
       riskScore,
       projections,
       sensitivityAnalysis,
-      paybackPeriod: investment > 0 ? investment / Math.max(1, monthlyProfit) : 0,
-      profitMargin: newIncome > 0 ? (monthlyProfit / newIncome) * 100 : 0
+      paybackPeriod: netInvestment > 0 ? netInvestment / Math.max(1, monthlyReturn) : 0,
+      profitMargin: newIncome > 0 ? (monthlyProfit / newIncome) * 100 : 0,
+      contributionMargin: contributionMargin * 100,
+      operatingLeverage,
+      workingCapital,
+      debtServiceCapacity,
+      reinvestmentRate,
+      distributionCapacity,
+      estimatedValuation,
+      fixedCostsRatio: fixedCostsRatio * 100,
+      variableCostRatio: variableCostRatio * 100,
+      cashFlowProjection: projections[projections.length - 1]?.cumulativeCashFlow || 0
     };
-  }, [currentData, predictions, incomeAdjustment, expenseAdjustment, timeHorizon]);
+  }, [currentData, predictions, incomeAdjustment, expenseAdjustment, timeHorizon, businessContext]);
 
   // Gerar insights com IA
   const generateAIInsights = useCallback(async () => {
@@ -677,20 +776,20 @@ export function EnhancedScenarioSimulator({
             </div>
           </div>
 
-          {/* Métricas Avançadas */}
-          <div className="grid gap-4 md:grid-cols-4 mt-6">
+          {/* Métricas Avançadas - Grid Expandido */}
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6 mt-6">
             <div className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg">
               <div className="text-sm text-gray-600">Break-even</div>
               <div className="text-2xl font-bold text-purple-700">
                 {formatCurrency(advancedMetrics.breakEvenPoint)}
               </div>
               <div className="text-xs text-gray-500 mt-1">
-                Ponto de equilíbrio
+                Receita para empatar
               </div>
             </div>
             
             <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg">
-              <div className="text-sm text-gray-600">ROI Projetado</div>
+              <div className="text-sm text-gray-600">ROI Anual</div>
               <div className="text-2xl font-bold text-green-700">
                 {advancedMetrics.roi.toFixed(0)}%
               </div>
@@ -706,6 +805,26 @@ export function EnhancedScenarioSimulator({
               </div>
               <div className="text-xs text-gray-500 mt-1">
                 Período de retorno
+              </div>
+            </div>
+            
+            <div className="p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg">
+              <div className="text-sm text-gray-600">Margem Contribuição</div>
+              <div className="text-2xl font-bold text-indigo-700">
+                {advancedMetrics.contributionMargin.toFixed(1)}%
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Margem após custos variáveis
+              </div>
+            </div>
+            
+            <div className="p-4 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg">
+              <div className="text-sm text-gray-600">Capital de Giro</div>
+              <div className="text-2xl font-bold text-teal-700">
+                {formatCurrency(advancedMetrics.workingCapital)}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Necessário para operação
               </div>
             </div>
             
@@ -728,6 +847,77 @@ export function EnhancedScenarioSimulator({
                 {advancedMetrics.riskScore > 70 ? "Alto risco" :
                  advancedMetrics.riskScore > 40 ? "Risco moderado" :
                  "Baixo risco"}
+              </div>
+            </div>
+          </div>
+
+          {/* Métricas Financeiras Avançadas - Segunda Linha */}
+          <div className="grid gap-4 md:grid-cols-4 mt-4">
+            <div className="p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-lg">
+              <div className="text-sm text-gray-600">Custos Fixos</div>
+              <div className="text-2xl font-bold text-orange-700">
+                {advancedMetrics.fixedCostsRatio.toFixed(1)}%
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                % dos custos totais
+              </div>
+            </div>
+            
+            <div className="p-4 bg-gradient-to-br from-pink-50 to-rose-50 rounded-lg">
+              <div className="text-sm text-gray-600">Alavancagem Op.</div>
+              <div className="text-2xl font-bold text-pink-700">
+                {advancedMetrics.operatingLeverage.toFixed(1)}x
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Sensibilidade operacional
+              </div>
+            </div>
+            
+            <div className="p-4 bg-gradient-to-br from-amber-50 to-yellow-50 rounded-lg">
+              <div className="text-sm text-gray-600">Capacidade Reinv.</div>
+              <div className="text-2xl font-bold text-amber-700">
+                {formatCurrency(advancedMetrics.reinvestmentRate)}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Mensal para crescimento
+              </div>
+            </div>
+            
+            <div className="p-4 bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg">
+              <div className="text-sm text-gray-600">Valuation Est.</div>
+              <div className="text-2xl font-bold text-emerald-700">
+                {formatCurrency(advancedMetrics.estimatedValuation)}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Valor estimado (10x)
+              </div>
+            </div>
+          </div>
+
+          {/* Análise de Fluxo de Caixa Projetado */}
+          <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+            <h5 className="font-medium text-blue-900 mb-3">Projeção de Fluxo de Caixa</h5>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <div className="text-sm text-blue-700">Fluxo Acumulado ({timeHorizon} meses)</div>
+                <div className={cn(
+                  "text-xl font-bold",
+                  advancedMetrics.cashFlowProjection > 0 ? "text-green-600" : "text-red-600"
+                )}>
+                  {formatCurrency(advancedMetrics.cashFlowProjection)}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-blue-700">Distribuição Mensal</div>
+                <div className="text-xl font-bold text-blue-800">
+                  {formatCurrency(advancedMetrics.distributionCapacity)}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-blue-700">Capacidade de Endividamento</div>
+                <div className="text-xl font-bold text-blue-800">
+                  {formatCurrency(advancedMetrics.debtServiceCapacity)}
+                </div>
               </div>
             </div>
           </div>
