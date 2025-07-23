@@ -86,12 +86,12 @@ class PluggyTransactionSyncService:
                 current_status = item.get('status')
                 logger.info(f"📋 Current item status: {current_status}")
                 
-                if current_status not in ['ACTIVE', 'UPDATED']:
+                if current_status not in ['ACTIVE', 'UPDATED', 'OUTDATED']:
                     logger.warning(f"⚠️ Cannot update item in status {current_status}")
                     return {
                         'success': False,
                         'status': current_status,
-                        'message': f'Item must be ACTIVE or UPDATED to force update, current status: {current_status}'
+                        'message': f'Item must be ACTIVE, UPDATED or OUTDATED to force update, current status: {current_status}'
                     }
                 
                 # Use the sync_item method to trigger update

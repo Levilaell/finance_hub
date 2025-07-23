@@ -393,8 +393,7 @@ class PluggySyncAccountView(APIView):
             import asyncio
             
             async def sync_account():
-                # NOTA: NÃO forçamos update do Item para evitar WAITING_USER_ACTION
-                # Em vez disso, usamos uma janela de tempo maior para capturar transações
+                # Estratégia inteligente: atualizar Item apenas se OUTDATED
                 logger.info(f"📊 Starting sync for account {account.id}")
                 
                 # Verificar status do Item antes de sincronizar
@@ -412,6 +411,48 @@ class PluggySyncAccountView(APIView):
                                     'status': 'waiting_user_action',
                                     'message': 'Item requires user authentication'
                                 }
+                            elif item_status == 'OUTDATED':
+                                logger.info(f"🔄 Item is OUTDATED, attempting to update it")
+                                try:
+                                    # Tentar forçar update apenas quando OUTDATED
+                                    update_result = await pluggy_sync_service.force_item_update(account.pluggy_item_id)
+                                    
+                                    if update_result.get('success'):
+                                        new_status = update_result.get('status')
+                                        logger.info(f"✅ Item update triggered, new status: {new_status}")
+                                        
+                                        # Aguardar atualização (com timeout)
+                                        max_wait = 30  # segundos
+                                        wait_interval = 2  # segundos
+                                        elapsed = 0
+                                        
+                                        while elapsed < max_wait:
+                                            await asyncio.sleep(wait_interval)
+                                            elapsed += wait_interval
+                                            
+                                            # Verificar status novamente
+                                            item = await client.get_item(account.pluggy_item_id)
+                                            current_status = item.get('status')
+                                            logger.info(f"⏳ Waiting for update... Status: {current_status} ({elapsed}s)")
+                                            
+                                            if current_status == 'UPDATED':
+                                                logger.info(f"✅ Item updated successfully!")
+                                                break
+                                            elif current_status == 'WAITING_USER_ACTION':
+                                                logger.warning(f"❌ Update triggered WAITING_USER_ACTION")
+                                                return {
+                                                    'account_id': account.id,
+                                                    'status': 'waiting_user_action',
+                                                    'message': 'Item requires user authentication after update'
+                                                }
+                                            elif current_status not in ['UPDATING', 'OUTDATED']:
+                                                logger.warning(f"⚠️ Unexpected status during update: {current_status}")
+                                                break
+                                    else:
+                                        logger.warning(f"⚠️ Could not update OUTDATED item: {update_result.get('message')}")
+                                except Exception as e:
+                                    logger.error(f"❌ Error updating OUTDATED item: {e}")
+                                    # Continuar mesmo assim
                     except Exception as e:
                         logger.warning(f"⚠️ Could not check item status: {e}")
                 
