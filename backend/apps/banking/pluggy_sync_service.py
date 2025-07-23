@@ -167,7 +167,7 @@ class PluggyTransactionSyncService:
             # Determine sync date range
             sync_from = self._get_sync_from_date_safe(account_info)
             # Buscar 1 dia no futuro para pegar transações com timezone issues
-            sync_to = (datetime.now() + timedelta(days=1)).date()
+            sync_to = (timezone.now() + timedelta(days=1)).date()
             
             logger.info(f"📅 Syncing transactions from {sync_from} to {sync_to} (incluindo 1 dia futuro para timezone)")
             

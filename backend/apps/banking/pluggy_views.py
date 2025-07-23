@@ -393,11 +393,24 @@ class PluggySyncAccountView(APIView):
             import asyncio
             
             async def sync_account():
-                # Direct sync without forcing item update
-                # This avoids triggering WAITING_USER_ACTION status
-                logger.info(f"📊 Starting direct transaction sync for account {account.id}")
+                # IMPORTANTE: Para obter transações novas, precisamos forçar update do Item
+                # Mas apenas se o item estiver em status que permite update
+                logger.info(f"📊 Starting sync for account {account.id}")
                 
-                # Just sync transactions with expanded date range
+                # Primeiro, tentar forçar update do Item se possível
+                if account.pluggy_item_id:
+                    logger.info(f"🔄 Tentando forçar update do Item {account.pluggy_item_id}")
+                    update_result = await pluggy_sync_service.force_item_update(account.pluggy_item_id)
+                    
+                    if update_result.get('success'):
+                        logger.info(f"✅ Item update triggered successfully")
+                        # Aguardar um pouco para a Pluggy processar
+                        await asyncio.sleep(3)
+                    else:
+                        logger.warning(f"⚠️ Could not force item update: {update_result.get('message', 'Unknown error')}")
+                        # Continuar mesmo assim, pode haver transações pendentes
+                
+                # Agora sincronizar as transações
                 return await pluggy_sync_service.sync_account_transactions(account)
             
             # Run async sync
