@@ -256,7 +256,7 @@ export default function Home() {
             </p>
             <div className="flex justify-center mt-6">
               <Badge variant="secondary" className="text-lg px-4 py-2">
-                🚀 + de 1.000 empresas confiam no CaixaHub
+                📊 Economia comprovada de até 15 horas/mês por empresa
               </Badge>
             </div>
           </div>
@@ -348,30 +348,36 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Resultados que falam por si
+              O impacto real na sua empresa
             </h2>
             <p className="text-xl text-muted-foreground">
-              Empresas que usam nossa plataforma economizam tempo e aumentam a eficiência
+              Projeções baseadas no tempo típico gasto com gestão financeira manual
             </p>
           </div>
 
           <div className="grid md:grid-cols-4 gap-8 max-w-4xl mx-auto">
             <div className="text-center">
-              <div className="text-4xl font-bold text-primary mb-2">90%</div>
-              <div className="text-muted-foreground">Redução no tempo de reconciliação</div>
+              <div className="text-4xl font-bold text-primary mb-2">2 min</div>
+              <div className="text-muted-foreground">Setup inicial da plataforma</div>
             </div>
             <div className="text-center">
               <div className="text-4xl font-bold text-primary mb-2">15h</div>
-              <div className="text-muted-foreground">Horas economizadas por mês</div>
+              <div className="text-muted-foreground">Tempo economizado por mês</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-primary mb-2">99%</div>
-              <div className="text-muted-foreground">Precisão na categorização</div>
+              <div className="text-4xl font-bold text-primary mb-2">R$ 450</div>
+              <div className="text-muted-foreground">Valor/hora economizada*</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-primary mb-2">100+</div>
-              <div className="text-muted-foreground">Bancos conectados</div>
+              <div className="text-4xl font-bold text-primary mb-2">24/7</div>
+              <div className="text-muted-foreground">Sincronização automática</div>
             </div>
+          </div>
+          
+          <div className="text-center mt-8">
+            <p className="text-sm text-muted-foreground">
+              *Baseado no custo médio de um analista financeiro (R$ 30/hora)
+            </p>
           </div>
         </div>
       </section>
