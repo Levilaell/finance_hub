@@ -102,7 +102,7 @@ export default function Home() {
               {/* Problem */}
               <div className="space-y-6">
                 <div className="inline-flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium">
-                  😰 O Problema
+                  O Problema
                 </div>
                 <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
                   Gestão financeira manual está travando seu crescimento
@@ -138,7 +138,7 @@ export default function Home() {
               {/* Solution */}
               <div className="space-y-6">
                 <div className="inline-flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                  ✅ A Solução
+                  A Solução
                 </div>
                 <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
                   Automatize tudo e foque no que realmente importa
@@ -153,7 +153,7 @@ export default function Home() {
                   <div className="flex items-start space-x-3">
                     <CheckCircleIcon className="w-6 h-6 text-green-500 mt-0.5 flex-shrink-0" />
                     <p className="text-gray-600">
-                      <strong>Sincronização em tempo real</strong> com mais de 100 bancos
+                      <strong>Sincronização em tempo real</strong> com mais de 20 bancos
                     </p>
                   </div>
                   <div className="flex items-start space-x-3">
@@ -269,7 +269,7 @@ export default function Home() {
                 </div>
                 <CardTitle>Conexão Bancária em Tempo Real</CardTitle>
                 <CardDescription>
-                  Conecte com + de 100 bancos brasileiros em segundos. Sincronização automática 
+                  Conecte com + de 20 bancos brasileiros em segundos. Sincronização automática 
                   24/7 via Open Banking para você nunca perder uma transação.
                 </CardDescription>
               </CardHeader>
@@ -485,14 +485,6 @@ export default function Home() {
             </Card>
           </div>
 
-          <div className="text-center mt-12">
-            <p className="text-muted-foreground mb-6">
-              Ainda tem dúvidas? Nossa equipe está pronta para ajudar
-            </p>
-            <Button variant="outline" size="lg">
-              Falar com um Especialista
-            </Button>
-          </div>
         </div>
       </section>
 
@@ -521,9 +513,9 @@ export default function Home() {
               </Button>
               <Button 
                 size="lg" 
-                variant="outline" 
+                variant="secondary" 
                 asChild 
-                className="text-lg px-8 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary"
+                className="text-lg px-8"
               >
                 <Link href="/register">
                   Começar Grátis Agora
