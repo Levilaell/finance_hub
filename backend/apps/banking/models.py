@@ -108,6 +108,8 @@ class BankAccount(models.Model):
     )
     last_sync_at = models.DateTimeField(_('last sync at'), blank=True, null=True)
     sync_frequency = models.IntegerField(_('sync frequency (hours)'), default=4)
+    sync_status = models.CharField(_('sync status'), max_length=30, default='active', blank=True)
+    sync_error_message = models.TextField(_('sync error message'), blank=True)
     
     # Account settings
     nickname = models.CharField(_('nickname'), max_length=100, blank=True)

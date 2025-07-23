@@ -88,18 +88,33 @@ class PluggyTransactionSyncService:
                 logger.warning(f"❌ No Pluggy account ID for account {account_info['id']}")
                 return {'account_id': account_info['id'], 'status': 'no_external_id', 'transactions': 0}
             
-            # Try to sync item first if available
+            # Check item status before syncing
             pluggy_item_id = await sync_to_async(lambda: account.pluggy_item_id)()
             if pluggy_item_id:
                 try:
-                    logger.info(f"🔄 Triggering Pluggy item sync for item {pluggy_item_id}")
                     async with PluggyClient() as client:
-                        sync_result = await client.sync_item(pluggy_item_id)
-                        logger.info(f"✅ Item sync triggered: {sync_result.get('status', 'unknown')}")
-                        # Wait a bit for sync to process
-                        await asyncio.sleep(2)
+                        item = await client.get_item(pluggy_item_id)
+                        item_status = item.get('status')
+                        logger.info(f"📋 Item {pluggy_item_id} status: {item_status}")
+                        
+                        if item_status == 'WAITING_USER_ACTION':
+                            logger.warning(f"⚠️ Item requires user action, cannot sync")
+                            return {
+                                'account_id': account_info['id'], 
+                                'status': 'waiting_user_action',
+                                'message': 'Item requires user authentication',
+                                'transactions': 0
+                            }
+                        elif item_status == 'LOGIN_ERROR':
+                            logger.warning(f"⚠️ Item has login error")
+                            return {
+                                'account_id': account_info['id'],
+                                'status': 'login_error', 
+                                'message': 'Invalid credentials',
+                                'transactions': 0
+                            }
                 except Exception as e:
-                    logger.warning(f"⚠️ Could not trigger item sync: {e}")
+                    logger.warning(f"⚠️ Could not check item status: {e}")
             
             # Determine sync date range
             sync_from = self._get_sync_from_date_safe(account_info)
@@ -166,6 +181,12 @@ class PluggyTransactionSyncService:
             
             # Update last sync time
             await self._update_account_sync_time(account)
+            
+            # Clear any error status
+            await sync_to_async(lambda: BankAccount.objects.filter(id=account.id).update(
+                sync_status='active',
+                sync_error_message=''
+            ))()
             
             # Update account balance
             await self._update_account_balance(account)

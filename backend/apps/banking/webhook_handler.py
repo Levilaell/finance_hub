@@ -67,7 +67,7 @@ class PluggyWebhookHandler:
         status_val = event_data.get('status')
         logger.info(f"Pluggy item {item_id} updated: {status_val}")
         
-        # If item is now active, sync all accounts
+        # Handle different status updates
         if status_val == 'ACTIVE':
             # Use sync_to_async for database queries
             accounts = await sync_to_async(
@@ -84,6 +84,30 @@ class PluggyWebhookHandler:
                         logger.info(f"Synced account {account.id} after item update")
                     except Exception as e:
                         logger.error(f"Failed to sync account {account.id}: {e}")
+                        
+        elif status_val == 'WAITING_USER_ACTION':
+            # Update account status to reflect authentication needed
+            await sync_to_async(
+                BankAccount.objects.filter(
+                    pluggy_item_id=item_id
+                ).update
+            )(
+                sync_status='waiting_user_action',
+                sync_error_message='Reautenticação necessária'
+            )
+            logger.warning(f"Item {item_id} requires user action for reauthentication")
+            
+        elif status_val == 'LOGIN_ERROR':
+            # Update account status for login errors
+            await sync_to_async(
+                BankAccount.objects.filter(
+                    pluggy_item_id=item_id
+                ).update
+            )(
+                sync_status='login_error',
+                sync_error_message='Credenciais inválidas'
+            )
+            logger.error(f"Item {item_id} has login error")
                         
         return {'success': True, 'message': f'Item {item_id} updated to {status_val}'}
     
