@@ -473,7 +473,7 @@ export default function Home() {
               <CardContent>
                 <p className="text-muted-foreground">
                   Sim. Exportamos dados em formatos compatíveis com todos os principais sistemas 
-                  contábeis (Excel, CSV, XML). Também oferecemos integrações diretas com os 
+                  contábeis (Excel, CSV). Também oferecemos integrações diretas com os 
                   softwares mais usados por contadores.
                 </p>
               </CardContent>
@@ -541,9 +541,6 @@ export default function Home() {
               </Link>
               <Link href="/privacy" className="hover:text-foreground">
                 Privacidade
-              </Link>
-              <Link href="#" className="hover:text-foreground">
-                Suporte
               </Link>
             </div>
             <div className="text-sm text-muted-foreground">
