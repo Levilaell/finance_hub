@@ -42,10 +42,12 @@ import {
 } from '@heroicons/react/24/outline';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ScenarioSimulator } from '@/components/ai-insights/scenario-simulator';
+import { EnhancedScenarioSimulator } from '@/components/ai-insights/enhanced-scenario-simulator';
 import { MarketBenchmarking } from '@/components/ai-insights/market-benchmarking';
 import { ContextInput, BusinessContext } from '@/components/ai-insights/context-input';
 import { FeatureShowcase } from '@/components/ai-insights/feature-showcase';
+import { ProactiveInsightsSystem } from '@/components/ai-insights/proactive-insights-system';
+import { InsightsSharing } from '@/components/ai-insights/insights-sharing';
 
 // Types
 interface AIInsight {
@@ -720,6 +722,18 @@ export default function AIInsightsPage() {
         </div>
       </div>
 
+      {/* Sistema de Insights Proativos - NOVO! */}
+      {aiInsightsData && (
+        <ProactiveInsightsSystem
+          financialData={aiInsightsData}
+          businessContext={businessContext}
+          onActionTaken={(insight) => {
+            console.log('Action taken on insight:', insight);
+            // Integrar com sistema de tracking
+          }}
+        />
+      )}
+
       {/* Showcase das Ferramentas Premium */}
       <FeatureShowcase 
         onFeatureClick={(feature) => {
@@ -817,34 +831,45 @@ export default function AIInsightsPage() {
                 {aiInsightsData?.predictions?.confidence && (
                   <ConfidenceIndicator level={aiInsightsData.predictions.confidence} />
                 )}
-                <Button
-                  variant="outline"
-                  size="default"
-                  onClick={() => {
-                    if (!isUpgradeRequired) {
-                      // Force refetch with cache invalidation
-                      setForceRefresh(true);
-                      setShouldFetchAnalysis(true);
-                      setTimeout(() => {
-                        refetchAIInsights();
-                      }, 100);
-                    }
-                  }}
-                  disabled={aiInsightsLoading || isUpgradeRequired}
-                  title={isUpgradeRequired ? "Limite de requisições atingido" : "Atualizar análise"}
-                  className={cn(
-                    "w-full sm:w-auto",
-                    isUpgradeRequired && "opacity-50 cursor-not-allowed"
+                <div className="flex gap-2">
+                  {aiInsightsData && (
+                    <InsightsSharing
+                      insights={aiInsightsData}
+                      onShare={(shareData) => {
+                        console.log('Insights shared:', shareData);
+                        toast.success('Insights compartilhados com sucesso!');
+                      }}
+                    />
                   )}
-                >
-                  {isUpgradeRequired && (
-                    <LockClosedIcon className="h-4 w-4" />
-                  )}
-                  {!isUpgradeRequired && (
-                    <ArrowPathIcon className={cn("h-4 w-4", aiInsightsLoading && "animate-spin")} />
-                  )}
-                  <span className="ml-2">{isUpgradeRequired ? "Limite Atingido" : "Atualizar"}</span>
-                </Button>
+                  <Button
+                    variant="outline"
+                    size="default"
+                    onClick={() => {
+                      if (!isUpgradeRequired) {
+                        // Force refetch with cache invalidation
+                        setForceRefresh(true);
+                        setShouldFetchAnalysis(true);
+                        setTimeout(() => {
+                          refetchAIInsights();
+                        }, 100);
+                      }
+                    }}
+                    disabled={aiInsightsLoading || isUpgradeRequired}
+                    title={isUpgradeRequired ? "Limite de requisições atingido" : "Atualizar análise"}
+                    className={cn(
+                      "w-full sm:w-auto",
+                      isUpgradeRequired && "opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    {isUpgradeRequired && (
+                      <LockClosedIcon className="h-4 w-4" />
+                    )}
+                    {!isUpgradeRequired && (
+                      <ArrowPathIcon className={cn("h-4 w-4", aiInsightsLoading && "animate-spin")} />
+                    )}
+                    <span className="ml-2">{isUpgradeRequired ? "Limite Atingido" : "Atualizar"}</span>
+                  </Button>
+                </div>
               </div>
             </CardTitle>
             <CardDescription className="flex items-center justify-between">
@@ -1305,7 +1330,7 @@ export default function AIInsightsPage() {
             
             <TabsContent value="simulator" className="mt-6">
               {aiInsightsData ? (
-                <ScenarioSimulator
+                <EnhancedScenarioSimulator
                   currentData={{
                     income: aiInsightsData.key_metrics?.income || 0,
                     expenses: aiInsightsData.key_metrics?.expenses || 0,
@@ -1313,16 +1338,19 @@ export default function AIInsightsPage() {
                     monthlyTrend: aiInsightsData.monthly_trend
                   }}
                   predictions={aiInsightsData.predictions}
+                  businessContext={businessContext}
                   onSimulationComplete={(results) => {
                     console.log('Simulation results:', results);
-                    toast.success('Simulação salva com sucesso!');
+                    toast.success('🎆 Simulação avançada salva com sucesso!');
+                    // Trigger refetch to update insights
+                    refetchAIInsights();
                   }}
                 />
               ) : (
                 <EmptyState
                   icon={BeakerIcon}
                   title="Gere uma análise primeiro"
-                  description="Para usar o simulador, você precisa primeiro gerar uma análise com IA"
+                  description="Para usar o simulador avançado, você precisa primeiro gerar uma análise com IA"
                 />
               )}
             </TabsContent>

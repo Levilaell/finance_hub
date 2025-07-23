@@ -34,6 +34,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.0",
     "date-fns": "^3.3.0",
+    "framer-motion": "^12.23.6",
     "lucide-react": "^0.511.0",
     "next": "14.2.5",
     "pluggy-connect-sdk": "^2.9.2",
