@@ -584,6 +584,7 @@ export default function AIInsightsPage() {
   const [shouldFetchAnalysis, setShouldFetchAnalysis] = useState(false);
   const [businessContext, setBusinessContext] = useState<BusinessContext | null>(null);
   const [activeTab, setActiveTab] = useState('insights');
+  const [currentStep, setCurrentStep] = useState(1); // Novo estado para steps
 
   // Set dates on client-side after hydration
   useEffect(() => {
@@ -708,224 +709,363 @@ export default function AIInsightsPage() {
     setSelectedPeriod({ start_date: start, end_date: end });
   }, []);
 
+  // Step progression logic
+  const canProceedToStep2 = selectedPeriod.start_date && selectedPeriod.end_date;
+  const canProceedToStep3 = canProceedToStep2 && aiInsightsData;
+  const canProceedToStep4 = canProceedToStep3;
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <SparklesIcon className="h-8 w-8 text-purple-600" />
-            Insights com IA
-          </h1>
-          <p className="text-gray-600">
-            Análise inteligente e previsões baseadas em seus dados financeiros
-          </p>
-        </div>
+      {/* Header simplificado */}
+      <div className="text-center">
+        <h1 className="text-3xl font-bold flex items-center justify-center gap-2 mb-2">
+          <SparklesIcon className="h-8 w-8 text-purple-600" />
+          Análise Inteligente de Finanças
+        </h1>
+        <p className="text-lg text-gray-600">
+          Transforme seus dados em decisões inteligentes em 3 passos simples
+        </p>
       </div>
 
-      {/* Sistema de Insights Proativos - NOVO! */}
-      {aiInsightsData && (
-        <ProactiveInsightsSystem
-          financialData={aiInsightsData}
-          businessContext={businessContext}
-          onActionTaken={(insight) => {
-            console.log('Action taken on insight:', insight);
-            // Integrar com sistema de tracking
-          }}
-        />
-      )}
-
-      {/* Showcase das Ferramentas Premium */}
-      <FeatureShowcase 
-        onFeatureClick={(feature) => {
-          setActiveTab(feature);
-          // Scroll suave até a seção de ferramentas
-          setTimeout(() => {
-            document.getElementById('advanced-tools')?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
-        }}
-        hasInsights={!!aiInsightsData}
-        hasContext={!!businessContext}
-      />
-
-      {/* Period Selection */}
-      {
-        <Card>
-        <CardHeader>
-          <CardTitle>Selecione o Período</CardTitle>
-          <CardDescription>Escolha um período para análise</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-4 mb-4">
-            {QUICK_PERIODS.map((period) => {
-              const Icon = period.icon;
-              return (
-                <Button
-                  key={period.id}
-                  variant="outline"
-                  className="justify-start h-auto p-4"
-                  onClick={() => handleQuickPeriod(period.id)}
-                >
-                  <Icon className="h-5 w-5 mr-3" />
-                  <div className="text-left">
-                    <div className="font-medium">{period.label}</div>
-                  </div>
-                </Button>
-              );
-            })}
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label>Data Inicial</Label>
-              <DatePicker
-                date={selectedPeriod.start_date || undefined}
-                onDateChange={(date) =>
-                  setSelectedPeriod({ ...selectedPeriod, start_date: date || new Date() })
-                }
-              />
-            </div>
-            <div>
-              <Label>Data Final</Label>
-              <DatePicker
-                date={selectedPeriod.end_date || undefined}
-                onDateChange={(date) =>
-                  setSelectedPeriod({ ...selectedPeriod, end_date: date || new Date() })
-                }
-              />
+      {/* Progress Steps */}
+      <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+        <CardContent className="py-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              {/* Step 1 */}
+              <div className="flex items-center">
+                <div className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
+                  currentStep >= 1 ? "bg-purple-600 text-white" : "bg-gray-200 text-gray-600"
+                )}>
+                  1
+                </div>
+                <span className={cn(
+                  "ml-2 font-medium",
+                  currentStep >= 1 ? "text-purple-600" : "text-gray-500"
+                )}>
+                  Escolher Período
+                </span>
+              </div>
+              
+              <div className="w-12 h-0.5 bg-gray-300"></div>
+              
+              {/* Step 2 */}
+              <div className="flex items-center">
+                <div className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
+                  currentStep >= 2 ? "bg-purple-600 text-white" : "bg-gray-200 text-gray-600"
+                )}>
+                  2
+                </div>
+                <span className={cn(
+                  "ml-2 font-medium",
+                  currentStep >= 2 ? "text-purple-600" : "text-gray-500"
+                )}>
+                  Gerar Análise
+                </span>
+              </div>
+              
+              <div className="w-12 h-0.5 bg-gray-300"></div>
+              
+              {/* Step 3 */}
+              <div className="flex items-center">
+                <div className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
+                  currentStep >= 3 ? "bg-purple-600 text-white" : "bg-gray-200 text-gray-600"
+                )}>
+                  3
+                </div>
+                <span className={cn(
+                  "ml-2 font-medium",
+                  currentStep >= 3 ? "text-purple-600" : "text-gray-500"
+                )}>
+                  Explorar Ferramentas
+                </span>
+              </div>
             </div>
           </div>
-          <div className="mt-4 flex justify-center">
-            <Button
-              onClick={() => {
-                if (selectedPeriod.start_date && selectedPeriod.end_date) {
-                  setShouldFetchAnalysis(true);
-                  // Força refetch imediato
-                  setTimeout(() => {
-                    refetchAIInsights();
-                  }, 100);
-                } else {
-                  toast.error('Por favor, selecione as datas inicial e final');
-                }
-              }}
-              disabled={!selectedPeriod.start_date || !selectedPeriod.end_date || aiInsightsLoading}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold px-8"
-              size="lg"
-            >
-              <SparklesIcon className="h-5 w-5 mr-2" />
-              {aiInsightsLoading ? 'Gerando Análise...' : 'Gerar Análise com IA'}
-            </Button>
+          
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              {currentStep === 1 && "📅 Primeiro, escolha o período que deseja analisar"}
+              {currentStep === 2 && "🚀 Agora vamos gerar sua análise personalizada com IA"}
+              {currentStep === 3 && "🎯 Explore as ferramentas avançadas com seus dados"}
+            </p>
           </div>
         </CardContent>
       </Card>
-      }
 
-      {/* AI Insights Content */}
-      <AIInsightsErrorBoundary>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center">
-                <SparklesIcon className="h-5 w-5 mr-2" />
-                Análise com Inteligência Artificial
-              </div>
-              <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
-                {aiInsightsData?.predictions?.confidence && (
-                  <ConfidenceIndicator level={aiInsightsData.predictions.confidence} />
-                )}
-                <div className="flex gap-2">
-                  {aiInsightsData && (
-                    <InsightsSharing
-                      insights={aiInsightsData}
-                      onShare={(shareData) => {
-                        console.log('Insights shared:', shareData);
-                        toast.success('Insights compartilhados com sucesso!');
-                      }}
-                    />
-                  )}
-                  <Button
-                    variant="outline"
-                    size="default"
-                    onClick={() => {
-                      if (!isUpgradeRequired) {
-                        // Force refetch with cache invalidation
-                        setForceRefresh(true);
-                        setShouldFetchAnalysis(true);
-                        setTimeout(() => {
-                          refetchAIInsights();
-                        }, 100);
-                      }
-                    }}
-                    disabled={aiInsightsLoading || isUpgradeRequired}
-                    title={isUpgradeRequired ? "Limite de requisições atingido" : "Atualizar análise"}
-                    className={cn(
-                      "w-full sm:w-auto",
-                      isUpgradeRequired && "opacity-50 cursor-not-allowed"
-                    )}
-                  >
-                    {isUpgradeRequired && (
-                      <LockClosedIcon className="h-4 w-4" />
-                    )}
-                    {!isUpgradeRequired && (
-                      <ArrowPathIcon className={cn("h-4 w-4", aiInsightsLoading && "animate-spin")} />
-                    )}
-                    <span className="ml-2">{isUpgradeRequired ? "Limite Atingido" : "Atualizar"}</span>
-                  </Button>
-                </div>
-              </div>
+
+      {/* STEP 1: Period Selection */}
+      {currentStep === 1 && (
+        <Card className="border-2 border-purple-200">
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl flex items-center justify-center gap-2">
+              <CalendarIcon className="h-6 w-6 text-purple-600" />
+              Passo 1: Escolha o Período para Análise
             </CardTitle>
-            <CardDescription className="flex items-center justify-between">
-              <span>Insights automáticos e previsões baseadas em seus dados financeiros</span>
-              {dataUpdatedAt && (
-                <span className="text-xs text-gray-500">
-                  Última análise: {formatDate(new Date(dataUpdatedAt))}
-                </span>
-              )}
+            <CardDescription className="text-base">
+              Selecione o período que você quer analisar. Recomendamos começar com &quot;Últimos 3 meses&quot;
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {/* Executive Summary */}
-              {aiInsightsData?.summary && (
-                <ExecutiveSummary summary={aiInsightsData.summary} />
-              )}
+            {/* Quick period buttons - simplified */}
+            <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6 mb-6">
+              {QUICK_PERIODS.slice(0, 6).map((period) => {
+                const Icon = period.icon;
+                return (
+                  <Button
+                    key={period.id}
+                    variant="outline"
+                    className="h-auto p-3 text-center hover:border-purple-400 hover:bg-purple-50"
+                    onClick={() => {
+                      handleQuickPeriod(period.id);
+                      setCurrentStep(2);
+                    }}
+                  >
+                    <div>
+                      <Icon className="h-5 w-5 mx-auto mb-1" />
+                      <div className="text-xs font-medium">{period.label}</div>
+                    </div>
+                  </Button>
+                );
+              })}
+            </div>
+            
+            <div className="text-center text-sm text-gray-500 mb-4">ou escolha datas específicas:</div>
+            
+            <div className="grid gap-4 md:grid-cols-2 max-w-md mx-auto">
+              <div>
+                <Label>Data Inicial</Label>
+                <DatePicker
+                  date={selectedPeriod.start_date || undefined}
+                  onDateChange={(date) => {
+                    setSelectedPeriod({ ...selectedPeriod, start_date: date || new Date() });
+                    if (date && selectedPeriod.end_date) {
+                      setCurrentStep(2);
+                    }
+                  }}
+                />
+              </div>
+              <div>
+                <Label>Data Final</Label>
+                <DatePicker
+                  date={selectedPeriod.end_date || undefined}
+                  onDateChange={(date) => {
+                    setSelectedPeriod({ ...selectedPeriod, end_date: date || new Date() });
+                    if (date && selectedPeriod.start_date) {
+                      setCurrentStep(2);
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            
+            {canProceedToStep2 && (
+              <div className="mt-6 text-center">
+                <Button
+                  onClick={() => setCurrentStep(2)}
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold px-8"
+                  size="lg"
+                >
+                  Continuar para Análise <ArrowTrendingUpIcon className="h-5 w-5 ml-2" />
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
-              {/* Key Metrics */}
-              {aiInsightsData?.key_metrics && (
-                <div className="grid gap-4 md:grid-cols-3 mb-6">
-                  <ScoreCard 
-                    title="Saúde Financeira" 
-                    score={aiInsightsData.key_metrics.health_score}
-                    grade={aiInsightsData.key_metrics.overall_grade}
-                  />
-                  <ScoreCard 
-                    title="Eficiência Operacional" 
-                    score={aiInsightsData.key_metrics.efficiency_score}
-                  />
-                  <ScoreCard 
-                    title="Potencial de Crescimento" 
-                    score={aiInsightsData.key_metrics.growth_potential}
-                  />
-                </div>
-              )}
-
-              {/* Loading State */}
-              {aiInsightsLoading && (
-                <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                  <div className="relative">
-                    <SparklesIcon className="h-16 w-16 text-purple-600 animate-pulse" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <LoadingSpinner className="h-8 w-8" />
+      {/* STEP 2: Generate Analysis */}
+      {currentStep === 2 && (
+        <Card className="border-2 border-purple-200">
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl flex items-center justify-center gap-2">
+              <SparklesIcon className="h-6 w-6 text-purple-600" />
+              Passo 2: Gerar Análise Inteligente
+            </CardTitle>
+            <CardDescription className="text-base">
+              Período selecionado: {selectedPeriod.start_date && formatDate(selectedPeriod.start_date)} até {selectedPeriod.end_date && formatDate(selectedPeriod.end_date)}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center space-y-4">
+              {!aiInsightsData && !aiInsightsLoading && (
+                <>
+                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg border border-purple-200">
+                    <SparklesIcon className="h-12 w-12 mx-auto text-purple-600 mb-3" />
+                    <h3 className="text-lg font-semibold mb-2">Pronto para Análise Inteligente!</h3>
+                    <p className="text-gray-600 mb-4">
+                      Nossa IA irá analisar suas transações e gerar insights personalizados, 
+                      previsões e recomendações específicas para o seu negócio.
+                    </p>
+                    <div className="flex items-center justify-center space-x-6 text-sm text-gray-600 mb-4">
+                      <div className="flex items-center">
+                        <CheckCircleIcon className="h-5 w-5 text-green-600 mr-2" />
+                        <span>Análise Automática</span>
+                      </div>
+                      <div className="flex items-center">
+                        <CheckCircleIcon className="h-5 w-5 text-green-600 mr-2" />
+                        <span>Previsões Futuras</span>
+                      </div>
+                      <div className="flex items-center">
+                        <CheckCircleIcon className="h-5 w-5 text-green-600 mr-2" />
+                        <span>Recomendações</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="text-center space-y-2">
-                    <p className="text-lg font-medium text-gray-900">Analisando seus dados com IA...</p>
-                    <p className="text-sm text-gray-600">Isso pode levar alguns segundos</p>
-                    <div className="flex items-center justify-center space-x-2 text-xs text-gray-500">
+                  
+                  <Button
+                    onClick={() => {
+                      setShouldFetchAnalysis(true);
+                      setTimeout(() => refetchAIInsights(), 100);
+                    }}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold px-12 py-4 text-lg"
+                    size="lg"
+                  >
+                    <SparklesIcon className="h-6 w-6 mr-3" />
+                    Gerar Análise com IA
+                  </Button>
+                  
+                  <div className="flex justify-center">
+                    <Button variant="ghost" onClick={() => setCurrentStep(1)} className="text-gray-500">
+                      ← Voltar e alterar período
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* STEP 2 & 3: AI Insights Content */}
+      {(currentStep === 2 || currentStep === 3) && (
+        <AIInsightsErrorBoundary>
+          <Card className={cn(
+            "border-2",
+            currentStep === 3 ? "border-green-200 bg-green-50/30" : "border-purple-200"
+          )}>            
+            <CardContent className="py-6">
+            <div className="space-y-6">
+              {/* Success message when analysis is ready */}
+              {aiInsightsData && currentStep === 2 && (
+                <>
+                  <div className="text-center py-6">
+                    <div className="bg-green-100 w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center">
+                      <CheckCircleIcon className="h-8 w-8 text-green-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-green-800 mb-2">✨ Análise Concluída!</h3>
+                    <p className="text-gray-600 mb-4">
+                      Sua análise inteligente está pronta. Vamos ver os resultados?
+                    </p>
+                    <Button
+                      onClick={() => setCurrentStep(3)}
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold px-8"
+                      size="lg"
+                    >
+                      Ver Resultados <ChartBarIcon className="h-5 w-5 ml-2" />
+                    </Button>
+                  </div>
+                </>
+              )}
+              
+              {/* Show results in step 3 */}
+              {aiInsightsData && currentStep === 3 && (
+                <>
+                  <div className="text-center mb-6">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                      📊 Seus Resultados
+                    </h3>
+                    <p className="text-gray-600">
+                      Período: {selectedPeriod.start_date && formatDate(selectedPeriod.start_date)} até {selectedPeriod.end_date && formatDate(selectedPeriod.end_date)}
+                    </p>
+                    <div className="flex justify-center gap-4 mt-4">
+                      {aiInsightsData && (
+                        <InsightsSharing
+                          insights={aiInsightsData}
+                          onShare={(shareData) => {
+                            console.log('Insights shared:', shareData);
+                            toast.success('Insights compartilhados com sucesso!');
+                          }}
+                        />
+                      )}
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setForceRefresh(true);
+                          setShouldFetchAnalysis(true);
+                          setCurrentStep(2);
+                          setTimeout(() => refetchAIInsights(), 100);
+                        }}
+                        disabled={aiInsightsLoading}
+                      >
+                        <ArrowPathIcon className={cn("h-4 w-4 mr-2", aiInsightsLoading && "animate-spin")} />
+                        Atualizar Análise
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Executive Summary */}
+                  {aiInsightsData?.summary && (
+                    <ExecutiveSummary summary={aiInsightsData.summary} />
+                  )}
+
+                  {/* Key Metrics */}
+                  {aiInsightsData?.key_metrics && (
+                    <div className="grid gap-4 md:grid-cols-3 mb-6">
+                      <ScoreCard 
+                        title="Saúde Financeira" 
+                        score={aiInsightsData.key_metrics.health_score}
+                        grade={aiInsightsData.key_metrics.overall_grade}
+                      />
+                      <ScoreCard 
+                        title="Eficiência Operacional" 
+                        score={aiInsightsData.key_metrics.efficiency_score}
+                      />
+                      <ScoreCard 
+                        title="Potencial de Crescimento" 
+                        score={aiInsightsData.key_metrics.growth_potential}
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Sistema de Insights Proativos */}
+                  <ProactiveInsightsSystem
+                    financialData={aiInsightsData}
+                    businessContext={businessContext}
+                    onActionTaken={(insight) => {
+                      console.log('Action taken on insight:', insight);
+                    }}
+                  />
+                </>
+              )}
+
+              {/* Loading State - only in step 2 */}
+              {aiInsightsLoading && currentStep === 2 && (
+                <div className="text-center py-12">
+                  <div className="relative mb-6">
+                    <SparklesIcon className="h-20 w-20 mx-auto text-purple-600 animate-pulse" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <LoadingSpinner className="h-10 w-10" />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">🤖 Analisando com IA...</h3>
+                  <p className="text-gray-600 mb-4">Nossa inteligência artificial está processando seus dados</p>
+                  
+                  <div className="max-w-md mx-auto">
+                    <div className="flex items-center justify-center space-x-2 text-sm text-gray-500 mb-4">
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                         <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                         <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                       </div>
-                      <span>Processando com OpenAI GPT</span>
+                      <span>Powered by OpenAI GPT</span>
+                    </div>
+                    
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+                      <p><strong>Aguarde...</strong> Estamos analisando padrões, gerando previsões e criando recomendações personalizadas para você.</p>
                     </div>
                   </div>
                 </div>
@@ -1263,73 +1403,82 @@ export default function AIInsightsPage() {
           </CardContent>
         </Card>
       </AIInsightsErrorBoundary>
+      )}
 
-      {/* Ferramentas Avançadas - Agora mais visível */}
-      <Card id="advanced-tools" className="border-2 border-purple-200 bg-gradient-to-br from-purple-50/50 to-pink-50/50">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-2xl flex items-center gap-2">
-                <SparklesIcon className="h-6 w-6 text-purple-600 animate-pulse" />
-                Ferramentas Avançadas de Análise
-                <Badge className="ml-2 bg-gradient-to-r from-purple-600 to-pink-600">PRO</Badge>
-              </CardTitle>
-              <CardDescription className="text-base mt-1">
-                Maximize seus resultados com ferramentas exclusivas de inteligência artificial
-              </CardDescription>
-            </div>
-            {!aiInsightsData && (
-              <div className="text-right">
-                <p className="text-sm text-purple-700 font-medium">💡 Dica: Gere uma análise primeiro</p>
-                <p className="text-xs text-gray-600">para aproveitar todas as ferramentas</p>
-              </div>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-6 h-auto p-1">
-              <TabsTrigger 
-                value="context" 
-                className="flex flex-col items-center gap-2 py-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white"
-              >
-                <CogIcon className="h-5 w-5" />
-                <span className="text-xs font-medium">Contexto</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="simulator" 
-                className="flex flex-col items-center gap-2 py-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white"
-              >
-                <BeakerIcon className="h-5 w-5" />
-                <span className="text-xs font-medium">Simulador</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="benchmarking" 
-                className="flex flex-col items-center gap-2 py-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white"
-              >
-                <GlobeAltIcon className="h-5 w-5" />
-                <span className="text-xs font-medium">Benchmarking</span>
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="context" className="mt-6">
-              <ContextInput 
-                onContextUpdate={(context) => {
-                  setBusinessContext(context);
-                  toast.success('Contexto atualizado! As próximas análises serão mais personalizadas.');
-                  // Força nova análise com contexto
-                  if (aiInsightsData) {
-                    setForceRefresh(true);
-                    setShouldFetchAnalysis(true);
-                    setTimeout(() => refetchAIInsights(), 100);
-                  }
-                }}
-                initialContext={businessContext || undefined}
-              />
-            </TabsContent>
-            
-            <TabsContent value="simulator" className="mt-6">
-              {aiInsightsData ? (
+      {/* STEP 3: Advanced Tools - Only show when analysis is ready */}
+      {currentStep === 3 && aiInsightsData && (
+        <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50/50 to-indigo-50/50">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl flex items-center justify-center gap-2">
+              <SparklesIcon className="h-7 w-7 text-blue-600" />
+              Ferramentas Avançadas
+              <Badge className="bg-gradient-to-r from-blue-600 to-indigo-600">PREMIUM</Badge>
+            </CardTitle>
+            <CardDescription className="text-base">
+              Explore ferramentas exclusivas para maximizar seus resultados
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-3 mb-8 h-auto p-1">
+                <TabsTrigger 
+                  value="context" 
+                  className="flex flex-col items-center gap-2 py-4 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+                >
+                  <CogIcon className="h-6 w-6" />
+                  <div className="text-center">
+                    <div className="text-sm font-semibold">Contexto</div>
+                    <div className="text-xs opacity-80">Personalizar IA</div>
+                  </div>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="simulator" 
+                  className="flex flex-col items-center gap-2 py-4 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+                >
+                  <BeakerIcon className="h-6 w-6" />
+                  <div className="text-center">
+                    <div className="text-sm font-semibold">Simulador</div>
+                    <div className="text-xs opacity-80">Cenários</div>
+                  </div>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="benchmarking" 
+                  className="flex flex-col items-center gap-2 py-4 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+                >
+                  <GlobeAltIcon className="h-6 w-6" />
+                  <div className="text-center">
+                    <div className="text-sm font-semibold">Benchmarking</div>
+                    <div className="text-xs opacity-80">Compare</div>
+                  </div>
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="context" className="mt-8">
+                <div className="mb-4 text-center">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">🎯 Configure o Contexto</h3>
+                  <p className="text-gray-600 text-sm">Adicione informações sobre seu negócio para análises mais precisas</p>
+                </div>
+                <ContextInput 
+                  onContextUpdate={(context) => {
+                    setBusinessContext(context);
+                    toast.success('Contexto atualizado! As próximas análises serão mais personalizadas.');
+                    // Força nova análise com contexto
+                    if (aiInsightsData) {
+                      setForceRefresh(true);
+                      setShouldFetchAnalysis(true);
+                      setCurrentStep(2);
+                      setTimeout(() => refetchAIInsights(), 100);
+                    }
+                  }}
+                  initialContext={businessContext || undefined}
+                />
+              </TabsContent>
+              
+              <TabsContent value="simulator" className="mt-8">
+                <div className="mb-4 text-center">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">🧪 Simule Cenários</h3>
+                  <p className="text-gray-600 text-sm">Teste diferentes situações e veja o impacto no seu negócio</p>
+                </div>
                 <EnhancedScenarioSimulator
                   currentData={{
                     income: aiInsightsData.key_metrics?.income || 0,
@@ -1341,22 +1490,16 @@ export default function AIInsightsPage() {
                   businessContext={businessContext}
                   onSimulationComplete={(results) => {
                     console.log('Simulation results:', results);
-                    toast.success('🎆 Simulação avançada salva com sucesso!');
-                    // Trigger refetch to update insights
-                    refetchAIInsights();
+                    toast.success('🎆 Simulação concluída com sucesso!');
                   }}
                 />
-              ) : (
-                <EmptyState
-                  icon={BeakerIcon}
-                  title="Gere uma análise primeiro"
-                  description="Para usar o simulador avançado, você precisa primeiro gerar uma análise com IA"
-                />
-              )}
-            </TabsContent>
-            
-            <TabsContent value="benchmarking" className="mt-6">
-              {aiInsightsData ? (
+              </TabsContent>
+              
+              <TabsContent value="benchmarking" className="mt-8">
+                <div className="mb-4 text-center">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">🏆 Compare com o Mercado</h3>
+                  <p className="text-gray-600 text-sm">Veja como sua empresa se compara com outras do setor</p>
+                </div>
                 <MarketBenchmarking
                   companyData={{
                     industry: businessContext?.industry || 'services',
@@ -1369,19 +1512,29 @@ export default function AIInsightsPage() {
                   }}
                   keyMetrics={aiInsightsData.key_metrics}
                 />
-              ) : (
-                <EmptyState
-                  icon={GlobeAltIcon}
-                  title="Gere uma análise primeiro"
-                  description="Para ver o benchmarking, você precisa primeiro gerar uma análise com IA"
-                />
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+              </TabsContent>
+            </Tabs>
+            
+            <div className="mt-8 text-center">
+              <Button
+                onClick={() => setCurrentStep(1)}
+                variant="outline"
+                className="mr-4"
+              >
+                ← Nova Análise
+              </Button>
+              <Button
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                variant="ghost"
+              >
+                ↑ Voltar ao topo
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Saved AI Analyses Section */}
+      {/* Saved AI Analyses Section - Always visible */}
       <AIAnalysesSection />
     </div>
   );

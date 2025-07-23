@@ -70,7 +70,7 @@ export function PluggyConnectIframe({
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [connectToken, onSuccess, onError, onClose]);
+  }, [connectToken, onSuccess, onError, onClose, updateItem]);
 
   if (!iframeUrl) {
     return null;

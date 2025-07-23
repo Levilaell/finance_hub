@@ -57,7 +57,7 @@ export interface Company {
   company_type: string;
   business_sector: string;
   subscription_plan?: SubscriptionPlan;
-  subscription_status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'suspended' | 'expired';
+  subscription_status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'cancelling' | 'suspended' | 'expired';
   billing_cycle: 'monthly' | 'yearly';
   trial_ends_at?: string;
   next_billing_date?: string;

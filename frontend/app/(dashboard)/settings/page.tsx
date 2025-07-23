@@ -1002,10 +1002,6 @@ export default function SettingsPage() {
                       )}
                     </div>
 
-
-                  </div>
-                </div>
-
                 {/* Plan Features */}
                 {user?.company?.subscription_plan && (
                   <div>
