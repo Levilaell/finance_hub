@@ -98,7 +98,7 @@ export default function Home() {
       <section className="py-20 bg-gradient-to-b from-red-50/50 to-green-50/50">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
-            <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div className="grid lg:grid-cols-2 gap-16 items-start">
               {/* Problem */}
               <div className="space-y-6">
                 <div className="inline-flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium">
@@ -254,11 +254,6 @@ export default function Home() {
               automatiza toda sua gestão financeira, desde a conexão bancária até relatórios 
               inteligentes que geram insights para o crescimento da sua empresa.
             </p>
-            <div className="flex justify-center mt-6">
-              <Badge variant="secondary" className="text-lg px-4 py-2">
-                📊 Economia comprovada de até 15 horas/mês por empresa
-              </Badge>
-            </div>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
