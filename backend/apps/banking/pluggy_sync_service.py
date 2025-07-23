@@ -113,6 +113,16 @@ class PluggyTransactionSyncService:
                                 'message': 'Invalid credentials',
                                 'transactions': 0
                             }
+                        elif item_status == 'OUTDATED':
+                            # Try to update the item when it's outdated
+                            logger.info(f"🔄 Item is OUTDATED, triggering update...")
+                            try:
+                                update_result = await client.sync_item(pluggy_item_id)
+                                logger.info(f"✅ Item update triggered successfully")
+                                # Wait a bit for the update to process
+                                await asyncio.sleep(3)
+                            except Exception as e:
+                                logger.warning(f"⚠️ Could not update outdated item: {e}")
                 except Exception as e:
                     logger.warning(f"⚠️ Could not check item status: {e}")
             
@@ -302,27 +312,39 @@ class PluggyTransactionSyncService:
         def save_transactions():
             created_count = 0
             
+            logger.info(f"🔍 Processing batch of {len(transactions)} transactions")
+            
             with transaction.atomic():
-                for tx_data in transactions:
+                for idx, tx_data in enumerate(transactions):
                     # Check if transaction already exists
                     external_id = tx_data.get('id')
                     if not external_id:
+                        logger.warning(f"Transaction #{idx} has no ID, skipping")
                         continue
+                    
+                    # Log transaction details
+                    tx_date = tx_data.get('date', 'no date')
+                    tx_desc = tx_data.get('description', 'no description')[:50]
+                    tx_amount = tx_data.get('amount', 0)
+                    logger.info(f"📝 Transaction #{idx}: ID={external_id}, Date={tx_date}, Amount={tx_amount}, Desc='{tx_desc}'")
                     
                     # Pluggy uses string IDs
                     if Transaction.objects.filter(
                         bank_account=account,
                         external_id=str(external_id)
                     ).exists():
-                        logger.debug(f"Transaction {external_id} already exists, skipping")
+                        logger.info(f"⏭️  Transaction {external_id} already exists, skipping")
                         continue
                     
                     # Create transaction
                     tx = self._create_transaction_from_pluggy_data(account, tx_data)
                     if tx:
                         created_count += 1
-                        logger.debug(f"Created transaction: {tx.description} - R$ {tx.amount}")
+                        logger.info(f"✅ Created new transaction: {external_id} - {tx.description} - R$ {tx.amount}")
+                    else:
+                        logger.warning(f"❌ Failed to create transaction: {external_id}")
             
+            logger.info(f"📊 Batch processing complete: {created_count} new transactions created out of {len(transactions)} total")
             return created_count
         
         return await save_transactions()
