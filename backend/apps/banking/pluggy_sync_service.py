@@ -133,15 +133,24 @@ class PluggyTransactionSyncService:
             
             # Check item status before syncing
             pluggy_item_id = await sync_to_async(lambda: account.pluggy_item_id)()
+            logger.info(f"🔍 [ITEM STATUS] Verificando status do item antes da sincronização")
+            logger.info(f"🔍 [ITEM STATUS] Account ID: {account_info['id']}, Item ID: {pluggy_item_id}")
+            
             if pluggy_item_id:
                 try:
                     async with PluggyClient() as client:
+                        logger.info(f"📡 [ITEM STATUS] Consultando status do item {pluggy_item_id} na API Pluggy...")
                         item = await client.get_item(pluggy_item_id)
                         item_status = item.get('status')
-                        logger.info(f"📋 Item {pluggy_item_id} status: {item_status}")
+                        last_updated = item.get('lastUpdatedAt')
                         
+                        logger.info(f"📋 [ITEM STATUS] Status atual: {item_status}")
+                        logger.info(f"📅 [ITEM STATUS] Última atualização do item: {last_updated}")
+                        
+                        # Log detalhado baseado no status
                         if item_status == 'WAITING_USER_ACTION':
-                            logger.warning(f"⚠️ Item requires user action, cannot sync")
+                            logger.warning(f"⚠️ [ITEM STATUS] Item {pluggy_item_id} requer ação do usuário!")
+                            logger.warning(f"⚠️ [ITEM STATUS] Sincronização bloqueada - usuário precisa se autenticar novamente")
                             return {
                                 'account_id': account_info['id'], 
                                 'status': 'waiting_user_action',
@@ -149,7 +158,8 @@ class PluggyTransactionSyncService:
                                 'transactions': 0
                             }
                         elif item_status == 'LOGIN_ERROR':
-                            logger.warning(f"⚠️ Item has login error")
+                            logger.error(f"❌ [ITEM STATUS] Item {pluggy_item_id} com erro de login!")
+                            logger.error(f"❌ [ITEM STATUS] Credenciais inválidas - sincronização bloqueada")
                             return {
                                 'account_id': account_info['id'],
                                 'status': 'login_error', 
@@ -157,12 +167,22 @@ class PluggyTransactionSyncService:
                                 'transactions': 0
                             }
                         elif item_status == 'OUTDATED':
-                            # Don't try to update OUTDATED items automatically
-                            # as it may trigger WAITING_USER_ACTION
-                            logger.warning(f"⚠️ Item is OUTDATED but continuing with sync")
-                            logger.info(f"📝 Note: New transactions may not be available until item is updated")
+                            logger.warning(f"⚠️ [ITEM STATUS] Item {pluggy_item_id} está DESATUALIZADO!")
+                            logger.warning(f"⚠️ [ITEM STATUS] Continuando com sync, mas novas transações podem não estar disponíveis")
+                            logger.info(f"📝 [ITEM STATUS] Recomendação: Forçar atualização do item ou solicitar reautenticação do usuário")
+                        elif item_status == 'UPDATING':
+                            logger.info(f"🔄 [ITEM STATUS] Item {pluggy_item_id} está sendo atualizado no momento")
+                            logger.info(f"🔄 [ITEM STATUS] Continuando com sync dos dados disponíveis")
+                        elif item_status == 'UPDATED':
+                            logger.info(f"✅ [ITEM STATUS] Item {pluggy_item_id} está atualizado e pronto para sync!")
+                        else:
+                            logger.warning(f"❓ [ITEM STATUS] Status desconhecido: {item_status}")
+                            
                 except Exception as e:
-                    logger.warning(f"⚠️ Could not check item status: {e}")
+                    logger.error(f"❌ [ITEM STATUS] Erro ao verificar status do item: {e}")
+                    logger.warning(f"⚠️ [ITEM STATUS] Continuando sync sem verificação de status")
+            else:
+                logger.warning(f"⚠️ [ITEM STATUS] Account {account_info['id']} não tem pluggy_item_id!")
             
             # Determine sync date range
             sync_from = self._get_sync_from_date_safe(account_info, force_extended_window)
@@ -304,33 +324,47 @@ class PluggyTransactionSyncService:
     def _get_sync_from_date_safe(self, account_info: Dict, force_extended_window: bool = False) -> datetime.date:
         """Determine the date to sync from using account info dict"""
         last_sync = account_info.get('last_sync_at')
+        now = timezone.now()
+        
+        logger.info(f"🕒 [SYNC DATE] Calculando janela de sincronização para conta {account_info['id']}")
+        logger.info(f"🕒 [SYNC DATE] Hora atual: {now}")
+        logger.info(f"🕒 [SYNC DATE] Última sincronização: {last_sync}")
+        logger.info(f"🕒 [SYNC DATE] Force extended window: {force_extended_window}")
         
         if not last_sync:
             # PRIMEIRA SYNC: período baseado no modo
             sandbox_mode = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
             if sandbox_mode:
                 days = 365  # 1 ano para sandbox
-                logger.info(f"🧪 Sandbox: First sync, using {days} days")
+                logger.info(f"🧪 [SYNC DATE] Sandbox: Primeira sync, usando {days} dias")
             else:
                 days = 90   # 3 meses em produção/trial
-                logger.info(f"🚀 Production/Trial: First sync, using {days} days")
+                logger.info(f"🚀 [SYNC DATE] Production/Trial: Primeira sync, usando {days} dias")
             
-            return (timezone.now() - timedelta(days=days)).date()
+            sync_from = (now - timedelta(days=days)).date()
+            logger.info(f"📅 [SYNC DATE] Data inicial calculada: {sync_from}")
+            return sync_from
         else:
             # SYNC INCREMENTAL: janela maior para capturar transações recentes
-            days_since_sync = (timezone.now() - last_sync).days
-            hours_since_sync = (timezone.now() - last_sync).total_seconds() / 3600
+            time_diff = now - last_sync
+            days_since_sync = time_diff.days
+            hours_since_sync = time_diff.total_seconds() / 3600
+            minutes_since_sync = time_diff.total_seconds() / 60
+            
+            logger.info(f"⏱️ [SYNC DATE] Tempo desde última sync: {minutes_since_sync:.0f} minutos ({hours_since_sync:.1f} horas, {days_since_sync} dias)")
             
             # Se forçar janela estendida (sync manual), usar período maior
             if force_extended_window:
                 days_back = 30  # Sempre buscar 30 dias em sync manual
-                logger.info(f"🔄 Manual sync requested, using extended {days_back} days window")
-                return (timezone.now() - timedelta(days=days_back)).date()
+                sync_from = (now - timedelta(days=days_back)).date()
+                logger.info(f"🔄 [SYNC DATE] Sync manual solicitado, usando janela estendida de {days_back} dias: {sync_from}")
+                return sync_from
             
             if days_since_sync > 30:
                 # Se muito tempo sem sync, buscar 30 dias para não perder nada
-                logger.info(f"⚠️ Long gap ({days_since_sync} days), using 30 days")
-                return (timezone.now() - timedelta(days=30)).date()
+                sync_from = (now - timedelta(days=30)).date()
+                logger.info(f"⚠️ [SYNC DATE] Intervalo longo ({days_since_sync} dias), usando 30 dias: {sync_from}")
+                return sync_from
             else:
                 # OTIMIZAÇÃO: Buscar desde a última sincronização com margem de segurança
                 # Margem de 2 dias para cobrir:
@@ -343,13 +377,16 @@ class PluggyTransactionSyncService:
                 # Se sincronizou há menos de 1 dia, usar janela mínima de 3 dias
                 if hours_since_sync < 24:
                     days_back = 3
-                    logger.info(f"📅 Recent sync ({hours_since_sync:.1f} hours ago), using minimum {days_back} days window")
+                    sync_from = (now - timedelta(days=days_back)).date()
+                    logger.info(f"📅 [SYNC DATE] Sync recente ({hours_since_sync:.1f} horas atrás), usando janela mínima de {days_back} dias: {sync_from}")
                 else:
                     # Buscar desde a última sync + margem
                     days_back = days_since_sync + margin_days
-                    logger.info(f"📅 Incremental sync: {days_since_sync} days since last sync + {margin_days} days margin = {days_back} days window")
+                    sync_from = (now - timedelta(days=days_back)).date()
+                    logger.info(f"📅 [SYNC DATE] Sync incremental: {days_since_sync} dias desde última sync + {margin_days} dias de margem = {days_back} dias de janela")
+                    logger.info(f"📅 [SYNC DATE] Data inicial calculada: {sync_from}")
                 
-                return (timezone.now() - timedelta(days=days_back)).date()
+                return sync_from
 
     async def _get_accounts_to_sync(self, company_id: int = None) -> List[BankAccount]:
         """Get Pluggy accounts that need synchronization"""

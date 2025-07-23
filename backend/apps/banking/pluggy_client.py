@@ -148,12 +148,18 @@ class PluggyClient:
                 'clientSecret': self.client_secret
             }
             
+            logger.info(f"🔐 [PLUGGY AUTH] Iniciando autenticação com Pluggy API")
+            logger.debug(f"🔐 [PLUGGY AUTH] Base URL: {self.base_url}")
+            
             response = await self.client.post(
                 f"{self.base_url}/auth",
                 json=auth_data
             )
             
+            logger.info(f"🔐 [PLUGGY AUTH] Status da resposta: {response.status_code}")
+            
             if response.status_code != 200:
+                logger.error(f"🔐 [PLUGGY AUTH] Falha na autenticação: {response.text}")
                 raise PluggyAuthenticationError(f"Authentication failed: {response.text}")
             
             data = response.json()
@@ -164,16 +170,18 @@ class PluggyClient:
             elif 'accessToken' in data:
                 self._access_token = data['accessToken']
             else:
-                logger.error(f"No access token in response. Available keys: {list(data.keys())}")
+                logger.error(f"🔐 [PLUGGY AUTH] Token não encontrado. Chaves disponíveis: {list(data.keys())}")
                 raise PluggyAuthenticationError(f"Missing access token in response: {data}")
             
-            logger.info("Successfully authenticated with Pluggy API")
+            logger.info(f"✅ [PLUGGY AUTH] Autenticação bem sucedida com Pluggy API")
+            logger.debug(f"🔐 [PLUGGY AUTH] Token recebido (primeiros 10 chars): {self._access_token[:10]}...")
             
             # Pluggy tokens typically expire in 2 hours
             self._token_expires_at = datetime.now() + timedelta(hours=2)
+            logger.info(f"🔐 [PLUGGY AUTH] Token expira em: {self._token_expires_at}")
             
         except Exception as e:
-            logger.error(f"Pluggy authentication error: {e}")
+            logger.error(f"❌ [PLUGGY AUTH] Erro na autenticação: {e}")
             raise PluggyAuthenticationError(f"Failed to authenticate: {e}")
     
     def _get_headers(self, include_auth: bool = True) -> Dict[str, str]:
@@ -230,19 +238,27 @@ class PluggyClient:
                 'parameters': parameters
             }
             
+            logger.info(f"🔗 [PLUGGY ITEM] Criando novo item para connector {connector_id}")
+            logger.debug(f"🔗 [PLUGGY ITEM] Parâmetros: {list(parameters.keys())}")
+            
             response = await self.client.post(
                 f"{self.base_url}/items",
                 json=item_data,
                 headers=self._get_headers()
             )
             
+            logger.info(f"🔗 [PLUGGY ITEM] Resposta da criação: Status {response.status_code}")
+            
             if response.status_code not in [200, 201]:
+                logger.error(f"❌ [PLUGGY ITEM] Falha ao criar item: {response.text}")
                 raise PluggyAPIError(f"Failed to create item: {response.text}")
             
-            return response.json()
+            data = response.json()
+            logger.info(f"✅ [PLUGGY ITEM] Item criado com sucesso! ID: {data.get('id')}, Status: {data.get('status')}")
+            return data
             
         except Exception as e:
-            logger.error(f"Error creating item: {e}")
+            logger.error(f"❌ [PLUGGY ITEM] Erro ao criar item: {e}")
             raise PluggyAPIError(f"Failed to create item: {e}")
     
     async def get_item(self, item_id: str) -> Dict[str, Any]:
@@ -250,18 +266,34 @@ class PluggyClient:
         try:
             await self._ensure_authenticated()
             
+            logger.info(f"📋 [PLUGGY ITEM] Consultando status do item {item_id}")
+            
             response = await self.client.get(
                 f"{self.base_url}/items/{item_id}",
                 headers=self._get_headers()
             )
             
             if response.status_code != 200:
+                logger.error(f"❌ [PLUGGY ITEM] Falha ao consultar item: {response.text}")
                 raise PluggyAPIError(f"Failed to get item: {response.text}")
             
-            return response.json()
+            data = response.json()
+            logger.info(f"📊 [PLUGGY ITEM] Status do item {item_id}: {data.get('status')}")
+            
+            # Log detalhado do estado do item
+            if data.get('status') == 'WAITING_USER_ACTION':
+                logger.warning(f"⚠️ [PLUGGY ITEM] Item {item_id} aguardando ação do usuário!")
+            elif data.get('status') == 'OUTDATED':
+                logger.warning(f"⚠️ [PLUGGY ITEM] Item {item_id} está DESATUALIZADO!")
+            elif data.get('status') == 'LOGIN_ERROR':
+                logger.error(f"❌ [PLUGGY ITEM] Item {item_id} com erro de login!")
+            elif data.get('status') == 'UPDATED':
+                logger.info(f"✅ [PLUGGY ITEM] Item {item_id} atualizado e pronto!")
+                
+            return data
             
         except Exception as e:
-            logger.error(f"Error getting item {item_id}: {e}")
+            logger.error(f"❌ [PLUGGY ITEM] Erro ao consultar item {item_id}: {e}")
             raise PluggyAPIError(f"Failed to get item: {e}")
     
     async def update_item(self, item_id: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
@@ -289,6 +321,8 @@ class PluggyClient:
         try:
             await self._ensure_authenticated()
             
+            logger.info(f"🔄 [PLUGGY SYNC] Forçando sincronização do item {item_id}")
+            
             # Trigger sync by sending empty PATCH request
             response = await self.client.patch(
                 f"{self.base_url}/items/{item_id}",
@@ -296,13 +330,25 @@ class PluggyClient:
                 headers=self._get_headers()
             )
             
+            logger.info(f"🔄 [PLUGGY SYNC] Resposta da sincronização: Status {response.status_code}")
+            
             if response.status_code != 200:
+                logger.error(f"❌ [PLUGGY SYNC] Falha ao sincronizar item: {response.text}")
                 raise PluggyAPIError(f"Failed to sync item: {response.text}")
             
-            return response.json()
+            data = response.json()
+            new_status = data.get('status')
+            logger.info(f"✅ [PLUGGY SYNC] Sincronização iniciada! Novo status: {new_status}")
+            
+            if new_status == 'UPDATING':
+                logger.info(f"⏳ [PLUGGY SYNC] Item {item_id} está sendo atualizado...")
+            elif new_status == 'WAITING_USER_ACTION':
+                logger.warning(f"⚠️ [PLUGGY SYNC] Item {item_id} requer ação do usuário após sync!")
+                
+            return data
             
         except Exception as e:
-            logger.error(f"Error syncing item {item_id}: {e}")
+            logger.error(f"❌ [PLUGGY SYNC] Erro ao sincronizar item {item_id}: {e}")
             raise PluggyAPIError(f"Failed to sync item: {e}")
     
     async def delete_item(self, item_id: str) -> bool:
@@ -385,19 +431,33 @@ class PluggyClient:
             if to_date:
                 params['to'] = to_date
             
+            logger.info(f"💳 [PLUGGY TRANS] Buscando transações para conta {account_id}")
+            logger.info(f"📅 [PLUGGY TRANS] Período: {from_date} até {to_date}")
+            logger.info(f"📄 [PLUGGY TRANS] Página {page}, tamanho {params['pageSize']}")
+            
             response = await self.client.get(
                 f"{self.base_url}/transactions",
                 params=params,
                 headers=self._get_headers()
             )
             
+            logger.info(f"💳 [PLUGGY TRANS] Resposta recebida: Status {response.status_code}")
+            
             if response.status_code != 200:
+                logger.error(f"❌ [PLUGGY TRANS] Falha ao buscar transações: {response.text}")
                 raise PluggyAPIError(f"Failed to get transactions: {response.text}")
             
-            return response.json()
+            data = response.json()
+            total_results = data.get('totalResults', 0)
+            results_count = len(data.get('results', []))
+            
+            logger.info(f"✅ [PLUGGY TRANS] Transações recebidas: {results_count} de {total_results} total")
+            logger.info(f"📊 [PLUGGY TRANS] Página {data.get('page', page)} de {data.get('totalPages', 1)}")
+            
+            return data
             
         except Exception as e:
-            logger.error(f"Error getting transactions for account {account_id}: {e}")
+            logger.error(f"❌ [PLUGGY TRANS] Erro ao buscar transações para conta {account_id}: {e}")
             raise PluggyAPIError(f"Failed to get transactions: {e}")
     
     async def get_identity(self, item_id: str) -> Dict[str, Any]:
