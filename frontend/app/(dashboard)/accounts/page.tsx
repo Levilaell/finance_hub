@@ -790,12 +790,6 @@ export default function AccountsPage() {
                 <li>• É um procedimento padrão do Open Banking</li>
               </ul>
             </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
-              <p className="text-sm text-amber-800">
-                <strong>Importante:</strong> Você será direcionado para o site oficial do seu banco. 
-                Nunca insira suas credenciais em sites que não sejam do banco.
-              </p>
-            </div>
           </div>
           <DialogFooter>
             <Button
