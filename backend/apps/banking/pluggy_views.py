@@ -626,7 +626,8 @@ def pluggy_webhook(request):
         
         # Parse event data
         event_type = request.data.get('event') or request.data.get('type')
-        event_data = request.data.get('data', {})
+        # For Pluggy webhooks, the data is in the root level, not nested in 'data'
+        event_data = request.data.get('data', request.data)
         
         logger.info(f"Received authenticated Pluggy webhook: {event_type}")
         logger.info(f"Webhook payload: {json.dumps(request.data, indent=2)}")
