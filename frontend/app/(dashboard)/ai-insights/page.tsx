@@ -36,7 +36,14 @@ import {
   LockClosedIcon,
   ClockIcon,
   TrashIcon,
+  CogIcon,
+  BeakerIcon,
+  GlobeAltIcon,
 } from '@heroicons/react/24/outline';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScenarioSimulator } from '@/components/ai-insights/scenario-simulator';
+import { MarketBenchmarking } from '@/components/ai-insights/market-benchmarking';
+import { ContextInput, BusinessContext } from '@/components/ai-insights/context-input';
 
 // Types
 interface AIInsight {
@@ -571,6 +578,8 @@ export default function AIInsightsPage() {
   const [isUpgradeRequired, setIsUpgradeRequired] = useState(false);
   const [cachedAIData, setCachedAIData] = useState<any>(null);
   const [shouldFetchAnalysis, setShouldFetchAnalysis] = useState(false);
+  const [businessContext, setBusinessContext] = useState<BusinessContext | null>(null);
+  const [activeTab, setActiveTab] = useState('insights');
 
   // Set dates on client-side after hydration
   useEffect(() => {
@@ -592,13 +601,14 @@ export default function AIInsightsPage() {
     refetch: refetchAIInsights,
     dataUpdatedAt
   } = useQuery({
-    queryKey: ['ai-insights', selectedPeriod, forceRefresh],
+    queryKey: ['ai-insights', selectedPeriod, forceRefresh, businessContext],
     queryFn: async () => {
       if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
       const result = await reportsService.getAIInsights({
         start_date: selectedPeriod.start_date,
         end_date: selectedPeriod.end_date,
-        force_refresh: forceRefresh
+        force_refresh: forceRefresh,
+        context: businessContext
       });
       
       // Reset force refresh after use
@@ -1216,6 +1226,97 @@ export default function AIInsightsPage() {
 
       {/* Saved AI Analyses Section */}
       <AIAnalysesSection />
+
+      {/* New Features Section */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Ferramentas Avançadas de Análise</CardTitle>
+          <CardDescription>
+            Explore simulações, benchmarking e configure o contexto do seu negócio
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="context" className="flex items-center gap-2">
+                <CogIcon className="h-4 w-4" />
+                Contexto
+              </TabsTrigger>
+              <TabsTrigger value="simulator" className="flex items-center gap-2">
+                <BeakerIcon className="h-4 w-4" />
+                Simulador
+              </TabsTrigger>
+              <TabsTrigger value="benchmarking" className="flex items-center gap-2">
+                <GlobeAltIcon className="h-4 w-4" />
+                Benchmarking
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="context" className="mt-6">
+              <ContextInput 
+                onContextUpdate={(context) => {
+                  setBusinessContext(context);
+                  toast.success('Contexto atualizado! As próximas análises serão mais personalizadas.');
+                  // Força nova análise com contexto
+                  if (aiInsightsData) {
+                    setForceRefresh(true);
+                    setShouldFetchAnalysis(true);
+                    setTimeout(() => refetchAIInsights(), 100);
+                  }
+                }}
+                initialContext={businessContext || undefined}
+              />
+            </TabsContent>
+            
+            <TabsContent value="simulator" className="mt-6">
+              {aiInsightsData ? (
+                <ScenarioSimulator
+                  currentData={{
+                    income: aiInsightsData.key_metrics?.income || 0,
+                    expenses: aiInsightsData.key_metrics?.expenses || 0,
+                    categories: aiInsightsData.top_expense_categories || [],
+                    monthlyTrend: aiInsightsData.monthly_trend
+                  }}
+                  predictions={aiInsightsData.predictions}
+                  onSimulationComplete={(results) => {
+                    console.log('Simulation results:', results);
+                    toast.success('Simulação salva com sucesso!');
+                  }}
+                />
+              ) : (
+                <EmptyState
+                  icon={BeakerIcon}
+                  title="Gere uma análise primeiro"
+                  description="Para usar o simulador, você precisa primeiro gerar uma análise com IA"
+                />
+              )}
+            </TabsContent>
+            
+            <TabsContent value="benchmarking" className="mt-6">
+              {aiInsightsData ? (
+                <MarketBenchmarking
+                  companyData={{
+                    industry: businessContext?.industry || 'services',
+                    size: 'small',
+                    revenue: aiInsightsData.key_metrics?.income || 0,
+                    expenses: aiInsightsData.key_metrics?.expenses || 0,
+                    profitMargin: aiInsightsData.key_metrics?.profit_margin || 0,
+                    expenseRatio: aiInsightsData.key_metrics?.expense_ratio || 0,
+                    categories: aiInsightsData.top_expense_categories || []
+                  }}
+                  keyMetrics={aiInsightsData.key_metrics}
+                />
+              ) : (
+                <EmptyState
+                  icon={GlobeAltIcon}
+                  title="Gere uma análise primeiro"
+                  description="Para ver o benchmarking, você precisa primeiro gerar uma análise com IA"
+                />
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }

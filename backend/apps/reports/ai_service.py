@@ -73,7 +73,8 @@ class EnhancedAIInsightsService:
         self, 
         financial_data: Dict[str, Any],
         company_name: str = "Empresa",
-        force_refresh: bool = False
+        force_refresh: bool = False,
+        business_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Generate comprehensive AI-powered insights with caching and error handling
@@ -85,7 +86,7 @@ class EnhancedAIInsightsService:
                 return self._generate_enhanced_fallback_insights(financial_data, company_name)
             
             # Generate cache key with version
-            cache_key = self._generate_cache_key(financial_data, company_name)
+            cache_key = self._generate_cache_key(financial_data, company_name, business_context)
             
             # Check cache unless force refresh
             if not force_refresh:
@@ -107,7 +108,7 @@ class EnhancedAIInsightsService:
             sanitized_data = self._sanitize_for_ai(analysis_data)
             
             # Create detailed prompt
-            prompt = self._create_advanced_analysis_prompt(sanitized_data, company_name)
+            prompt = self._create_advanced_analysis_prompt(sanitized_data, company_name, business_context)
             
             # Call OpenAI API with error handling
             try:
@@ -264,7 +265,7 @@ class EnhancedAIInsightsService:
         
         return round(input_cost + output_cost, 4)
     
-    def _generate_cache_key(self, financial_data: Dict[str, Any], company_name: str) -> str:
+    def _generate_cache_key(self, financial_data: Dict[str, Any], company_name: str, business_context: Optional[Dict[str, Any]] = None) -> str:
         """Generate a cache key based on financial data"""
         # Create a simplified version of the data for hashing
         key_data = {
@@ -273,7 +274,8 @@ class EnhancedAIInsightsService:
             'income': round(float(financial_data.get('income', 0)), 2),
             'expenses': round(float(financial_data.get('expenses', 0)), 2),
             'transaction_count': financial_data.get('transaction_count', 0),
-            'version': CACHE_VERSION
+            'version': CACHE_VERSION,
+            'has_context': bool(business_context)
         }
         
         # Generate hash
@@ -599,7 +601,7 @@ class EnhancedAIInsightsService:
             return 'medium'
         return 'low'
     
-    def _create_advanced_analysis_prompt(self, analysis_data: Dict[str, Any], company_name: str) -> str:
+    def _create_advanced_analysis_prompt(self, analysis_data: Dict[str, Any], company_name: str, business_context: Optional[Dict[str, Any]] = None) -> str:
         """Create an advanced analysis prompt with all insights"""
         
         basic = analysis_data['basic_metrics']
@@ -616,8 +618,25 @@ class EnhancedAIInsightsService:
         period_days = basic.get('period_days', 30)
         transaction_count = basic.get('transaction_count', 0)
         
+        # Add business context if provided
+        context_str = ""
+        if business_context:
+            context_str = f"""
+        CONTEXTO DO NEGÓCIO:
+        - Setor: {business_context.get('industry', 'Não especificado')}
+        - Modelo de Negócio: {business_context.get('businessModel', 'Não especificado')}
+        - Público-alvo: {business_context.get('targetMarket', 'Não especificado')}
+        - Metas: {', '.join(business_context.get('businessGoals', []))}
+        - Desafios: {', '.join(business_context.get('challenges', []))}
+        - Sazonalidade: {business_context.get('seasonality', 'Não informada')}
+        - Mudanças Recentes: {business_context.get('recentChanges', 'Nenhuma')}
+        - Diferencial: {business_context.get('competitiveAdvantage', 'Não informado')}
+        - Perguntas Específicas: {', '.join(business_context.get('customQuestions', []))}
+        """
+        
         prompt = f"""
         Analise os dados financeiros detalhados da empresa {company_name}:
+        {context_str}
         
         MÉTRICAS BÁSICAS ({period_days} dias):
         - Receita Total: R$ {income:,.2f}
@@ -712,6 +731,17 @@ class EnhancedAIInsightsService:
         7. Cada insight deve levar a uma ação clara
         8. Considere sazonalidade e contexto brasileiro
         """
+        
+        # Add specific instructions based on business context
+        if business_context and business_context.get('customQuestions'):
+            prompt += "\n\nRESPONDA ESPECIFICAMENTE AS SEGUINTES PERGUNTAS:\n"
+            for question in business_context['customQuestions']:
+                prompt += f"- {question}\n"
+        
+        if business_context and business_context.get('businessGoals'):
+            prompt += "\n\nCONSIDERE AS SEGUINTES METAS DO NEGÓCIO:\n"
+            for goal in business_context['businessGoals']:
+                prompt += f"- {goal}\n"
         
         return prompt
     

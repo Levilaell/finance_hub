@@ -888,10 +888,21 @@ class AIInsightsView(APIView):
                 custom_params = request.GET.get('custom_params', {})
                 insights = self._generate_custom_insights(financial_data, custom_params)
             else:
+                # Get business context from request
+                context_param = request.GET.get('context')
+                business_context = None
+                if context_param:
+                    try:
+                        import json
+                        business_context = json.loads(context_param)
+                    except:
+                        pass
+                
                 insights = enhanced_ai_service.generate_insights(
                     financial_data,
                     company_name=company.name,
-                    force_refresh=force_refresh
+                    force_refresh=force_refresh,
+                    business_context=business_context
                 )
             
             # Add interactive elements
@@ -1813,8 +1824,56 @@ class AIInsightsView(APIView):
         return enhanced_ai_service.generate_insights(
             financial_data,
             company_name=financial_data.get('company_context', {}).get('name', 'Empresa'),
-            force_refresh=True
+            force_refresh=True,
+            business_context=custom_params.get('business_context')
         )
+    
+    def _calculate_monthly_trend(self, company, start_date, end_date):
+        """Calculate monthly trend data for visualizations"""
+        from dateutil.relativedelta import relativedelta
+        from django.db.models import Sum, Q
+        
+        accounts = BankAccount.objects.filter(company=company, is_active=True)
+        monthly_trend = []
+        
+        # Calculate for last 6 months or period range
+        current_date = start_date
+        while current_date <= end_date:
+            month_start = current_date.replace(day=1)
+            next_month = month_start + relativedelta(months=1)
+            month_end = next_month - timedelta(days=1)
+            
+            # Get transactions for the month
+            monthly_transactions = Transaction.objects.filter(
+                bank_account__in=accounts,
+                transaction_date__date__gte=month_start,
+                transaction_date__date__lte=month_end
+            )
+            
+            # Calculate income
+            income = monthly_transactions.filter(
+                transaction_type__in=['credit', 'transfer_in', 'pix_in']
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            
+            # Calculate expenses
+            expenses = abs(monthly_transactions.filter(
+                transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0'))
+            
+            monthly_trend.append({
+                'month': month_start.strftime('%B %Y'),
+                'income': self._to_float(income),
+                'expenses': self._to_float(expenses),
+                'profit': self._to_float(income - expenses)
+            })
+            
+            current_date = next_month
+            
+            # Limit to 12 months
+            if len(monthly_trend) >= 12:
+                break
+        
+        return monthly_trend
     
     def _add_interactive_elements(self, insights, company):
         """Add interactive elements to insights"""

@@ -202,15 +202,22 @@ export const reportsService = {
     end_date: Date;
     force_refresh?: boolean;
     type?: 'comprehensive' | 'quick' | 'custom';
+    context?: any;
   }): Promise<AIInsights | null> {
     try {
+      const queryParams: any = {
+        start_date: params.start_date.toISOString().split('T')[0],
+        end_date: params.end_date.toISOString().split('T')[0],
+        force_refresh: params.force_refresh || false,
+        type: params.type || 'comprehensive',
+      };
+      
+      if (params.context) {
+        queryParams.context = JSON.stringify(params.context);
+      }
+      
       const response = await api.get('/api/reports/ai-insights/', {
-        params: {
-          start_date: params.start_date.toISOString().split('T')[0],
-          end_date: params.end_date.toISOString().split('T')[0],
-          force_refresh: params.force_refresh || false,
-          type: params.type || 'comprehensive',
-        },
+        params: queryParams,
         timeout: 30000, // 30 seconds timeout for AI processing
       });
       return response.data;
