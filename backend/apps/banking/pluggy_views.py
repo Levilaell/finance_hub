@@ -498,16 +498,34 @@ class PluggySyncAccountView(APIView):
                 except Exception as e:
                     logger.error(f"❌ Error updating counters: {e}")
                 
-                return Response({
+                # Incluir informações detalhadas da sincronização
+                transactions_count = result.get('transactions', 0)
+                base_message = f'{transactions_count} transações sincronizadas'
+                
+                # Se houver mensagem específica do resultado, usar ela
+                if result.get('message'):
+                    base_message = result['message']
+                
+                response_data = {
                     'success': True,
                     'data': {
-                        'message': f'Sincronização concluída com sucesso',
-                        'transactions_synced': result.get('transactions', 0),
+                        'message': base_message,
+                        'transactions_synced': transactions_count,
                         'status': result.get('status'),
                         'sandbox_mode': sandbox_mode,
-                        'usage_updated': True
+                        'usage_updated': True,
+                        'sync_from': result.get('sync_from'),
+                        'sync_to': result.get('sync_to'),
+                        'days_searched': result.get('days_searched')
                     }
-                })
+                }
+                
+                # Se o item está OUTDATED e não encontrou transações, sugerir reconexão
+                if result.get('item_status') == 'OUTDATED' and transactions_count == 0:
+                    response_data['data']['suggestion'] = 'Considere reconectar sua conta para garantir acesso às transações mais recentes.'
+                    response_data['data']['item_status'] = 'OUTDATED'
+                
+                return Response(response_data)
             else:
                 # Check if it's a waiting_user_action status
                 if result.get('status') == 'waiting_user_action':

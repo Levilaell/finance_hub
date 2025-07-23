@@ -210,7 +210,22 @@ export default function AccountsPage() {
       
       if (result.success) {
         const transactionCount = result.data.transactions_synced;
-        toast.success(`✅ ${transactionCount} transações sincronizadas`);
+        const message = result.data.message || `${transactionCount} transações sincronizadas`;
+        
+        // Mostrar mensagem apropriada baseada no resultado
+        if (transactionCount === 0 && result.data.days_searched) {
+          toast.info(`📊 ${message} (últimos ${result.data.days_searched} dias verificados)`);
+          
+          // Se há sugestão de reconexão, mostrar
+          if (result.data.suggestion) {
+            toast.warning(result.data.suggestion, { duration: 6000 });
+          }
+        } else if (transactionCount > 0) {
+          toast.success(`✅ ${transactionCount} transações sincronizadas`);
+        } else {
+          toast.info(`📊 ${message}`);
+        }
+        
         fetchAccounts(); // Refresh accounts list
       } else {
         throw new Error('Falha na sincronização');

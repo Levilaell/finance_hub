@@ -248,11 +248,34 @@ class PluggyTransactionSyncService:
             
             logger.info(f"✅ Synced {total_transactions} transactions for Pluggy account {account_info['id']}")
             
-            return {
+            # Adicionar informações sobre a janela de tempo usada
+            sync_info = {
                 'account_id': account_info['id'],
                 'status': 'success',
-                'transactions': total_transactions
+                'transactions': total_transactions,
+                'sync_from': sync_from.isoformat(),
+                'sync_to': sync_to.isoformat(),
+                'days_searched': (sync_to - sync_from).days
             }
+            
+            # Se não encontrou transações, adicionar mensagem informativa
+            if total_transactions == 0:
+                if pluggy_item_id:
+                    try:
+                        async with PluggyClient() as client:
+                            item = await client.get_item(pluggy_item_id)
+                            item_status = item.get('status')
+                            if item_status == 'OUTDATED':
+                                sync_info['message'] = 'Nenhuma transação nova encontrada. A conexão com o banco pode estar desatualizada.'
+                                sync_info['item_status'] = item_status
+                            else:
+                                sync_info['message'] = f'Nenhuma transação nova nos últimos {(sync_to - sync_from).days} dias.'
+                    except:
+                        sync_info['message'] = f'Nenhuma transação nova nos últimos {(sync_to - sync_from).days} dias.'
+                else:
+                    sync_info['message'] = f'Nenhuma transação nova nos últimos {(sync_to - sync_from).days} dias.'
+            
+            return sync_info
             
         except Exception as e:
             logger.error(f"❌ Error syncing Pluggy account {account.id}: {e}", exc_info=True)
@@ -308,19 +331,11 @@ class PluggyTransactionSyncService:
                 # Se muito tempo sem sync, buscar 30 dias para não perder nada
                 logger.info(f"⚠️ Long gap ({days_since_sync} days), using 30 days")
                 return (timezone.now() - timedelta(days=30)).date()
-            elif hours_since_sync < 24:
-                # SYNC MUITO RECENTE: usar janela MAIOR para garantir que pegamos transações
-                # A Pluggy pode ter delay significativo para disponibilizar transações recentes
-                days_back = 7  # Aumentado para 7 dias para garantir que não perdemos transações
-                logger.info(f"🔄 Recent sync ({hours_since_sync:.1f} hours ago), using {days_back} days window to ensure we catch all transactions")
-                return (timezone.now() - timedelta(days=days_back)).date()
             else:
-                # Incremental normal - sempre buscar pelo menos 3 dias
-                # para garantir que não perdemos transações com data retroativa
-                # e considerar problemas de timezone (UTC vs Brasil)
-                min_days_back = 3  # 3 dias cobre finais de semana e feriados
-                days_back = max(days_since_sync + 1, min_days_back)  # +1 dia de overlap
-                logger.info(f"🔄 Incremental sync, {days_since_sync} days since last sync, fetching {days_back} days")
+                # SEMPRE usar janela de pelo menos 7 dias para garantir que pegamos transações
+                # que podem ter sido processadas com delay pela Pluggy
+                days_back = max(7, days_since_sync + 3)
+                logger.info(f"📅 Using {days_back} days window for incremental sync (last sync: {hours_since_sync:.1f} hours ago)")
                 return (timezone.now() - timedelta(days=days_back)).date()
 
     async def _get_accounts_to_sync(self, company_id: int = None) -> List[BankAccount]:
