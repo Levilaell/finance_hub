@@ -148,7 +148,7 @@ export function MarketBenchmarking({
   );
   const [showDetails, setShowDetails] = useState(false);
 
-  const industryData = MARKET_DATA.industries[selectedIndustry];
+  const industryData = MARKET_DATA.industries[selectedIndustry as keyof typeof MARKET_DATA.industries];
 
   // Calcular comparações
   const comparisons = useMemo(() => {
