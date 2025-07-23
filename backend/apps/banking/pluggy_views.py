@@ -389,9 +389,22 @@ class PluggySyncAccountView(APIView):
             
             # Use the corrected sync service
             from .pluggy_sync_service import pluggy_sync_service
+            from .pluggy_client import PluggyClient
             import asyncio
             
             async def sync_account():
+                # Force item update before syncing
+                if account.pluggy_item_id:
+                    update_result = await pluggy_sync_service.force_item_update(account.pluggy_item_id)
+                    if update_result.get('success'):
+                        logger.info(f"✅ Item update triggered successfully")
+                        # Wait a bit for Pluggy to start processing
+                        await asyncio.sleep(3)
+                    else:
+                        logger.warning(f"⚠️ Could not force item update: {update_result.get('message', update_result.get('error'))}")
+                        # Continue with sync anyway
+                
+                # Now sync transactions
                 return await pluggy_sync_service.sync_account_transactions(account)
             
             # Run async sync

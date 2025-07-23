@@ -71,6 +71,53 @@ class PluggyTransactionSyncService:
             logger.error(f"Error in Pluggy sync_all_accounts: {e}")
             raise
     
+    async def force_item_update(self, item_id: str) -> Dict[str, Any]:
+        """Force a Pluggy item to update
+        
+        This triggers Pluggy to fetch the latest data from the bank.
+        Should be called before syncing to ensure we get the most recent transactions.
+        """
+        try:
+            async with PluggyClient() as client:
+                logger.info(f"🔄 Forcing update for Pluggy item {item_id}")
+                
+                # First check item status
+                item = await client.get_item(item_id)
+                current_status = item.get('status')
+                logger.info(f"📋 Current item status: {current_status}")
+                
+                if current_status not in ['ACTIVE', 'UPDATED']:
+                    logger.warning(f"⚠️ Cannot update item in status {current_status}")
+                    return {
+                        'success': False,
+                        'status': current_status,
+                        'message': f'Item must be ACTIVE or UPDATED to force update, current status: {current_status}'
+                    }
+                
+                # Send empty PATCH to trigger update
+                update_response = await client._make_request(
+                    'PATCH',
+                    f'/items/{item_id}',
+                    json={}
+                )
+                
+                new_status = update_response.get('status')
+                logger.info(f"✅ Item update triggered, new status: {new_status}")
+                
+                return {
+                    'success': True,
+                    'status': new_status,
+                    'previous_status': current_status,
+                    'item_id': item_id
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Error forcing item update: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
     async def sync_account_transactions(self, account: BankAccount) -> Dict[str, Any]:
         """Sync transactions for a specific Pluggy account
         
