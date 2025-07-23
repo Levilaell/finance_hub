@@ -44,6 +44,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScenarioSimulator } from '@/components/ai-insights/scenario-simulator';
 import { MarketBenchmarking } from '@/components/ai-insights/market-benchmarking';
 import { ContextInput, BusinessContext } from '@/components/ai-insights/context-input';
+import { FeatureShowcase } from '@/components/ai-insights/feature-showcase';
 
 // Types
 interface AIInsight {
@@ -718,6 +719,19 @@ export default function AIInsightsPage() {
         </div>
       </div>
 
+      {/* Showcase das Ferramentas Premium */}
+      <FeatureShowcase 
+        onFeatureClick={(feature) => {
+          setActiveTab(feature);
+          // Scroll suave até a seção de ferramentas
+          setTimeout(() => {
+            document.getElementById('advanced-tools')?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        }}
+        hasInsights={!!aiInsightsData}
+        hasContext={!!businessContext}
+      />
+
       {/* Period Selection */}
       {
         <Card>
@@ -1224,31 +1238,51 @@ export default function AIInsightsPage() {
         </Card>
       </AIInsightsErrorBoundary>
 
-      {/* Saved AI Analyses Section */}
-      <AIAnalysesSection />
-
-      {/* New Features Section */}
-      <Card className="mt-6">
+      {/* Ferramentas Avançadas - Agora mais visível */}
+      <Card id="advanced-tools" className="border-2 border-purple-200 bg-gradient-to-br from-purple-50/50 to-pink-50/50">
         <CardHeader>
-          <CardTitle>Ferramentas Avançadas de Análise</CardTitle>
-          <CardDescription>
-            Explore simulações, benchmarking e configure o contexto do seu negócio
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                <SparklesIcon className="h-6 w-6 text-purple-600 animate-pulse" />
+                Ferramentas Avançadas de Análise
+                <Badge className="ml-2 bg-gradient-to-r from-purple-600 to-pink-600">PRO</Badge>
+              </CardTitle>
+              <CardDescription className="text-base mt-1">
+                Maximize seus resultados com ferramentas exclusivas de inteligência artificial
+              </CardDescription>
+            </div>
+            {!aiInsightsData && (
+              <div className="text-right">
+                <p className="text-sm text-purple-700 font-medium">💡 Dica: Gere uma análise primeiro</p>
+                <p className="text-xs text-gray-600">para aproveitar todas as ferramentas</p>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="context" className="flex items-center gap-2">
-                <CogIcon className="h-4 w-4" />
-                Contexto
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-6 h-auto p-1">
+              <TabsTrigger 
+                value="context" 
+                className="flex flex-col items-center gap-2 py-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white"
+              >
+                <CogIcon className="h-5 w-5" />
+                <span className="text-xs font-medium">Contexto</span>
               </TabsTrigger>
-              <TabsTrigger value="simulator" className="flex items-center gap-2">
-                <BeakerIcon className="h-4 w-4" />
-                Simulador
+              <TabsTrigger 
+                value="simulator" 
+                className="flex flex-col items-center gap-2 py-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white"
+              >
+                <BeakerIcon className="h-5 w-5" />
+                <span className="text-xs font-medium">Simulador</span>
               </TabsTrigger>
-              <TabsTrigger value="benchmarking" className="flex items-center gap-2">
-                <GlobeAltIcon className="h-4 w-4" />
-                Benchmarking
+              <TabsTrigger 
+                value="benchmarking" 
+                className="flex flex-col items-center gap-2 py-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white"
+              >
+                <GlobeAltIcon className="h-5 w-5" />
+                <span className="text-xs font-medium">Benchmarking</span>
               </TabsTrigger>
             </TabsList>
             
@@ -1317,6 +1351,9 @@ export default function AIInsightsPage() {
           </Tabs>
         </CardContent>
       </Card>
+
+      {/* Saved AI Analyses Section */}
+      <AIAnalysesSection />
     </div>
   );
 }
