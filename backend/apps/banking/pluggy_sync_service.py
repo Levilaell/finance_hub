@@ -332,10 +332,23 @@ class PluggyTransactionSyncService:
                 logger.info(f"⚠️ Long gap ({days_since_sync} days), using 30 days")
                 return (timezone.now() - timedelta(days=30)).date()
             else:
-                # SEMPRE usar janela de pelo menos 7 dias para garantir que pegamos transações
-                # que podem ter sido processadas com delay pela Pluggy
-                days_back = max(7, days_since_sync + 3)
-                logger.info(f"📅 Using {days_back} days window for incremental sync (last sync: {hours_since_sync:.1f} hours ago)")
+                # OTIMIZAÇÃO: Buscar desde a última sincronização com margem de segurança
+                # Margem de 2 dias para cobrir:
+                # - Transações com data retroativa
+                # - Delays de processamento da Pluggy
+                # - Diferenças de timezone
+                # - Finais de semana e feriados
+                margin_days = 2
+                
+                # Se sincronizou há menos de 1 dia, usar janela mínima de 3 dias
+                if hours_since_sync < 24:
+                    days_back = 3
+                    logger.info(f"📅 Recent sync ({hours_since_sync:.1f} hours ago), using minimum {days_back} days window")
+                else:
+                    # Buscar desde a última sync + margem
+                    days_back = days_since_sync + margin_days
+                    logger.info(f"📅 Incremental sync: {days_since_sync} days since last sync + {margin_days} days margin = {days_back} days window")
+                
                 return (timezone.now() - timedelta(days=days_back)).date()
 
     async def _get_accounts_to_sync(self, company_id: int = None) -> List[BankAccount]:
