@@ -1,22 +1,24 @@
-# Sincronização Sempre Atualizada
+# Sincronização com Autenticação Bancária
 
 ## Nova Funcionalidade
 
-Agora, sempre que o usuário clicar em "Sincronizar", o sistema abre o Pluggy Connect para garantir que o Item seja atualizado antes de buscar transações.
+Agora, sempre que o usuário clicar em "Sincronizar", o sistema explica que o BANCO está solicitando autenticação e abre o Pluggy Connect para garantir acesso às transações mais recentes.
 
 ## Como Funciona
 
 ### 1. Usuário Clica em "Sincronizar"
-- Sistema abre imediatamente o Pluggy Connect
-- Mensagem: "Abrindo conexão com o banco para sincronizar..."
+- Sistema mostra dialog explicativo
+- Mensagem clara: "Seu banco está solicitando que você faça login"
+- Explica por que isso é necessário (segurança bancária)
 
-### 2. Atualização do Item
+### 2. Autenticação no Banco
+- Usuário clica em "Autenticar no Banco"
 - Pluggy Connect abre com o parâmetro `updateItem`
-- Usuário pode precisar fazer login (se banco solicitar)
+- Usuário faz login no site oficial do banco
 - Item é atualizado para status UPDATED
 
 ### 3. Sincronização Automática
-- Após sucesso no Pluggy Connect, sistema aguarda 2 segundos
+- Após autenticação bem-sucedida, sistema aguarda 2 segundos
 - Sincroniza automaticamente as transações
 - Mostra resultado: quantidade de transações sincronizadas
 
@@ -48,10 +50,23 @@ const handleSyncAccount = async (accountId: string) => {
 // - Mostra resultado ao usuário
 ```
 
+## Mensagens Claras sobre Segurança
+
+O sistema deixa claro que:
+- É o BANCO que está solicitando autenticação
+- Isso é uma medida de segurança normal
+- Faz parte do protocolo Open Banking
+- O usuário será direcionado ao site oficial do banco
+
 ## Experiência do Usuário
 
 1. **Antes**: Clique em sincronizar → 0 transações (se OUTDATED)
-2. **Agora**: Clique em sincronizar → Pluggy Connect → Login (se necessário) → Transações sincronizadas
+2. **Agora**: 
+   - Clique em sincronizar
+   - Dialog explicativo sobre segurança bancária
+   - Clique em "Autenticar no Banco"
+   - Login no site oficial do banco
+   - Transações sincronizadas automaticamente
 
 ## Observações
 

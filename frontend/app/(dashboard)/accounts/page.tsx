@@ -65,6 +65,7 @@ export default function AccountsPage() {
   const [useIframeMode, setUseIframeMode] = useState(false);
   const [reconnectingAccountId, setReconnectingAccountId] = useState<string | null>(null);
   const [reconnectError, setReconnectError] = useState<{accountId: string; message: string} | null>(null);
+  const [showBankAuthDialog, setShowBankAuthDialog] = useState<{accountId: string; accountName?: string} | null>(null);
 
   // ✅ Função handlePluggyCallback (mantida como está)
   const handlePluggyCallback = useCallback(async (itemId: string) => {
@@ -202,20 +203,18 @@ export default function AccountsPage() {
 
   // ✅ Função handleSyncAccount - sempre abre Pluggy Connect para garantir atualização
   const handleSyncAccount = async (accountId: string) => {
-    // Sempre abrir Pluggy Connect para reconectar/atualizar o Item
-    toast.info('Abrindo conexão com o banco para sincronizar...');
-    await handleReconnectAccount(accountId);
+    // Encontrar o nome da conta
+    const account = accounts.find(acc => acc.id === accountId);
+    const accountName = account?.account_name || 'sua conta';
     
-    // Após fechar o Pluggy Connect, a sincronização será feita automaticamente
-    // pelo callback de sucesso
+    // Mostrar dialog explicativo
+    setShowBankAuthDialog({ accountId, accountName });
   };
 
   // ✅ Função para reconectar conta
   const handleReconnectAccount = async (accountId: string) => {
     setReconnectingAccountId(accountId);
     try {
-      toast.info('Gerando token de reconexão...');
-      
       const result = await bankingService.reconnectPluggyAccount(accountId);
       
       if (result.success && result.data?.connect_token) {
@@ -240,7 +239,7 @@ export default function AccountsPage() {
         // Store account ID for automatic sync after reconnection
         sessionStorage.setItem('pluggy_reconnecting_account', accountId);
         
-        toast.success('Abrindo Pluggy Connect para atualizar conexão...');
+        toast.success('Abrindo conexão segura com seu banco...');
       } else {
         throw new Error(result.data?.message || 'Erro ao gerar token de reconexão');
       }
@@ -381,7 +380,7 @@ export default function AccountsPage() {
                     resetPluggyWidget();
                     
                     // Aguardar um momento para o Item ser processado
-                    toast.success('Conexão atualizada! Sincronizando transações...');
+                    toast.success('Autenticação concluída! Buscando suas transações...');
                     
                     setTimeout(async () => {
                       try {
@@ -470,7 +469,7 @@ export default function AccountsPage() {
                     resetPluggyWidget();
                     
                     // Aguardar um momento para o Item ser processado
-                    toast.success('Conexão atualizada! Sincronizando transações...');
+                    toast.success('Autenticação concluída! Buscando suas transações...');
                     
                     setTimeout(async () => {
                       try {
@@ -768,6 +767,54 @@ export default function AccountsPage() {
                   Reconectar Conta
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bank Authentication Required Dialog */}
+      <Dialog open={!!showBankAuthDialog} onOpenChange={() => setShowBankAuthDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Autenticação Bancária Necessária</DialogTitle>
+            <DialogDescription>
+              Seu banco está solicitando que você faça login para sincronizar as transações mais recentes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <h4 className="font-medium text-blue-900 mb-2">Por que isso é necessário?</h4>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Por segurança, os bancos exigem autenticação periódica</li>
+                <li>• Isso garante que apenas você tem acesso às suas transações</li>
+                <li>• É um procedimento padrão do Open Banking</li>
+              </ul>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+              <p className="text-sm text-amber-800">
+                <strong>Importante:</strong> Você será direcionado para o site oficial do seu banco. 
+                Nunca insira suas credenciais em sites que não sejam do banco.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowBankAuthDialog(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                const authInfo = showBankAuthDialog;
+                setShowBankAuthDialog(null);
+                if (authInfo?.accountId) {
+                  handleReconnectAccount(authInfo.accountId);
+                }
+              }}
+            >
+              <LinkIcon className="h-4 w-4 mr-2" />
+              Autenticar no Banco
             </Button>
           </DialogFooter>
         </DialogContent>
