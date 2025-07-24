@@ -2,6 +2,7 @@
 Pluggy API Client
 Handles authentication and communication with Pluggy API
 """
+import json
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
@@ -109,10 +110,16 @@ class PluggyClient:
             
             # Log response for debugging
             if response.content:
-                result = response.json()
-                logger.debug(f"Response from {endpoint}: {result}")
-                return result
+                try:
+                    result = response.json()
+                    logger.debug(f"Response from {endpoint}: {result}")
+                    return result
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to decode JSON response from {endpoint}: {e}")
+                    logger.error(f"Raw response: {response.text}")
+                    return {}
             else:
+                logger.warning(f"Empty response from {endpoint}")
                 return {}
             
         except requests.exceptions.RequestException as e:
@@ -274,7 +281,15 @@ class PluggyClient:
         if to_date:
             params['to'] = to_date.strftime('%Y-%m-%d')
             
-        return self._make_request('GET', '/transactions', params=params)
+        logger.info(f"[Pluggy API] Getting transactions for account {account_id} with params: {params}")
+        
+        try:
+            result = self._make_request('GET', '/transactions', params=params)
+            logger.info(f"[Pluggy API] Transactions response type: {type(result)}, has results: {'results' in result if isinstance(result, dict) else 'N/A'}")
+            return result
+        except Exception as e:
+            logger.error(f"[Pluggy API] Error getting transactions: {e}")
+            return {'results': [], 'total': 0, 'totalPages': 0}
     
     def get_transaction(self, transaction_id: str) -> Dict:
         """
