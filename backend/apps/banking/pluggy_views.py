@@ -6,6 +6,7 @@ import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional
+import json
 
 from django.db import transaction
 from django.utils import timezone
@@ -244,6 +245,14 @@ class PluggyCallbackView(APIView):
             
             # Get item details
             item = pluggy.get_item(item_id)
+
+            logger.info(f"Item details: {json.dumps(item, indent=2)}")
+            if item.get('statusDetail'):
+                logger.info(f"Item status details: {json.dumps(item['statusDetail'], indent=2)}")
+
+                transactions_detail = item['statusDetail'].get('transactions', {})
+                if not transactions_detail.get('isUpdated', False):
+                    logger.warning("Transactions are not yet updated for this item")
             
             # Get accounts for this item
             accounts_response = pluggy.get_accounts(item_id)
@@ -394,15 +403,28 @@ class PluggyCallbackView(APIView):
                     logger.info(f"Syncing transactions for {len(created_accounts)} accounts")
                     # Give Pluggy a moment to process the new connection
                     import time
-                    time.sleep(2)
+                    time.sleep(5)
+
+                    item_check = pluggy.get_item(item_id)
+                    item_status = item_check.get('status')
+                    execution_status = item_check.get('executionStatus')
+                    logger.info(f"Item status before syncing transactions: {item_status}")
                     
-                    for account in created_accounts:
-                        try:
-                            logger.info(f"Starting transaction sync for account {account.id} (external_id: {account.external_id})")
-                            self._sync_transactions(account, pluggy)
-                        except Exception as e:
-                            logger.error(f"Error syncing transactions for account {account.id}: {e}", exc_info=True)
-                            # Continue with other accounts
+                    # Log do statusDetail também
+                    if item_check.get('statusDetail'):
+                        logger.info(f"Status details: {json.dumps(item_check['statusDetail'], indent=2)}")
+                    
+                    if item_status not in ['UPDATED', 'PARTIAL_SUCCESS']:
+                        logger.warning(f"Item not ready for transaction sync. Status: {item_status}")
+                        # Talvez agendar uma tarefa assíncrona para sincronizar depois
+                    
+                    else:
+                        for account in created_accounts:
+                            try:
+                                logger.info(f"Starting transaction sync for account {account.id} (external_id: {account.external_id})")
+                                self._sync_transactions(account, pluggy)
+                            except Exception as e:
+                                logger.error(f"Error syncing transactions for account {account.id}: {e}", exc_info=True)
                 
             # Return response even if no accounts were created
             if not created_accounts:
@@ -484,11 +506,14 @@ class PluggyCallbackView(APIView):
                 # Extract transactions from result
                 if isinstance(result, dict):
                     transactions = result.get('results', [])
+                    total_pages = result.get('totalPages', 1)
                 elif isinstance(result, list):
                     transactions = result
+                    total_pages = 1
                 else:
                     logger.warning(f"Unexpected transaction result type: {type(result)}")
                     transactions = []
+                    total_pages = 1
                 
                 if not transactions:
                     logger.info(f"No more transactions on page {page}")
@@ -502,7 +527,7 @@ class PluggyCallbackView(APIView):
                         total_updated += 1
                 
                 # Check if there are more pages
-                if result.get('totalPages', 1) <= page:
+                if page >= total_pages:
                     break
                     
                 page += 1
@@ -510,8 +535,8 @@ class PluggyCallbackView(APIView):
             logger.info(f"Synced transactions for {bank_account}: {total_created} new, {total_updated} updated")
             
         except Exception as e:
-            logger.error(f"Failed to sync transactions: {e}")
-    
+            logger.error(f"Failed to sync transactions: {e}", exc_info=True)
+
     def _process_transaction(self, bank_account: BankAccount, trans_data: Dict) -> bool:
         """
         Process a single transaction

@@ -89,6 +89,8 @@ class PluggyClient:
                 headers=headers,
                 timeout=self.timeout
             )
+
+            logger.debug(f"Response status code: {response.status_code}")
             
             # If unauthorized, refresh API key and retry
             if response.status_code == 401:
@@ -285,12 +287,43 @@ class PluggyClient:
         
         try:
             result = self._make_request('GET', '/transactions', params=params)
+            
+            # Garantir que sempre retornamos um dict válido
+            if result is None:
+                logger.warning(f"[Pluggy API] Null response for transactions")
+                return {'results': [], 'total': 0, 'totalPages': 0, 'page': page}
+                
             logger.info(f"[Pluggy API] Transactions response type: {type(result)}, has results: {'results' in result if isinstance(result, dict) else 'N/A'}")
+            
+            # Se a resposta não tem o formato esperado, normalizar
+            if isinstance(result, list):
+                return {
+                    'results': result,
+                    'total': len(result),
+                    'totalPages': 1,
+                    'page': 1
+                }
+            elif isinstance(result, dict) and 'results' not in result:
+                # Pode ser que o dict seja um erro ou formato diferente
+                if 'error' in result:
+                    logger.error(f"[Pluggy API] Error in transaction response: {result}")
+                    return {'results': [], 'total': 0, 'totalPages': 0, 'page': page}
+                else:
+                    # Tentar wrappear em results
+                    return {
+                        'results': [result],
+                        'total': 1,
+                        'totalPages': 1,
+                        'page': 1
+                    }
+            
             return result
+            
         except Exception as e:
-            logger.error(f"[Pluggy API] Error getting transactions: {e}")
-            return {'results': [], 'total': 0, 'totalPages': 0}
-    
+            logger.error(f"[Pluggy API] Error getting transactions: {e}", exc_info=True)
+            return {'results': [], 'total': 0, 'totalPages': 0, 'page': page}
+
+
     def get_transaction(self, transaction_id: str) -> Dict:
         """
         Get specific transaction details
