@@ -77,7 +77,7 @@ class BankAccount(models.Model):
     
     # Account details
     account_type = models.CharField(_('account type'), max_length=20, choices=ACCOUNT_TYPES)
-    agency = models.CharField(_('agency'), max_length=10, blank=True)
+    agency = models.CharField(_('agency'), max_length=10, blank=True, null=True)
     account_number = models.CharField(_('account number'), max_length=20)
     account_digit = models.CharField(_('account digit'), max_length=2, blank=True)
     name = models.CharField(_('account name'), max_length=255, blank=True)
@@ -131,7 +131,7 @@ class BankAccount(models.Model):
         db_table = 'bank_accounts'
         verbose_name = _('Bank Account')
         verbose_name_plural = _('Bank Accounts')
-        unique_together = ('company', 'bank_provider', 'agency', 'account_number', 'account_type')
+        unique_together = [('company', 'external_id')]  # Pluggy provides unique IDs
         indexes = [
             models.Index(fields=['company', 'status']),
             models.Index(fields=['bank_provider', 'external_id']),
@@ -154,50 +154,12 @@ class BankAccount(models.Model):
         super().save(*args, **kwargs)
     
     def clean(self):
-        """Custom validation for Brazilian bank accounts"""
+        """Custom validation for bank accounts"""
         super().clean()
         
-        # Validate agency format (Brazilian format: 0000-0 or 0000)
-        if self.agency:
-            if not self._validate_brazilian_agency(self.agency):
-                raise ValidationError({
-                    'agency': 'Agência deve estar no formato brasileiro (ex: 0001, 1234-5)'
-                })
-        
-        # Validate account number format (Brazilian format: numbers + optional letter)
-        if self.account_number:
-            if not self._validate_brazilian_account(self.account_number):
-                raise ValidationError({
-                    'account_number': 'Número da conta deve estar no formato brasileiro (ex: 12345-6, 123456-X)'
-                })
-    
-    def _validate_brazilian_agency(self, agency: str) -> bool:
-        """Validate Brazilian agency format"""
-        # Remove common separators
-        clean_agency = agency.replace('-', '').replace('.', '').replace('/', '').strip()
-        
-        # Accept various formats:
-        # - Pure digits: 0001, 1234, 12345
-        # - With separators: 0001-5, 1234-X
-        # - Letters for digital banks: XXXX
-        # - Mixed: AG01
-        # - Empty is also valid (for digital banks without agency)
-        if not clean_agency:
-            return True
-            
-        # Allow alphanumeric agencies (some digital banks use letters)
-        pattern = r'^[A-Z0-9]{1,10}$'
-        return bool(re.match(pattern, clean_agency.upper()))
-    
-    def _validate_brazilian_account(self, account: str) -> bool:
-        """Validate Brazilian account number format"""
-        # Remove common separators
-        clean_account = account.replace('-', '').replace('.', '').strip()
-        
-        # Brazilian accounts: digits + optional check digit (letter or number)
-        # Examples: 123456, 1234567, 123456X, 123456-7
-        pattern = r'^\d{4,12}[A-Z0-9]?$'
-        return bool(re.match(pattern, clean_account.upper()))
+        # For Pluggy integration, we rely on external_id for uniqueness
+        # Agency and account validation is optional since formats vary by bank
+        pass
     
     @property
     def display_name(self):
