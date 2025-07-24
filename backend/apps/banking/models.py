@@ -120,6 +120,9 @@ class BankAccount(models.Model):
     is_primary = models.BooleanField(_('is primary account'), default=False)
     is_active = models.BooleanField(_('is active'), default=True)
     
+    # Additional data
+    metadata = models.JSONField(_('metadata'), default=dict, blank=True)
+    
     # Metadata
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     updated_at = models.DateTimeField(_('updated at'), auto_now=True)
