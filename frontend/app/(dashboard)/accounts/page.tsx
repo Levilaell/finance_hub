@@ -100,12 +100,12 @@ export default function AccountsPage() {
             try {
               // Verificar status antes de sincronizar
               console.log(`[AccountsPage] Verificando status da conta ${account.id}...`);
-              const statusCheck = await bankingService.checkAccountStatus(account.id);
+              const statusCheck = await bankingService.checkAccountStatus(String(account.id));
               console.log(`[AccountsPage] Status do item: ${statusCheck.data?.item_status}`);
               
               if (statusCheck.data?.item_status === 'UPDATED' || statusCheck.data?.item_status === 'ACTIVE') {
                 console.log(`[AccountsPage] Sincronizando conta ${account.id}...`);
-                const syncResult = await syncAccount(account.id);
+                const syncResult = await syncAccount(String(account.id));
                 if (syncResult.success) {
                   const txCount = syncResult.data?.transactions_synced || 0;
                   console.log(`[AccountsPage] Conta ${account.id}: ${txCount} transações sincronizadas`);
@@ -261,7 +261,7 @@ export default function AccountsPage() {
       
       // Se o status está OK, tentar sincronizar
       console.log('[SYNC] Status OK, chamando API de sincronização...');
-      const result = await syncAccount(accountId);
+      const result = await syncAccount(String(accountId));
       console.log('[SYNC] Resultado da sincronização:', result);
       console.log('[SYNC] Detalhes da sincronização:', {
         transactions_synced: result.data?.transactions_synced,
