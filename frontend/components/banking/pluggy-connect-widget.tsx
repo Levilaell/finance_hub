@@ -8,10 +8,9 @@ interface PluggyConnectWidgetProps {
   onSuccess: (itemData: any) => void;
   onError: (error: any) => void;
   onClose?: () => void;
-  updateItem?: string; // Add support for reconnection
+  updateItem?: string;
 }
 
-// Declaração global para o SDK da Pluggy
 declare global {
   interface Window {
     PluggyConnect: any;
@@ -28,14 +27,12 @@ export function PluggyConnectWidget({
   const [sdkLoaded, setSdkLoaded] = useState(false);
   const pluggyInstance = useRef<any>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasClosedRef = useRef(false); // Prevenir múltiplos fechamentos
 
   useEffect(() => {
-    // Garantir que o DOM esteja pronto antes de carregar o SDK
     const initializeSDK = () => {
-      // Carregar o SDK da Pluggy
       console.log('[Pluggy] Iniciando carregamento do SDK...');
       
-      // Verificar se o script já foi carregado
       const existingScript = document.querySelector('script[src="https://cdn.pluggy.ai/pluggy-connect.js"]');
       if (existingScript) {
         console.log('[Pluggy] SDK já carregado');
@@ -45,7 +42,6 @@ export function PluggyConnectWidget({
         }
       }
       
-      // Timeout de segurança - 10 segundos para carregar o SDK
       loadTimeoutRef.current = setTimeout(() => {
         if (!sdkLoaded) {
           console.error('[Pluggy] Timeout ao carregar SDK');
@@ -76,7 +72,6 @@ export function PluggyConnectWidget({
       document.body.appendChild(script);
     };
 
-    // Aguardar o DOM estar completamente carregado
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', initializeSDK);
     } else {
@@ -84,27 +79,22 @@ export function PluggyConnectWidget({
     }
 
     return () => {
-      // Cleanup timeout
       if (loadTimeoutRef.current) {
         clearTimeout(loadTimeoutRef.current);
       }
       
-      // Cleanup event listener
       document.removeEventListener('DOMContentLoaded', initializeSDK);
       
-      // Cleanup script
       const existingScript = document.querySelector('script[src="https://cdn.pluggy.ai/pluggy-connect.js"]');
       if (existingScript && existingScript.parentNode) {
         existingScript.parentNode.removeChild(existingScript);
       }
       
-      // Destruir instância se existir
       if (pluggyInstance.current) {
         try {
           if (typeof pluggyInstance.current.destroy === 'function') {
             pluggyInstance.current.destroy();
           }
-          // Remover qualquer iframe ou modal que possa ter ficado
           const iframes = document.querySelectorAll('iframe[src*="pluggy"]');
           iframes.forEach(iframe => iframe.remove());
           
@@ -129,11 +119,19 @@ export function PluggyConnectWidget({
 
     console.log('[Pluggy] Todas as condições atendidas, inicializando widget...');
     
-    // Função wrapper para garantir que onClose sempre existe
+    // Reset do flag de fechamento
+    hasClosedRef.current = false;
+    
     const handleClose = () => {
+      // Prevenir múltiplas chamadas
+      if (hasClosedRef.current) {
+        console.log('[Pluggy] Widget já fechado, ignorando...');
+        return;
+      }
+      
+      hasClosedRef.current = true;
       console.log('[Pluggy] Fechando widget...');
       
-      // Remover manualmente o widget se ele não fechar sozinho
       setTimeout(() => {
         const iframes = document.querySelectorAll('iframe[src*="pluggy"]');
         iframes.forEach(iframe => iframe.remove());
@@ -147,35 +145,22 @@ export function PluggyConnectWidget({
       }
     };
     
-    // Função async para inicializar o widget
     const initializeWidget = async () => {
       try {
-        // Aguardar um momento para garantir que o DOM esteja pronto
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        // Configuração do Pluggy Connect
         console.log('[Pluggy] Criando configuração do widget...');
         const config = {
           connectToken: connectToken,
           includeSandbox: true,
           ...(updateItem && { updateItem }),
           
-          // Não passar elementos DOM diretamente
-          // O Pluggy Connect vai criar seu próprio container
-          
           onSuccess: (data: any) => {
             console.log('[Pluggy] Success callback - Full data:', JSON.stringify(data, null, 2));
-            console.log('[Pluggy] Success callback - Item details:', {
-              itemId: data?.item?.id,
-              itemStatus: data?.item?.status,
-              updateMode: !!updateItem,
-              fullItem: data?.item
-            });
             
             const itemId = data?.item?.id || data?.itemId || data?.id;
             
             if (itemId) {
-              // Mensagem diferente para update vs criação
               if (updateItem) {
                 toast.success('Conta reconectada com sucesso! Sincronizando transações...');
               } else {
@@ -199,24 +184,51 @@ export function PluggyConnectWidget({
           
           onError: (error: any) => {
             console.log('[Pluggy] Error callback:', error);
+            
+            // Tratamento especial para erro de sincronização
+            if (error?.message === 'Item was not sync successfully') {
+              // Este erro ocorre quando o item requer ação do usuário
+              // mas ainda assim foi atualizado parcialmente
+              console.warn('[Pluggy] Item sync warning:', error);
+              
+              // Verificar se há dados do item mesmo com erro
+              const itemData = error?.data?.item || error?.item;
+              if (itemData && itemData.id) {
+                console.log('[Pluggy] Item data found despite error:', itemData);
+                
+                // Se é uma atualização e temos o item, considerar como sucesso parcial
+                if (updateItem && itemData.id === updateItem) {
+                  toast.warning('Conta reconectada com limitações. Alguns dados podem estar indisponíveis.');
+                  onSuccess({ 
+                    item: itemData,
+                    partial: true,
+                    warning: 'Sincronização parcial'
+                  });
+                  handleClose();
+                  return;
+                }
+              }
+            }
+            
             const errorMessage = error?.message || error?.error || 'Erro ao conectar com o banco';
             toast.error(errorMessage);
             onError(new Error(errorMessage));
             handleClose();
           },
           
-          onExit: handleClose,
-          onClose: handleClose,
-          
-          props: {
-            onClose: handleClose
+          onExit: () => {
+            console.log('[Pluggy] onExit called');
+            handleClose();
           },
           
-          // Eventos para debug
+          onClose: () => {
+            console.log('[Pluggy] onClose called');
+            handleClose();
+          },
+          
           onEvent: (event: string, metadata: any) => {
             console.log('[Pluggy] Event:', event, metadata);
             
-            // Capturar informações do item
             if (event === 'ITEM_RESPONSE' && metadata) {
               console.log('[Pluggy] Item Response Details:', {
                 event,
@@ -224,24 +236,40 @@ export function PluggyConnectWidget({
                 item: metadata.item,
                 status: metadata.item?.status || metadata.status,
                 error: metadata.error,
-                timestamp: new Date(metadata.timestamp).toISOString()
+                timestamp: new Date().toISOString()
               });
               
-              // Se o item está em status de erro ou requer ação
               const itemStatus = metadata.item?.status || metadata.status;
               if (itemStatus) {
                 console.log(`[Pluggy] 📊 Status do Item: ${itemStatus}`);
                 
-                if (itemStatus === 'WAITING_USER_ACTION') {
-                  console.warn('[Pluggy] ⚠️ Item requer ação do usuário!');
-                } else if (itemStatus === 'LOGIN_ERROR') {
-                  console.error('[Pluggy] ❌ Erro de login no item!');
-                } else if (itemStatus === 'OUTDATED') {
-                  console.warn('[Pluggy] ⚠️ Item está desatualizado!');
-                } else if (itemStatus === 'UPDATED' || itemStatus === 'SUCCESS') {
-                  console.log('[Pluggy] ✅ Item atualizado com sucesso!');
+                switch(itemStatus) {
+                  case 'WAITING_USER_ACTION':
+                    console.warn('[Pluggy] ⚠️ Item requer ação do usuário!');
+                    break;
+                  case 'LOGIN_ERROR':
+                    console.error('[Pluggy] ❌ Erro de login no item!');
+                    break;
+                  case 'OUTDATED':
+                    console.warn('[Pluggy] ⚠️ Item está desatualizado!');
+                    break;
+                  case 'UPDATED':
+                  case 'SUCCESS':
+                    console.log('[Pluggy] ✅ Item atualizado com sucesso!');
+                    break;
+                  case 'PARTIAL_SUCCESS':
+                    console.log('[Pluggy] ⚠️ Item atualizado parcialmente!');
+                    break;
                 }
               }
+            }
+            
+            // Eventos de progresso
+            if (event === 'LOGIN_SUCCESS') {
+              console.log('[Pluggy] ✅ Login realizado com sucesso!');
+              toast.success('Login realizado! Buscando suas informações...');
+            } else if (event === 'LOGIN_STEP_COMPLETED') {
+              console.log('[Pluggy] ✅ Etapa de login concluída!');
             }
             
             // Detectar eventos de fechamento
@@ -253,11 +281,6 @@ export function PluggyConnectWidget({
 
         console.log('[Pluggy] Configuração criada:', config);
         
-        // Criar instância do Pluggy Connect
-        console.log('[Pluggy] Criando instância do PluggyConnect...');
-        console.log('[Pluggy] window.PluggyConnect:', window.PluggyConnect);
-        
-        // Verificar se PluggyConnect está disponível
         if (typeof window.PluggyConnect !== 'function') {
           throw new Error('PluggyConnect não é uma função. Tipo: ' + typeof window.PluggyConnect);
         }
@@ -265,7 +288,6 @@ export function PluggyConnectWidget({
         pluggyInstance.current = new window.PluggyConnect(config);
         console.log('[Pluggy] Instância criada:', pluggyInstance.current);
         
-        // Abrir o widget
         if (pluggyInstance.current.init && typeof pluggyInstance.current.init === 'function') {
           console.log('[Pluggy] Chamando init()...');
           pluggyInstance.current.init();
@@ -277,20 +299,6 @@ export function PluggyConnectWidget({
           throw new Error('Pluggy widget não possui método init() ou open()');
         }
         
-        // Fallback: se o widget não fechar sozinho após alguns segundos sem atividade
-        const inactivityTimer = setTimeout(() => {
-          const iframes = document.querySelectorAll('iframe[src*="pluggy"]');
-          if (iframes.length === 0) {
-            // Widget já foi fechado
-            handleClose();
-          }
-        }, 300000); // 5 minutos
-        
-        // Limpar timer ao destruir
-        return () => {
-          clearTimeout(inactivityTimer);
-        };
-      
       } catch (error: any) {
         console.error('[Pluggy] Erro ao inicializar widget:', error);
         toast.error('Erro ao inicializar conexão bancária: ' + (error.message || 'Erro desconhecido'));
@@ -298,18 +306,13 @@ export function PluggyConnectWidget({
       }
     };
     
-    // Chamar a função de inicialização
     initializeWidget();
     
   }, [sdkLoaded, connectToken, onSuccess, onError, onClose, updateItem]);
 
-  // Container para o widget - garantir que seja renderizado mas invisível
-  // O Pluggy Connect cria seu próprio modal/iframe
-  // Não precisamos renderizar nada
   return null;
 }
 
-// Componente alternativo que cria um overlay customizado
 export function PluggyConnectModal({
   connectToken,
   onSuccess,
@@ -318,28 +321,45 @@ export function PluggyConnectModal({
   updateItem
 }: PluggyConnectWidgetProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const hasHandledRef = useRef(false); // Prevenir múltiplas chamadas
   
   const handleClose = () => {
+    if (hasHandledRef.current) return;
+    hasHandledRef.current = true;
+    
     setIsOpen(false);
     if (onClose) {
       onClose();
     }
   };
 
+  const handleSuccess = (data: any) => {
+    if (hasHandledRef.current) return;
+    hasHandledRef.current = true;
+    
+    onSuccess(data);
+    setIsOpen(false);
+  };
+
+  const handleError = (error: any) => {
+    if (hasHandledRef.current) return;
+    hasHandledRef.current = true;
+    
+    onError(error);
+    setIsOpen(false);
+  };
+
   if (!isOpen) return null;
 
   return (
     <>
-      {/* Overlay */}
       <div 
         className="fixed inset-0 bg-black/50 z-[9998]"
         onClick={handleClose}
       />
       
-      {/* Container para o Pluggy */}
       <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
         <div className="pointer-events-auto relative">
-          {/* Botão de fechar customizado */}
           <button
             onClick={handleClose}
             className="absolute -top-10 right-0 text-white hover:text-gray-300 text-2xl font-bold z-[10000]"
@@ -348,17 +368,10 @@ export function PluggyConnectModal({
             ✕
           </button>
           
-          {/* Widget do Pluggy */}
           <PluggyConnectWidget
             connectToken={connectToken}
-            onSuccess={(data) => {
-              onSuccess(data);
-              handleClose();
-            }}
-            onError={(error) => {
-              onError(error);
-              handleClose();
-            }}
+            onSuccess={handleSuccess}
+            onError={handleError}
             onClose={handleClose}
             updateItem={updateItem}
           />
