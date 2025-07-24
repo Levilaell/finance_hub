@@ -182,12 +182,23 @@ export const useBankingStore = create<BankingState>((set, get) => ({
           };
         }
         
+        // Se for erro de MFA required
+        if (response.status === 400 && data.error === 'mfa_required') {
+          return {
+            success: false,
+            error_code: 'MFA_REQUIRED',
+            message: data.message || 'Esta conta precisa ser reconectada para continuar sincronizando.',
+            reconnection_required: true,
+            data: data.data
+          };
+        }
+        
         // Outros erros
         return {
           success: false,
-          error_code: data.error_code,
+          error_code: data.error_code || data.error,
           message: data.message || data.error || 'Failed to sync account',
-          reconnection_required: data.reconnection_required,
+          reconnection_required: data.reconnection_required || (data.data && data.data.reconnect_required),
           data: data
         };
       }

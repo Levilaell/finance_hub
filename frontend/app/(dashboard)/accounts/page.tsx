@@ -291,7 +291,7 @@ export default function AccountsPage() {
           message: result.message
         });
         
-        if (result.error_code === 'WAITING_USER_ACTION' || result.reconnection_required) {
+        if (result.error_code === 'WAITING_USER_ACTION' || result.error_code === 'MFA_REQUIRED' || result.reconnection_required) {
           // Só neste caso mostrar o dialog de reconexão
           console.log('[SYNC] Item requer reconexão, mostrando dialog...');
           const account = accounts.find(acc => acc.id === accountId);

@@ -693,16 +693,17 @@ class PluggyAccountSyncView(APIView):
             logger.info(f"Status detail: {item.get('statusDetail')}")
             logger.info(f"Last updated: {item.get('lastUpdatedAt')}")
             
-            # Check if MFA is required
-            if item_status == 'WAITING_USER_INPUT':
-                logger.warning(f"Item {account.pluggy_item_id} requires user authentication")
+            # Check if MFA is required or USER_INPUT_TIMEOUT
+            if execution_status == 'USER_INPUT_TIMEOUT' or item_status == 'WAITING_USER_INPUT':
+                logger.warning(f"Item {account.pluggy_item_id} requires user authentication (status: {item_status}, execution: {execution_status})")
                 return Response({
                     'success': False,
                     'error': 'mfa_required',
-                    'message': 'Esta conta requer autenticação adicional. Por favor, reconecte a conta.',
+                    'message': 'Esta conta precisa ser reconectada para continuar sincronizando.',
                     'data': {
                         'item_id': account.pluggy_item_id,
                         'status': item_status,
+                        'execution_status': execution_status,
                         'reconnect_required': True
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)

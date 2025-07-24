@@ -268,7 +268,24 @@ class BankingService {
       };
     };
   }> {
-    return apiClient.post(`/api/banking/pluggy/accounts/${accountId}/reconnect/`);
+    // Primeiro, obter o item_id da conta
+    const account = await this.getBankAccount(accountId);
+    if (!account.pluggy_item_id) {
+      throw new Error('Conta não conectada via Pluggy');
+    }
+    
+    // Usar o endpoint de connect-token passando o itemId para reconexão
+    const response = await apiClient.post('/api/banking/pluggy/connect-token/', {
+      itemId: account.pluggy_item_id
+    });
+    
+    return {
+      success: response.success,
+      data: {
+        ...response.data,
+        item_id: account.pluggy_item_id
+      }
+    };
   }
 
   // ===== NOVA FUNÇÃO PARA CONECTAR BANCO VIA PLUGGY =====
