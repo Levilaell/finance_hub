@@ -464,64 +464,47 @@ export default function AccountsPage() {
             connectToken={pluggyConnectToken}
             updateItem={sessionStorage.getItem('pluggy_update_item') || undefined}
             onSuccess={async (itemData) => {
-              console.log('[AccountsPage] Pluggy Iframe Success:', itemData);
-              const itemId = itemData?.item?.id || itemData?.itemId;
-              
-              if (itemId) {
-                try {
-                  // Se é uma atualização de item (reconexão), sincronizar automaticamente
-                  const updateItemId = sessionStorage.getItem('pluggy_update_item');
-                  const reconnectingAccount = sessionStorage.getItem('pluggy_reconnecting_account');
-                  
-                  if (updateItemId && reconnectingAccount) {
-                    console.log('[AccountsPage] Item updated via iframe, syncing automatically...');
-                    
-                    // Limpar dados de reconexão
-                    sessionStorage.removeItem('pluggy_update_item');
-                    sessionStorage.removeItem('pluggy_reconnecting_account');
-                    
-                    // Fechar widget
-                    resetPluggyWidget();
-                    
-                    // Aguardar um momento para o Item ser processado
-                    toast.success('Autenticação concluída! Buscando suas transações...');
-                    
-                    setTimeout(async () => {
-                      try {
-                        // Sincronizar conta usando o método correto
-                        await handleSyncAccount(reconnectingAccount);
+                console.log('[AccountsPage] Pluggy Connect Success:', itemData);
+                const itemId = itemData?.item?.id || itemData?.itemId;
+                
+                if (itemId) {
+                    try {
+                        const updateItemId = sessionStorage.getItem('pluggy_update_item');
+                        const reconnectingAccount = sessionStorage.getItem('pluggy_reconnecting_account');
                         
-                        // Atualizar lista de contas
-                        await fetchAccounts();
-                      } catch (error) {
-                        console.error('[AccountsPage] Error syncing after reconnection:', error);
-                        toast.error('Erro ao sincronizar após reconexão');
-                      }
-                    }, 2000); // Aguardar 2 segundos para o Item ser processado
-                    
-                    return;
-                  }
-                  
-                  // Fluxo normal de nova conexão
-                  console.log('[AccountsPage] Calling handlePluggyCallback with itemId:', itemId);
-                  const result = await handlePluggyCallback(itemId);
-                  console.log('[AccountsPage] handlePluggyCallback result:', result);
-                  
-                  await fetchAccounts();
-                  
-                } catch (error) {
-                  console.error('[AccountsPage] Error in handlePluggyCallback:', error);
-                  toast.error('Erro ao processar conexão bancária');
+                        if (updateItemId && reconnectingAccount) {
+                            console.log('[AccountsPage] Item updated, syncing automatically...');
+                            
+                            // NÃO fechar o widget imediatamente
+                            // resetPluggyWidget(); // REMOVER ESTA LINHA
+                            
+                            // Limpar dados de reconexão
+                            sessionStorage.removeItem('pluggy_update_item');
+                            sessionStorage.removeItem('pluggy_reconnecting_account');
+                            
+                            // Aguardar e depois fechar
+                            toast.success('Autenticação concluída! Buscando suas transações...');
+                            
+                            setTimeout(() => {
+                                resetPluggyWidget(); // Fechar DEPOIS do timeout
+                                handleSyncAccount(reconnectingAccount);
+                                fetchAccounts();
+                            }, 2000);
+                            
+                            return;
+                        }
+                        
+                        // ... resto do código
+                    } catch (error) {
+                        console.error('[AccountsPage] Error:', error);
+                        toast.error('Erro ao processar conexão bancária');
+                    }
                 }
-              } else {
-                console.error('[AccountsPage] No itemId found in iframe success response:', itemData);
-                toast.error('Erro: ID da conexão não encontrado');
-              }
-              
-              resetPluggyWidget();
-              // Clear update item after use
-              sessionStorage.removeItem('pluggy_update_item');
-              sessionStorage.removeItem('pluggy_reconnecting_account');
+                
+                // Fechar widget apenas no final
+                setTimeout(() => {
+                    resetPluggyWidget();
+                }, 500);
             }}
             onError={(error) => {
               console.error('[AccountsPage] Pluggy Iframe Error:', error);
