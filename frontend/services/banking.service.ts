@@ -269,7 +269,7 @@ class BankingService {
     };
   }> {
     // Primeiro, obter o item_id da conta
-    const account = await this.getBankAccount(accountId);
+    const account = await this.getAccount(accountId);
     if (!account.pluggy_item_id) {
       throw new Error('Conta não conectada via Pluggy');
     }
