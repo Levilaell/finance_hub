@@ -520,11 +520,16 @@ class PluggyCallbackView(APIView):
                     break
                 
                 for trans_data in transactions:
-                    created = self._process_transaction(bank_account, trans_data)
-                    if created:
-                        total_created += 1
-                    else:
-                        total_updated += 1
+                    try:
+                        created = self._process_transaction(bank_account, trans_data)
+                        if created:
+                            total_created += 1
+                        else:
+                            total_updated += 1
+                    except Exception as e:
+                        logger.error(f"Error processing transaction {trans_data.get('id', 'unknown')}: {e}")
+                        logger.error(f"Transaction data: {trans_data}")
+                        continue
                 
                 # Check if there are more pages
                 if page >= total_pages:
@@ -536,6 +541,7 @@ class PluggyCallbackView(APIView):
             
         except Exception as e:
             logger.error(f"Failed to sync transactions: {e}", exc_info=True)
+
 
     def _process_transaction(self, bank_account: BankAccount, trans_data: Dict) -> bool:
         """
@@ -562,6 +568,12 @@ class PluggyCallbackView(APIView):
             mapper = PluggyCategoryMapper()
             category = mapper.get_or_create_category(trans_data['category'])
         
+        # CORREÇÃO: Tratar merchant de forma segura
+        merchant_data = trans_data.get('merchant')
+        merchant_name = ''
+        if merchant_data and isinstance(merchant_data, dict):
+            merchant_name = merchant_data.get('name', '')
+        
         # Create or update transaction
         transaction_obj, created = Transaction.objects.update_or_create(
             external_id=trans_data['id'],
@@ -571,19 +583,20 @@ class PluggyCallbackView(APIView):
                 'amount': amount,
                 'description': trans_data.get('description', '')[:500],
                 'transaction_date': transaction_date,
-                'counterpart_name': trans_data.get('merchant', {}).get('name', '')[:200],
+                'counterpart_name': merchant_name[:200],  # Usar a variável tratada
                 'category': category,
                 'status': 'completed',
                 'metadata': {
                     'pluggy_category': trans_data.get('category'),
                     'payment_method': trans_data.get('paymentMethod'),
-                    'merchant': trans_data.get('merchant', {})
+                    'merchant': merchant_data  # Usar merchant_data que pode ser None
                 }
             }
         )
         
         return created
-    
+
+
     def _map_transaction_type(self, trans_data: Dict) -> str:
         """
         Map Pluggy transaction type to our internal types
