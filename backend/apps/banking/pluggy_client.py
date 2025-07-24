@@ -13,6 +13,11 @@ from django.core.cache import cache
 logger = logging.getLogger(__name__)
 
 
+class PluggyError(Exception):
+    """Custom exception for Pluggy API errors"""
+    pass
+
+
 class PluggyClient:
     """
     Client for Pluggy API communication
@@ -28,6 +33,14 @@ class PluggyClient:
         
         # Log configuration for debugging
         logger.info(f"Pluggy Client initialized - Base URL: {self.base_url}, Sandbox: {self.use_sandbox}")
+        
+    def __enter__(self):
+        """Context manager entry"""
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit"""
+        pass
         
     def _get_api_key(self) -> str:
         """
@@ -62,7 +75,7 @@ class PluggyClient:
             
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to create API key: {e}")
-            raise Exception(f"Failed to authenticate with Pluggy: {str(e)}")
+            raise PluggyError(f"Failed to authenticate with Pluggy: {str(e)}")
     
     def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None, params: Optional[Dict] = None) -> Any:
         """
@@ -128,11 +141,18 @@ class PluggyClient:
             logger.error(f"API request failed: {method} {endpoint} - {e}")
             if hasattr(e, 'response') and e.response is not None:
                 logger.error(f"Response content: {e.response.text}")
-            raise Exception(f"Pluggy API error: {str(e)}")
+            raise PluggyError(f"Pluggy API error: {str(e)}")
     
-    def get_connectors(self, country: str = 'BR', type: Optional[str] = None, sandbox: Optional[bool] = None) -> List[Dict]:
+    def get_connectors(self, country: str = 'BR', type: Optional[str] = None, 
+                      sandbox: Optional[bool] = None, is_open_finance: Optional[bool] = None) -> List[Dict]:
         """
         List available bank connectors
+        
+        Args:
+            country: Country code (default: BR)
+            type: Connector type filter
+            sandbox: Filter sandbox connectors
+            is_open_finance: Filter Open Finance connectors
         """
         params = {
             'countries': country
@@ -143,6 +163,8 @@ class PluggyClient:
             params['sandbox'] = sandbox
         elif self.use_sandbox:
             params['sandbox'] = True
+        if is_open_finance is not None:
+            params['isOpenFinance'] = is_open_finance
             
         response = self._make_request('GET', '/connectors', params=params)
         
@@ -151,32 +173,60 @@ class PluggyClient:
             return response['results']
         return response
     
-    def create_connect_token(self, item_id: Optional[str] = None, client_user_id: Optional[str] = None) -> Dict:
+    def create_connect_token(self, item_id: Optional[str] = None, 
+                           client_user_id: Optional[str] = None,
+                           allowed_connectors: Optional[List[int]] = None,
+                           products: Optional[List[str]] = None) -> Dict:
         """
         Create a connect token for Pluggy Connect widget
+        
+        Args:
+            item_id: Existing item ID for updates
+            client_user_id: Your internal user ID
+            allowed_connectors: List of allowed connector IDs
+            products: List of products to collect
         """
         data = {}
         if item_id:
             data['itemId'] = item_id
         if client_user_id:
             data['clientUserId'] = client_user_id
+        if allowed_connectors:
+            data['allowedConnectors'] = allowed_connectors
+        if products:
+            data['products'] = products
+            
+        # Add options for Open Finance
+        data['options'] = {
+            'includeOpenFinance': True,  # Permitir conectores Open Finance
+            'avoidDuplicates': True      # Evitar duplicação de contas
+        }
             
         response = self._make_request('POST', '/connect_token', data)
         return {
             'accessToken': response['accessToken'],
-            'connectUrl': f"{settings.PLUGGY_CONNECT_URL}?token={response['accessToken']}"
+            'connectUrl': f"{settings.PLUGGY_CONNECT_URL}?token={response['accessToken']}",
+            'expiresAt': response.get('expiresAt')
         }
     
-    def create_item(self, connector_id: int, credentials: Dict, client_user_id: Optional[str] = None) -> Dict:
+    def create_item(self, connector_id: int, parameters: Dict, 
+                   client_user_id: Optional[str] = None,
+                   products: Optional[List[str]] = None) -> Dict:
         """
         Create a new item (bank connection)
+        
+        For Open Finance connectors, parameters should include:
+        - For Personal: {'cpf': '12345678900'}
+        - For Business: {'cnpj': '12345678000100'}
         """
         data = {
             'connectorId': connector_id,
-            'parameters': credentials
+            'parameters': parameters
         }
         if client_user_id:
             data['clientUserId'] = client_user_id
+        if products:
+            data['products'] = products
             
         return self._make_request('POST', '/items', data)
     
@@ -191,6 +241,12 @@ class PluggyClient:
         Update an existing item (refresh data)
         """
         return self._make_request('PATCH', f'/items/{item_id}')
+    
+    def sync_item(self, item_id: str) -> Dict:
+        """
+        Force sync an item (alternative to update_item)
+        """
+        return self._make_request('POST', f'/items/{item_id}/sync')
     
     def delete_item(self, item_id: str) -> None:
         """
@@ -267,8 +323,8 @@ class PluggyClient:
         """
         return self._make_request('GET', f'/accounts/{account_id}')
     
-    def get_transactions(self, account_id: str, from_date: Optional[datetime] = None, 
-                        to_date: Optional[datetime] = None, page: int = 1, page_size: int = 500) -> Dict:
+    def get_transactions(self, account_id: str, from_date: Optional[Any] = None, 
+                        to_date: Optional[Any] = None, page: int = 1, page_size: int = 500) -> Dict:
         """
         Get transactions for an account
         """
@@ -278,10 +334,17 @@ class PluggyClient:
             'page': page
         }
         
+        # Handle both datetime and string dates
         if from_date:
-            params['from'] = from_date.strftime('%Y-%m-%d')
+            if isinstance(from_date, str):
+                params['from'] = from_date
+            else:
+                params['from'] = from_date.strftime('%Y-%m-%d')
         if to_date:
-            params['to'] = to_date.strftime('%Y-%m-%d')
+            if isinstance(to_date, str):
+                params['to'] = to_date
+            else:
+                params['to'] = to_date.strftime('%Y-%m-%d')
             
         logger.info(f"[Pluggy API] Getting transactions for account {account_id} with params: {params}")
         
@@ -323,7 +386,6 @@ class PluggyClient:
             logger.error(f"[Pluggy API] Error getting transactions: {e}", exc_info=True)
             return {'results': [], 'total': 0, 'totalPages': 0, 'page': page}
 
-
     def get_transaction(self, transaction_id: str) -> Dict:
         """
         Get specific transaction details
@@ -353,6 +415,18 @@ class PluggyClient:
         Get transactions for a specific investment
         """
         return self._make_request('GET', f'/investments/{investment_id}/transactions')
+    
+    def get_loans(self, item_id: str) -> List[Dict]:
+        """
+        Get loans for an item (Open Finance)
+        """
+        return self._make_request('GET', f'/loans?itemId={item_id}')
+    
+    def get_credit_cards(self, item_id: str) -> List[Dict]:
+        """
+        Get credit cards for an item
+        """
+        return self._make_request('GET', f'/credit-cards?itemId={item_id}')
     
     def validate_webhook(self, signature: str, payload: str) -> bool:
         """

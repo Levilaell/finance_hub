@@ -29,7 +29,10 @@ class BankProvider(models.Model):
     is_open_banking = models.BooleanField(_('supports Open Banking'), default=True)
     api_endpoint = models.URLField(_('API endpoint'), blank=True)
     is_active = models.BooleanField(_('is active'), default=True)
-    
+    is_open_finance = models.BooleanField(
+        default=False,
+        help_text='Se este provedor é um conector Open Finance'
+    )
     # Integration settings
     requires_agency = models.BooleanField(_('requires agency'), default=True)
     requires_account = models.BooleanField(_('requires account'), default=True)

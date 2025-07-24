@@ -42,13 +42,16 @@ class PluggyConnectTokenView(APIView):
             # Get optional parameters
             item_id = request.data.get('itemId') or request.data.get('item_id')
             client_user_id = request.data.get('clientUserId', str(request.user.id))
+            include_open_finance = request.data.get('includeOpenFinance', True)
+            products = request.data.get('products', ['ACCOUNTS', 'TRANSACTIONS'])
             
-            logger.info(f"Parameters - item_id: {item_id}, client_user_id: {client_user_id}")
+            logger.info(f"Parameters - item_id: {item_id}, client_user_id: {client_user_id}, open_finance: {include_open_finance}")
             
-            # Create connect token
+            # Create connect token with Open Finance support
             token_data = pluggy.create_connect_token(
                 item_id=item_id,
-                client_user_id=client_user_id
+                client_user_id=client_user_id,
+                products=products
             )
             
             logger.info("Connect token created successfully")
@@ -60,7 +63,8 @@ class PluggyConnectTokenView(APIView):
                     'connect_token': token_data['accessToken'],
                     'connect_url': token_data['connectUrl'],
                     'sandbox_mode': pluggy.use_sandbox,
-                    'expires_at': token_data.get('expiresAt')
+                    'expires_at': token_data.get('expiresAt'),
+                    'include_open_finance': include_open_finance
                 }
             }
             
@@ -69,7 +73,10 @@ class PluggyConnectTokenView(APIView):
                 response_data['data']['sandbox_credentials'] = {
                     'user': 'user-ok',
                     'password': 'password-ok', 
-                    'token': '123456'
+                    'token': '123456',
+                    'cpf': '76109277673',  # CPF para teste Open Finance
+                    'open_finance_user': 'test@example.com',
+                    'open_finance_password': 'P@ssword01'
                 }
             
             return Response(response_data)
@@ -103,25 +110,41 @@ class PluggyBanksView(APIView):
             country = request.query_params.get('country', 'BR')
             connector_type = request.query_params.get('type')
             sandbox = request.query_params.get('sandbox')
+            include_open_finance = request.query_params.get('includeOpenFinance', 'true').lower() == 'true'
             
             # Get connectors
-            connectors = pluggy.get_connectors(
+            all_connectors = []
+            
+            # Get regular connectors
+            regular_connectors = pluggy.get_connectors(
                 country=country,
                 type=connector_type,
-                sandbox=sandbox.lower() == 'true' if sandbox else None
+                sandbox=sandbox.lower() == 'true' if sandbox else None,
+                is_open_finance=False
             )
+            all_connectors.extend(regular_connectors)
+            
+            # Get Open Finance connectors if requested
+            if include_open_finance:
+                of_connectors = pluggy.get_connectors(
+                    country=country,
+                    type=connector_type,
+                    is_open_finance=True
+                )
+                all_connectors.extend(of_connectors)
             
             # Filter and format for frontend
             formatted_banks = []
-            for connector in connectors:
+            for connector in all_connectors:
                 # Skip if not a bank connector
-                if connector.get('type') != 'PERSONAL_BANK':
+                if connector.get('type') not in ['PERSONAL_BANK', 'BUSINESS_BANK']:
                     continue
                     
                 formatted_banks.append({
                     'id': connector['id'],
-                    'code': str(connector['id']),  # Use ID as code
+                    'code': str(connector['id']),
                     'name': connector['name'],
+                    'displayName': f"[OF] {connector['name']}" if connector.get('isOpenFinance') else connector['name'],
                     'institutionUrl': connector.get('institutionUrl', ''),
                     'logo_url': connector.get('imageUrl', ''),
                     'imageUrl': connector.get('imageUrl', ''),
@@ -131,15 +154,19 @@ class PluggyBanksView(APIView):
                     'type': connector['type'],
                     'sandbox': connector.get('sandbox', False),
                     'oauth': connector.get('oauth', False),
-                    'openFinance': connector.get('openFinance', False),
-                    'is_active': True
+                    'openFinance': connector.get('isOpenFinance', False),
+                    'isOpenFinance': connector.get('isOpenFinance', False),
+                    'is_active': True,
+                    'supportedProducts': connector.get('products', []),
+                    'requiresCpfCnpj': connector.get('isOpenFinance', False)
                 })
             
             return Response({
                 'success': True,
                 'data': formatted_banks,
                 'total': len(formatted_banks),
-                'sandbox_mode': pluggy.use_sandbox
+                'sandbox_mode': pluggy.use_sandbox,
+                'has_open_finance': any(bank['isOpenFinance'] for bank in formatted_banks)
             })
             
         except Exception as e:
@@ -171,24 +198,31 @@ class PluggyConnectorsView(APIView):
             country = request.query_params.get('country', 'BR')
             connector_type = request.query_params.get('type')
             sandbox = request.query_params.get('sandbox')
+            is_open_finance = request.query_params.get('isOpenFinance')
+            
+            # Convert string to boolean
+            if is_open_finance is not None:
+                is_open_finance = is_open_finance.lower() == 'true'
             
             # Get connectors
             connectors = pluggy.get_connectors(
                 country=country,
                 type=connector_type,
-                sandbox=sandbox.lower() == 'true' if sandbox else None
+                sandbox=sandbox.lower() == 'true' if sandbox else None,
+                is_open_finance=is_open_finance
             )
             
             # Filter and format for frontend
             formatted_connectors = []
             for connector in connectors:
                 # Skip if not a bank connector
-                if connector.get('type') != 'PERSONAL_BANK':
+                if connector.get('type') not in ['PERSONAL_BANK', 'BUSINESS_BANK']:
                     continue
                     
                 formatted_connectors.append({
                     'id': connector['id'],
                     'name': connector['name'],
+                    'displayName': f"[OF] {connector['name']}" if connector.get('isOpenFinance') else connector['name'],
                     'institutionUrl': connector.get('institutionUrl', ''),
                     'imageUrl': connector.get('imageUrl', ''),
                     'primaryColor': connector.get('primaryColor', '#000000'),
@@ -196,7 +230,10 @@ class PluggyConnectorsView(APIView):
                     'type': connector['type'],
                     'sandbox': connector.get('sandbox', False),
                     'oauth': connector.get('oauth', False),
-                    'openFinance': connector.get('openFinance', False)
+                    'openFinance': connector.get('isOpenFinance', False),
+                    'isOpenFinance': connector.get('isOpenFinance', False),
+                    'products': connector.get('products', []),
+                    'credentials': connector.get('credentials', [])
                 })
             
             return Response(formatted_connectors)
@@ -247,6 +284,12 @@ class PluggyCallbackView(APIView):
             item = pluggy.get_item(item_id)
 
             logger.info(f"Item details: {json.dumps(item, indent=2)}")
+            
+            # Check if it's Open Finance
+            connector = item.get('connector', {})
+            is_open_finance = connector.get('isOpenFinance', False)
+            logger.info(f"Is Open Finance connector: {is_open_finance}")
+            
             if item.get('statusDetail'):
                 logger.info(f"Item status details: {json.dumps(item['statusDetail'], indent=2)}")
 
@@ -292,6 +335,15 @@ class PluggyCallbackView(APIView):
             user_company = request.user.company
             logger.info(f"Processing accounts for company {user_company.id}")
             
+            # Get additional data if Open Finance
+            identity_data = None
+            if is_open_finance:
+                try:
+                    identity_data = pluggy.get_identity(item_id)
+                    logger.info(f"Got identity data for Open Finance: {identity_data}")
+                except Exception as e:
+                    logger.warning(f"Could not get identity data: {e}")
+            
             with transaction.atomic():
                 for account_data in accounts:
                     # Debug: Log each account data
@@ -305,7 +357,6 @@ class PluggyCallbackView(APIView):
                     logger.info(f"Processing account: {account_data.get('id', 'unknown')}, type: {account_data.get('type')}")
                     
                     # Create or update bank provider
-                    connector = item.get('connector', {})
                     provider, _ = BankProvider.objects.get_or_create(
                         code=str(connector.get('id')),
                         defaults={
@@ -313,7 +364,8 @@ class PluggyCallbackView(APIView):
                             'logo_url': connector.get('imageUrl', ''),
                             'primary_color': connector.get('primaryColor', '#000000'),
                             'api_endpoint': '',  # Not used with Pluggy
-                            'is_active': True
+                            'is_active': True,
+                            'is_open_finance': is_open_finance
                         }
                     )
                     logger.info(f"Bank provider: {provider}")
@@ -341,6 +393,24 @@ class PluggyCallbackView(APIView):
                     # Log the data for debugging
                     logger.info(f"Account data - Type: {account_type}, Number: {account_number}, Agency: {agency}")
                     
+                    # Prepare metadata with Open Finance specific data
+                    metadata = {
+                        'owner': account_data.get('owner', ''),
+                        'subtype': account_data.get('subtype', ''),
+                        'bank_data': account_data.get('bankData', {}),
+                        'created_at': account_data.get('createdAt', ''),
+                        'updated_at': account_data.get('updatedAt', ''),
+                        'is_open_finance': is_open_finance
+                    }
+                    
+                    # Add credit card specific data if available
+                    if account_data.get('creditData'):
+                        metadata['credit_data'] = account_data['creditData']
+                    
+                    # Add identity data if available
+                    if identity_data:
+                        metadata['identity'] = identity_data
+                    
                     try:
                         # Create or update bank account
                         bank_account, created = BankAccount.objects.update_or_create(
@@ -360,13 +430,7 @@ class PluggyCallbackView(APIView):
                                 'is_active': True,
                                 'status': 'active',
                                 'last_sync_at': timezone.now(),
-                                'metadata': {
-                                    'owner': account_data.get('owner', ''),
-                                    'subtype': account_data.get('subtype', ''),
-                                    'bank_data': account_data.get('bankData', {}),
-                                    'created_at': account_data.get('createdAt', ''),
-                                    'updated_at': account_data.get('updatedAt', '')
-                                }
+                                'metadata': metadata
                             }
                         )
                     except Exception as e:
@@ -385,6 +449,7 @@ class PluggyCallbackView(APIView):
                             bank_account.available_balance = Decimal(str(account_data.get('balance', 0)))
                             bank_account.last_sync_at = timezone.now()
                             bank_account.status = 'active'
+                            bank_account.metadata = metadata
                             bank_account.save()
                             created = False
                             logger.info(f"Updated existing bank account: {bank_account}")
@@ -446,7 +511,8 @@ class PluggyCallbackView(APIView):
                     'accounts': serializer.data,
                     'message': f'Successfully connected {len(created_accounts)} account(s)',
                     'sandbox_mode': pluggy.use_sandbox,
-                    'item_id': item_id
+                    'item_id': item_id,
+                    'is_open_finance': is_open_finance
                 }
             })
             
@@ -469,8 +535,10 @@ class PluggyCallbackView(APIView):
             'BANK': 'checking',  # Default bank accounts to checking
             'CHECKING': 'checking',
             'SAVINGS': 'savings',
+            'CREDIT': 'credit_card',
             'CREDIT_CARD': 'credit_card',
             'INVESTMENT': 'investment',
+            'LOAN': 'loan',
             'OTHER': 'other'
         }
         return type_mapping.get(pluggy_type, 'checking')
@@ -480,8 +548,11 @@ class PluggyCallbackView(APIView):
         Sync transactions for a bank account
         """
         try:
-            # Get transactions for the last 90 days
-            from_date = timezone.now() - timedelta(days=90)
+            # Get transactions for the last 90 days (365 for Open Finance)
+            is_open_finance = bank_account.metadata.get('is_open_finance', False)
+            days_back = 365 if is_open_finance else 90
+            
+            from_date = timezone.now() - timedelta(days=days_back)
             to_date = timezone.now()
             
             page = 1
@@ -542,7 +613,6 @@ class PluggyCallbackView(APIView):
         except Exception as e:
             logger.error(f"Failed to sync transactions: {e}", exc_info=True)
 
-
     def _process_transaction(self, bank_account: BankAccount, trans_data: Dict) -> bool:
         """
         Process a single transaction
@@ -574,6 +644,25 @@ class PluggyCallbackView(APIView):
         if merchant_data and isinstance(merchant_data, dict):
             merchant_name = merchant_data.get('name', '')
         
+        # Handle payment data for Open Finance
+        payment_data = trans_data.get('paymentData', {})
+        metadata = {
+            'pluggy_category': trans_data.get('category'),
+            'payment_method': trans_data.get('paymentMethod'),
+            'merchant': merchant_data,
+            'operation_type': trans_data.get('operationType'),
+            'provider_id': trans_data.get('providerId')
+        }
+        
+        # Add payment data details
+        if payment_data:
+            metadata['payment_data'] = payment_data
+            # Extract counterpart name from payment data if available
+            if payment_data.get('receiver', {}).get('name'):
+                merchant_name = payment_data['receiver']['name']
+            elif payment_data.get('payer', {}).get('name'):
+                merchant_name = payment_data['payer']['name']
+        
         # Create or update transaction
         transaction_obj, created = Transaction.objects.update_or_create(
             external_id=trans_data['id'],
@@ -583,29 +672,42 @@ class PluggyCallbackView(APIView):
                 'amount': amount,
                 'description': trans_data.get('description', '')[:500],
                 'transaction_date': transaction_date,
-                'counterpart_name': merchant_name[:200],  # Usar a variável tratada
+                'counterpart_name': merchant_name[:200],
                 'category': category,
-                'status': 'completed',
-                'metadata': {
-                    'pluggy_category': trans_data.get('category'),
-                    'payment_method': trans_data.get('paymentMethod'),
-                    'merchant': merchant_data  # Usar merchant_data que pode ser None
-                }
+                'status': 'completed' if trans_data.get('status') == 'POSTED' else 'pending',
+                'metadata': metadata
             }
         )
         
         return created
 
-
     def _map_transaction_type(self, trans_data: Dict) -> str:
         """
         Map Pluggy transaction type to our internal types
         """
+        # For Open Finance, check operationType first
+        operation_type = trans_data.get('operationType')
+        if operation_type:
+            operation_map = {
+                'PIX': 'pix_in' if trans_data.get('type') == 'CREDIT' else 'pix_out',
+                'TED': 'transfer_in' if trans_data.get('type') == 'CREDIT' else 'transfer_out',
+                'DOC': 'transfer_in' if trans_data.get('type') == 'CREDIT' else 'transfer_out',
+                'TRANSFERENCIA_MESMA_INSTITUICAO': 'transfer_in' if trans_data.get('type') == 'CREDIT' else 'transfer_out',
+                'BOLETO': 'debit',
+                'CARTAO': 'debit',
+                'DEPOSITO': 'credit',
+                'SAQUE': 'debit'
+            }
+            if operation_type in operation_map:
+                return operation_map[operation_type]
+        
+        # Fall back to original logic
         amount = trans_data.get('amount', 0)
         payment_method = trans_data.get('paymentMethod')
+        pluggy_type = trans_data.get('type')
         
         # Determine type based on amount and payment method
-        if amount > 0:
+        if pluggy_type == 'CREDIT' or amount > 0:
             if payment_method == 'PIX':
                 return 'pix_in'
             elif payment_method == 'TRANSFER':
@@ -629,19 +731,10 @@ class PluggyAccountStatusView(APIView):
     """
     permission_classes = [IsAuthenticated]
     
-    def get(self, request, *args, **kwargs):
+    def get(self, request, account_id):
         """
         Get current sync status for an account
         """
-        # Get account_id from kwargs (URL parameter)
-        account_id = kwargs.get('account_id') or kwargs.get('pk')
-        
-        if not account_id:
-            return Response(
-                {'error': 'Account ID is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
         try:
             # Get account
             account = BankAccount.objects.get(
@@ -649,7 +742,31 @@ class PluggyAccountStatusView(APIView):
                 company=request.user.company
             )
             
-            return Response({
+            # Check if it's Open Finance
+            is_open_finance = account.metadata.get('is_open_finance', False)
+            
+            # Get rate limit info if Open Finance
+            rate_limit_info = None
+            if is_open_finance and account.pluggy_item_id:
+                try:
+                    pluggy = PluggyClient()
+                    item = pluggy.get_item(account.pluggy_item_id)
+                    status_detail = item.get('statusDetail', {})
+                    
+                    # Check for rate limit warnings
+                    for product, details in status_detail.items():
+                        if isinstance(details, dict) and details.get('warnings'):
+                            for warning in details['warnings']:
+                                if 'rate limit' in str(warning).lower():
+                                    rate_limit_info = {
+                                        'product': product,
+                                        'warning': str(warning)
+                                    }
+                                    break
+                except Exception as e:
+                    logger.warning(f"Could not check rate limits: {e}")
+            
+            response_data = {
                 'id': account.id,
                 'status': account.status,
                 'sync_status': account.sync_status,
@@ -657,8 +774,12 @@ class PluggyAccountStatusView(APIView):
                 'sync_error_message': account.sync_error_message,
                 'current_balance': float(account.current_balance),
                 'available_balance': float(account.available_balance),
-                'transaction_count': account.transactions.count()
-            })
+                'transaction_count': account.transactions.count(),
+                'is_open_finance': is_open_finance,
+                'rate_limit_info': rate_limit_info
+            }
+            
+            return Response(response_data)
             
         except BankAccount.DoesNotExist:
             return Response(
@@ -673,27 +794,10 @@ class PluggyAccountSyncView(APIView):
     """
     permission_classes = [IsAuthenticated]
     
-    def post(self, request, *args, **kwargs):
+    def post(self, request, account_id):
         """
         Trigger sync for a specific account
-        
-        Args:
-            request: The HTTP request
-            account_id: The ID of the account to sync (from URL kwargs)
         """
-        # Get account_id from kwargs (URL parameter)
-        account_id = kwargs.get('account_id') or kwargs.get('pk')
-        
-        if not account_id:
-            return Response(
-                {
-                    'success': False,
-                    'error': 'Account ID is required',
-                    'message': 'ID da conta é obrigatório'
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
         try:
             # Get account
             account = BankAccount.objects.get(
@@ -708,87 +812,49 @@ class PluggyAccountSyncView(APIView):
                 )
             
             pluggy = PluggyClient()
+            is_open_finance = account.metadata.get('is_open_finance', False)
 
             # Check item status BEFORE trying to update
-            try:
-                item = pluggy.get_item(account.pluggy_item_id)
-            except Exception as e:
-                logger.error(f"Error getting item {account.pluggy_item_id}: {e}")
-                return Response(
-                    {
-                        'success': False,
-                        'error': 'Failed to get item status from Pluggy',
-                        'message': f'Erro ao verificar status da conta: {str(e)}'
-                    },
-                    status=status.HTTP_503_SERVICE_UNAVAILABLE
-                )
-            
+            item = pluggy.get_item(account.pluggy_item_id)
             item_status = item.get('status')
             execution_status = item.get('executionStatus')
-            connector = item.get('connector', {})
-            has_mfa = connector.get('hasMFA', False)
             
             logger.info(f"Item status: {item_status}")
             logger.info(f"Execution status: {execution_status}")
-            logger.info(f"Connector: {connector.get('name')} (ID: {connector.get('id')})")
-            logger.info(f"Has MFA: {has_mfa}")
             logger.info(f"Status detail: {json.dumps(item.get('statusDetail'), indent=2)}")
             logger.info(f"Last updated: {item.get('lastUpdatedAt')}")
             
-            # Para bancos com MFA (como Inter), verificar se precisa reconexão
-            if has_mfa:
-                logger.info(f"Bank {connector.get('name')} requires MFA for each sync")
-                
-                # Se está OUTDATED com USER_INPUT_TIMEOUT, precisa reconectar
-                if item_status == 'OUTDATED' and execution_status == 'USER_INPUT_TIMEOUT':
-                    logger.warning(f"MFA bank with expired session, reconnection required")
-                    return Response({
-                        'success': False,
-                        'error_code': 'MFA_REQUIRED',
-                        'message': f'O {connector.get("name", "banco")} requer autenticação para cada sincronização.',
-                        'reconnection_required': True,
-                        'data': {
-                            'item_id': account.pluggy_item_id,
-                            'status': item_status,
-                            'execution_status': execution_status,
-                            'bank_requires_mfa': True
-                        }
-                    }, status=status.HTTP_400_BAD_REQUEST)
-                
-                # Se está WAITING_USER_INPUT, também precisa reconectar
-                elif item_status == 'WAITING_USER_INPUT':
-                    logger.warning(f"Item {account.pluggy_item_id} waiting for user input")
-                    return Response({
-                        'success': False,
-                        'error_code': 'MFA_REQUIRED',
-                        'message': f'O {connector.get("name", "banco")} está aguardando sua autenticação.',
-                        'reconnection_required': True,
-                        'data': {
-                            'item_id': account.pluggy_item_id,
-                            'status': item_status,
-                            'execution_status': execution_status,
-                            'bank_requires_mfa': True
-                        }
-                    }, status=status.HTTP_400_BAD_REQUEST)
-                    
-                # Se está UPDATED com PARTIAL_SUCCESS, é recém reconectado - sincronizar sem forçar update
-                elif item_status == 'UPDATED' and execution_status == 'PARTIAL_SUCCESS':
-                    logger.info("MFA bank with PARTIAL_SUCCESS, likely just reconnected")
-                    # Verificar tempo desde última atualização
-                    last_updated = item.get('lastUpdatedAt')
-                    if last_updated:
-                        try:
-                            last_update_time = datetime.fromisoformat(last_updated.replace('Z', '+00:00'))
-                            minutes_since_update = (datetime.now(timezone.utc) - last_update_time).total_seconds() / 60
-                            
-                            # Se foi atualizado há menos de 5 minutos, provavelmente acabou de reconectar
-                            if minutes_since_update < 5:
-                                logger.info(f"Item was updated {minutes_since_update:.1f} minutes ago, treating as fresh reconnection")
-                                # Continuar com sincronização sem tentar update
-                            else:
-                                logger.info(f"Item was updated {minutes_since_update:.1f} minutes ago, may need reconnection soon")
-                        except Exception as e:
-                            logger.warning(f"Error parsing last update time: {e}")
+            # Check for rate limits (Open Finance)
+            if is_open_finance and item.get('statusDetail'):
+                for product, details in item['statusDetail'].items():
+                    if isinstance(details, dict) and details.get('warnings'):
+                        for warning in details['warnings']:
+                            if '423' in str(warning.get('code', '')) or 'rate limit' in str(warning).lower():
+                                logger.warning(f"Rate limit reached for {product}")
+                                return Response({
+                                    'success': False,
+                                    'error_code': 'RATE_LIMIT',
+                                    'message': f'Limite de requisições mensais atingido para {product}. Tente novamente no próximo mês.',
+                                    'data': {
+                                        'product': product,
+                                        'warning': str(warning)
+                                    }
+                                }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+            
+            # Check if MFA is required or USER_INPUT_TIMEOUT
+            if execution_status == 'USER_INPUT_TIMEOUT' or item_status == 'WAITING_USER_INPUT':
+                logger.warning(f"Item {account.pluggy_item_id} requires user authentication (status: {item_status}, execution: {execution_status})")
+                return Response({
+                    'success': False,
+                    'error_code': 'MFA_REQUIRED',
+                    'message': 'Esta conta precisa ser reconectada para continuar sincronizando.',
+                    'reconnection_required': True,
+                    'data': {
+                        'item_id': account.pluggy_item_id,
+                        'status': item_status,
+                        'execution_status': execution_status
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
             
             # Check for login errors
             if item_status == 'LOGIN_ERROR':
@@ -804,59 +870,84 @@ class PluggyAccountSyncView(APIView):
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Para bancos SEM MFA, tentar atualizar o item se necessário
-            should_update_item = False
-            if not has_mfa and item_status in ['OUTDATED', 'UPDATED']:
-                # Verificar quando foi a última atualização
-                last_updated = item.get('lastUpdatedAt')
-                if last_updated:
-                    try:
-                        last_update_time = datetime.fromisoformat(last_updated.replace('Z', '+00:00'))
-                        hours_since_update = (datetime.now(timezone.utc) - last_update_time).total_seconds() / 3600
-                        
-                        # Se faz mais de 2 horas desde a última atualização, tentar atualizar
-                        if hours_since_update > 2:
-                            should_update_item = True
-                            logger.info(f"Item last updated {hours_since_update:.1f} hours ago, will try to update")
-                    except Exception as e:
-                        logger.warning(f"Error parsing last update time: {e}")
-            
-            # Tentar atualizar item apenas se necessário e se não tem MFA
-            if should_update_item:
-                logger.info(f"Triggering update for item {account.pluggy_item_id}")
-                try:
-                    update_result = pluggy.update_item(account.pluggy_item_id)
-                    logger.info(f"Update result: {json.dumps(update_result, indent=2)}")
+            # Check for PARTIAL_SUCCESS with specific details
+            if item_status == 'UPDATED' and execution_status == 'PARTIAL_SUCCESS':
+                logger.info(f"Item {account.pluggy_item_id} has PARTIAL_SUCCESS, checking details...")
+                status_detail = item.get('statusDetail', {})
+                transactions_detail = status_detail.get('transactions', {})
+                
+                # Log all status details for debugging
+                logger.info(f"Transactions detail: {json.dumps(transactions_detail, indent=2)}")
+                
+                # If transactions were not updated, it might need reconnection
+                if not transactions_detail.get('isUpdated', False):
+                    logger.warning("Transactions were not updated in PARTIAL_SUCCESS")
                     
-                    # Wait a moment for the update to start
-                    import time
-                    time.sleep(3)
+                    # Check if it's because of authentication issues
+                    warnings = transactions_detail.get('warnings', [])
+                    needs_reconnection = any(
+                        'auth' in str(w).lower() or 
+                        'login' in str(w).lower() or 
+                        'session' in str(w).lower() 
+                        for w in warnings
+                    )
                     
-                    # Check status after update
-                    updated_item = pluggy.get_item(account.pluggy_item_id)
-                    new_status = updated_item.get('status')
-                    new_execution_status = updated_item.get('executionStatus')
-                    
-                    logger.info(f"Status after update: {new_status}, execution: {new_execution_status}")
-                    
-                    # Se mudou para WAITING_USER_INPUT, precisa reconectar
-                    if new_status == 'WAITING_USER_INPUT':
-                        logger.warning(f"Item now requires user input after update attempt")
+                    if needs_reconnection:
                         return Response({
                             'success': False,
                             'error_code': 'MFA_REQUIRED',
-                            'message': 'A sincronização requer autenticação adicional.',
+                            'message': 'A sincronização das transações requer nova autenticação.',
                             'reconnection_required': True,
                             'data': {
                                 'item_id': account.pluggy_item_id,
-                                'status': new_status,
-                                'execution_status': new_execution_status
+                                'status': item_status,
+                                'execution_status': execution_status
                             }
                         }, status=status.HTTP_400_BAD_REQUEST)
-                        
-                except Exception as update_error:
-                    logger.error(f"Error updating item: {update_error}")
-                    # Continue with sync even if update fails
+                else:
+                    logger.info("Transactions were updated successfully despite PARTIAL_SUCCESS")
+            
+            # Check if item is outdated
+            if item_status == 'OUTDATED':
+                logger.info(f"Item {account.pluggy_item_id} is outdated, attempting sync anyway")
+                # Continue with sync but warn that data might be stale
+            
+            # If status is OK or OUTDATED, proceed with update
+            logger.info(f"Triggering update for item {account.pluggy_item_id}")
+            
+            try:
+                update_result = pluggy.update_item(account.pluggy_item_id)
+                logger.info(f"Update result: {json.dumps(update_result, indent=2)}")
+            except Exception as update_error:
+                logger.error(f"Error updating item: {update_error}")
+                # If update fails, continue with existing data
+                update_result = None
+            
+            # Wait a moment for the update to start
+            import time
+            time.sleep(3)  # Increased wait time for better stability
+            
+            # Check status after update
+            updated_item = pluggy.get_item(account.pluggy_item_id)
+            new_status = updated_item.get('status')
+            new_execution_status = updated_item.get('executionStatus')
+            
+            logger.info(f"Status after update: {new_status}, execution: {new_execution_status}")
+            
+            # If it went to WAITING_USER_INPUT after update
+            if new_status == 'WAITING_USER_INPUT' or new_execution_status == 'WAITING_USER_ACTION':
+                logger.warning(f"Item now requires user input after update attempt")
+                return Response({
+                    'success': False,
+                    'error_code': 'MFA_REQUIRED',
+                    'message': 'A sincronização requer autenticação adicional. Por favor, reconecte a conta.',
+                    'reconnection_required': True,
+                    'data': {
+                        'item_id': account.pluggy_item_id,
+                        'status': new_status,
+                        'execution_status': new_execution_status
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
             
             # Initialize sync statistics
             sync_stats = {
@@ -864,9 +955,9 @@ class PluggyAccountSyncView(APIView):
                 'sync_from': None,
                 'sync_to': None,
                 'days_searched': 0,
-                'status': item_status,
-                'execution_status': execution_status,
-                'bank_requires_mfa': has_mfa
+                'status': new_status,
+                'execution_status': new_execution_status,
+                'is_open_finance': is_open_finance
             }
             
             # Get updated account info
@@ -895,38 +986,46 @@ class PluggyAccountSyncView(APIView):
             except Exception as e:
                 logger.error(f"Error updating account info: {e}")
             
-            # Sync transactions
-            try:
-                # Determine sync period
-                if has_mfa:
-                    # Para bancos com MFA, usar janela menor pois dados podem estar desatualizados
-                    from_date = timezone.now() - timedelta(days=7)
-                else:
-                    # Para bancos sem MFA, usar janela normal
-                    from_date = timezone.now() - timedelta(days=30)
-                
-                to_date = timezone.now()
-                
-                sync_stats['sync_from'] = from_date.isoformat()
-                sync_stats['sync_to'] = to_date.isoformat()
-                sync_stats['days_searched'] = (to_date - from_date).days
-                
-                # Count transactions before sync
-                before_count = account.transactions.count()
-                
-                # Use the callback view's sync method
-                callback_view = PluggyCallbackView()
-                callback_view._sync_transactions(account, pluggy)
-                
-                # Count transactions after sync
-                after_count = account.transactions.count()
-                sync_stats['transactions_synced'] = after_count - before_count
-                
-                logger.info(f"Synced {sync_stats['transactions_synced']} new transactions")
-                
-            except Exception as e:
-                logger.error(f"Error syncing transactions: {e}")
-                sync_stats['sync_error'] = str(e)
+            # Sync recent transactions only if item is in a good state
+            if new_status in ['UPDATED', 'PARTIAL_SUCCESS'] or (new_status == 'OUTDATED' and new_execution_status != 'ERROR'):
+                try:
+                    # Determine sync period based on status and connector type
+                    if new_status == 'OUTDATED':
+                        # For outdated items, try smaller window
+                        from_date = timezone.now() - timedelta(days=3)
+                    elif is_open_finance:
+                        # Open Finance: check last 30 days
+                        from_date = timezone.now() - timedelta(days=30)
+                    else:
+                        # Normal sync window
+                        from_date = timezone.now() - timedelta(days=7)
+                    
+                    to_date = timezone.now()
+                    
+                    sync_stats['sync_from'] = from_date.isoformat()
+                    sync_stats['sync_to'] = to_date.isoformat()
+                    sync_stats['days_searched'] = (to_date - from_date).days
+                    
+                    # Count transactions before sync
+                    before_count = account.transactions.count()
+                    
+                    # Use the callback view's sync method
+                    callback_view = PluggyCallbackView()
+                    callback_view._sync_transactions(account, pluggy)
+                    
+                    # Count transactions after sync
+                    after_count = account.transactions.count()
+                    sync_stats['transactions_synced'] = after_count - before_count
+                    
+                    logger.info(f"Synced {sync_stats['transactions_synced']} new transactions")
+                    
+                except Exception as e:
+                    logger.error(f"Error syncing transactions: {e}")
+                    sync_stats['sync_error'] = str(e)
+            else:
+                logger.warning(f"Skipping transaction sync due to item status: {new_status}")
+                sync_stats['sync_skipped'] = True
+                sync_stats['skip_reason'] = f'Item status {new_status} not suitable for sync'
             
             # Prepare response
             response_data = {
@@ -935,22 +1034,15 @@ class PluggyAccountSyncView(APIView):
                 'data': {
                     'account': BankAccountSerializer(account).data,
                     'sync_stats': sync_stats,
-                    'item_status': item_status,
-                    'execution_status': execution_status
+                    'item_status': new_status,
+                    'execution_status': new_execution_status
                 }
             }
             
-            # Add warnings based on bank type and status
-            if has_mfa:
-                if execution_status == 'USER_INPUT_TIMEOUT':
-                    response_data['warning'] = f'O {connector.get("name", "banco")} requer autenticação a cada sincronização. Para buscar transações mais recentes, reconecte a conta.'
-                    response_data['reconnection_suggested'] = True
-                elif execution_status == 'PARTIAL_SUCCESS':
-                    response_data['info'] = 'Sincronização parcial concluída. Alguns dados podem estar limitados.'
-            elif item_status == 'OUTDATED':
+            # Add warnings if needed
+            if new_status == 'OUTDATED':
                 response_data['warning'] = 'A conexão com o banco está desatualizada. Alguns dados podem não estar completos.'
-            
-            if sync_stats.get('transactions_synced', 0) == 0:
+            elif sync_stats.get('transactions_synced', 0) == 0:
                 response_data['info'] = 'Nenhuma transação nova encontrada no período.'
             
             return Response(response_data)
@@ -976,20 +1068,15 @@ class PluggyAccountSyncView(APIView):
                     'message': 'Esta conta requer autenticação adicional.',
                     'reconnection_required': True,
                     'data': {
-                        'item_id': account.pluggy_item_id if 'account' in locals() else None
+                        'item_id': account.pluggy_item_id if account else None
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Return a more detailed error response
             return Response(
                 {
                     'success': False,
                     'error': str(e),
-                    'message': f'Erro ao sincronizar: {str(e)}',
-                    'details': {
-                        'type': type(e).__name__,
-                        'args': e.args if hasattr(e, 'args') else []
-                    }
+                    'message': f'Erro ao sincronizar: {str(e)}'
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
@@ -1013,8 +1100,8 @@ class PluggyWebhookView(APIView):
             # TODO: Configure PLUGGY_WEBHOOK_SECRET in production
             signature = request.headers.get('X-Pluggy-Signature', '')
             pluggy = PluggyClient()
-            
-            # Temporarily disabled for testing
+
+# Temporarily disabled for testing
             # if not pluggy.validate_webhook(signature, request.body.decode()):
             #     logger.warning("Invalid webhook signature")
             #     return Response(
@@ -1038,6 +1125,8 @@ class PluggyWebhookView(APIView):
                 self._handle_item_deleted(data)
             elif event_type == 'transactions.created':
                 self._handle_transactions_created(data)
+            elif event_type == 'consent.revoked':
+                self._handle_consent_revoked(data)
             
             return Response({'status': 'ok'})
             
@@ -1111,3 +1200,114 @@ class PluggyWebhookView(APIView):
         # This would trigger a sync for the affected accounts
         # Implementation depends on webhook data structure
         pass
+    
+    def _handle_consent_revoked(self, data: Dict):
+        """
+        Handle Open Finance consent revoked event
+        """
+        item_id = data.get('id')
+        if not item_id:
+            return
+            
+        # Mark accounts as needing reconnection
+        accounts = BankAccount.objects.filter(pluggy_item_id=item_id)
+        
+        for account in accounts:
+            account.status = 'consent_revoked'
+            account.sync_error_message = 'Consentimento revogado no Open Finance'
+            account.save()
+            
+            logger.info(f"Consent revoked for account {account}")
+
+
+class PluggyOpenFinanceInfoView(APIView):
+    """
+    Get information about Open Finance connectors and rate limits
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """
+        Get Open Finance information
+        """
+        try:
+            pluggy = PluggyClient()
+            
+            # Get Open Finance connectors
+            of_connectors = pluggy.get_connectors(is_open_finance=True)
+            
+            # Format connector info
+            connector_info = []
+            for connector in of_connectors:
+                connector_info.append({
+                    'id': connector['id'],
+                    'name': connector['name'],
+                    'type': connector['type'],
+                    'products': connector.get('products', []),
+                    'imageUrl': connector.get('imageUrl', '')
+                })
+            
+            # Rate limit information
+            rate_limits = {
+                'accounts': {
+                    'list': 4,
+                    'balance': 420,
+                    'period': 'monthly',
+                    'description': 'Lista de contas e saldos'
+                },
+                'credit_cards': {
+                    'list': 4,
+                    'bills': 30,
+                    'limits': 240,
+                    'period': 'monthly',
+                    'description': 'Cartões de crédito, faturas e limites'
+                },
+                'transactions': {
+                    'recent': 240,
+                    'historical': 4,
+                    'period': 'monthly',
+                    'description': 'Transações recentes (1-6 dias) e históricas (7-365 dias)'
+                },
+                'identity': {
+                    'requests': 4,
+                    'period': 'monthly',
+                    'description': 'Dados de identidade'
+                },
+                'investments': {
+                    'list': 120,
+                    'detail': 4,
+                    'balance': 120,
+                    'period': 'monthly',
+                    'description': 'Investimentos, detalhes e saldos'
+                },
+                'loans': {
+                    'requests': 4,
+                    'period': 'monthly',
+                    'description': 'Empréstimos e financiamentos'
+                }
+            }
+            
+            return Response({
+                'success': True,
+                'data': {
+                    'connectors': connector_info,
+                    'total_connectors': len(connector_info),
+                    'rate_limits': rate_limits,
+                    'info': {
+                        'description': 'Open Finance Brasil permite acesso regulado aos dados bancários',
+                        'requires_cpf_cnpj': True,
+                        'consent_duration': '12 meses',
+                        'data_retention': '365 dias de histórico'
+                    }
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to get Open Finance info: {e}")
+            return Response(
+                {
+                    'success': False,
+                    'error': str(e)
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )

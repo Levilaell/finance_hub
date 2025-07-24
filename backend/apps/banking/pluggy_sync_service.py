@@ -86,6 +86,10 @@ class PluggyTransactionSyncService:
                 current_status = item.get('status')
                 logger.info(f"📋 Current item status: {current_status}")
                 
+                # Check if it's Open Finance
+                is_open_finance = item.get('connector', {}).get('isOpenFinance', False)
+                logger.info(f"📊 Is Open Finance: {is_open_finance}")
+                
                 if current_status not in ['ACTIVE', 'UPDATED', 'OUTDATED']:
                     logger.warning(f"⚠️ Cannot update item in status {current_status}")
                     return {
@@ -93,6 +97,20 @@ class PluggyTransactionSyncService:
                         'status': current_status,
                         'message': f'Item must be ACTIVE, UPDATED or OUTDATED to force update, current status: {current_status}'
                     }
+                
+                # Check for Open Finance rate limits
+                if is_open_finance and item.get('statusDetail'):
+                    for product, details in item['statusDetail'].items():
+                        if isinstance(details, dict) and details.get('warnings'):
+                            for warning in details['warnings']:
+                                if '423' in str(warning.get('code', '')) or 'rate limit' in str(warning).lower():
+                                    logger.warning(f"⚠️ Rate limit reached for {product}")
+                                    return {
+                                        'success': False,
+                                        'status': 'rate_limited',
+                                        'message': f'Rate limit reached for {product}. Try again next month.',
+                                        'product': product
+                                    }
                 
                 # Use the sync_item method to trigger update
                 update_response = await client.sync_item(item_id)
@@ -104,7 +122,8 @@ class PluggyTransactionSyncService:
                     'success': True,
                     'status': new_status,
                     'previous_status': current_status,
-                    'item_id': item_id
+                    'item_id': item_id,
+                    'is_open_finance': is_open_finance
                 }
                 
         except Exception as e:
@@ -113,13 +132,13 @@ class PluggyTransactionSyncService:
                 'success': False,
                 'error': str(e)
             }
-
+    
     async def sync_account_transactions(self, account: BankAccount, force_extended_window: bool = False) -> Dict[str, Any]:
         """Sync transactions for a specific Pluggy account
         
-        IMPORTANTE: Alguns bancos (como Inter) requerem MFA a cada sincronização.
-        Nesses casos, não tentamos forçar update do item, apenas sincronizamos
-        as transações disponíveis.
+        IMPORTANTE: A API da Pluggy pode ter um delay de alguns minutos para disponibilizar
+        transações muito recentes. Por isso, usamos janelas de tempo maiores em syncs frequentes
+        para garantir que pegamos todas as transações, mesmo as que foram processadas com delay.
         """
         try:
             # Get account info asynchronously
@@ -131,6 +150,10 @@ class PluggyTransactionSyncService:
                 logger.warning(f"❌ No Pluggy account ID for account {account_info['id']}")
                 return {'account_id': account_info['id'], 'status': 'no_external_id', 'transactions': 0}
             
+            # Check if it's Open Finance
+            is_open_finance = account_info.get('metadata', {}).get('is_open_finance', False)
+            logger.info(f"📊 Open Finance account: {is_open_finance}")
+            
             # Check item status before syncing
             pluggy_item_id = await sync_to_async(lambda: account.pluggy_item_id)()
             if pluggy_item_id:
@@ -138,25 +161,34 @@ class PluggyTransactionSyncService:
                     async with PluggyClient() as client:
                         item = await client.get_item(pluggy_item_id)
                         item_status = item.get('status')
-                        execution_status = item.get('executionStatus')
-                        connector = item.get('connector', {})
-                        has_mfa = connector.get('hasMFA', False)
+                        logger.info(f"📋 Item {pluggy_item_id} status: {item_status}")
                         
-                        logger.info(f"📋 Item {pluggy_item_id} status: {item_status}, execution: {execution_status}, hasMFA: {has_mfa}")
+                        # Check for Open Finance specific errors
+                        if is_open_finance:
+                            if item_status == 'USER_AUTHORIZATION_REVOKED':
+                                logger.warning(f"⚠️ Open Finance consent revoked")
+                                return {
+                                    'account_id': account_info['id'],
+                                    'status': 'consent_revoked',
+                                    'message': 'Consentimento Open Finance revogado',
+                                    'transactions': 0
+                                }
+                            
+                            # Check rate limits
+                            status_detail = item.get('statusDetail', {})
+                            for product, details in status_detail.items():
+                                if isinstance(details, dict) and not details.get('isUpdated', True):
+                                    warnings = details.get('warnings', [])
+                                    for warning in warnings:
+                                        if '423' in str(warning.get('code', '')):
+                                            logger.warning(f"⚠️ Rate limit hit for {product}")
+                                            return {
+                                                'account_id': account_info['id'],
+                                                'status': 'rate_limited',
+                                                'message': f'Limite de requisições atingido para {product}',
+                                                'transactions': 0
+                                            }
                         
-                        # Se o banco requer MFA e está OUTDATED com USER_INPUT_TIMEOUT, 
-                        # não tentar update automático
-                        if has_mfa and item_status == 'OUTDATED' and execution_status == 'USER_INPUT_TIMEOUT':
-                            logger.warning(f"⚠️ Bank requires MFA and session expired. Manual reconnection needed.")
-                            return {
-                                'account_id': account_info['id'], 
-                                'status': 'mfa_required',
-                                'message': 'Este banco requer autenticação a cada sincronização',
-                                'transactions': 0,
-                                'requires_reconnection': True
-                            }
-                        
-                        # Check outros status problemáticos
                         if item_status == 'WAITING_USER_ACTION':
                             logger.warning(f"⚠️ Item requires user action, cannot sync")
                             return {
@@ -173,20 +205,20 @@ class PluggyTransactionSyncService:
                                 'message': 'Invalid credentials',
                                 'transactions': 0
                             }
-                        
-                        # Para bancos com MFA, mesmo com PARTIAL_SUCCESS, sincronizar o que temos
-                        if has_mfa and execution_status == 'PARTIAL_SUCCESS':
-                            logger.info(f"ℹ️ Bank with MFA in PARTIAL_SUCCESS state, syncing available data")
-                        
+                        elif item_status == 'OUTDATED':
+                            # Don't try to update OUTDATED items automatically
+                            # as it may trigger WAITING_USER_ACTION
+                            logger.warning(f"⚠️ Item is OUTDATED but continuing with sync")
+                            logger.info(f"📝 Note: New transactions may not be available until item is updated")
                 except Exception as e:
                     logger.warning(f"⚠️ Could not check item status: {e}")
             
-            # Determine sync date range
-            sync_from = self._get_sync_from_date_safe(account_info, force_extended_window)
+            # Determine sync date range (different for Open Finance)
+            sync_from = self._get_sync_from_date_safe(account_info, force_extended_window, is_open_finance)
             # Buscar 1 dia no futuro para pegar transações com timezone issues
             sync_to = (timezone.now() + timedelta(days=1)).date()
             
-            logger.info(f"📅 Syncing transactions from {sync_from} to {sync_to}")
+            logger.info(f"📅 Syncing transactions from {sync_from} to {sync_to} (incluindo 1 dia futuro para timezone)")
             
             # Fetch and save transactions
             total_transactions = 0
@@ -232,8 +264,11 @@ class PluggyTransactionSyncService:
                         
                         page += 1
                         
-                        # Rate limiting between pages
-                        await asyncio.sleep(0.2)
+                        # Rate limiting between pages (slower for Open Finance)
+                        if is_open_finance:
+                            await asyncio.sleep(0.5)
+                        else:
+                            await asyncio.sleep(0.2)
                         
                     except PluggyError as e:
                         logger.error(f"❌ Pluggy error for account {account_info['id']}: {e}")
@@ -272,7 +307,8 @@ class PluggyTransactionSyncService:
                 'transactions': total_transactions,
                 'sync_from': sync_from.isoformat(),
                 'sync_to': sync_to.isoformat(),
-                'days_searched': (sync_to - sync_from).days
+                'days_searched': (sync_to - sync_from).days,
+                'is_open_finance': is_open_finance
             }
             
             # Se não encontrou transações, adicionar mensagem informativa
@@ -282,13 +318,9 @@ class PluggyTransactionSyncService:
                         async with PluggyClient() as client:
                             item = await client.get_item(pluggy_item_id)
                             item_status = item.get('status')
-                            execution_status = item.get('executionStatus')
-                            connector = item.get('connector', {})
-                            has_mfa = connector.get('hasMFA', False)
-                            
-                            if has_mfa and (item_status == 'OUTDATED' or execution_status == 'USER_INPUT_TIMEOUT'):
-                                sync_info['message'] = 'Nenhuma transação nova. Para buscar transações mais recentes, reconecte a conta.'
-                                sync_info['requires_reconnection'] = True
+                            if item_status == 'OUTDATED':
+                                sync_info['message'] = 'Nenhuma transação nova encontrada. A conexão com o banco pode estar desatualizada.'
+                                sync_info['item_status'] = item_status
                             else:
                                 sync_info['message'] = f'Nenhuma transação nova nos últimos {(sync_to - sync_from).days} dias.'
                     except:
@@ -305,8 +337,8 @@ class PluggyTransactionSyncService:
                 'status': 'error',
                 'error': str(e),
                 'transactions': 0
-            }    
-
+            }
+    
     @sync_to_async
     def _get_account_info(self, account: BankAccount) -> Dict[str, Any]:
         """Get account info safely for async context"""
@@ -319,22 +351,27 @@ class PluggyTransactionSyncService:
             'id': account_with_provider.id,
             'external_id': account_with_provider.external_id,
             'bank_name': account_with_provider.bank_provider.name if account_with_provider.bank_provider else 'Unknown',
-            'last_sync_at': account_with_provider.last_sync_at
+            'last_sync_at': account_with_provider.last_sync_at,
+            'metadata': account_with_provider.metadata or {}
         }
     
-    def _get_sync_from_date_safe(self, account_info: Dict, force_extended_window: bool = False) -> datetime.date:
+    def _get_sync_from_date_safe(self, account_info: Dict, force_extended_window: bool = False, is_open_finance: bool = False) -> datetime.date:
         """Determine the date to sync from using account info dict"""
         last_sync = account_info.get('last_sync_at')
         
         if not last_sync:
-            # PRIMEIRA SYNC: período baseado no modo
-            sandbox_mode = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
-            if sandbox_mode:
-                days = 365  # 1 ano para sandbox
-                logger.info(f"🧪 Sandbox: First sync, using {days} days")
+            # PRIMEIRA SYNC: período baseado no modo e tipo de conector
+            if is_open_finance:
+                days = 365  # Open Finance suporta 1 ano completo
+                logger.info(f"🏛️ Open Finance: First sync, using {days} days")
             else:
-                days = 90   # 3 meses em produção/trial
-                logger.info(f"🚀 Production/Trial: First sync, using {days} days")
+                sandbox_mode = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
+                if sandbox_mode:
+                    days = 365  # 1 ano para sandbox
+                    logger.info(f"🧪 Sandbox: First sync, using {days} days")
+                else:
+                    days = 90   # 3 meses em produção/trial
+                    logger.info(f"🚀 Production/Trial: First sync, using {days} days")
             
             return (timezone.now() - timedelta(days=days)).date()
         else:
@@ -348,6 +385,22 @@ class PluggyTransactionSyncService:
                 logger.info(f"🔄 Manual sync requested, using extended {days_back} days window")
                 return (timezone.now() - timedelta(days=days_back)).date()
             
+            # Open Finance: considerar limites de rate
+            if is_open_finance:
+                # Para Open Finance, ser mais conservador com syncs frequentes
+                if hours_since_sync < 24:
+                    days_back = 1  # Só buscar 1 dia se sincronizou hoje
+                    logger.info(f"🏛️ Open Finance: Recent sync, using minimal {days_back} day window")
+                elif days_since_sync <= 7:
+                    days_back = 7  # Buscar 7 dias se sincronizou na última semana
+                    logger.info(f"🏛️ Open Finance: Weekly sync, using {days_back} days window")
+                else:
+                    days_back = 30  # Máximo de 30 dias para não gastar rate limit
+                    logger.info(f"🏛️ Open Finance: Monthly sync, using {days_back} days window")
+                
+                return (timezone.now() - timedelta(days=days_back)).date()
+            
+            # Conectores diretos (não Open Finance)
             if days_since_sync > 30:
                 # Se muito tempo sem sync, buscar 30 dias para não perder nada
                 logger.info(f"⚠️ Long gap ({days_since_sync} days), using 30 days")
@@ -389,13 +442,29 @@ class PluggyTransactionSyncService:
                 queryset = queryset.filter(company_id=company_id)
             
             # Only sync accounts that haven't been synced recently
-            cutoff_time = timezone.now() - timedelta(hours=2)  # Pluggy allows more frequent syncs
-            queryset = queryset.filter(
+            # Different intervals for Open Finance vs Direct connectors
+            cutoff_time_direct = timezone.now() - timedelta(hours=2)  # Direct connectors: 2 hours
+            cutoff_time_of = timezone.now() - timedelta(hours=24)    # Open Finance: 24 hours
+            
+            # Separate query for Open Finance and Direct connectors
+            direct_accounts = queryset.filter(
+                metadata__is_open_finance__isnull=True
+            ).filter(
                 models.Q(last_sync_at__isnull=True) |
-                models.Q(last_sync_at__lt=cutoff_time)
+                models.Q(last_sync_at__lt=cutoff_time_direct)
             )
             
-            return list(queryset)
+            of_accounts = queryset.filter(
+                metadata__is_open_finance=True
+            ).filter(
+                models.Q(last_sync_at__isnull=True) |
+                models.Q(last_sync_at__lt=cutoff_time_of)
+            )
+            
+            # Combine both querysets
+            all_accounts = list(direct_accounts) + list(of_accounts)
+            
+            return all_accounts
         
         return await get_accounts()
     
@@ -509,6 +578,30 @@ class PluggyTransactionSyncService:
                 else:
                     balance_after = Decimal(str(balance_value))
                 
+                # Build metadata with Open Finance specific fields
+                metadata = {
+                    'pluggy_category': tx_data.get('category'),
+                    'payment_method': tx_data.get('paymentMethod'),
+                    'merchant': merchant_info,
+                    'operation_type': tx_data.get('operationType'),  # Open Finance
+                    'provider_id': tx_data.get('providerId')  # Open Finance
+                }
+                
+                # Add payment data if available (Open Finance)
+                payment_data = tx_data.get('paymentData')
+                if payment_data:
+                    metadata['payment_data'] = payment_data
+                    # Extract counterpart info
+                    if payment_data.get('receiver', {}).get('name'):
+                        merchant_name = payment_data['receiver']['name']
+                    elif payment_data.get('payer', {}).get('name'):
+                        merchant_name = payment_data['payer']['name']
+                
+                # Add credit card metadata if available
+                credit_card_metadata = tx_data.get('creditCardMetadata')
+                if credit_card_metadata:
+                    metadata['credit_card_metadata'] = credit_card_metadata
+                
                 transaction_obj = Transaction.objects.create(
                     bank_account=account,
                     external_id=external_id,
@@ -520,9 +613,9 @@ class PluggyTransactionSyncService:
                     counterpart_document='',
                     balance_after=balance_after,
                     category=category,  # Categoria da Pluggy ou None
-                    # Categorização automática via Pluggy (campo removido)
-                    status='completed',
-                    created_at=timezone.now()
+                    status='completed' if tx_data.get('status') == 'POSTED' else 'pending',
+                    created_at=timezone.now(),
+                    metadata=metadata
                 )
                 
                 category_name = category.name if category else 'Uncategorized'
@@ -534,7 +627,6 @@ class PluggyTransactionSyncService:
                 logger.error(f"❌ Error creating transaction from Pluggy data: {e}", exc_info=True)
                 logger.error(f"❌ Transaction data that failed: {tx_data}")
                 return None
-
 
     def _get_pluggy_category(self, tx_data: Dict) -> Optional['TransactionCategory']:
         """Get category from Pluggy data using mapper"""
@@ -615,11 +707,18 @@ class PluggyTransactionSyncService:
                 if account_data:
                     current_balance = Decimal(str(account_data.get('balance', '0')))
                     
+                    # For credit cards, also get available limit
+                    available_balance = current_balance
+                    if account_data.get('creditData'):
+                        credit_data = account_data['creditData']
+                        available_limit = credit_data.get('availableCreditLimit', 0)
+                        available_balance = Decimal(str(available_limit))
+                    
                     @sync_to_async
                     def update_balance():
                         BankAccount.objects.filter(id=account.id).update(
                             current_balance=current_balance,
-                            available_balance=current_balance  # Pluggy provides one balance
+                            available_balance=available_balance
                         )
                     
                     await update_balance()
@@ -635,7 +734,8 @@ class PluggyTransactionSyncService:
             status_map = {
                 'auth_error': 'error',
                 'connection_error': 'error',
-                'expired': 'expired'
+                'expired': 'expired',
+                'consent_revoked': 'consent_revoked'
             }
             status = status_map.get(error_type, 'error')
             
