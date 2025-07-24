@@ -275,7 +275,20 @@ class BankingService {
     }
     
     // Usar o endpoint de connect-token passando o itemId para reconexão
-    const response = await apiClient.post('/api/banking/pluggy/connect-token/', {
+    const response = await apiClient.post<{
+      success: boolean;
+      data: {
+        connect_token: string;
+        connect_url: string;
+        sandbox_mode: boolean;
+        expires_at?: string;
+        sandbox_credentials?: {
+          user: string;
+          password: string;
+          token: string;
+        };
+      };
+    }>('/api/banking/pluggy/connect-token/', {
       itemId: account.pluggy_item_id
     });
     
