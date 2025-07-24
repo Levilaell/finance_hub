@@ -9,6 +9,8 @@ from typing import Dict, List, Optional
 
 from django.db import transaction
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -248,8 +250,25 @@ class PluggyCallbackView(APIView):
             
             created_accounts = []
             
+            # Check if user has a company
+            if not hasattr(request.user, 'company') or not request.user.company:
+                logger.error(f"User {request.user.id} has no company associated")
+                return Response(
+                    {
+                        'success': False,
+                        'error': 'User has no company',
+                        'message': 'Usuário não possui empresa associada. Por favor, complete seu cadastro.'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            user_company = request.user.company
+            logger.info(f"Processing accounts for company {user_company.id}")
+            
             with transaction.atomic():
                 for account_data in accounts:
+                    logger.info(f"Processing account: {account_data}")
+                    
                     # Create or update bank provider
                     connector = item.get('connector', {})
                     provider, _ = BankProvider.objects.get_or_create(
@@ -262,26 +281,60 @@ class PluggyCallbackView(APIView):
                             'is_active': True
                         }
                     )
+                    logger.info(f"Bank provider: {provider}")
                     
-                    # Create or update bank account
-                    bank_account, created = BankAccount.objects.update_or_create(
-                        external_id=account_data['id'],
-                        company=request.user.company,
-                        defaults={
-                            'bank_provider': provider,
-                            'pluggy_item_id': item_id,
-                            'account_type': self._map_account_type(account_data.get('type')),
-                            'account_number': account_data.get('number', ''),
-                            'agency': account_data.get('agency', ''),
-                            'name': account_data.get('name', 'Conta Bancária'),
-                            'current_balance': Decimal(str(account_data.get('balance', 0))),
-                            'available_balance': Decimal(str(account_data.get('balance', 0))),
-                            'currency': account_data.get('currencyCode', 'BRL'),
-                            'is_active': True,
-                            'status': 'active',
-                            'last_sync_at': timezone.now()
-                        }
-                    )
+                    # Prepare account data
+                    account_type = self._map_account_type(account_data.get('type'))
+                    account_number = account_data.get('number', '') or f"PLUGGY_{account_data['id'][:8]}"
+                    agency = account_data.get('agency', '') or 'N/A'
+                    
+                    # Log the data for debugging
+                    logger.info(f"Account data - Type: {account_type}, Number: {account_number}, Agency: {agency}")
+                    
+                    try:
+                        # Create or update bank account
+                        bank_account, created = BankAccount.objects.update_or_create(
+                            external_id=account_data['id'],
+                            company=user_company,
+                            defaults={
+                                'bank_provider': provider,
+                                'pluggy_item_id': item_id,
+                                'account_type': account_type,
+                                'account_number': account_number,
+                                'agency': agency,
+                                'name': account_data.get('name', 'Conta Bancária'),
+                                'current_balance': Decimal(str(account_data.get('balance', 0))),
+                                'available_balance': Decimal(str(account_data.get('balance', 0))),
+                                'currency': account_data.get('currencyCode', 'BRL'),
+                                'is_active': True,
+                                'status': 'active',
+                                'last_sync_at': timezone.now()
+                            }
+                        )
+                    except Exception as e:
+                        logger.error(f"Error creating/updating bank account: {e}")
+                        # If unique constraint fails, try to find existing account
+                        bank_account = BankAccount.objects.filter(
+                            company=user_company,
+                            bank_provider=provider,
+                            account_number=account_number,
+                            agency=agency,
+                            account_type=account_type
+                        ).first()
+                        
+                        if bank_account:
+                            # Update existing account
+                            bank_account.external_id = account_data['id']
+                            bank_account.pluggy_item_id = item_id
+                            bank_account.current_balance = Decimal(str(account_data.get('balance', 0)))
+                            bank_account.available_balance = Decimal(str(account_data.get('balance', 0)))
+                            bank_account.last_sync_at = timezone.now()
+                            bank_account.status = 'active'
+                            bank_account.save()
+                            created = False
+                            logger.info(f"Updated existing bank account: {bank_account}")
+                        else:
+                            raise e
                     
                     if created:
                         logger.info(f"Created new bank account: {bank_account}")
@@ -509,11 +562,13 @@ class PluggyAccountSyncView(APIView):
             )
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class PluggyWebhookView(APIView):
     """
     Handle Pluggy webhooks
     """
     permission_classes = []  # Webhooks don't use normal auth
+    authentication_classes = []  # Disable authentication for webhooks
     
     def post(self, request):
         """
