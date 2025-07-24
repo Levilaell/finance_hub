@@ -698,7 +698,7 @@ class PluggyAccountSyncView(APIView):
                 logger.warning(f"Item {account.pluggy_item_id} requires user authentication (status: {item_status}, execution: {execution_status})")
                 return Response({
                     'success': False,
-                    'error': 'mfa_required',
+                    'error_code': 'MFA_REQUIRED',
                     'message': 'Esta conta precisa ser reconectada para continuar sincronizando.',
                     'data': {
                         'item_id': account.pluggy_item_id,

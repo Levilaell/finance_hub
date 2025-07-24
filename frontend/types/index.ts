@@ -141,6 +141,8 @@ export interface BankAccount {
   last_sync_at: string | null;
   created_at: string;
   updated_at: string;
+  external_id?: string;
+  pluggy_item_id?: string;
 }
 
 export interface BankTransaction {
