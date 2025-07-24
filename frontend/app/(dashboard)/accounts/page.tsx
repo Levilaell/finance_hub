@@ -183,84 +183,6 @@ export default function AccountsPage() {
     }
   }, [accounts]);
 
-  // Handler para sucesso do Pluggy Connect
-  const handlePluggySuccess = useCallback(async (itemData: any) => {
-    try {
-      console.log('[Accounts] Pluggy success:', itemData);
-      
-      const itemId = itemData?.item?.id || itemData?.itemId;
-      if (!itemId) {
-        throw new Error('ID da conexão não encontrado');
-      }
-
-      // Se for reconexão
-      if (pluggyConnect.mode === 'reconnect' && pluggyConnect.accountId) {
-        toast.success('Conta reconectada! Sincronizando transações...');
-        
-        // Fechar modal
-        setPluggyConnect({ isOpen: false, token: null, mode: 'connect' });
-        
-        // Atualizar lista primeiro
-        await fetchAccounts();
-        
-        // Aguardar estabilização e sincronizar
-        setTimeout(() => {
-          handleSyncAccount(pluggyConnect.accountId!);
-        }, 2000);
-        
-        return;
-      }
-
-      // Se for nova conexão
-      toast.success('Processando conexão...');
-      
-      const response: PluggyCallbackResponse = await bankingService.handlePluggyCallback(itemId);
-      
-      if (response.success && response.data) {
-        const accountsCreated = response.data.accounts?.length || 0;
-        toast.success(`✅ ${accountsCreated} conta(s) conectada(s) com sucesso!`);
-        
-        // Fechar modal
-        setPluggyConnect({ isOpen: false, token: null, mode: 'connect' });
-        
-        // Atualizar lista
-        await fetchAccounts();
-        
-        // Sincronizar automaticamente as novas contas
-        if (response.data.accounts && response.data.accounts.length > 0) {
-          setTimeout(() => {
-            response.data!.accounts.forEach((account) => {
-              handleSyncAccount(account.id.toString());
-            });
-          }, 3000);
-        }
-      } else {
-        throw new Error(response.message || 'Erro ao processar conexão');
-      }
-    } catch (error: any) {
-      console.error('[Accounts] Erro no callback:', error);
-      toast.error(error.message || 'Erro ao processar conexão');
-      setPluggyConnect({ isOpen: false, token: null, mode: 'connect' });
-    }
-  }, [pluggyConnect.mode, pluggyConnect.accountId, fetchAccounts]);
-
-
-  // Handler para erro do Pluggy Connect
-  const handlePluggyError = useCallback((error: any) => {
-    console.error('[Accounts] Pluggy error:', error);
-    
-    const errorMessage = error?.message || error?.error || 'Erro ao conectar com o banco';
-    toast.error(errorMessage);
-    
-    setPluggyConnect({ isOpen: false, token: null, mode: 'connect' });
-  }, []);
-
-  // Handler para fechar Pluggy Connect
-  const handlePluggyClose = useCallback(() => {
-    console.log('[Accounts] Pluggy closed');
-    setPluggyConnect({ isOpen: false, token: null, mode: 'connect' });
-  }, []);
-
   // Handler para sincronizar conta
   const handleSyncAccount = useCallback(async (accountId: string) => {
     console.log(`[Accounts] Sincronizando conta ${accountId}`);
@@ -325,6 +247,86 @@ export default function AccountsPage() {
       setSyncingAccountId(null);
     }
   }, [accounts, syncAccount, fetchAccounts]);
+
+  // Handler para sucesso do Pluggy Connect
+  const handlePluggySuccess = useCallback(async (itemData: any) => {
+    try {
+      console.log('[Accounts] Pluggy success:', itemData);
+      
+      const itemId = itemData?.item?.id || itemData?.itemId;
+      if (!itemId) {
+        throw new Error('ID da conexão não encontrado');
+      }
+
+      // Se for reconexão
+      if (pluggyConnect.mode === 'reconnect' && pluggyConnect.accountId) {
+        toast.success('Conta reconectada! Sincronizando transações...');
+        
+        // Fechar modal
+        setPluggyConnect({ isOpen: false, token: null, mode: 'connect' });
+        
+        // Atualizar lista primeiro
+        await fetchAccounts();
+        
+        // Aguardar estabilização e sincronizar
+        setTimeout(() => {
+          handleSyncAccount(pluggyConnect.accountId!);
+        }, 2000);
+        
+        return;
+      }
+
+      // Se for nova conexão
+      toast.success('Processando conexão...');
+      
+      const response: PluggyCallbackResponse = await bankingService.handlePluggyCallback(itemId);
+      
+      if (response.success && response.data) {
+        const accountsCreated = response.data.accounts?.length || 0;
+        toast.success(`✅ ${accountsCreated} conta(s) conectada(s) com sucesso!`);
+        
+        // Fechar modal
+        setPluggyConnect({ isOpen: false, token: null, mode: 'connect' });
+        
+        // Atualizar lista
+        await fetchAccounts();
+        
+        // Sincronizar automaticamente as novas contas
+        if (response.data.accounts && response.data.accounts.length > 0) {
+          setTimeout(() => {
+            response.data!.accounts.forEach((account) => {
+              handleSyncAccount(account.id.toString());
+            });
+          }, 3000);
+        }
+      } else {
+        throw new Error(response.message || 'Erro ao processar conexão');
+      }
+    } catch (error: any) {
+      console.error('[Accounts] Erro no callback:', error);
+      toast.error(error.message || 'Erro ao processar conexão');
+      setPluggyConnect({ isOpen: false, token: null, mode: 'connect' });
+    }
+  }, [pluggyConnect.mode, pluggyConnect.accountId, fetchAccounts, handleSyncAccount]);
+
+
+  // Handler para erro do Pluggy Connect
+  const handlePluggyError = useCallback((error: any) => {
+    console.error('[Accounts] Pluggy error:', error);
+    
+    const errorMessage = error?.message || error?.error || 'Erro ao conectar com o banco';
+    toast.error(errorMessage);
+    
+    setPluggyConnect({ isOpen: false, token: null, mode: 'connect' });
+  }, []);
+
+  // Handler para fechar Pluggy Connect
+  const handlePluggyClose = useCallback(() => {
+    console.log('[Accounts] Pluggy closed');
+    setPluggyConnect({ isOpen: false, token: null, mode: 'connect' });
+  }, []);
+
+
 
   // Handler para deletar conta
   const handleDeleteAccount = useCallback(async () => {
@@ -552,7 +554,7 @@ export default function AccountsPage() {
           <DialogHeader>
             <DialogTitle>Remover Conta Bancária</DialogTitle>
             <DialogDescription>
-              Tem certeza que deseja remover a conta "{selectedAccount?.account_name}"? 
+              Tem certeza que deseja remover a conta &ldquo;{selectedAccount?.account_name}&rdquo;? 
               Esta ação não pode ser desfeita e todas as transações serão mantidas no histórico.
             </DialogDescription>
           </DialogHeader>

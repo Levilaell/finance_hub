@@ -170,7 +170,7 @@ export function PluggyConnect({
 
     // Timeout para carregamento
     const timeout = setTimeout(() => {
-      if (loading && mounted) {
+      if (mounted) {
         setError('Timeout ao carregar Pluggy');
         setLoading(false);
       }
