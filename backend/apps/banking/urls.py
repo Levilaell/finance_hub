@@ -30,6 +30,7 @@ urlpatterns = [
     path('pluggy/connectors/', pluggy_views.PluggyConnectorsView.as_view(), name='pluggy-connectors'),
     path('pluggy/callback/', pluggy_views.PluggyCallbackView.as_view(), name='pluggy-callback'),
     path('pluggy/accounts/<int:account_id>/status/', pluggy_views.PluggyAccountStatusView.as_view(), name='pluggy-account-status'),
-    path('pluggy/accounts/<uuid:account_id>/sync/', pluggy_views.PluggyAccountSyncView.as_view(), name='pluggy-account-sync'),
+    path('pluggy/accounts/<int:account_id>/sync/', pluggy_views.PluggyAccountSyncView.as_view(), name='pluggy-account-sync'),
     path('pluggy/webhook/', pluggy_views.PluggyWebhookView.as_view(), name='pluggy-webhook'),
+    path('pluggy/accounts/<int:account_id>/sync/', pluggy_views.PluggyAccountSyncView.as_view(), name='pluggy-account-sync'),
 ]
