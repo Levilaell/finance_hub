@@ -700,6 +700,7 @@ class PluggyAccountSyncView(APIView):
                     'success': False,
                     'error_code': 'MFA_REQUIRED',
                     'message': 'Esta conta precisa ser reconectada para continuar sincronizando.',
+                    'reconnection_required': True,
                     'data': {
                         'item_id': account.pluggy_item_id,
                         'status': item_status,
