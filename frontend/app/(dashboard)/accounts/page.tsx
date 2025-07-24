@@ -438,13 +438,38 @@ export default function AccountsPage() {
   };
 
   const resetPluggyWidget = () => {
+      console.log('[AccountsPage] Resetando widget Pluggy...');
+      
       setPluggyConnectToken(null);
       setIsConnecting(false);
       setPluggyError(null);
       setUseIframeMode(false);
-      // Limpar quaisquer dados temporários
+      
+      // Limpar dados temporários
       sessionStorage.removeItem('pluggy_update_item');
       sessionStorage.removeItem('pluggy_reconnecting_account');
+      
+      // Forçar limpeza de qualquer modal/iframe remanescente
+      setTimeout(() => {
+          const iframes = document.querySelectorAll('iframe[src*="pluggy"], iframe[src*="connect.pluggy"]');
+          iframes.forEach(iframe => {
+              console.log('[AccountsPage] Removendo iframe:', iframe);
+              iframe.remove();
+          });
+          
+          const modals = document.querySelectorAll('[class*="pluggy"], [id*="pluggy"], .zoid-overlay, .zoid-container');
+          modals.forEach(modal => {
+              console.log('[AccountsPage] Removendo modal:', modal);
+              modal.remove();
+          });
+          
+          // Remover overlay se existir
+          const overlays = document.querySelectorAll('.fixed.inset-0.bg-black\\/50');
+          overlays.forEach(overlay => {
+              console.log('[AccountsPage] Removendo overlay:', overlay);
+              overlay.remove();
+          });
+      }, 100);
   };
 
   // Show loading state while auth is being checked
