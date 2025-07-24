@@ -463,6 +463,7 @@ class PluggyCallbackView(APIView):
             
             while True:
                 # Get transactions page
+                logger.info(f"Fetching transactions for account {bank_account.external_id}, page {page}")
                 result = pluggy.get_transactions(
                     account_id=bank_account.external_id,
                     from_date=from_date,
@@ -470,8 +471,22 @@ class PluggyCallbackView(APIView):
                     page=page
                 )
                 
-                transactions = result.get('results', [])
+                # Handle None result
+                if result is None:
+                    logger.warning(f"No transactions data returned for account {bank_account.external_id}")
+                    break
+                    
+                # Extract transactions from result
+                if isinstance(result, dict):
+                    transactions = result.get('results', [])
+                elif isinstance(result, list):
+                    transactions = result
+                else:
+                    logger.warning(f"Unexpected transaction result type: {type(result)}")
+                    transactions = []
+                
                 if not transactions:
+                    logger.info(f"No more transactions on page {page}")
                     break
                 
                 for trans_data in transactions:
@@ -563,6 +578,41 @@ class PluggyCallbackView(APIView):
                 return 'debit'
             else:
                 return 'debit'
+
+
+class PluggyAccountStatusView(APIView):
+    """
+    Get sync status for a bank account
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, account_id):
+        """
+        Get current sync status for an account
+        """
+        try:
+            # Get account
+            account = BankAccount.objects.get(
+                id=account_id,
+                company=request.user.company
+            )
+            
+            return Response({
+                'id': account.id,
+                'status': account.status,
+                'sync_status': account.sync_status,
+                'last_sync_at': account.last_sync_at.isoformat() if account.last_sync_at else None,
+                'sync_error_message': account.sync_error_message,
+                'current_balance': float(account.current_balance),
+                'available_balance': float(account.available_balance),
+                'transaction_count': account.transactions.count()
+            })
+            
+        except BankAccount.DoesNotExist:
+            return Response(
+                {'error': 'Account not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 class PluggyAccountSyncView(APIView):
