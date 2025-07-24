@@ -57,7 +57,8 @@ interface BankAuthDialogState {
 interface ExtendedSyncResult {
   success: boolean;
   error_code?: string;
-  message?: string;
+  message?: string | { message: string };
+  error?: string;
   reconnection_required?: boolean;
   warning?: string;
   reconnection_suggested?: boolean;
@@ -332,6 +333,16 @@ export default function AccountsPage() {
                   bank_requires_mfa: result.data?.bank_requires_mfa
               });
               
+              // Extrair mensagem de erro corretamente
+              let errorMessage = 'Erro ao sincronizar conta';
+              if (typeof result.message === 'string') {
+                  errorMessage = result.message;
+              } else if (result.message?.message) {
+                  errorMessage = result.message.message;
+              } else if (result.error) {
+                  errorMessage = result.error;
+              }
+              
               if (result.error_code === 'WAITING_USER_ACTION' || result.error_code === 'MFA_REQUIRED' || result.reconnection_required) {
                   const account = accounts.find(acc => acc.id === accountId);
                   const accountName = account?.account_name || 'sua conta';
@@ -341,18 +352,28 @@ export default function AccountsPage() {
                       setShowBankAuthDialog({ 
                           accountId, 
                           accountName,
-                          message: result.message || 'Este banco requer autenticação a cada sincronização.',
+                          message: errorMessage,
                           isMFABank: true
                       });
                   } else {
                       setShowBankAuthDialog({ accountId, accountName });
                   }
               } else {
-                  toast.error(result.message || 'Erro ao sincronizar conta');
+                  toast.error(errorMessage);
               }
           }
       } catch (error: any) {
           console.error('[SYNC] Erro:', error);
+          
+          // Extrair mensagem de erro
+          let errorMessage = 'Erro ao sincronizar';
+          if (error.message) {
+              errorMessage = error.message;
+          } else if (error.response?.data?.message) {
+              errorMessage = error.response.data.message;
+          } else if (error.response?.data?.error) {
+              errorMessage = error.response.data.error;
+          }
           
           // Verificar se o erro indica necessidade de reconexão
           if (error.response?.status === 403 || error.response?.data?.reconnection_required) {
@@ -360,7 +381,7 @@ export default function AccountsPage() {
               const accountName = account?.account_name || 'sua conta';
               setShowBankAuthDialog({ accountId, accountName });
           } else {
-              toast.error('Erro ao sincronizar: ' + (error.message || 'Erro desconhecido'));
+              toast.error(`${errorMessage}: ${error.response?.status === 500 ? 'Erro interno do servidor' : 'Erro desconhecido'}`);
           }
       } finally {
           setSyncingAccountId(null);
