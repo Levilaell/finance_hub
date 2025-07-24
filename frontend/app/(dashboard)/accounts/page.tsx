@@ -235,123 +235,147 @@ export default function AccountsPage() {
     }
   };
 
-  // ✅ Função handleSyncAccount - sincroniza transações diretamente
   const handleSyncAccount = async (accountId: string) => {
-    console.log(`[SYNC] Iniciando sincronização da conta ${accountId}`);
-    setSyncingAccountId(accountId);
-    
-    try {
-      // Primeiro, verificar o status da conta
-      console.log('[SYNC] Verificando status da conta antes de sincronizar...');
-      const statusCheck = await bankingService.checkAccountStatus(accountId);
-      console.log('[SYNC] Status da conta:', statusCheck);
+      console.log(`[SYNC] Iniciando sincronização da conta ${accountId}`);
       
-      if (statusCheck.data?.item_status) {
-        console.log(`[SYNC] Status do item Pluggy: ${statusCheck.data.item_status}`);
-        
-        // Se precisa reconexão, mostrar dialog direto
-        if (statusCheck.data.needs_reconnection || statusCheck.data.item_status === 'WAITING_USER_ACTION') {
-          console.log('[SYNC] Item precisa de reconexão, mostrando dialog...');
-          const account = accounts.find(acc => acc.id === accountId);
-          const accountName = account?.account_name || 'sua conta';
-          setShowBankAuthDialog({ accountId, accountName });
+      // Verificar se já estamos reconectando para evitar loops
+      const isReconnecting = sessionStorage.getItem('pluggy_reconnecting_account');
+      if (isReconnecting === accountId) {
+          console.log('[SYNC] Já em processo de reconexão, ignorando...');
           return;
-        }
       }
       
-      // Se o status está OK, tentar sincronizar
-      console.log('[SYNC] Status OK, chamando API de sincronização...');
-      const result = await syncAccount(String(accountId));
-      console.log('[SYNC] Resultado da sincronização:', result);
-      console.log('[SYNC] Detalhes da sincronização:', {
-        transactions_synced: result.data?.transactions_synced,
-        sync_from: result.data?.sync_from,
-        sync_to: result.data?.sync_to,
-        days_searched: result.data?.days_searched,
-        status: result.data?.status,
-        item_status: result.data?.item_status,
-        full_data: result.data
-      });
+      setSyncingAccountId(accountId);
       
-      if (result.success) {
-        const transactionCount = result.data?.transactions_synced || 0;
-        if (transactionCount > 0) {
-          toast.success(`✅ ${transactionCount} transações sincronizadas`);
-        } else {
-          toast.info('Nenhuma transação nova encontrada');
-        }
-        
-        // Atualizar lista de contas
-        await fetchAccounts();
-      } else {
-        // Verificar se é erro de autenticação
-        console.log('[SYNC] Erro na sincronização:', {
-          error_code: result.error_code,
-          reconnection_required: result.reconnection_required,
-          message: result.message
-        });
-        
-        if (result.error_code === 'WAITING_USER_ACTION' || result.error_code === 'MFA_REQUIRED' || result.reconnection_required) {
-          // Só neste caso mostrar o dialog de reconexão
-          console.log('[SYNC] Item requer reconexão, mostrando dialog...');
-          const account = accounts.find(acc => acc.id === accountId);
-          const accountName = account?.account_name || 'sua conta';
-          setShowBankAuthDialog({ accountId, accountName });
-        } else {
-          toast.error(result.message || 'Erro ao sincronizar conta');
-        }
+      try {
+          // Primeiro, verificar o status da conta
+          console.log('[SYNC] Verificando status da conta antes de sincronizar...');
+          const statusCheck = await bankingService.checkAccountStatus(accountId);
+          console.log('[SYNC] Status da conta:', statusCheck);
+          
+          if (statusCheck.data?.item_status) {
+              console.log(`[SYNC] Status do item Pluggy: ${statusCheck.data.item_status}`);
+              
+              // Se precisa reconexão, mostrar dialog direto
+              if (statusCheck.data.needs_reconnection || statusCheck.data.item_status === 'WAITING_USER_ACTION') {
+                  console.log('[SYNC] Item precisa de reconexão, mostrando dialog...');
+                  const account = accounts.find(acc => acc.id === accountId);
+                  const accountName = account?.account_name || 'sua conta';
+                  setShowBankAuthDialog({ accountId, accountName });
+                  return;
+              }
+          }
+          
+          // Se o status está OK, tentar sincronizar
+          console.log('[SYNC] Status OK, chamando API de sincronização...');
+          const result = await syncAccount(String(accountId));
+          console.log('[SYNC] Resultado da sincronização:', result);
+          console.log('[SYNC] Detalhes da sincronização:', {
+              transactions_synced: result.data?.transactions_synced,
+              sync_from: result.data?.sync_from,
+              sync_to: result.data?.sync_to,
+              days_searched: result.data?.days_searched,
+              status: result.data?.status,
+              item_status: result.data?.item_status,
+              full_data: result.data
+          });
+          
+          if (result.success) {
+              const transactionCount = result.data?.transactions_synced || 0;
+              if (transactionCount > 0) {
+                  toast.success(`✅ ${transactionCount} transações sincronizadas`);
+              } else {
+                  toast.info('Nenhuma transação nova encontrada');
+              }
+              
+              // Atualizar lista de contas
+              await fetchAccounts();
+          } else {
+              // Verificar se é erro de autenticação
+              console.log('[SYNC] Erro na sincronização:', {
+                  error_code: result.error_code,
+                  reconnection_required: result.reconnection_required,
+                  message: result.message
+              });
+              
+              if (result.error_code === 'WAITING_USER_ACTION' || result.error_code === 'MFA_REQUIRED' || result.reconnection_required) {
+                  // Adicionar verificação para evitar reconexão dupla
+                  const account = accounts.find(acc => acc.id === accountId);
+                  
+                  // Verificar se acabamos de reconectar
+                  const lastReconnectTime = sessionStorage.getItem(`last_reconnect_${accountId}`);
+                  const now = Date.now();
+                  
+                  if (lastReconnectTime && (now - parseInt(lastReconnectTime)) < 60000) { // 1 minuto
+                      console.log('[SYNC] Reconexão recente detectada, evitando loop');
+                      toast.warning('A conta foi reconectada recentemente. Tente novamente em alguns minutos.');
+                      return;
+                  }
+                  
+                  const accountName = account?.account_name || 'sua conta';
+                  setShowBankAuthDialog({ accountId, accountName });
+              } else {
+                  toast.error(result.message || 'Erro ao sincronizar conta');
+              }
+          }
+      } catch (error: any) {
+          console.error('[SYNC] Erro:', error);
+          
+          // Verificar se o erro indica necessidade de reconexão
+          if (error.response?.status === 403 || error.response?.data?.reconnection_required) {
+              const account = accounts.find(acc => acc.id === accountId);
+              const accountName = account?.account_name || 'sua conta';
+              setShowBankAuthDialog({ accountId, accountName });
+          } else {
+              toast.error('Erro ao sincronizar: ' + (error.message || 'Erro desconhecido'));
+          }
+      } finally {
+          setSyncingAccountId(null);
       }
-    } catch (error: any) {
-      // Verificar se o erro indica necessidade de reconexão
-      if (error.response?.status === 403 || error.response?.data?.reconnection_required) {
-        const account = accounts.find(acc => acc.id === accountId);
-        const accountName = account?.account_name || 'sua conta';
-        setShowBankAuthDialog({ accountId, accountName });
-      } else {
-        toast.error('Erro ao sincronizar: ' + (error.message || 'Erro desconhecido'));
-      }
-    } finally {
-      setSyncingAccountId(null);
-    }
   };
 
-  // ✅ Função para reconectar conta
   const handleReconnectAccount = async (accountId: string) => {
-    setReconnectingAccountId(accountId);
-    try {
-      const result = await bankingService.reconnectPluggyAccount(accountId);
+      setReconnectingAccountId(accountId);
       
-      if (result.success && result.data?.connect_token) {
-        const { connect_token, item_id } = result.data;
-        
-        // Show sandbox credentials if in sandbox mode
-        if (result.data.sandbox_mode && result.data.sandbox_credentials) {
-          const creds = result.data.sandbox_credentials;
-          toast.info(
-            `🧪 Modo Sandbox - Use as credenciais: ${creds.user} / ${creds.password} / ${creds.token}`,
-            { duration: 15000 }
-          );
-        }
-        
-        // Setup Pluggy Connect widget for reconnection
-        setPluggyConnectToken(connect_token);
-        setIsConnecting(true);
-        setReconnectError(null);
-        
-        // Store item_id for updateItem parameter
-        sessionStorage.setItem('pluggy_update_item', item_id);
-        // Store account ID for automatic sync after reconnection
-        sessionStorage.setItem('pluggy_reconnecting_account', accountId);
-        
-        toast.success('Abrindo conexão segura com seu banco...');
-      } else {
-        throw new Error(result.data?.message || 'Erro ao gerar token de reconexão');
+      // Marcar timestamp de reconexão
+      sessionStorage.setItem(`last_reconnect_${accountId}`, Date.now().toString());
+      
+      try {
+          const result = await bankingService.reconnectPluggyAccount(accountId);
+          
+          if (result.success && result.data?.connect_token) {
+              const { connect_token, item_id } = result.data;
+              
+              // Show sandbox credentials if in sandbox mode
+              if (result.data.sandbox_mode && result.data.sandbox_credentials) {
+                  const creds = result.data.sandbox_credentials;
+                  toast.info(
+                      `🧪 Modo Sandbox - Use as credenciais: ${creds.user} / ${creds.password} / ${creds.token}`,
+                      { duration: 15000 }
+                  );
+              }
+              
+              // Setup Pluggy Connect widget for reconnection
+              setPluggyConnectToken(connect_token);
+              setIsConnecting(true);
+              setReconnectError(null);
+              
+              // Store item_id for updateItem parameter
+              sessionStorage.setItem('pluggy_update_item', item_id);
+              // Store account ID for automatic sync after reconnection
+              sessionStorage.setItem('pluggy_reconnecting_account', accountId);
+              
+              toast.success('Abrindo conexão segura com seu banco...');
+          } else {
+              throw new Error(result.data?.message || 'Erro ao gerar token de reconexão');
+          }
+      } catch (error: any) {
+          toast.error('Erro ao reconectar conta: ' + (error.message || 'Erro desconhecido'));
+          // Limpar timestamp em caso de erro
+          sessionStorage.removeItem(`last_reconnect_${accountId}`);
+      } finally {
+          setReconnectingAccountId(null);
       }
-    } catch (error: any) {
-      toast.error('Erro ao reconectar conta: ' + (error.message || 'Erro desconhecido'));
-    } finally {
-      setReconnectingAccountId(null);
-    }
   };
 
   const handleDeleteAccount = async () => {
@@ -413,12 +437,14 @@ export default function AccountsPage() {
     }
   };
 
-  // ✅ Função para resetar o estado do widget
   const resetPluggyWidget = () => {
-    setPluggyConnectToken(null);
-    setIsConnecting(false);
-    setPluggyError(null);
-    setUseIframeMode(false);
+      setPluggyConnectToken(null);
+      setIsConnecting(false);
+      setPluggyError(null);
+      setUseIframeMode(false);
+      // Limpar quaisquer dados temporários
+      sessionStorage.removeItem('pluggy_update_item');
+      sessionStorage.removeItem('pluggy_reconnecting_account');
   };
 
   // Show loading state while auth is being checked
@@ -525,66 +551,91 @@ export default function AccountsPage() {
             connectToken={pluggyConnectToken}
             updateItem={sessionStorage.getItem('pluggy_update_item') || undefined}
             onSuccess={async (itemData) => {
-              console.log('[AccountsPage] Pluggy Connect Success:', itemData);
-              console.log('[AccountsPage] Update item mode:', sessionStorage.getItem('pluggy_update_item'));
-              console.log('[AccountsPage] Item status received:', itemData?.item?.status);
-              const itemId = itemData?.item?.id || itemData?.itemId;
-              
-              if (itemId) {
-                try {
-                  // Se é uma atualização de item (reconexão), sincronizar automaticamente
-                  const updateItemId = sessionStorage.getItem('pluggy_update_item');
-                  const reconnectingAccount = sessionStorage.getItem('pluggy_reconnecting_account');
-                  
-                  if (updateItemId && reconnectingAccount) {
-                    console.log('[AccountsPage] Item updated, syncing automatically...');
-                    
-                    // Limpar dados de reconexão
-                    sessionStorage.removeItem('pluggy_update_item');
-                    sessionStorage.removeItem('pluggy_reconnecting_account');
-                    
-                    // Fechar widget
-                    resetPluggyWidget();
-                    
-                    // Aguardar um momento para o Item ser processado
-                    toast.success('Autenticação concluída! Buscando suas transações...');
-                    
-                    setTimeout(async () => {
-                      try {
-                        // Sincronizar conta usando o método correto
-                        await handleSyncAccount(reconnectingAccount);
+                console.log('[AccountsPage] Pluggy Connect Success:', itemData);
+                const itemId = itemData?.item?.id || itemData?.itemId;
+                
+                if (itemId) {
+                    try {
+                        const updateItemId = sessionStorage.getItem('pluggy_update_item');
+                        const reconnectingAccount = sessionStorage.getItem('pluggy_reconnecting_account');
                         
-                        // Atualizar lista de contas
+                        if (updateItemId && reconnectingAccount) {
+                            console.log('[AccountsPage] Item updated, checking execution status...');
+                            
+                            // Verificar o status da execução
+                            const executionStatus = itemData?.item?.executionStatus;
+                            const itemStatus = itemData?.item?.status;
+                            
+                            console.log('[AccountsPage] Execution status:', executionStatus);
+                            console.log('[AccountsPage] Item status:', itemStatus);
+                            
+                            // Limpar dados de reconexão
+                            sessionStorage.removeItem('pluggy_update_item');
+                            sessionStorage.removeItem('pluggy_reconnecting_account');
+                            
+                            // Se teve sucesso parcial ou timeout, não tentar sincronizar automaticamente
+                            if (executionStatus === 'PARTIAL_SUCCESS' || executionStatus === 'USER_INPUT_TIMEOUT') {
+                                toast.warning('Conta reconectada com limitações. Tente sincronizar novamente mais tarde.');
+                                
+                                // Apenas atualizar a lista de contas
+                                setTimeout(() => {
+                                    resetPluggyWidget();
+                                    fetchAccounts();
+                                }, 500);
+                                
+                                return;
+                            }
+                            
+                            // Se foi sucesso completo, tentar sincronizar
+                            if (itemStatus === 'UPDATED' && executionStatus === 'SUCCESS') {
+                                toast.success('Autenticação concluída! Buscando suas transações...');
+                                
+                                setTimeout(async () => {
+                                    resetPluggyWidget();
+                                    
+                                    try {
+                                        await handleSyncAccount(reconnectingAccount);
+                                        await fetchAccounts();
+                                    } catch (error) {
+                                        console.error('[AccountsPage] Error syncing after reconnection:', error);
+                                        // Não mostrar dialog de erro, apenas atualizar contas
+                                        await fetchAccounts();
+                                    }
+                                }, 2000);
+                                
+                                return;
+                            }
+                            
+                            // Caso padrão - apenas fechar e atualizar
+                            toast.info('Reconexão concluída.');
+                            setTimeout(() => {
+                                resetPluggyWidget();
+                                fetchAccounts();
+                            }, 500);
+                            
+                            return;
+                        }
+                        
+                        // Fluxo normal de nova conexão
+                        console.log('[AccountsPage] Calling handlePluggyCallback with itemId:', itemId);
+                        const result = await handlePluggyCallback(itemId);
+                        console.log('[AccountsPage] handlePluggyCallback result:', result);
+                        
                         await fetchAccounts();
-                      } catch (error) {
-                        console.error('[AccountsPage] Error syncing after reconnection:', error);
-                        toast.error('Erro ao sincronizar após reconexão');
-                      }
-                    }, 2000); // Aguardar 2 segundos para o Item ser processado
-                    
-                    return;
-                  }
-                  
-                  // Fluxo normal de nova conexão
-                  console.log('[AccountsPage] Calling handlePluggyCallback with itemId:', itemId);
-                  const result = await handlePluggyCallback(itemId);
-                  console.log('[AccountsPage] handlePluggyCallback result:', result);
-                  
-                  await fetchAccounts();
-                  
-                } catch (error) {
-                  console.error('[AccountsPage] Error in handlePluggyCallback:', error);
-                  toast.error('Erro ao processar conexão bancária');
+                        
+                    } catch (error) {
+                        console.error('[AccountsPage] Error in handlePluggyCallback:', error);
+                        toast.error('Erro ao processar conexão bancária');
+                    }
+                } else {
+                    console.error('[AccountsPage] No itemId found in success response:', itemData);
+                    toast.error('Erro: ID da conexão não encontrado');
                 }
-              } else {
-                console.error('[AccountsPage] No itemId found in success response:', itemData);
-                toast.error('Erro: ID da conexão não encontrado');
-              }
-              
-              resetPluggyWidget();
-              // Clear update item after use
-              sessionStorage.removeItem('pluggy_update_item');
-              sessionStorage.removeItem('pluggy_reconnecting_account');
+                
+                // Fechar widget com delay
+                setTimeout(() => {
+                    resetPluggyWidget();
+                }, 500);
             }}
             onError={(error) => {
               console.error('[AccountsPage] Pluggy Connect Error:', error);
