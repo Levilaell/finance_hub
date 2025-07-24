@@ -298,15 +298,21 @@ export default function AccountsPage() {
               if (transactionCount > 0) {
                   toast.success(`✅ ${transactionCount} transações sincronizadas`);
               } else {
-                  toast.info('Nenhuma transação nova encontrada');
+                  // Se não encontrou transações novas, verificar se é por causa de MFA
+                  if (bankRequiresMFA) {
+                      toast.info('Nenhuma transação nova. Para buscar transações mais recentes, reconecte a conta.');
+                  } else {
+                      toast.info('Nenhuma transação nova encontrada');
+                  }
               }
               
-              // Se o banco requer MFA e sugere reconexão, mostrar aviso
-              if (bankRequiresMFA && reconnectionSuggested) {
-                  toast.warning(
-                      result.warning || 'Este banco requer autenticação a cada sincronização.',
+              // Se o banco requer MFA e sugere reconexão, mostrar aviso mas não forçar
+              if (bankRequiresMFA && reconnectionSuggested && result.warning) {
+                  // Apenas mostrar toast informativo, não forçar reconexão
+                  toast.info(
+                      result.warning,
                       { 
-                          duration: 8000,
+                          duration: 6000,
                           action: {
                               label: 'Reconectar',
                               onClick: () => handleReconnectAccount(accountId)
@@ -630,12 +636,20 @@ export default function AccountsPage() {
                             
                             // Se teve sucesso parcial ou timeout, não tentar sincronizar automaticamente
                             if (executionStatus === 'PARTIAL_SUCCESS' || executionStatus === 'USER_INPUT_TIMEOUT') {
-                                toast.warning('Conta reconectada com limitações. Tente sincronizar novamente mais tarde.');
+                                // Para bancos com MFA e PARTIAL_SUCCESS, isso é esperado
+                                toast.info('Conta reconectada! Sincronizando dados disponíveis...');
                                 
-                                // Atualizar lista de contas após um pequeno delay
-                                setTimeout(() => {
-                                    fetchAccounts();
-                                }, 500);
+                                // Aguardar um pouco e então sincronizar os dados disponíveis
+                                setTimeout(async () => {
+                                    try {
+                                        // Sincronizar os dados que estão disponíveis
+                                        await handleSyncAccount(reconnectingAccount);
+                                        await fetchAccounts();
+                                    } catch (error) {
+                                        console.error('[AccountsPage] Error syncing after PARTIAL_SUCCESS:', error);
+                                        await fetchAccounts();
+                                    }
+                                }, 1000);
                                 
                                 return;
                             }
