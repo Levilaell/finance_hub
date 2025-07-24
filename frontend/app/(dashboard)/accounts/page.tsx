@@ -368,10 +368,20 @@ export default function AccountsPage() {
   };
 
   const handleReconnectAccount = async (accountId: string) => {
+      // Verificar se já reconectou recentemente
+      const lastReconnectTime = sessionStorage.getItem(`last_reconnect_${accountId}`);
+      const now = Date.now();
+      
+      if (lastReconnectTime && (now - parseInt(lastReconnectTime)) < 300000) { // 5 minutos
+          const minutesAgo = Math.floor((now - parseInt(lastReconnectTime)) / 60000);
+          toast.warning(`Esta conta foi reconectada há ${minutesAgo} minuto(s). Os dados já estão atualizados.`);
+          return;
+      }
+      
       setReconnectingAccountId(accountId);
       
       // Marcar timestamp de reconexão
-      sessionStorage.setItem(`last_reconnect_${accountId}`, Date.now().toString());
+      sessionStorage.setItem(`last_reconnect_${accountId}`, now.toString());
       
       try {
           const result = await bankingService.reconnectPluggyAccount(accountId);
@@ -637,18 +647,21 @@ export default function AccountsPage() {
                             // Se teve sucesso parcial ou timeout, não tentar sincronizar automaticamente
                             if (executionStatus === 'PARTIAL_SUCCESS' || executionStatus === 'USER_INPUT_TIMEOUT') {
                                 // Para bancos com MFA e PARTIAL_SUCCESS, isso é esperado
-                                toast.info('Conta reconectada! Sincronizando dados disponíveis...');
+                                const connectorInfo = itemData?.item?.connector;
+                                const hasMFA = connectorInfo?.hasMFA;
                                 
-                                // Aguardar um pouco e então sincronizar os dados disponíveis
-                                setTimeout(async () => {
-                                    try {
-                                        // Sincronizar os dados que estão disponíveis
-                                        await handleSyncAccount(reconnectingAccount);
-                                        await fetchAccounts();
-                                    } catch (error) {
-                                        console.error('[AccountsPage] Error syncing after PARTIAL_SUCCESS:', error);
-                                        await fetchAccounts();
-                                    }
+                                if (hasMFA) {
+                                    toast.success('✅ Conta reconectada! Os dados foram atualizados.');
+                                    toast.info('💡 Este banco requer autenticação sempre que você quiser buscar novas transações.', {
+                                        duration: 6000
+                                    });
+                                } else {
+                                    toast.info('Conta reconectada! Sincronizando dados disponíveis...');
+                                }
+                                
+                                // Apenas atualizar a lista de contas, sem tentar sincronizar novamente
+                                setTimeout(() => {
+                                    fetchAccounts();
                                 }, 1000);
                                 
                                 return;
