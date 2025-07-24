@@ -698,9 +698,8 @@ class PluggyAccountSyncView(APIView):
                 logger.warning(f"Item {account.pluggy_item_id} requires user authentication (status: {item_status}, execution: {execution_status})")
                 return Response({
                     'success': False,
-                    'error_code': 'MFA_REQUIRED',
+                    'error': 'mfa_required',
                     'message': 'Esta conta precisa ser reconectada para continuar sincronizando.',
-                    'reconnection_required': True,
                     'data': {
                         'item_id': account.pluggy_item_id,
                         'status': item_status,
@@ -726,6 +725,18 @@ class PluggyAccountSyncView(APIView):
             # Check if item is outdated but warn user
             if item_status == 'OUTDATED':
                 logger.info(f"Item {account.pluggy_item_id} is outdated, attempting sync anyway")
+            
+            # Check for PARTIAL_SUCCESS with specific execution status
+            if item_status == 'UPDATED' and execution_status == 'PARTIAL_SUCCESS':
+                logger.info(f"Item {account.pluggy_item_id} has PARTIAL_SUCCESS, checking details...")
+                status_detail = item.get('statusDetail', {})
+                transactions_detail = status_detail.get('transactions', {})
+                
+                # If transactions were updated, proceed normally
+                if transactions_detail.get('isUpdated', False):
+                    logger.info("Transactions were updated, proceeding with sync...")
+                else:
+                    logger.warning("Transactions were not updated in PARTIAL_SUCCESS")
             
             # If status is OK, proceed with update
             logger.info(f"Triggering update for item {account.pluggy_item_id}")

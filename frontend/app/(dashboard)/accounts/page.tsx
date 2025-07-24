@@ -488,17 +488,8 @@ export default function AccountsPage() {
                     
                     setTimeout(async () => {
                       try {
-                        // Sincronizar conta
-                        const result = await bankingService.syncPluggyAccount(reconnectingAccount);
-                        
-                        if (result.success) {
-                          const transactionCount = result.data.transactions_synced;
-                          if (transactionCount > 0) {
-                            toast.success(`✅ ${transactionCount} transações sincronizadas`);
-                          } else {
-                            toast.info('Nenhuma transação nova encontrada');
-                          }
-                        }
+                        // Sincronizar conta usando o método correto
+                        await handleSyncAccount(reconnectingAccount);
                         
                         // Atualizar lista de contas
                         await fetchAccounts();
@@ -518,8 +509,6 @@ export default function AccountsPage() {
                   
                   await fetchAccounts();
                   
-                  // Force page refresh to ensure UI updates
-                  window.location.reload();
                 } catch (error) {
                   console.error('[AccountsPage] Error in handlePluggyCallback:', error);
                   toast.error('Erro ao processar conexão bancária');
@@ -579,17 +568,8 @@ export default function AccountsPage() {
                     
                     setTimeout(async () => {
                       try {
-                        // Sincronizar conta
-                        const result = await bankingService.syncPluggyAccount(reconnectingAccount);
-                        
-                        if (result.success) {
-                          const transactionCount = result.data.transactions_synced;
-                          if (transactionCount > 0) {
-                            toast.success(`✅ ${transactionCount} transações sincronizadas`);
-                          } else {
-                            toast.info('Nenhuma transação nova encontrada');
-                          }
-                        }
+                        // Sincronizar conta usando o método correto
+                        await handleSyncAccount(reconnectingAccount);
                         
                         // Atualizar lista de contas
                         await fetchAccounts();
@@ -609,8 +589,6 @@ export default function AccountsPage() {
                   
                   await fetchAccounts();
                   
-                  // Force page refresh to ensure UI updates
-                  window.location.reload();
                 } catch (error) {
                   console.error('[AccountsPage] Error in handlePluggyCallback:', error);
                   toast.error('Erro ao processar conexão bancária');
