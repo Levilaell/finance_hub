@@ -174,11 +174,20 @@ class BankAccount(models.Model):
     def _validate_brazilian_agency(self, agency: str) -> bool:
         """Validate Brazilian agency format"""
         # Remove common separators
-        clean_agency = agency.replace('-', '').replace('.', '').strip()
+        clean_agency = agency.replace('-', '').replace('.', '').replace('/', '').strip()
         
-        # Brazilian agencies: 3-5 digits, sometimes with check digit
-        pattern = r'^\d{3,5}$'
-        return bool(re.match(pattern, clean_agency)) and len(clean_agency) <= 5
+        # Accept various formats:
+        # - Pure digits: 0001, 1234, 12345
+        # - With separators: 0001-5, 1234-X
+        # - Letters for digital banks: XXXX
+        # - Mixed: AG01
+        # - Empty is also valid (for digital banks without agency)
+        if not clean_agency:
+            return True
+            
+        # Allow alphanumeric agencies (some digital banks use letters)
+        pattern = r'^[A-Z0-9]{1,10}$'
+        return bool(re.match(pattern, clean_agency.upper()))
     
     def _validate_brazilian_account(self, account: str) -> bool:
         """Validate Brazilian account number format"""

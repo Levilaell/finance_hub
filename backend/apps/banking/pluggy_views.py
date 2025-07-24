@@ -312,30 +312,16 @@ class PluggyCallbackView(APIView):
                     # Prepare account data
                     account_type = self._map_account_type(account_data.get('type'))
                     account_number = account_data.get('number', '') or f"PLUGGY_{account_data['id'][:8]}"
-                    
-                    # Extract agency and account details from bankData.transferNumber if available
-                    agency = account_data.get('agency', '')
                     account_digit = ''
                     
-                    if account_data.get('bankData', {}).get('transferNumber'):
-                        # Format: 077/0001/20414083-8 -> extract agency (0001) and digit (8)
-                        transfer_number = account_data['bankData']['transferNumber']
-                        parts = transfer_number.split('/')
-                        if len(parts) >= 3:
-                            if not agency:
-                                agency = parts[1]  # Agency is the second part
-                            
-                            # Extract account number and digit from third part
-                            account_part = parts[2]
-                            if '-' in account_part:
-                                acc_parts = account_part.split('-')
-                                if not account_number:
-                                    account_number = acc_parts[0]
-                                account_digit = acc_parts[1] if len(acc_parts) > 1 else ''
+                    # Extract agency based on bank-specific formats
+                    agency = self._extract_agency_from_account_data(account_data, connector)
                     
-                    # If still no agency, use a default that passes validation
-                    if not agency:
-                        agency = '0001'  # Default agency that passes Brazilian format validation
+                    # Extract account digit if present in the number
+                    if '-' in str(account_number):
+                        parts = str(account_number).split('-')
+                        account_number = parts[0]
+                        account_digit = parts[1] if len(parts) > 1 else ''
                     
                     # Log the data for debugging
                     logger.info(f"Account data - Type: {account_type}, Number: {account_number}, Agency: {agency}")
@@ -574,6 +560,51 @@ class PluggyCallbackView(APIView):
                 return 'debit'
             else:
                 return 'debit'
+    
+    def _extract_agency_from_account_data(self, account_data: Dict, connector: Dict) -> str:
+        """
+        Extract agency from account data based on bank-specific formats
+        """
+        # First try the standard agency field
+        agency = account_data.get('agency', '')
+        if agency:
+            return agency
+            
+        # Get bank-specific data
+        bank_data = account_data.get('bankData', {})
+        bank_name = connector.get('name', '').lower()
+        
+        # Try to extract from transferNumber (used by many banks)
+        transfer_number = bank_data.get('transferNumber', '')
+        if transfer_number:
+            # Common formats:
+            # Inter: 077/0001/20414083-8
+            # Bradesco: 237/1234/0012345-6
+            # Itaú: 341/1234/12345-6
+            parts = transfer_number.split('/')
+            if len(parts) >= 2:
+                # Second part is usually the agency
+                agency = parts[1]
+                return agency
+        
+        # For digital banks without traditional agencies
+        digital_banks = ['nubank', 'c6 bank', 'picpay', 'mercado pago', 'pagseguro', 'neon', 'next']
+        if any(digital in bank_name for digital in digital_banks):
+            # Digital banks often use a single agency or none
+            return '0001'
+        
+        # Bank-specific logic
+        if 'nubank' in bank_name:
+            return '0001'
+        elif 'inter' in bank_name and not agency:
+            # Inter specific format already handled above
+            return '0001'
+        elif 'caixa' in bank_name:
+            # Caixa might have agency in a different field
+            return bank_data.get('agencia', '') or '0001'
+        
+        # Default agency if none found
+        return '0001'
 
 
 class PluggyAccountSyncView(APIView):
