@@ -23,7 +23,9 @@ class BankProvider(models.Model):
     name = models.CharField(_('bank name'), max_length=100)
     code = models.CharField(_('bank code'), max_length=10, unique=True)
     logo = models.ImageField(_('logo'), upload_to='bank_logos/', blank=True, null=True)
+    logo_url = models.URLField(_('logo URL'), blank=True, help_text='External logo URL (e.g., from Pluggy)')
     color = models.CharField(_('brand color'), max_length=7, default='#000000')
+    primary_color = models.CharField(_('primary color'), max_length=7, default='#000000', blank=True)
     is_open_banking = models.BooleanField(_('supports Open Banking'), default=True)
     api_endpoint = models.URLField(_('API endpoint'), blank=True)
     is_active = models.BooleanField(_('is active'), default=True)
@@ -75,9 +77,11 @@ class BankAccount(models.Model):
     
     # Account details
     account_type = models.CharField(_('account type'), max_length=20, choices=ACCOUNT_TYPES)
-    agency = models.CharField(_('agency'), max_length=10)
+    agency = models.CharField(_('agency'), max_length=10, blank=True)
     account_number = models.CharField(_('account number'), max_length=20)
     account_digit = models.CharField(_('account digit'), max_length=2, blank=True)
+    name = models.CharField(_('account name'), max_length=255, blank=True)
+    currency = models.CharField(_('currency'), max_length=3, default='BRL')
     
     # Open Banking integration
     external_id = models.CharField(_('external account ID'), max_length=100, blank=True)
@@ -336,6 +340,7 @@ class Transaction(models.Model):
     pix_key = models.CharField(_('PIX key'), max_length=100, blank=True)
     notes = models.TextField(_('notes'), blank=True)
     tags = models.JSONField(_('tags'), default=list)
+    metadata = models.JSONField(_('metadata'), default=dict, blank=True, help_text='Additional data from Pluggy')
     
     # Status and processing
     status = models.CharField(_('status'), max_length=20, choices=STATUS_CHOICES, default='completed')
