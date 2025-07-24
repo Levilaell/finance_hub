@@ -594,17 +594,19 @@ export default function AccountsPage() {
                             console.log('[AccountsPage] Execution status:', executionStatus);
                             console.log('[AccountsPage] Item status:', itemStatus);
                             
-                            // Limpar dados de reconexão
+                            // Limpar dados de reconexão IMEDIATAMENTE
                             sessionStorage.removeItem('pluggy_update_item');
                             sessionStorage.removeItem('pluggy_reconnecting_account');
+                            
+                            // Fechar widget IMEDIATAMENTE para evitar tela branca
+                            resetPluggyWidget();
                             
                             // Se teve sucesso parcial ou timeout, não tentar sincronizar automaticamente
                             if (executionStatus === 'PARTIAL_SUCCESS' || executionStatus === 'USER_INPUT_TIMEOUT') {
                                 toast.warning('Conta reconectada com limitações. Tente sincronizar novamente mais tarde.');
                                 
-                                // Apenas atualizar a lista de contas
+                                // Atualizar lista de contas após um pequeno delay
                                 setTimeout(() => {
-                                    resetPluggyWidget();
                                     fetchAccounts();
                                 }, 500);
                                 
@@ -616,14 +618,11 @@ export default function AccountsPage() {
                                 toast.success('Autenticação concluída! Buscando suas transações...');
                                 
                                 setTimeout(async () => {
-                                    resetPluggyWidget();
-                                    
                                     try {
                                         await handleSyncAccount(reconnectingAccount);
                                         await fetchAccounts();
                                     } catch (error) {
                                         console.error('[AccountsPage] Error syncing after reconnection:', error);
-                                        // Não mostrar dialog de erro, apenas atualizar contas
                                         await fetchAccounts();
                                     }
                                 }, 2000);
@@ -631,10 +630,9 @@ export default function AccountsPage() {
                                 return;
                             }
                             
-                            // Caso padrão - apenas fechar e atualizar
+                            // Caso padrão
                             toast.info('Reconexão concluída.');
                             setTimeout(() => {
-                                resetPluggyWidget();
                                 fetchAccounts();
                             }, 500);
                             
@@ -642,6 +640,8 @@ export default function AccountsPage() {
                         }
                         
                         // Fluxo normal de nova conexão
+                        resetPluggyWidget(); // Fechar widget também aqui
+                        
                         console.log('[AccountsPage] Calling handlePluggyCallback with itemId:', itemId);
                         const result = await handlePluggyCallback(itemId);
                         console.log('[AccountsPage] handlePluggyCallback result:', result);
@@ -651,41 +651,35 @@ export default function AccountsPage() {
                     } catch (error) {
                         console.error('[AccountsPage] Error in handlePluggyCallback:', error);
                         toast.error('Erro ao processar conexão bancária');
+                        resetPluggyWidget(); // Garantir que fecha em caso de erro
                     }
                 } else {
                     console.error('[AccountsPage] No itemId found in success response:', itemData);
                     toast.error('Erro: ID da conexão não encontrado');
+                    resetPluggyWidget(); // Fechar também aqui
                 }
-                
-                // Fechar widget com delay
-                setTimeout(() => {
-                    resetPluggyWidget();
-                }, 500);
             }}
             onError={(error) => {
-              console.error('[AccountsPage] Pluggy Connect Error:', error);
-              const errorMessage = error.message || 'Erro desconhecido';
-              
-              // Se falhar com SDK, tentar com iframe
-              if (errorMessage.includes('SDK') || errorMessage.includes('script')) {
-                toast.warning('Tentando modo alternativo...');
-                setUseIframeMode(true);
-                return;
-              }
-              
-              setPluggyError(errorMessage);
-              toast.error(`Erro na conexão: ${errorMessage}`);
-              
-              setTimeout(() => {
+                console.error('[AccountsPage] Pluggy Connect Error:', error);
+                const errorMessage = error.message || 'Erro desconhecido';
+                
+                // Sempre resetar o widget em caso de erro
                 resetPluggyWidget();
-              }, 3000);
+                
+                // Se falhar com SDK, tentar com iframe
+                if (errorMessage.includes('SDK') || errorMessage.includes('script')) {
+                    toast.warning('Tentando modo alternativo...');
+                    setUseIframeMode(true);
+                    return;
+                }
+                
+                setPluggyError(errorMessage);
+                toast.error(`Erro na conexão: ${errorMessage}`);
             }}
             onClose={() => {
-              console.log('[AccountsPage] Pluggy Connect Closed without success');
-              resetPluggyWidget();
-              // Clear update item after use
-              sessionStorage.removeItem('pluggy_update_item');
-              sessionStorage.removeItem('pluggy_reconnecting_account');
+                console.log('[AccountsPage] Pluggy Connect Closed');
+                // Sempre resetar quando fechar
+                resetPluggyWidget();
             }}
           />
         )
