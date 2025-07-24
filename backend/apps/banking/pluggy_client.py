@@ -63,7 +63,7 @@ class PluggyClient:
             logger.error(f"Failed to create API key: {e}")
             raise Exception(f"Failed to authenticate with Pluggy: {str(e)}")
     
-    def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None, params: Optional[Dict] = None) -> Dict:
+    def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None, params: Optional[Dict] = None) -> Any:
         """
         Make authenticated request to Pluggy API
         """
@@ -79,6 +79,7 @@ class PluggyClient:
         url = f"{self.base_url}{endpoint}"
         
         try:
+            logger.debug(f"Making request: {method} {url} with params: {params}")
             response = requests.request(
                 method=method,
                 url=url,
@@ -105,10 +106,19 @@ class PluggyClient:
                 )
             
             response.raise_for_status()
-            return response.json() if response.content else {}
+            
+            # Log response for debugging
+            if response.content:
+                result = response.json()
+                logger.debug(f"Response from {endpoint}: {result}")
+                return result
+            else:
+                return {}
             
         except requests.exceptions.RequestException as e:
             logger.error(f"API request failed: {method} {endpoint} - {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Response content: {e.response.text}")
             raise Exception(f"Pluggy API error: {str(e)}")
     
     def get_connectors(self, country: str = 'BR', type: Optional[str] = None, sandbox: Optional[bool] = None) -> List[Dict]:
@@ -183,7 +193,64 @@ class PluggyClient:
         """
         Get accounts for an item
         """
-        return self._make_request('GET', f'/accounts?itemId={item_id}')
+        # Try the standard accounts endpoint with itemId parameter
+        try:
+            response = self._make_request('GET', f'/accounts', params={'itemId': item_id})
+            
+            # Debug: Log the raw API response
+            logger.info(f"[Pluggy API] Raw accounts response: {response}")
+            
+            # Handle different response formats
+            if isinstance(response, dict):
+                # Check if it's a paginated response with 'results' key
+                if 'results' in response:
+                    logger.info(f"[Pluggy API] Found 'results' key in response")
+                    return response['results']
+                # Check if response has 'data' key (some APIs use this)
+                elif 'data' in response:
+                    logger.info(f"[Pluggy API] Found 'data' key in response")
+                    return response['data']
+                # Check if it has pagination metadata but no results
+                elif 'total' in response and 'page' in response and 'results' not in response:
+                    logger.warning(f"[Pluggy API] Response has pagination metadata but no results. Total: {response.get('total')}")
+                    # Try alternative endpoint: /items/{item_id}/accounts
+                    logger.info(f"[Pluggy API] Trying alternative endpoint: /items/{item_id}/accounts")
+                    alt_response = self._make_request('GET', f'/items/{item_id}/accounts')
+                    logger.info(f"[Pluggy API] Alternative endpoint response: {alt_response}")
+                    
+                    if isinstance(alt_response, list):
+                        return alt_response
+                    elif isinstance(alt_response, dict) and 'results' in alt_response:
+                        return alt_response['results']
+                    elif isinstance(alt_response, dict) and 'data' in alt_response:
+                        return alt_response['data']
+                    else:
+                        return []
+                else:
+                    # If it's a single account object, wrap in a list
+                    logger.info(f"[Pluggy API] Response is a single object, wrapping in list")
+                    return [response] if response else []
+            elif isinstance(response, list):
+                logger.info(f"[Pluggy API] Response is already a list")
+                return response
+            else:
+                logger.error(f"[Pluggy API] Unexpected accounts response format: {type(response)}")
+                return []
+        except Exception as e:
+            logger.error(f"[Pluggy API] Error getting accounts: {e}")
+            # Try alternative endpoint as fallback
+            try:
+                logger.info(f"[Pluggy API] Trying fallback endpoint: /items/{item_id}/accounts")
+                alt_response = self._make_request('GET', f'/items/{item_id}/accounts')
+                if isinstance(alt_response, list):
+                    return alt_response
+                elif isinstance(alt_response, dict) and 'results' in alt_response:
+                    return alt_response['results']
+                else:
+                    return []
+            except Exception as fallback_error:
+                logger.error(f"[Pluggy API] Fallback also failed: {fallback_error}")
+                return []
     
     def get_account(self, account_id: str) -> Dict:
         """

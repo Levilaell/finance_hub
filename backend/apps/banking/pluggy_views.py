@@ -246,7 +246,25 @@ class PluggyCallbackView(APIView):
             item = pluggy.get_item(item_id)
             
             # Get accounts for this item
-            accounts = pluggy.get_accounts(item_id)
+            accounts_response = pluggy.get_accounts(item_id)
+            
+            # Debug: Log the raw response
+            logger.info(f"Raw accounts response type: {type(accounts_response)}")
+            logger.info(f"Raw accounts response: {accounts_response}")
+            
+            # Handle different response formats from Pluggy
+            if isinstance(accounts_response, dict):
+                # If response is a dict, look for 'results' or 'data' key
+                accounts = accounts_response.get('results', accounts_response.get('data', []))
+                logger.info(f"Extracted accounts from dict: {accounts}")
+            elif isinstance(accounts_response, list):
+                accounts = accounts_response
+                logger.info(f"Using accounts list directly: {accounts}")
+            else:
+                logger.error(f"Unexpected accounts response type: {type(accounts_response)}, value: {accounts_response}")
+                accounts = []
+            
+            logger.info(f"Found {len(accounts)} accounts for item {item_id}")
             
             created_accounts = []
             
@@ -267,7 +285,15 @@ class PluggyCallbackView(APIView):
             
             with transaction.atomic():
                 for account_data in accounts:
-                    logger.info(f"Processing account: {account_data}")
+                    # Debug: Log each account data
+                    logger.info(f"Processing account data - Type: {type(account_data)}, Value: {account_data}")
+                    
+                    # Skip if not a valid account object
+                    if not isinstance(account_data, dict):
+                        logger.warning(f"Skipping invalid account data: {account_data}")
+                        continue
+                        
+                    logger.info(f"Processing account: {account_data.get('id', 'unknown')}, type: {account_data.get('type')}")
                     
                     # Create or update bank provider
                     connector = item.get('connector', {})
@@ -343,9 +369,27 @@ class PluggyCallbackView(APIView):
                     
                     created_accounts.append(bank_account)
                 
-                # Fetch initial transactions
-                for account in created_accounts:
-                    self._sync_transactions(account, pluggy)
+                # Fetch initial transactions only if accounts were created
+                if created_accounts:
+                    logger.info(f"Syncing transactions for {len(created_accounts)} accounts")
+                    for account in created_accounts:
+                        try:
+                            self._sync_transactions(account, pluggy)
+                        except Exception as e:
+                            logger.error(f"Error syncing transactions for account {account.id}: {e}")
+                            # Continue with other accounts
+                
+            # Return response even if no accounts were created
+            if not created_accounts:
+                logger.warning(f"No accounts created for item {item_id}")
+                # Try to get existing accounts
+                existing_accounts = BankAccount.objects.filter(
+                    pluggy_item_id=item_id,
+                    company=user_company
+                )
+                if existing_accounts.exists():
+                    created_accounts = list(existing_accounts)
+                    logger.info(f"Found {len(created_accounts)} existing accounts for item")
             
             # Return created accounts in the format expected by frontend
             serializer = BankAccountSerializer(created_accounts, many=True)
