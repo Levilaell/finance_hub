@@ -87,7 +87,41 @@ export default function AccountsPage() {
         sessionStorage.removeItem('pluggy_bank_code');
         
         // Refresh accounts list
-        fetchAccounts();
+        await fetchAccounts();
+        
+        // Aguardar um pouco para o item Pluggy se estabilizar
+        console.log('[AccountsPage] Aguardando 3 segundos para o item Pluggy se estabilizar...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Sincronizar transações automaticamente após conectar
+        console.log('[AccountsPage] Iniciando sincronização automática após conexão...');
+        if (response.data.accounts && response.data.accounts.length > 0) {
+          for (const account of response.data.accounts) {
+            try {
+              // Verificar status antes de sincronizar
+              console.log(`[AccountsPage] Verificando status da conta ${account.id}...`);
+              const statusCheck = await bankingService.checkAccountStatus(account.id);
+              console.log(`[AccountsPage] Status do item: ${statusCheck.data?.item_status}`);
+              
+              if (statusCheck.data?.item_status === 'UPDATED' || statusCheck.data?.item_status === 'ACTIVE') {
+                console.log(`[AccountsPage] Sincronizando conta ${account.id}...`);
+                const syncResult = await syncAccount(account.id);
+                if (syncResult.success) {
+                  const txCount = syncResult.data?.transactions_synced || 0;
+                  console.log(`[AccountsPage] Conta ${account.id}: ${txCount} transações sincronizadas`);
+                }
+              } else {
+                console.warn(`[AccountsPage] Conta ${account.id} não está pronta para sync. Status: ${statusCheck.data?.item_status}`);
+              }
+            } catch (error) {
+              console.error(`[AccountsPage] Erro ao sincronizar conta ${account.id}:`, error);
+            }
+          }
+          
+          // Atualizar lista de contas novamente após sincronização
+          await fetchAccounts();
+          toast.info('Sincronização inicial concluída!');
+        }
         
         return response.data;
       } else {
@@ -201,14 +235,84 @@ export default function AccountsPage() {
     }
   };
 
-  // ✅ Função handleSyncAccount - sempre abre Pluggy Connect para garantir atualização
+  // ✅ Função handleSyncAccount - sincroniza transações diretamente
   const handleSyncAccount = async (accountId: string) => {
-    // Encontrar o nome da conta
-    const account = accounts.find(acc => acc.id === accountId);
-    const accountName = account?.account_name || 'sua conta';
+    console.log(`[SYNC] Iniciando sincronização da conta ${accountId}`);
+    setSyncingAccountId(accountId);
     
-    // Mostrar dialog explicativo
-    setShowBankAuthDialog({ accountId, accountName });
+    try {
+      // Primeiro, verificar o status da conta
+      console.log('[SYNC] Verificando status da conta antes de sincronizar...');
+      const statusCheck = await bankingService.checkAccountStatus(accountId);
+      console.log('[SYNC] Status da conta:', statusCheck);
+      
+      if (statusCheck.data?.item_status) {
+        console.log(`[SYNC] Status do item Pluggy: ${statusCheck.data.item_status}`);
+        
+        // Se precisa reconexão, mostrar dialog direto
+        if (statusCheck.data.needs_reconnection || statusCheck.data.item_status === 'WAITING_USER_ACTION') {
+          console.log('[SYNC] Item precisa de reconexão, mostrando dialog...');
+          const account = accounts.find(acc => acc.id === accountId);
+          const accountName = account?.account_name || 'sua conta';
+          setShowBankAuthDialog({ accountId, accountName });
+          return;
+        }
+      }
+      
+      // Se o status está OK, tentar sincronizar
+      console.log('[SYNC] Status OK, chamando API de sincronização...');
+      const result = await syncAccount(accountId);
+      console.log('[SYNC] Resultado da sincronização:', result);
+      console.log('[SYNC] Detalhes da sincronização:', {
+        transactions_synced: result.data?.transactions_synced,
+        sync_from: result.data?.sync_from,
+        sync_to: result.data?.sync_to,
+        days_searched: result.data?.days_searched,
+        status: result.data?.status,
+        item_status: result.data?.item_status,
+        full_data: result.data
+      });
+      
+      if (result.success) {
+        const transactionCount = result.data?.transactions_synced || 0;
+        if (transactionCount > 0) {
+          toast.success(`✅ ${transactionCount} transações sincronizadas`);
+        } else {
+          toast.info('Nenhuma transação nova encontrada');
+        }
+        
+        // Atualizar lista de contas
+        await fetchAccounts();
+      } else {
+        // Verificar se é erro de autenticação
+        console.log('[SYNC] Erro na sincronização:', {
+          error_code: result.error_code,
+          reconnection_required: result.reconnection_required,
+          message: result.message
+        });
+        
+        if (result.error_code === 'WAITING_USER_ACTION' || result.reconnection_required) {
+          // Só neste caso mostrar o dialog de reconexão
+          console.log('[SYNC] Item requer reconexão, mostrando dialog...');
+          const account = accounts.find(acc => acc.id === accountId);
+          const accountName = account?.account_name || 'sua conta';
+          setShowBankAuthDialog({ accountId, accountName });
+        } else {
+          toast.error(result.message || 'Erro ao sincronizar conta');
+        }
+      }
+    } catch (error: any) {
+      // Verificar se o erro indica necessidade de reconexão
+      if (error.response?.status === 403 || error.response?.data?.reconnection_required) {
+        const account = accounts.find(acc => acc.id === accountId);
+        const accountName = account?.account_name || 'sua conta';
+        setShowBankAuthDialog({ accountId, accountName });
+      } else {
+        toast.error('Erro ao sincronizar: ' + (error.message || 'Erro desconhecido'));
+      }
+    } finally {
+      setSyncingAccountId(null);
+    }
   };
 
   // ✅ Função para reconectar conta
@@ -450,6 +554,8 @@ export default function AccountsPage() {
             updateItem={sessionStorage.getItem('pluggy_update_item') || undefined}
             onSuccess={async (itemData) => {
               console.log('[AccountsPage] Pluggy Connect Success:', itemData);
+              console.log('[AccountsPage] Update item mode:', sessionStorage.getItem('pluggy_update_item'));
+              console.log('[AccountsPage] Item status received:', itemData?.item?.status);
               const itemId = itemData?.item?.id || itemData?.itemId;
               
               if (itemId) {
@@ -776,9 +882,13 @@ export default function AccountsPage() {
       <Dialog open={!!showBankAuthDialog} onOpenChange={() => setShowBankAuthDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Autenticação Bancária Necessária</DialogTitle>
+            <DialogTitle>Reautenticação Necessária</DialogTitle>
             <DialogDescription>
-              Seu banco está solicitando que você faça login para sincronizar as transações mais recentes.
+              {showBankAuthDialog?.accountName ? (
+                <>A conexão com {showBankAuthDialog.accountName} expirou e precisa ser renovada.</>
+              ) : (
+                <>A conexão com seu banco expirou e precisa ser renovada.</>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">

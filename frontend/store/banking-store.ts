@@ -142,7 +142,7 @@ export const useBankingStore = create<BankingState>((set, get) => ({
       const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
       if (!token) throw new Error('Authentication required');
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/banking/accounts/${accountId}/sync/`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/banking/pluggy/accounts/${accountId}/sync/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -150,12 +150,58 @@ export const useBankingStore = create<BankingState>((set, get) => ({
         },
       });
       
-      if (!response.ok) throw new Error('Failed to sync account');
+      // Tentar fazer parse do JSON apenas se for JSON válido
+      let data;
+      const contentType = response.headers.get('content-type');
       
-      // Refresh accounts after sync
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        // Se não for JSON (provavelmente HTML de erro), criar estrutura de erro
+        data = {
+          error: 'Invalid response format',
+          message: 'Server returned non-JSON response'
+        };
+      }
+      
+      if (!response.ok) {
+        // Se for 403, provavelmente precisa reconectar
+        if (response.status === 403) {
+          return {
+            success: false,
+            error_code: data.error_code || 'WAITING_USER_ACTION',
+            message: data.message || 'Reautenticação necessária',
+            reconnection_required: true,
+            data: data
+          };
+        }
+        
+        // Outros erros
+        return {
+          success: false,
+          error_code: data.error_code,
+          message: data.message || data.error || 'Failed to sync account',
+          reconnection_required: data.reconnection_required,
+          data: data
+        };
+      }
+      
+      // Refresh accounts after successful sync
       await get().fetchAccounts();
+      
+      // Retornar dados de sucesso
+      return {
+        success: true,
+        data: data.data || data,
+        message: data.message
+      };
     } catch (error: any) {
-      throw error;
+      console.error('Sync account error:', error);
+      return {
+        success: false,
+        message: error.message || 'Network error',
+        error: error
+      };
     }
   },
 

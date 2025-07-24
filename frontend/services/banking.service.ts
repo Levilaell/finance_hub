@@ -229,6 +229,7 @@ class BankingService {
       account_id: number;
       external_id: string;
       status: string;
+      item_status?: string;
       last_sync: string | null;
       balance: number;
       pluggy_status: string;
@@ -239,6 +240,13 @@ class BankingService {
     };
   }> {
     return apiClient.get(`/api/banking/pluggy/accounts/${accountId}/status/`);
+  }
+
+  /**
+   * Check account status (alias for getPluggyAccountStatus)
+   */
+  async checkAccountStatus(accountId: string) {
+    return this.getPluggyAccountStatus(accountId);
   }
 
   /**

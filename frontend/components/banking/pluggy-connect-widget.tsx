@@ -27,7 +27,6 @@ export function PluggyConnectWidget({
 }: PluggyConnectWidgetProps) {
   const [sdkLoaded, setSdkLoaded] = useState(false);
   const pluggyInstance = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -119,12 +118,11 @@ export function PluggyConnectWidget({
   }, [onError, sdkLoaded]);
 
   useEffect(() => {
-    if (!sdkLoaded || !connectToken || !window.PluggyConnect || !containerRef.current) {
+    if (!sdkLoaded || !connectToken || !window.PluggyConnect) {
       console.log('[Pluggy] Aguardando condições:', { 
         sdkLoaded, 
         hasToken: !!connectToken, 
-        hasPluggyConnect: !!window.PluggyConnect,
-        hasContainer: !!containerRef.current 
+        hasPluggyConnect: !!window.PluggyConnect
       });
       return;
     }
@@ -152,13 +150,8 @@ export function PluggyConnectWidget({
     // Função async para inicializar o widget
     const initializeWidget = async () => {
       try {
-        // Aguardar um momento para garantir que o container esteja no DOM
+        // Aguardar um momento para garantir que o DOM esteja pronto
         await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Verificar novamente se o container existe
-        if (!containerRef.current) {
-          throw new Error('Container não encontrado no DOM');
-        }
         
         // Configuração do Pluggy Connect
         console.log('[Pluggy] Criando configuração do widget...');
@@ -167,19 +160,32 @@ export function PluggyConnectWidget({
           includeSandbox: true,
           ...(updateItem && { updateItem }),
           
-          // Especificar onde renderizar o widget
-          target: containerRef.current,
-          containerId: 'pluggy-connect-container',
+          // Não passar elementos DOM diretamente
+          // O Pluggy Connect vai criar seu próprio container
           
           onSuccess: (data: any) => {
-            console.log('[Pluggy] Success callback:', data);
+            console.log('[Pluggy] Success callback - Full data:', JSON.stringify(data, null, 2));
+            console.log('[Pluggy] Success callback - Item details:', {
+              itemId: data?.item?.id,
+              itemStatus: data?.item?.status,
+              updateMode: !!updateItem,
+              fullItem: data?.item
+            });
+            
             const itemId = data?.item?.id || data?.itemId || data?.id;
             
             if (itemId) {
-              toast.success('Conta conectada com sucesso!');
+              // Mensagem diferente para update vs criação
+              if (updateItem) {
+                toast.success('Conta reconectada com sucesso! Sincronizando transações...');
+              } else {
+                toast.success('Conta conectada com sucesso!');
+              }
+              
               onSuccess({ 
                 item: { 
                   id: itemId,
+                  status: data?.item?.status,
                   ...(data.item || {})
                 } 
               });
@@ -209,6 +215,35 @@ export function PluggyConnectWidget({
           // Eventos para debug
           onEvent: (event: string, metadata: any) => {
             console.log('[Pluggy] Event:', event, metadata);
+            
+            // Capturar informações do item
+            if (event === 'ITEM_RESPONSE' && metadata) {
+              console.log('[Pluggy] Item Response Details:', {
+                event,
+                metadata,
+                item: metadata.item,
+                status: metadata.item?.status || metadata.status,
+                error: metadata.error,
+                timestamp: new Date(metadata.timestamp).toISOString()
+              });
+              
+              // Se o item está em status de erro ou requer ação
+              const itemStatus = metadata.item?.status || metadata.status;
+              if (itemStatus) {
+                console.log(`[Pluggy] 📊 Status do Item: ${itemStatus}`);
+                
+                if (itemStatus === 'WAITING_USER_ACTION') {
+                  console.warn('[Pluggy] ⚠️ Item requer ação do usuário!');
+                } else if (itemStatus === 'LOGIN_ERROR') {
+                  console.error('[Pluggy] ❌ Erro de login no item!');
+                } else if (itemStatus === 'OUTDATED') {
+                  console.warn('[Pluggy] ⚠️ Item está desatualizado!');
+                } else if (itemStatus === 'UPDATED' || itemStatus === 'SUCCESS') {
+                  console.log('[Pluggy] ✅ Item atualizado com sucesso!');
+                }
+              }
+            }
+            
             // Detectar eventos de fechamento
             if (event === 'CLOSE' || event === 'EXIT' || event === 'CANCEL') {
               handleClose();
@@ -269,21 +304,9 @@ export function PluggyConnectWidget({
   }, [sdkLoaded, connectToken, onSuccess, onError, onClose, updateItem]);
 
   // Container para o widget - garantir que seja renderizado mas invisível
-  return (
-    <div 
-      ref={containerRef} 
-      id="pluggy-connect-container"
-      style={{ 
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        zIndex: 9999,
-        pointerEvents: 'none'
-      }} 
-    />
-  );
+  // O Pluggy Connect cria seu próprio modal/iframe
+  // Não precisamos renderizar nada
+  return null;
 }
 
 // Componente alternativo que cria um overlay customizado
