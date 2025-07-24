@@ -45,6 +45,25 @@ import { PluggyConnectModal } from '@/components/banking/pluggy-connect-widget';
 import { PluggyConnectIframe } from '@/components/banking/pluggy-connect-iframe';
 import { PluggyInfoDialog } from '@/components/banking/pluggy-info-dialog';
 
+// Adicionar interface para o tipo de diálogo de autenticação
+interface BankAuthDialogState {
+  accountId: string;
+  accountName?: string;
+  message?: string;
+  isMFABank?: boolean;
+}
+
+// Adicionar interface estendida para o resultado de sincronização
+interface ExtendedSyncResult {
+  success: boolean;
+  error_code?: string;
+  message?: string;
+  reconnection_required?: boolean;
+  warning?: string;
+  reconnection_suggested?: boolean;
+  data?: any;
+}
+
 export default function AccountsPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
@@ -65,7 +84,7 @@ export default function AccountsPage() {
   const [useIframeMode, setUseIframeMode] = useState(false);
   const [reconnectingAccountId, setReconnectingAccountId] = useState<string | null>(null);
   const [reconnectError, setReconnectError] = useState<{accountId: string; message: string} | null>(null);
-  const [showBankAuthDialog, setShowBankAuthDialog] = useState<{accountId: string; accountName?: string} | null>(null);
+  const [showBankAuthDialog, setShowBankAuthDialog] = useState<BankAuthDialogState | null>(null);
 
   // ✅ Função handlePluggyCallback (mantida como está)
   const handlePluggyCallback = useCallback(async (itemId: string) => {
@@ -131,7 +150,7 @@ export default function AccountsPage() {
       toast.error('Erro ao finalizar conexão: ' + error.message);
       throw error;
     }
-  }, [fetchAccounts]);
+  }, [fetchAccounts, syncAccount]);
 
   useEffect(() => {
     console.log('[AccountsPage] useEffect triggered', {
@@ -268,24 +287,32 @@ export default function AccountsPage() {
           
           // Se o status está OK, tentar sincronizar
           console.log('[SYNC] Status OK, chamando API de sincronização...');
-          const result = await syncAccount(String(accountId));
+          const result = await syncAccount(String(accountId)) as ExtendedSyncResult;
           console.log('[SYNC] Resultado da sincronização:', result);
-          console.log('[SYNC] Detalhes da sincronização:', {
-              transactions_synced: result.data?.transactions_synced,
-              sync_from: result.data?.sync_from,
-              sync_to: result.data?.sync_to,
-              days_searched: result.data?.days_searched,
-              status: result.data?.status,
-              item_status: result.data?.item_status,
-              full_data: result.data
-          });
           
           if (result.success) {
-              const transactionCount = result.data?.transactions_synced || 0;
+              const transactionCount = result.data?.sync_stats?.transactions_synced || 0;
+              const bankRequiresMFA = result.data?.sync_stats?.bank_requires_mfa;
+              const reconnectionSuggested = result.reconnection_suggested;
+              
               if (transactionCount > 0) {
                   toast.success(`✅ ${transactionCount} transações sincronizadas`);
               } else {
                   toast.info('Nenhuma transação nova encontrada');
+              }
+              
+              // Se o banco requer MFA e sugere reconexão, mostrar aviso
+              if (bankRequiresMFA && reconnectionSuggested) {
+                  toast.warning(
+                      result.warning || 'Este banco requer autenticação a cada sincronização.',
+                      { 
+                          duration: 8000,
+                          action: {
+                              label: 'Reconectar',
+                              onClick: () => handleReconnectAccount(accountId)
+                          }
+                      }
+                  );
               }
               
               // Atualizar lista de contas
@@ -295,25 +322,25 @@ export default function AccountsPage() {
               console.log('[SYNC] Erro na sincronização:', {
                   error_code: result.error_code,
                   reconnection_required: result.reconnection_required,
-                  message: result.message
+                  message: result.message,
+                  bank_requires_mfa: result.data?.bank_requires_mfa
               });
               
               if (result.error_code === 'WAITING_USER_ACTION' || result.error_code === 'MFA_REQUIRED' || result.reconnection_required) {
-                  // Adicionar verificação para evitar reconexão dupla
                   const account = accounts.find(acc => acc.id === accountId);
-                  
-                  // Verificar se acabamos de reconectar
-                  const lastReconnectTime = sessionStorage.getItem(`last_reconnect_${accountId}`);
-                  const now = Date.now();
-                  
-                  if (lastReconnectTime && (now - parseInt(lastReconnectTime)) < 60000) { // 1 minuto
-                      console.log('[SYNC] Reconexão recente detectada, evitando loop');
-                      toast.warning('A conta foi reconectada recentemente. Tente novamente em alguns minutos.');
-                      return;
-                  }
-                  
                   const accountName = account?.account_name || 'sua conta';
-                  setShowBankAuthDialog({ accountId, accountName });
+                  
+                  // Se é um banco com MFA, usar mensagem específica
+                  if (result.data?.bank_requires_mfa) {
+                      setShowBankAuthDialog({ 
+                          accountId, 
+                          accountName,
+                          message: result.message || 'Este banco requer autenticação a cada sincronização.',
+                          isMFABank: true
+                      });
+                  } else {
+                      setShowBankAuthDialog({ accountId, accountName });
+                  }
               } else {
                   toast.error(result.message || 'Erro ao sincronizar conta');
               }
@@ -911,48 +938,71 @@ export default function AccountsPage() {
 
       {/* Bank Authentication Required Dialog */}
       <Dialog open={!!showBankAuthDialog} onOpenChange={() => setShowBankAuthDialog(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reautenticação Necessária</DialogTitle>
-            <DialogDescription>
-              {showBankAuthDialog?.accountName ? (
-                <>A conexão com {showBankAuthDialog.accountName} expirou e precisa ser renovada.</>
-              ) : (
-                <>A conexão com seu banco expirou e precisa ser renovada.</>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-              <h4 className="font-medium text-blue-900 mb-2">Por que isso é necessário?</h4>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>• Por segurança, os bancos exigem autenticação periódica</li>
-                <li>• Isso garante que apenas você tem acesso às suas transações</li>
-                <li>• É um procedimento padrão do Open Banking</li>
-              </ul>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowBankAuthDialog(null)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => {
-                const authInfo = showBankAuthDialog;
-                setShowBankAuthDialog(null);
-                if (authInfo?.accountId) {
-                  handleReconnectAccount(authInfo.accountId);
-                }
-              }}
-            >
-              <LinkIcon className="h-4 w-4 mr-2" />
-              Autenticar no Banco
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>
+                      {showBankAuthDialog?.isMFABank ? 'Autenticação Necessária' : 'Reautenticação Necessária'}
+                  </DialogTitle>
+                  <DialogDescription>
+                      {showBankAuthDialog?.message || (
+                          showBankAuthDialog?.accountName ? (
+                              <>A conexão com {showBankAuthDialog.accountName} expirou e precisa ser renovada.</>
+                          ) : (
+                              <>A conexão com seu banco expirou e precisa ser renovada.</>
+                          )
+                      )}
+                  </DialogDescription>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                      <h4 className="font-medium text-blue-900 mb-2">Por que isso é necessário?</h4>
+                      <ul className="text-sm text-blue-800 space-y-1">
+                          {showBankAuthDialog?.isMFABank ? (
+                              <>
+                                  <li>• Este banco requer autenticação a cada sincronização</li>
+                                  <li>• É uma medida de segurança adicional do banco</li>
+                                  <li>• Suas transações anteriores estão preservadas</li>
+                              </>
+                          ) : (
+                              <>
+                                  <li>• Por segurança, os bancos exigem autenticação periódica</li>
+                                  <li>• Isso garante que apenas você tem acesso às suas transações</li>
+                                  <li>• É um procedimento padrão do Open Banking</li>
+                              </>
+                          )}
+                      </ul>
+                  </div>
+                  
+                  {showBankAuthDialog?.isMFABank && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+                          <p className="text-sm text-amber-800">
+                              <strong>Nota:</strong> Este banco solicita autenticação sempre que você deseja buscar novas transações. 
+                              Isso é normal e faz parte da política de segurança do banco.
+                          </p>
+                      </div>
+                  )}
+              </div>
+              <DialogFooter>
+                  <Button
+                      variant="outline"
+                      onClick={() => setShowBankAuthDialog(null)}
+                  >
+                      Cancelar
+                  </Button>
+                  <Button
+                      onClick={() => {
+                          const authInfo = showBankAuthDialog;
+                          setShowBankAuthDialog(null);
+                          if (authInfo?.accountId) {
+                              handleReconnectAccount(authInfo.accountId);
+                          }
+                      }}
+                  >
+                      <LinkIcon className="h-4 w-4 mr-2" />
+                      Autenticar no Banco
+                  </Button>
+              </DialogFooter>
+          </DialogContent>
       </Dialog>
 
     </div>

@@ -113,13 +113,13 @@ class PluggyTransactionSyncService:
                 'success': False,
                 'error': str(e)
             }
-    
+
     async def sync_account_transactions(self, account: BankAccount, force_extended_window: bool = False) -> Dict[str, Any]:
         """Sync transactions for a specific Pluggy account
         
-        IMPORTANTE: A API da Pluggy pode ter um delay de alguns minutos para disponibilizar
-        transações muito recentes. Por isso, usamos janelas de tempo maiores em syncs frequentes
-        para garantir que pegamos todas as transações, mesmo as que foram processadas com delay.
+        IMPORTANTE: Alguns bancos (como Inter) requerem MFA a cada sincronização.
+        Nesses casos, não tentamos forçar update do item, apenas sincronizamos
+        as transações disponíveis.
         """
         try:
             # Get account info asynchronously
@@ -138,8 +138,25 @@ class PluggyTransactionSyncService:
                     async with PluggyClient() as client:
                         item = await client.get_item(pluggy_item_id)
                         item_status = item.get('status')
-                        logger.info(f"📋 Item {pluggy_item_id} status: {item_status}")
+                        execution_status = item.get('executionStatus')
+                        connector = item.get('connector', {})
+                        has_mfa = connector.get('hasMFA', False)
                         
+                        logger.info(f"📋 Item {pluggy_item_id} status: {item_status}, execution: {execution_status}, hasMFA: {has_mfa}")
+                        
+                        # Se o banco requer MFA e está OUTDATED com USER_INPUT_TIMEOUT, 
+                        # não tentar update automático
+                        if has_mfa and item_status == 'OUTDATED' and execution_status == 'USER_INPUT_TIMEOUT':
+                            logger.warning(f"⚠️ Bank requires MFA and session expired. Manual reconnection needed.")
+                            return {
+                                'account_id': account_info['id'], 
+                                'status': 'mfa_required',
+                                'message': 'Este banco requer autenticação a cada sincronização',
+                                'transactions': 0,
+                                'requires_reconnection': True
+                            }
+                        
+                        # Check outros status problemáticos
                         if item_status == 'WAITING_USER_ACTION':
                             logger.warning(f"⚠️ Item requires user action, cannot sync")
                             return {
@@ -156,11 +173,11 @@ class PluggyTransactionSyncService:
                                 'message': 'Invalid credentials',
                                 'transactions': 0
                             }
-                        elif item_status == 'OUTDATED':
-                            # Don't try to update OUTDATED items automatically
-                            # as it may trigger WAITING_USER_ACTION
-                            logger.warning(f"⚠️ Item is OUTDATED but continuing with sync")
-                            logger.info(f"📝 Note: New transactions may not be available until item is updated")
+                        
+                        # Para bancos com MFA, mesmo com PARTIAL_SUCCESS, sincronizar o que temos
+                        if has_mfa and execution_status == 'PARTIAL_SUCCESS':
+                            logger.info(f"ℹ️ Bank with MFA in PARTIAL_SUCCESS state, syncing available data")
+                        
                 except Exception as e:
                     logger.warning(f"⚠️ Could not check item status: {e}")
             
@@ -169,7 +186,7 @@ class PluggyTransactionSyncService:
             # Buscar 1 dia no futuro para pegar transações com timezone issues
             sync_to = (timezone.now() + timedelta(days=1)).date()
             
-            logger.info(f"📅 Syncing transactions from {sync_from} to {sync_to} (incluindo 1 dia futuro para timezone)")
+            logger.info(f"📅 Syncing transactions from {sync_from} to {sync_to}")
             
             # Fetch and save transactions
             total_transactions = 0
@@ -265,9 +282,13 @@ class PluggyTransactionSyncService:
                         async with PluggyClient() as client:
                             item = await client.get_item(pluggy_item_id)
                             item_status = item.get('status')
-                            if item_status == 'OUTDATED':
-                                sync_info['message'] = 'Nenhuma transação nova encontrada. A conexão com o banco pode estar desatualizada.'
-                                sync_info['item_status'] = item_status
+                            execution_status = item.get('executionStatus')
+                            connector = item.get('connector', {})
+                            has_mfa = connector.get('hasMFA', False)
+                            
+                            if has_mfa and (item_status == 'OUTDATED' or execution_status == 'USER_INPUT_TIMEOUT'):
+                                sync_info['message'] = 'Nenhuma transação nova. Para buscar transações mais recentes, reconecte a conta.'
+                                sync_info['requires_reconnection'] = True
                             else:
                                 sync_info['message'] = f'Nenhuma transação nova nos últimos {(sync_to - sync_from).days} dias.'
                     except:
@@ -284,8 +305,8 @@ class PluggyTransactionSyncService:
                 'status': 'error',
                 'error': str(e),
                 'transactions': 0
-            }
-    
+            }    
+
     @sync_to_async
     def _get_account_info(self, account: BankAccount) -> Dict[str, Any]:
         """Get account info safely for async context"""

@@ -937,51 +937,280 @@ class PluggyWebhookView(APIView):
     permission_classes = []  # Webhooks don't use normal auth
     authentication_classes = []  # Disable authentication for webhooks
     throttle_classes = []  # Disable rate limiting for webhooks
-    
-    def post(self, request):
+
+    def post(self, request, account_id):
         """
-        Process Pluggy webhook events
+        Trigger sync for a specific account
         """
         try:
-            # Validate webhook signature (disabled for now)
-            # TODO: Configure PLUGGY_WEBHOOK_SECRET in production
-            signature = request.headers.get('X-Pluggy-Signature', '')
-            pluggy = PluggyClient()
-            
-            # Temporarily disabled for testing
-            # if not pluggy.validate_webhook(signature, request.body.decode()):
-            #     logger.warning("Invalid webhook signature")
-            #     return Response(
-            #         {'error': 'Invalid signature'},
-            #         status=status.HTTP_401_UNAUTHORIZED
-            #     )
-            
-            logger.info(f"Webhook received with signature: {signature[:20]}..." if signature else "No signature")
-            
-            # Process event
-            event_type = request.data.get('event')
-            data = request.data.get('data', {})
-            
-            logger.info(f"Received Pluggy webhook: {event_type}")
-            
-            if event_type == 'item.updated':
-                self._handle_item_updated(data)
-            elif event_type == 'item.error':
-                self._handle_item_error(data)
-            elif event_type == 'item.deleted':
-                self._handle_item_deleted(data)
-            elif event_type == 'transactions.created':
-                self._handle_transactions_created(data)
-            
-            return Response({'status': 'ok'})
-            
-        except Exception as e:
-            logger.error(f"Webhook processing error: {e}")
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            # Get account
+            account = BankAccount.objects.get(
+                id=account_id,
+                company=request.user.company
             )
-    
+            
+            if not account.pluggy_item_id:
+                return Response(
+                    {'error': 'Account not connected through Pluggy'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            pluggy = PluggyClient()
+
+            # Check item status BEFORE trying to update
+            item = pluggy.get_item(account.pluggy_item_id)
+            item_status = item.get('status')
+            execution_status = item.get('executionStatus')
+            connector = item.get('connector', {})
+            has_mfa = connector.get('hasMFA', False)
+            
+            logger.info(f"Item status: {item_status}")
+            logger.info(f"Execution status: {execution_status}")
+            logger.info(f"Connector: {connector.get('name')} (ID: {connector.get('id')})")
+            logger.info(f"Has MFA: {has_mfa}")
+            logger.info(f"Status detail: {json.dumps(item.get('statusDetail'), indent=2)}")
+            logger.info(f"Last updated: {item.get('lastUpdatedAt')}")
+            
+            # Para bancos com MFA (como Inter), verificar se precisa reconexão
+            if has_mfa:
+                logger.info(f"Bank {connector.get('name')} requires MFA for each sync")
+                
+                # Se está OUTDATED com USER_INPUT_TIMEOUT, precisa reconectar
+                if item_status == 'OUTDATED' and execution_status == 'USER_INPUT_TIMEOUT':
+                    logger.warning(f"MFA bank with expired session, reconnection required")
+                    return Response({
+                        'success': False,
+                        'error_code': 'MFA_REQUIRED',
+                        'message': f'O {connector.get("name", "banco")} requer autenticação para cada sincronização.',
+                        'reconnection_required': True,
+                        'data': {
+                            'item_id': account.pluggy_item_id,
+                            'status': item_status,
+                            'execution_status': execution_status,
+                            'bank_requires_mfa': True
+                        }
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Se está WAITING_USER_INPUT, também precisa reconectar
+                elif item_status == 'WAITING_USER_INPUT':
+                    logger.warning(f"Item {account.pluggy_item_id} waiting for user input")
+                    return Response({
+                        'success': False,
+                        'error_code': 'MFA_REQUIRED',
+                        'message': f'O {connector.get("name", "banco")} está aguardando sua autenticação.',
+                        'reconnection_required': True,
+                        'data': {
+                            'item_id': account.pluggy_item_id,
+                            'status': item_status,
+                            'execution_status': execution_status,
+                            'bank_requires_mfa': True
+                        }
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                    
+                # Se está UPDATED com PARTIAL_SUCCESS, tentar sincronizar o que tem disponível
+                elif item_status == 'UPDATED' and execution_status == 'PARTIAL_SUCCESS':
+                    logger.info("MFA bank with PARTIAL_SUCCESS, will sync available data")
+                    # Continuar com sincronização sem tentar update
+            
+            # Check for login errors
+            if item_status == 'LOGIN_ERROR':
+                logger.warning(f"Item {account.pluggy_item_id} has login error")
+                return Response({
+                    'success': False,
+                    'error_code': 'LOGIN_ERROR',
+                    'message': 'Credenciais inválidas. Por favor, reconecte a conta.',
+                    'reconnection_required': True,
+                    'data': {
+                        'item_id': account.pluggy_item_id,
+                        'status': item_status
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Para bancos SEM MFA, tentar atualizar o item se necessário
+            should_update_item = False
+            if not has_mfa and item_status in ['OUTDATED', 'UPDATED']:
+                # Verificar quando foi a última atualização
+                last_updated = item.get('lastUpdatedAt')
+                if last_updated:
+                    try:
+                        last_update_time = datetime.fromisoformat(last_updated.replace('Z', '+00:00'))
+                        hours_since_update = (datetime.now(timezone.utc) - last_update_time).total_seconds() / 3600
+                        
+                        # Se faz mais de 2 horas desde a última atualização, tentar atualizar
+                        if hours_since_update > 2:
+                            should_update_item = True
+                            logger.info(f"Item last updated {hours_since_update:.1f} hours ago, will try to update")
+                    except Exception as e:
+                        logger.warning(f"Error parsing last update time: {e}")
+            
+            # Tentar atualizar item apenas se necessário e se não tem MFA
+            if should_update_item:
+                logger.info(f"Triggering update for item {account.pluggy_item_id}")
+                try:
+                    update_result = pluggy.update_item(account.pluggy_item_id)
+                    logger.info(f"Update result: {json.dumps(update_result, indent=2)}")
+                    
+                    # Wait a moment for the update to start
+                    import time
+                    time.sleep(3)
+                    
+                    # Check status after update
+                    updated_item = pluggy.get_item(account.pluggy_item_id)
+                    new_status = updated_item.get('status')
+                    new_execution_status = updated_item.get('executionStatus')
+                    
+                    logger.info(f"Status after update: {new_status}, execution: {new_execution_status}")
+                    
+                    # Se mudou para WAITING_USER_INPUT, precisa reconectar
+                    if new_status == 'WAITING_USER_INPUT':
+                        logger.warning(f"Item now requires user input after update attempt")
+                        return Response({
+                            'success': False,
+                            'error_code': 'MFA_REQUIRED',
+                            'message': 'A sincronização requer autenticação adicional.',
+                            'reconnection_required': True,
+                            'data': {
+                                'item_id': account.pluggy_item_id,
+                                'status': new_status,
+                                'execution_status': new_execution_status
+                            }
+                        }, status=status.HTTP_400_BAD_REQUEST)
+                        
+                except Exception as update_error:
+                    logger.error(f"Error updating item: {update_error}")
+                    # Continue with sync even if update fails
+            
+            # Initialize sync statistics
+            sync_stats = {
+                'transactions_synced': 0,
+                'sync_from': None,
+                'sync_to': None,
+                'days_searched': 0,
+                'status': item_status,
+                'execution_status': execution_status,
+                'bank_requires_mfa': has_mfa
+            }
+            
+            # Get updated account info
+            try:
+                accounts_response = pluggy.get_accounts(account.pluggy_item_id)
+                
+                # Handle different response formats
+                if isinstance(accounts_response, dict):
+                    accounts = accounts_response.get('results', accounts_response.get('data', []))
+                elif isinstance(accounts_response, list):
+                    accounts = accounts_response
+                else:
+                    accounts = []
+                
+                # Update account balance
+                for acc_data in accounts:
+                    if acc_data['id'] == account.external_id:
+                        # Update balance
+                        account.current_balance = Decimal(str(acc_data.get('balance', 0)))
+                        account.available_balance = Decimal(str(acc_data.get('balance', 0)))
+                        account.last_sync_at = timezone.now()
+                        account.save()
+                        logger.info(f"Updated balance: {account.current_balance}")
+                        break
+                        
+            except Exception as e:
+                logger.error(f"Error updating account info: {e}")
+            
+            # Sync transactions
+            try:
+                # Determine sync period
+                if has_mfa:
+                    # Para bancos com MFA, usar janela menor pois dados podem estar desatualizados
+                    from_date = timezone.now() - timedelta(days=7)
+                else:
+                    # Para bancos sem MFA, usar janela normal
+                    from_date = timezone.now() - timedelta(days=30)
+                
+                to_date = timezone.now()
+                
+                sync_stats['sync_from'] = from_date.isoformat()
+                sync_stats['sync_to'] = to_date.isoformat()
+                sync_stats['days_searched'] = (to_date - from_date).days
+                
+                # Count transactions before sync
+                before_count = account.transactions.count()
+                
+                # Use the callback view's sync method
+                callback_view = PluggyCallbackView()
+                callback_view._sync_transactions(account, pluggy)
+                
+                # Count transactions after sync
+                after_count = account.transactions.count()
+                sync_stats['transactions_synced'] = after_count - before_count
+                
+                logger.info(f"Synced {sync_stats['transactions_synced']} new transactions")
+                
+            except Exception as e:
+                logger.error(f"Error syncing transactions: {e}")
+                sync_stats['sync_error'] = str(e)
+            
+            # Prepare response
+            response_data = {
+                'success': True,
+                'message': 'Sincronização concluída',
+                'data': {
+                    'account': BankAccountSerializer(account).data,
+                    'sync_stats': sync_stats,
+                    'item_status': item_status,
+                    'execution_status': execution_status
+                }
+            }
+            
+            # Add warnings based on bank type and status
+            if has_mfa:
+                if execution_status == 'USER_INPUT_TIMEOUT':
+                    response_data['warning'] = f'O {connector.get("name", "banco")} requer autenticação a cada sincronização. Para buscar transações mais recentes, reconecte a conta.'
+                    response_data['reconnection_suggested'] = True
+                elif execution_status == 'PARTIAL_SUCCESS':
+                    response_data['info'] = 'Sincronização parcial concluída. Alguns dados podem estar limitados.'
+            elif item_status == 'OUTDATED':
+                response_data['warning'] = 'A conexão com o banco está desatualizada. Alguns dados podem não estar completos.'
+            
+            if sync_stats.get('transactions_synced', 0) == 0:
+                response_data['info'] = 'Nenhuma transação nova encontrada no período.'
+            
+            return Response(response_data)
+            
+        except BankAccount.DoesNotExist:
+            return Response(
+                {
+                    'success': False,
+                    'error': 'Account not found',
+                    'message': 'Conta não encontrada'
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Failed to sync account: {e}", exc_info=True)
+            
+            # Check if it's a Pluggy API error about MFA/authentication
+            error_message = str(e).lower()
+            if any(keyword in error_message for keyword in ['waiting', 'user', 'action', 'auth', 'session', 'timeout']):
+                return Response({
+                    'success': False,
+                    'error_code': 'MFA_REQUIRED',
+                    'message': 'Esta conta requer autenticação adicional.',
+                    'reconnection_required': True,
+                    'data': {
+                        'item_id': account.pluggy_item_id if account else None
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            return Response(
+                {
+                    'success': False,
+                    'error': str(e),
+                    'message': f'Erro ao sincronizar: {str(e)}'
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )    
+
     def _handle_item_updated(self, data: Dict):
         """
         Handle item updated event
