@@ -664,7 +664,7 @@ class PluggyAccountSyncView(APIView):
     """
     permission_classes = [IsAuthenticated]
     
-    def post(self, request, account_id):
+    def post(self, request):
         """
         Trigger sync for a specific account
         """
@@ -950,7 +950,7 @@ class PluggyAccountSyncView(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
+
 
 @method_decorator(csrf_exempt, name='dispatch')
 class PluggyWebhookView(APIView):

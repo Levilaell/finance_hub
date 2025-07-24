@@ -494,23 +494,51 @@ export default function AccountsPage() {
       
       // Forçar limpeza de qualquer modal/iframe remanescente
       setTimeout(() => {
-          const iframes = document.querySelectorAll('iframe[src*="pluggy"], iframe[src*="connect.pluggy"]');
+          // Remover iframes
+          const iframes = document.querySelectorAll('iframe[src*="pluggy"], iframe[src*="connect.pluggy"], iframe[title*="Pluggy"]');
+          console.log(`[AccountsPage] Removendo ${iframes.length} iframes`);
           iframes.forEach(iframe => {
               console.log('[AccountsPage] Removendo iframe:', iframe);
               iframe.remove();
           });
           
-          const modals = document.querySelectorAll('[class*="pluggy"], [id*="pluggy"], .zoid-overlay, .zoid-container');
+          // Remover modais e containers
+          const modals = document.querySelectorAll('[class*="pluggy"], [id*="pluggy"], .zoid-overlay, .zoid-container, [data-zoid]');
+          console.log(`[AccountsPage] Removendo ${modals.length} modais`);
           modals.forEach(modal => {
               console.log('[AccountsPage] Removendo modal:', modal);
               modal.remove();
           });
           
           // Remover overlay se existir
-          const overlays = document.querySelectorAll('.fixed.inset-0.bg-black\\/50');
+          const overlays = document.querySelectorAll('.fixed.inset-0.bg-black\\/50, .fixed.inset-0.z-\\[9998\\], .fixed.inset-0.z-\\[9999\\]');
+          console.log(`[AccountsPage] Removendo ${overlays.length} overlays`);
           overlays.forEach(overlay => {
               console.log('[AccountsPage] Removendo overlay:', overlay);
               overlay.remove();
+          });
+          
+          // Remover qualquer elemento com z-index muito alto que possa estar cobrindo a tela
+          const highZIndexElements = Array.from(document.querySelectorAll('*')).filter(el => {
+              const zIndex = window.getComputedStyle(el).zIndex;
+              return zIndex !== 'auto' && parseInt(zIndex) > 1000;
+          });
+          console.log(`[AccountsPage] Elementos com z-index alto: ${highZIndexElements.length}`);
+          highZIndexElements.forEach(el => {
+              if (!el.closest('[data-radix-portal]')) { // Não remover elementos do Radix UI
+                  console.log('[AccountsPage] Removendo elemento com z-index alto:', el, 'z-index:', window.getComputedStyle(el).zIndex);
+                  el.remove();
+              }
+          });
+          
+          // Restaurar scroll do body se estiver bloqueado
+          document.body.style.overflow = '';
+          document.documentElement.style.overflow = '';
+          
+          console.log('[AccountsPage] Reset completo. Estado do DOM:', {
+              bodyOverflow: document.body.style.overflow,
+              htmlOverflow: document.documentElement.style.overflow,
+              remainingModals: document.querySelectorAll('[class*="pluggy"]').length
           });
       }, 100);
   };
@@ -646,9 +674,13 @@ export default function AccountsPage() {
                             
                             // Se teve sucesso parcial ou timeout, não tentar sincronizar automaticamente
                             if (executionStatus === 'PARTIAL_SUCCESS' || executionStatus === 'USER_INPUT_TIMEOUT') {
+                                console.log('[AccountsPage] Handling PARTIAL_SUCCESS/TIMEOUT after reconnection');
+                                
                                 // Para bancos com MFA e PARTIAL_SUCCESS, isso é esperado
                                 const connectorInfo = itemData?.item?.connector;
                                 const hasMFA = connectorInfo?.hasMFA;
+                                
+                                console.log('[AccountsPage] Bank has MFA:', hasMFA);
                                 
                                 if (hasMFA) {
                                     toast.success('✅ Conta reconectada! Os dados foram atualizados.');
@@ -659,9 +691,21 @@ export default function AccountsPage() {
                                     toast.info('Conta reconectada! Sincronizando dados disponíveis...');
                                 }
                                 
+                                // Debug: verificar estado do DOM antes de atualizar
+                                console.log('[AccountsPage] DOM state before fetchAccounts:', {
+                                    bodyClasses: document.body.className,
+                                    hasOverlays: document.querySelectorAll('.fixed.inset-0').length,
+                                    hasModals: document.querySelectorAll('[class*="pluggy"]').length
+                                });
+                                
                                 // Apenas atualizar a lista de contas, sem tentar sincronizar novamente
                                 setTimeout(() => {
-                                    fetchAccounts();
+                                    console.log('[AccountsPage] Calling fetchAccounts after PARTIAL_SUCCESS');
+                                    fetchAccounts().then(() => {
+                                        console.log('[AccountsPage] fetchAccounts completed');
+                                    }).catch(err => {
+                                        console.error('[AccountsPage] Error in fetchAccounts:', err);
+                                    });
                                 }, 1000);
                                 
                                 return;
@@ -734,6 +778,12 @@ export default function AccountsPage() {
                 console.log('[AccountsPage] Pluggy Connect Closed');
                 // Sempre resetar quando fechar
                 resetPluggyWidget();
+                
+                // Forçar re-render após um pequeno delay
+                setTimeout(() => {
+                    console.log('[AccountsPage] Forcing re-render after close');
+                    fetchAccounts();
+                }, 200);
             }}
           />
         )
