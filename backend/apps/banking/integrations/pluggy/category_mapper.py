@@ -5,7 +5,7 @@ Maps Pluggy categories to internal TransactionCategory model
 import logging
 from typing import Optional
 from django.core.cache import cache
-from .models import TransactionCategory
+from ...models import TransactionCategory
 
 logger = logging.getLogger(__name__)
 
@@ -219,3 +219,7 @@ class PluggyCategoryMapper:
                     result[pluggy_cat] = category
         
         return result
+
+
+# Global instance
+pluggy_category_mapper = PluggyCategoryMapper()

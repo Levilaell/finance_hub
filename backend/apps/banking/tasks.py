@@ -275,7 +275,7 @@ def sync_pluggy_account(self, account_id):
         account_id: BankAccount ID to sync
     """
     import asyncio
-    from .pluggy_sync_service import pluggy_sync_service
+    from .integrations.pluggy.sync_service import pluggy_sync_service
     
     try:
         account = BankAccount.objects.get(
@@ -327,7 +327,7 @@ def sync_all_pluggy_accounts():
     Periodic task to sync all Pluggy accounts
     """
     import asyncio
-    from .pluggy_sync_service import pluggy_sync_service
+    from .integrations.pluggy.sync_service import pluggy_sync_service
     
     try:
         logger.info("🔄 Starting periodic sync of all Pluggy accounts")
@@ -349,4 +349,98 @@ def sync_all_pluggy_accounts():
         
     except Exception as exc:
         logger.error(f"❌ Error in periodic Pluggy sync: {exc}")
+        return {'status': 'error', 'message': str(exc)}
+
+
+@shared_task
+def notify_consent_renewal_required(account_id):
+    """
+    Send notification for consent renewal required
+    """
+    from django.core.mail import send_mail
+    from django.conf import settings
+    
+    try:
+        account = BankAccount.objects.get(id=account_id)
+        user = account.company.owner
+        
+        send_mail(
+            subject=f'⚠️ Renovação de Consentimento Necessária - {account.display_name}',
+            message=f'''
+            Olá {user.first_name},
+            
+            O consentimento Open Finance para sua conta {account.display_name} está expirando e precisa ser renovado.
+            
+            Por favor, acesse o sistema e reconecte sua conta para continuar sincronizando suas transações.
+            
+            Atenciosamente,
+            Equipe CaixaHub
+            ''',
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+        
+        logger.info(f"Consent renewal notification sent for account {account_id}")
+        return {'status': 'success', 'account_id': account_id}
+        
+    except BankAccount.DoesNotExist:
+        logger.error(f"Account {account_id} not found")
+        return {'status': 'error', 'message': 'Account not found'}
+    except Exception as e:
+        logger.error(f"Error sending consent renewal notification: {e}")
+        return {'status': 'error', 'message': str(e)}
+
+
+@shared_task
+def check_and_renew_consents():
+    """
+    Runs daily via Celery Beat to check and renew consents
+    """
+    import asyncio
+    from .integrations.pluggy.consent_service import check_and_renew_consents_task
+    
+    try:
+        logger.info("🔄 Starting consent renewal check")
+        
+        # Run async task
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(check_and_renew_consents_task())
+        finally:
+            loop.close()
+        
+        logger.info(f"✅ Consent renewal check completed: {result}")
+        return result
+        
+    except Exception as exc:
+        logger.error(f"❌ Error in consent renewal check: {exc}")
+        return {'status': 'error', 'message': str(exc)}
+
+
+@shared_task
+def renew_single_consent_task(account_id):
+    """
+    Renew consent for a single account
+    """
+    import asyncio
+    from .integrations.pluggy.consent_service import renew_single_consent_task as async_renew
+    
+    try:
+        logger.info(f"🔄 Starting consent renewal for account {account_id}")
+        
+        # Run async task
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(async_renew(account_id))
+        finally:
+            loop.close()
+        
+        logger.info(f"✅ Consent renewal completed for account {account_id}: {result}")
+        return result
+        
+    except Exception as exc:
+        logger.error(f"❌ Error renewing consent for account {account_id}: {exc}")
         return {'status': 'error', 'message': str(exc)}

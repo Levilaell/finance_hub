@@ -7,7 +7,7 @@ from django.db import transaction
 from asgiref.sync import sync_to_async
 
 from .models import BankAccount
-from .pluggy_sync_service import PluggyTransactionSyncService
+from .integrations.pluggy.sync_service import PluggyTransactionSyncService
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@
 Async service for transaction synchronization with Pluggy API
 """
 import asyncio
-from .pluggy_category_mapper import pluggy_category_mapper
+from .category_mapper import pluggy_category_mapper
 
 import logging
 from datetime import datetime, timedelta
@@ -15,8 +15,8 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from .models import BankAccount, Transaction, TransactionCategory, BankProvider
-from .pluggy_client import PluggyClient, PluggyError
+from ...models import BankAccount, Transaction, TransactionCategory, BankProvider
+from .client import PluggyClient, PluggyError
 
 logger = logging.getLogger(__name__)
 
@@ -751,7 +751,7 @@ class PluggyTransactionSyncService:
         @sync_to_async
         def update_counter():
             from apps.companies.models import Company, ResourceUsage
-            from apps.banking.models import Transaction
+            from ....models import Transaction
             from django.utils import timezone
             from datetime import datetime
             

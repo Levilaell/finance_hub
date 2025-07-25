@@ -20,7 +20,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
-from .cache_service import cache_service
+from ..cache_service import cache_service
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +41,12 @@ class StandardResultsSetPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 100
 
-from .models import (BankAccount, BankProvider, 
+from ..models import (BankAccount, BankProvider, 
                      Transaction, TransactionCategory)
-from .serializers import (BankAccountSerializer, BankProviderSerializer,
+from ..serializers import (BankAccountSerializer, BankProviderSerializer,
                           DashboardSerializer, EnhancedDashboardSerializer, ExpenseTrendSerializer, TimeSeriesDataSerializer, TransactionCategorySerializer,
                           TransactionSerializer)
-from .services import BankingSyncService
+from ..services import BankingSyncService
 
 
 class BankAccountViewSet(viewsets.ModelViewSet):

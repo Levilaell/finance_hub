@@ -18,9 +18,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import BankAccount, BankProvider, Transaction
-from .pluggy_client import PluggyClient
-from .serializers import BankAccountSerializer
+from ..models import BankAccount, BankProvider, Transaction
+from ..integrations.pluggy.client import PluggyClient
+from ..serializers import BankAccountSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -617,7 +617,7 @@ class PluggyCallbackView(APIView):
         """
         Process a single transaction
         """
-        from .pluggy_category_mapper import PluggyCategoryMapper
+        from ..integrations.pluggy.category_mapper import PluggyCategoryMapper
         
         # Map transaction type
         transaction_type = self._map_transaction_type(trans_data)

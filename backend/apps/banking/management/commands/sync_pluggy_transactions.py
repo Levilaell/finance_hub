@@ -6,8 +6,8 @@ from django.utils import timezone
 from datetime import timedelta
 
 from apps.banking.models import BankAccount
-from apps.banking.pluggy_client import PluggyClient
-from apps.banking.pluggy_views import PluggyCallbackView
+from apps.banking.integrations.pluggy.client import PluggyClient
+from apps.banking.views.pluggy_views import PluggyCallbackView
 
 
 class Command(BaseCommand):

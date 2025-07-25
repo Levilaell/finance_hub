@@ -3,7 +3,7 @@ Test Pluggy integration
 """
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from apps.banking.pluggy_client import PluggyClient
+from apps.banking.integrations.pluggy.client import PluggyClient
 import json
 
 
