@@ -23,22 +23,16 @@ export interface DashboardData {
 
 class DashboardService {
   async getDashboardData(): Promise<DashboardData> {
-    try {
-      // Try enhanced dashboard first
-      return await apiClient.get<DashboardData>("/api/banking/dashboard/enhanced/");
-    } catch (error) {
       // Fallback to simple dashboard
       return await apiClient.get<DashboardData>("/api/banking/dashboard/");
-    }
+    
   }
 
   async getSimpleDashboard(): Promise<DashboardData> {
     return apiClient.get<DashboardData>("/api/banking/dashboard/");
   }
 
-  async getEnhancedDashboard(): Promise<DashboardData> {
-    return apiClient.get<DashboardData>("/api/banking/dashboard/enhanced/");
-  }
+
 }
 
 export const dashboardService = new DashboardService();

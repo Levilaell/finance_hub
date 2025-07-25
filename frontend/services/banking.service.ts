@@ -16,13 +16,6 @@ interface PluggyConnectTokenResponse {
   data: {
     connect_token: string;
     connect_url: string;
-    sandbox_mode: boolean;
-    expires_at?: string;
-    sandbox_credentials?: {
-      user: string;
-      password: string;
-      token: string;
-    };
   };
 }
 
@@ -73,7 +66,6 @@ class BankingService {
   }
 
   async syncAccount(id: string): Promise<SyncResult> {
-    // Em vez de Promise<{ message: string }>
     const response = await apiClient.post<{
       success: boolean;
       error_code?: string;
@@ -122,37 +114,16 @@ class BankingService {
     data?: {
       connect_token: string;
       connect_url: string;
-      sandbox_mode: boolean;
-      expires_at?: string;
-      message?: string;
-      sandbox_credentials?: {
-        user: string;
-        password: string;
-        token: string;
-      };
     };
     message?: string;
   }> {
     try {
-      const response = await apiClient.post<{
-        connect_token: string;
-        connect_url: string;
-        sandbox_mode: boolean;
-        expires_at?: string;
-        sandbox_credentials?: {
-          user: string;
-          password: string;
-          token: string;
-        };
-      }>("/api/banking/pluggy/connect-token/", {
+      const response = await apiClient.post<PluggyConnectTokenResponse>("/api/banking/pluggy/connect-token/", {
         item_id: itemId
       });
       
-      // Wrap na estrutura esperada
-      return {
-        success: true,
-        data: response
-      };
+      // A resposta já vem no formato correto
+      return response;
     } catch (error: any) {
       return {
         success: false,
@@ -185,14 +156,6 @@ class BankingService {
       connect_token: string;
       connect_url: string;
       item_id: string;
-      sandbox_mode: boolean;
-      expires_at?: string;
-      message?: string;
-      sandbox_credentials?: {
-        user: string;
-        password: string;
-        token: string;
-      };
     };
     message?: string;
   }> {
@@ -218,11 +181,7 @@ class BankingService {
           data: {
             connect_token: tokenResponse.data.connect_token,
             connect_url: tokenResponse.data.connect_url,
-            sandbox_mode: tokenResponse.data.sandbox_mode,
-            item_id: account.pluggy_item_id, // ← IMPORTANTE
-            expires_at: tokenResponse.data.expires_at,
-            message: tokenResponse.data.message,
-            sandbox_credentials: tokenResponse.data.sandbox_credentials
+            item_id: account.pluggy_item_id // ← IMPORTANTE
           }
         };
       }

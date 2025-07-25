@@ -181,6 +181,7 @@ class DashboardSerializer(serializers.Serializer):
     transactions_count = serializers.IntegerField()
     recent_transactions = TransactionSerializer(many=True, read_only=True)
     top_categories = serializers.ListField(child=serializers.DictField())
+    usage_limits = serializers.DictField(required=False)
 
 
 

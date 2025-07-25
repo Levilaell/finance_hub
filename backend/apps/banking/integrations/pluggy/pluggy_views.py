@@ -18,9 +18,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..models import BankAccount, BankProvider, Transaction
-from ..integrations.pluggy.client import PluggyClient
-from ..serializers import BankAccountSerializer
+from ...models import BankAccount, BankProvider, Transaction
+from .client import PluggyClient
+from ...serializers import BankAccountSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -42,16 +42,13 @@ class PluggyConnectTokenView(APIView):
             # Get optional parameters
             item_id = request.data.get('itemId') or request.data.get('item_id')
             client_user_id = request.data.get('clientUserId', str(request.user.id))
-            include_open_finance = request.data.get('includeOpenFinance', True)
-            products = request.data.get('products', ['ACCOUNTS', 'TRANSACTIONS'])
             
-            logger.info(f"Parameters - item_id: {item_id}, client_user_id: {client_user_id}, open_finance: {include_open_finance}")
+            logger.info(f"Parameters - item_id: {item_id}, client_user_id: {client_user_id}")
             
             # Create connect token with Open Finance support
             token_data = pluggy.create_connect_token(
                 item_id=item_id,
                 client_user_id=client_user_id,
-                products=products
             )
             
             logger.info("Connect token created successfully")
@@ -62,22 +59,9 @@ class PluggyConnectTokenView(APIView):
                 'data': {
                     'connect_token': token_data['accessToken'],
                     'connect_url': token_data['connectUrl'],
-                    'sandbox_mode': pluggy.use_sandbox,
-                    'expires_at': token_data.get('expiresAt'),
-                    'include_open_finance': include_open_finance
                 }
             }
-            
-            # Add sandbox credentials if in sandbox mode
-            if pluggy.use_sandbox:
-                response_data['data']['sandbox_credentials'] = {
-                    'user': 'user-ok',
-                    'password': 'password-ok', 
-                    'token': '123456',
-                    'cpf': '76109277673',  # CPF para teste Open Finance
-                    'open_finance_user': 'test@example.com',
-                    'open_finance_password': 'P@ssword01'
-                }
+        
             
             return Response(response_data)
             
@@ -617,7 +601,7 @@ class PluggyCallbackView(APIView):
         """
         Process a single transaction
         """
-        from ..integrations.pluggy.category_mapper import PluggyCategoryMapper
+        from .category_mapper import PluggyCategoryMapper
         
         # Map transaction type
         transaction_type = self._map_transaction_type(trans_data)

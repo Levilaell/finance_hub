@@ -11,6 +11,7 @@ from django.db.models import Count, Max, Q, Sum
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -23,10 +24,10 @@ class StandardResultsSetPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 100
 
-from ..models import (BankAccount, BankProvider, 
+from .models import (BankAccount, BankProvider, 
                      Transaction, TransactionCategory)
-from ..serializers import (BankAccountSerializer, BankProviderSerializer,
-                          DashboardSerializer, EnhancedDashboardSerializer, ExpenseTrendSerializer, TimeSeriesDataSerializer, TransactionCategorySerializer,
+from .serializers import (BankAccountSerializer, BankProviderSerializer,
+                          DashboardSerializer, ExpenseTrendSerializer, TimeSeriesDataSerializer, TransactionCategorySerializer,
                           TransactionSerializer)
 
 
@@ -68,7 +69,6 @@ class BankAccountViewSet(viewsets.ModelViewSet):
             
             serializer.save(company=company)
         except AttributeError:
-            from rest_framework.exceptions import ValidationError
             raise ValidationError("Usuário não possui empresa associada")
     
     @action(detail=True, methods=['post'])
@@ -495,66 +495,6 @@ class DashboardView(APIView):
         return Response(data)
 
 
-class EnhancedDashboardView(APIView):
-    """
-    Enhanced dashboard with all financial features
-    """
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get(self, request):
-        from django.db.models import Sum, Count, Q, Avg
-        from datetime import datetime, timedelta
-        import calendar
-        
-        try:
-            company = request.user.company
-        except AttributeError:
-            return Response({
-                'error': 'Usuário não possui empresa associada'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        now = timezone.now()
-        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        
-        # Basic dashboard data (existing)
-        accounts = BankAccount.objects.filter(company=company, is_active=True)
-        total_balance = accounts.aggregate(total=Sum('current_balance'))['total'] or Decimal('0')
-        
-        # This month transactions (current month only)
-        transactions = Transaction.objects.filter(
-            bank_account__in=accounts,
-            transaction_date__gte=start_of_month
-        )
-        
-        income = transactions.filter(
-            transaction_type__in=['credit', 'transfer_in', 'pix_in']
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-        
-        expenses = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-        
-        recent_transactions = Transaction.objects.filter(
-            bank_account__in=accounts
-        ).select_related('category', 'bank_account')[:10]
-        
-        top_categories = transactions.filter(
-            category__isnull=False
-        ).values('category__name', 'category__icon').annotate(
-            total=Sum('amount'), count=Count('id')
-        ).order_by('-total')[:5]
-        
-        data = {
-            'current_balance': total_balance,
-            'monthly_income': income,
-            'monthly_expenses': abs(expenses),
-            'monthly_net': income - abs(expenses),
-            'recent_transactions': TransactionSerializer(recent_transactions, many=True).data,
-            'transactions_count': transactions.count(),
-            'top_categories': list(top_categories),
-            'accounts_count': accounts.count(),
-        }
-        
-        return Response(data)
 
 
 class TimeSeriesAnalyticsView(APIView):
@@ -585,8 +525,3 @@ class ExpenseTrendsView(APIView):
         return Response([])
 
 
-# REMOVED DEPRECATED VIEWS:
-# - ConnectBankAccountView: Use Pluggy endpoints instead
-# - OpenBankingCallbackView: Use POST /api/banking/pluggy/callback/
-# - RefreshTokenView: Pluggy manages tokens automatically
-# - SyncBankAccountView: Use POST /api/banking/pluggy/accounts/{account_id}/sync/

@@ -87,17 +87,8 @@ export default function AccountsPage() {
           token: result.data.connect_token,
           mode: 'connect'
         });
-
-        // Mostrar credenciais sandbox se aplicável
-        if (result.data.sandbox_mode && result.data.sandbox_credentials) {
-          const creds = result.data.sandbox_credentials;
-          toast.info(
-            `🧪 Modo Sandbox\nUsuário: ${creds.user}\nSenha: ${creds.password}\nToken: ${creds.token}`,
-            { duration: 15000 }
-          );
-        }
       } else {
-        throw new Error(result.data?.message || 'Erro ao criar token de conexão');
+        throw new Error(result.message || 'Erro ao criar token de conexão');
       }
     } catch (error: any) {
       console.error('[Accounts] Erro ao conectar banco:', error);
@@ -105,7 +96,6 @@ export default function AccountsPage() {
     }
   }, []);
 
-  // Handler para reconectar conta
   const handleReconnectAccount = useCallback(async (accountId: string) => {
     try {
       const account = accounts.find(a => a.id === accountId);
@@ -123,17 +113,8 @@ export default function AccountsPage() {
           accountId: accountId,
           itemId: result.data.item_id
         });
-
-        // Mostrar credenciais sandbox se aplicável
-        if (result.data.sandbox_mode && result.data.sandbox_credentials) {
-          const creds = result.data.sandbox_credentials;
-          toast.info(
-            `🧪 Modo Sandbox\nUsuário: ${creds.user}\nSenha: ${creds.password}`,
-            { duration: 10000 }
-          );
-        }
       } else {
-        throw new Error(result.data?.message || 'Erro ao gerar token de reconexão');
+        throw new Error(result.message || 'Erro ao gerar token de reconexão');
       }
     } catch (error: any) {
       console.error('[Accounts] Erro ao reconectar:', error);
