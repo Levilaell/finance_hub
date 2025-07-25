@@ -189,5 +189,3 @@ def check_and_renew_consents():
         return {'status': 'error', 'message': str(exc)}
 
 
-@shared_task
-# REMOVED: renew_single_consent_task - Not used anywhere in the codebase

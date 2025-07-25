@@ -173,40 +173,51 @@ class PluggyClient:
             return response['results']
         return response
     
-    def create_connect_token(self, item_id: Optional[str] = None, 
+    def create_connect_token(self, 
+                           item_id: Optional[str] = None, 
                            client_user_id: Optional[str] = None,
-                           allowed_connectors: Optional[List[int]] = None,
-                           products: Optional[List[str]] = None) -> Dict:
+                           webhook_url: Optional[str] = None,
+                           oauth_redirect_url: Optional[str] = None,
+                           avoid_duplicates: bool = True) -> Dict:
         """
         Create a connect token for Pluggy Connect widget
         
         Args:
-            item_id: Existing item ID for updates
-            client_user_id: Your internal user ID
-            allowed_connectors: List of allowed connector IDs
-            products: List of products to collect
+            item_id: Existing item ID for updates (required for updates)
+            client_user_id: Your internal user ID for traceability
+            webhook_url: URL to receive webhooks for items created with this token
+            oauth_redirect_url: URL to redirect after OAuth flow completion
+            avoid_duplicates: Prevent creating duplicate items (default: True)
+
+        Returns:
+            Dict with accessToken, connectUrl and expiresAt
         """
+
         data = {}
         if item_id:
             data['itemId'] = item_id
+
+        options = {
+            'avoidDuplicates': avoid_duplicates
+        }
+
         if client_user_id:
-            data['clientUserId'] = client_user_id
-        if allowed_connectors:
-            data['allowedConnectors'] = allowed_connectors
-        if products:
-            data['products'] = products
+            options['clientUserId'] = client_user_id
+
+        if webhook_url:
+            options['webhookUrl'] = webhook_url
+
+        if oauth_redirect_url:
+            options['oauthRedirectUri'] = oauth_redirect_url
             
         # Add options for Open Finance
-        data['options'] = {
-            'includeOpenFinance': True,  # Permitir conectores Open Finance
-            'avoidDuplicates': True      # Evitar duplicação de contas
-        }
+        data['options'] = options
             
         response = self._make_request('POST', '/connect_token', data)
+
         return {
             'accessToken': response['accessToken'],
             'connectUrl': f"{settings.PLUGGY_CONNECT_URL}?token={response['accessToken']}",
-            'expiresAt': response.get('expiresAt')
         }
     
     def create_item(self, connector_id: int, parameters: Dict, 
