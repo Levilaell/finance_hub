@@ -10,100 +10,16 @@ from django.utils import timezone
 from apps.companies.models import Company
 
 from .models import BankAccount
-from .services import BankingSyncService, FinancialInsightsService
+# Removed unused imports: BankingSyncService, FinancialInsightsService
 
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True, max_retries=3)
-def sync_bank_account(self, account_id, days_back=7):
-    """
-    DEPRECATED: Use sync_pluggy_account instead
-    This uses the deprecated BankingSyncService
-    """
-    logger.warning(f"sync_bank_account is deprecated. Use sync_pluggy_account for account {account_id}")
-    # Redirect to Pluggy sync
-    return sync_pluggy_account.apply_async(args=[account_id])
-
-
-@shared_task
-def sync_all_company_accounts(company_id):
-    """
-    DEPRECATED: Use sync_all_pluggy_accounts instead
-    This uses the deprecated BankingSyncService
-    """
-    logger.warning(f"sync_all_company_accounts is deprecated. Use sync_all_pluggy_accounts for company {company_id}")
-    # Queue individual Pluggy syncs for each account
-    try:
-        company = Company.objects.get(id=company_id)
-        accounts = BankAccount.objects.filter(
-            company=company,
-            is_active=True,
-            external_id__isnull=False  # Only Pluggy accounts
-        )
-        
-        results = []
-        for account in accounts:
-            task = sync_pluggy_account.delay(account.id)
-            results.append({
-                'account_id': account.id,
-                'task_id': task.id
-            })
-        
-        return {
-            'status': 'success',
-            'company_id': company_id,
-            'queued_count': len(results)
-        }
-        
-    except Company.DoesNotExist:
-        logger.error(f"Company {company_id} not found")
-        return {'status': 'error', 'message': 'Company not found'}
-
-
-@shared_task
-def periodic_account_sync():
-    """
-    DEPRECATED: Use sync_all_pluggy_accounts instead
-    This task is replaced by Pluggy-specific sync
-    """
-    logger.warning("periodic_account_sync is deprecated. Use sync_all_pluggy_accounts instead")
-    # Redirect to Pluggy sync
-    return sync_all_pluggy_accounts.apply_async()
-
-
-@shared_task
-def generate_financial_insights(company_id):
-    """
-    Generate financial insights for a company
-    
-    Args:
-        company_id: Company ID
-    """
-    try:
-        company = Company.objects.get(id=company_id)
-        insights_service = FinancialInsightsService()
-        
-        insights = insights_service.generate_insights(company)
-        
-        # Store insights in cache or database for dashboard
-        # Implementation depends on your caching strategy
-        
-        logger.info(f"Financial insights generated for company: {company}")
-        
-        return {
-            'status': 'success',
-            'company_id': company_id,
-            'insights': insights
-        }
-        
-    except Company.DoesNotExist:
-        logger.error(f"Company {company_id} not found")
-        return {'status': 'error', 'message': 'Company not found'}
-    
-    except Exception as exc:
-        logger.error(f"Error generating insights for company {company_id}: {exc}")
-        return {'status': 'error', 'message': str(exc)}
+# REMOVED DEPRECATED TASKS:
+# - sync_bank_account: Not used anywhere, replaced by sync_pluggy_account
+# - sync_all_company_accounts: Not used anywhere, replaced by sync_all_pluggy_accounts
+# - periodic_account_sync: Replaced by sync_all_pluggy_accounts in Celery Beat
+# - generate_financial_insights: Not used anywhere in the codebase
 
 
 @shared_task
@@ -282,27 +198,4 @@ def check_and_renew_consents():
 
 
 @shared_task
-def renew_single_consent_task(account_id):
-    """
-    Renew consent for a single account
-    """
-    import asyncio
-    from .integrations.pluggy.consent_service import renew_single_consent_task as async_renew
-    
-    try:
-        logger.info(f"🔄 Starting consent renewal for account {account_id}")
-        
-        # Run async task
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(async_renew(account_id))
-        finally:
-            loop.close()
-        
-        logger.info(f"✅ Consent renewal completed for account {account_id}: {result}")
-        return result
-        
-    except Exception as exc:
-        logger.error(f"❌ Error renewing consent for account {account_id}: {exc}")
-        return {'status': 'error', 'message': str(exc)}
+# REMOVED: renew_single_consent_task - Not used anywhere in the codebase

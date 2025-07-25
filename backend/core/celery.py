@@ -23,17 +23,17 @@ app.autodiscover_tasks()
 # Celery Beat schedule for periodic tasks
 app.conf.beat_schedule = {
     # Banking tasks
-    'sync-all-accounts': {
-        'task': 'apps.banking.tasks.periodic_account_sync',
+    'sync-all-pluggy-accounts': {
+        'task': 'apps.banking.tasks.sync_all_pluggy_accounts',
         'schedule': 60.0 * 60.0 * 4,  # Every 4 hours
     },
     'cleanup-old-logs': {
         'task': 'apps.banking.tasks.cleanup_old_sync_logs',
         'schedule': 60.0 * 60.0 * 24,  # Every 24 hours
     },
-    'send-balance-alerts': {
-        'task': 'apps.banking.tasks.send_low_balance_alerts',
-        'schedule': 60.0 * 60.0 * 12,  # Every 12 hours
+    'check-and-renew-consents': {
+        'task': 'apps.banking.tasks.check_and_renew_consents',
+        'schedule': 60.0 * 60.0 * 24,  # Every 24 hours
     },
     
     # Subscription and billing tasks
