@@ -58,6 +58,15 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.companies.tasks.check_usage_limits',
         'schedule': crontab(minute=0, hour='*/6'),  # Every 6 hours
     },
+    # Pluggy sync tasks
+    'sync-pluggy-accounts': {
+        'task': 'apps.banking.tasks.sync_all_pluggy_accounts',
+        'schedule': crontab(minute=0, hour='*/4'),  # Every 4 hours
+    },
+    'check-and-renew-consents': {
+        'task': 'apps.banking.tasks.check_and_renew_consents',
+        'schedule': crontab(hour=8, minute=0),  # 8 AM daily
+    },
 }
 
 # CORS settings

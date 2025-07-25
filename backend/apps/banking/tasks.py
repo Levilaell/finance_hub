@@ -350,3 +350,40 @@ def sync_all_pluggy_accounts():
     except Exception as exc:
         logger.error(f"❌ Error in periodic Pluggy sync: {exc}")
         return {'status': 'error', 'message': str(exc)}
+
+
+@shared_task
+def check_and_renew_consents():
+    """
+    Periodic task to check and renew expiring consents
+    Runs daily via Celery Beat
+    """
+    from .consent_renewal_service import check_and_renew_consents_task
+    
+    logger.info("🔄 Starting consent renewal check")
+    
+    try:
+        result = check_and_renew_consents_task()
+        logger.info(f"✅ Consent renewal check completed: {result}")
+        return result
+    except Exception as exc:
+        logger.error(f"❌ Error in consent renewal check: {exc}")
+        return {'status': 'error', 'message': str(exc)}
+
+
+@shared_task
+def renew_single_consent(account_id):
+    """
+    Task to renew consent for a single account
+    """
+    from .consent_renewal_service import renew_single_consent_task
+    
+    logger.info(f"🔄 Starting consent renewal for account {account_id}")
+    
+    try:
+        result = renew_single_consent_task(account_id)
+        logger.info(f"✅ Consent renewal completed for account {account_id}: {result}")
+        return result
+    except Exception as exc:
+        logger.error(f"❌ Error renewing consent for account {account_id}: {exc}")
+        return {'status': 'error', 'message': str(exc)}

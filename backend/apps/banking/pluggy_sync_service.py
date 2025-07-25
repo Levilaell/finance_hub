@@ -17,6 +17,8 @@ from django.utils import timezone
 
 from .models import BankAccount, Transaction, TransactionCategory, BankProvider
 from .pluggy_client import PluggyClient, PluggyError
+from .pluggy_error_handlers import error_handler
+from .consent_renewal_service import renew_single_consent_task
 
 logger = logging.getLogger(__name__)
 
@@ -330,6 +332,39 @@ class PluggyTransactionSyncService:
             
             return sync_info
             
+        except PluggyError as e:
+            logger.error(f"❌ Pluggy error syncing account {account.id}: {e}", exc_info=True)
+            
+            # Usar o error handler para decidir ação
+            error_action = error_handler.handle_error(
+                e.error_code,
+                e.error_data,
+                {
+                    'item_id': account_info.get('pluggy_item_id'),
+                    'account_id': account.id,
+                    'user_id': account.company.user_id if hasattr(account, 'company') else None,
+                    'is_open_finance': is_open_finance
+                }
+            )
+            
+            # Atualizar status da conta baseado na ação recomendada
+            if error_action.get('update_status'):
+                await self._update_account_status(account, error_action['update_status'], error_action.get('message', str(e)))
+            
+            # Se precisa renovar consentimento, agendar tarefa
+            if error_action.get('action') == 'renew_consent':
+                renew_single_consent_task.delay(account.id)
+                error_action['renewal_scheduled'] = True
+            
+            return {
+                'account_id': account.id,
+                'status': 'error',
+                'error': str(e),
+                'error_code': e.error_code,
+                'error_action': error_action,
+                'transactions': 0
+            }
+            
         except Exception as e:
             logger.error(f"❌ Error syncing Pluggy account {account.id}: {e}", exc_info=True)
             return {
@@ -338,6 +373,14 @@ class PluggyTransactionSyncService:
                 'error': str(e),
                 'transactions': 0
             }
+    
+    @sync_to_async
+    def _update_account_status(self, account: BankAccount, status: str, message: str = ''):
+        """Update account sync status"""
+        account.sync_status = status
+        account.sync_error_message = message
+        account.save(update_fields=['sync_status', 'sync_error_message'])
+        logger.info(f"Updated account {account.id} status to {status}")
     
     @sync_to_async
     def _get_account_info(self, account: BankAccount) -> Dict[str, Any]:
@@ -352,7 +395,8 @@ class PluggyTransactionSyncService:
             'external_id': account_with_provider.external_id,
             'bank_name': account_with_provider.bank_provider.name if account_with_provider.bank_provider else 'Unknown',
             'last_sync_at': account_with_provider.last_sync_at,
-            'metadata': account_with_provider.metadata or {}
+            'metadata': account_with_provider.metadata or {},
+            'pluggy_item_id': account_with_provider.pluggy_item_id
         }
     
     def _get_sync_from_date_safe(self, account_info: Dict, force_extended_window: bool = False, is_open_finance: bool = False) -> datetime.date:

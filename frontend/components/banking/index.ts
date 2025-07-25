@@ -1,3 +1,2 @@
-export { PluggyConnectWidget, PluggyConnectModal } from './pluggy-connect-widget';
-export { PluggyInfoDialog } from './pluggy-info-dialog';
-export { PluggyConnectHandler } from './pluggy-connect-handler';
+export { PluggyConnect } from './pluggy-connect';
+export { PluggyConnectIframe } from './pluggy-connect-iframe';

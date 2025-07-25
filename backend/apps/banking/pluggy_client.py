@@ -9,13 +9,17 @@ from datetime import datetime, timedelta
 import requests
 from django.conf import settings
 from django.core.cache import cache
+from .pluggy_error_handlers import error_handler
 
 logger = logging.getLogger(__name__)
 
 
 class PluggyError(Exception):
     """Custom exception for Pluggy API errors"""
-    pass
+    def __init__(self, message, error_code=None, error_data=None):
+        super().__init__(message)
+        self.error_code = error_code
+        self.error_data = error_data or {}
 
 
 class PluggyClient:
@@ -139,9 +143,39 @@ class PluggyClient:
             
         except requests.exceptions.RequestException as e:
             logger.error(f"API request failed: {method} {endpoint} - {e}")
+            
+            # Extrair informações do erro
+            error_code = 'UNKNOWN_ERROR'
+            error_data = {
+                'method': method,
+                'endpoint': endpoint,
+                'error_message': str(e)
+            }
+            
             if hasattr(e, 'response') and e.response is not None:
                 logger.error(f"Response content: {e.response.text}")
-            raise PluggyError(f"Pluggy API error: {str(e)}")
+                error_data['status_code'] = e.response.status_code
+                error_data['response_text'] = e.response.text
+                
+                # Tentar extrair código de erro do response
+                try:
+                    error_json = e.response.json()
+                    error_code = error_json.get('code', error_json.get('error', 'UNKNOWN_ERROR'))
+                    error_data['error_details'] = error_json
+                except:
+                    pass
+                
+                # Mapear status HTTP para códigos de erro
+                if e.response.status_code == 423:
+                    error_code = '423'
+                elif e.response.status_code == 429:
+                    error_code = 'RATE_LIMIT_EXCEEDED'
+                elif e.response.status_code == 503:
+                    error_code = 'SERVICE_UNAVAILABLE'
+                elif e.response.status_code == 504:
+                    error_code = 'TIMEOUT'
+            
+            raise PluggyError(f"Pluggy API error: {str(e)}", error_code=error_code, error_data=error_data)
     
     def get_connectors(self, country: str = 'BR', type: Optional[str] = None, 
                       sandbox: Optional[bool] = None, is_open_finance: Optional[bool] = None) -> List[Dict]:
