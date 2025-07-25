@@ -193,23 +193,5 @@ def send_balance_notification(bank_account):
 
 
 
-@receiver(post_save, sender=Transaction)
-def detect_recurring_patterns(sender, instance, created, **kwargs):
-    """
-    Detect recurring transaction patterns for better predictions
-    """
-    if created and instance.transaction_type in ['debit', 'credit']:
-        try:
-            from .services import RecurringPatternDetector
-            
-            # Queue pattern detection asynchronously
-            if settings.CELERY_ENABLED:
-                from .tasks import detect_recurring_pattern
-                detect_recurring_pattern.delay(str(instance.id))
-            else:
-                # In development, run synchronously
-                detector = RecurringPatternDetector()
-                detector.analyze_transaction(instance)
-                
-        except Exception as e:
-            logger.error(f"❌ Error detecting recurring patterns: {e}")
+# REMOVED: detect_recurring_patterns signal
+# RecurringPatternDetector was not implemented and detect_recurring_pattern task does not exist

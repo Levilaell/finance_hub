@@ -28,7 +28,6 @@ from ..models import (BankAccount, BankProvider,
 from ..serializers import (BankAccountSerializer, BankProviderSerializer,
                           DashboardSerializer, EnhancedDashboardSerializer, ExpenseTrendSerializer, TimeSeriesDataSerializer, TransactionCategorySerializer,
                           TransactionSerializer)
-from ..services import BankingSyncService
 
 
 class BankAccountViewSet(viewsets.ModelViewSet):
@@ -75,15 +74,24 @@ class BankAccountViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def sync(self, request, pk=None):
         """Sync transactions for specific account"""
+        from ..tasks import sync_pluggy_account
+        
         account = self.get_object()
-        sync_service = BankingSyncService()
+        
+        # Check if account is a Pluggy account
+        if not account.external_id:
+            return Response({
+                'status': 'error',
+                'message': 'Esta conta não está conectada via Pluggy'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            result = sync_service.sync_account(account)
+            # Queue async sync task
+            task = sync_pluggy_account.delay(account.id)
             return Response({
                 'status': 'success',
                 'message': 'Sincronização iniciada',
-                'sync_id': result.id
+                'task_id': task.id
             })
         except Exception as e:
             return Response({
@@ -577,63 +585,8 @@ class ExpenseTrendsView(APIView):
         return Response([])
 
 
-# ✅ CONEXÃO BANCÁRIA SIMPLIFICADA - REDIRECIONA PARA PLUGGY
-
-class ConnectBankAccountView(APIView):
-    """
-    DESCONTINUADO - Use endpoints Pluggy específicos
-    """
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def post(self, request):
-        logger.warning("Legacy ConnectBankAccountView called - redirecting to Pluggy")
-        
-        return Response({
-            'error': 'Endpoint descontinuado',
-            'message': 'Use os endpoints Pluggy para conectar contas bancárias',
-            'instructions': {
-                'connect_token': 'POST /api/banking/pluggy/connect-token/',
-                'callback': 'POST /api/banking/pluggy/callback/',
-                'banks': 'GET /api/banking/pluggy/banks/'
-            },
-            'status': 'deprecated'
-        }, status=status.HTTP_410_GONE)
-
-
-class OpenBankingCallbackView(APIView):
-    """
-    DESCONTINUADO - Use Pluggy callbacks
-    """
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def post(self, request):
-        return Response({
-            'error': 'Endpoint descontinuado',
-            'message': 'Use POST /api/banking/pluggy/callback/ para callbacks'
-        }, status=status.HTTP_410_GONE)
-
-
-class RefreshTokenView(APIView):
-    """
-    DESCONTINUADO - Pluggy gerencia tokens automaticamente
-    """
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def post(self, request, account_id):
-        return Response({
-            'error': 'Endpoint descontinuado',
-            'message': 'Pluggy gerencia tokens automaticamente'
-        }, status=status.HTTP_410_GONE)
-
-
-class SyncBankAccountView(APIView):
-    """
-    DESCONTINUADO - Use sync Pluggy específico
-    """
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def post(self, request, account_id):
-        return Response({
-            'error': 'Endpoint descontinuado',
-            'message': f'Use POST /api/banking/pluggy/accounts/{account_id}/sync/'
-        }, status=status.HTTP_410_GONE)
+# REMOVED DEPRECATED VIEWS:
+# - ConnectBankAccountView: Use Pluggy endpoints instead
+# - OpenBankingCallbackView: Use POST /api/banking/pluggy/callback/
+# - RefreshTokenView: Pluggy manages tokens automatically
+# - SyncBankAccountView: Use POST /api/banking/pluggy/accounts/{account_id}/sync/

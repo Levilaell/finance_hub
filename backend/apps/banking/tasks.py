@@ -14,14 +14,6 @@ from .models import BankAccount
 
 logger = logging.getLogger(__name__)
 
-
-# REMOVED DEPRECATED TASKS:
-# - sync_bank_account: Not used anywhere, replaced by sync_pluggy_account
-# - sync_all_company_accounts: Not used anywhere, replaced by sync_all_pluggy_accounts
-# - periodic_account_sync: Replaced by sync_all_pluggy_accounts in Celery Beat
-# - generate_financial_insights: Not used anywhere in the codebase
-
-
 @shared_task
 def cleanup_old_sync_logs():
    """
