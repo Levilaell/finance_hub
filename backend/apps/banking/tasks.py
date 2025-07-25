@@ -18,110 +18,58 @@ logger = logging.getLogger(__name__)
 @shared_task(bind=True, max_retries=3)
 def sync_bank_account(self, account_id, days_back=7):
     """
-    Async task to sync individual bank account
-    
-    Args:
-        account_id: BankAccount ID to sync
-        days_back: Number of days to sync backwards
+    DEPRECATED: Use sync_pluggy_account instead
+    This uses the deprecated BankingSyncService
     """
-    try:
-        account = BankAccount.objects.get(id=account_id)
-        sync_service = BankingSyncService()
-        
-        sync_log = sync_service.sync_account(account, days_back)
-        
-        logger.info(f"Bank account sync completed: {account} - {sync_log.transactions_new} new transactions")
-        
-        return {
-            'status': 'success',
-            'account_id': account_id,
-            'sync_id': sync_log.id,
-            'new_transactions': sync_log.transactions_new
-        }
-        
-    except BankAccount.DoesNotExist:
-        logger.error(f"Bank account {account_id} not found")
-        return {'status': 'error', 'message': 'Account not found'}
-        
-    except Exception as exc:
-        logger.error(f"Error syncing account {account_id}: {exc}")
-        
-        # Retry with exponential backoff
-        if self.request.retries < self.max_retries:
-            raise self.retry(countdown=60 * (2 ** self.request.retries))
-        
-        return {'status': 'error', 'message': str(exc)}
+    logger.warning(f"sync_bank_account is deprecated. Use sync_pluggy_account for account {account_id}")
+    # Redirect to Pluggy sync
+    return sync_pluggy_account.apply_async(args=[account_id])
 
 
 @shared_task
 def sync_all_company_accounts(company_id):
     """
-    Sync all accounts for a company
-    
-    Args:
-        company_id: Company ID
+    DEPRECATED: Use sync_all_pluggy_accounts instead
+    This uses the deprecated BankingSyncService
     """
+    logger.warning(f"sync_all_company_accounts is deprecated. Use sync_all_pluggy_accounts for company {company_id}")
+    # Queue individual Pluggy syncs for each account
     try:
         company = Company.objects.get(id=company_id)
-        sync_service = BankingSyncService()
+        accounts = BankAccount.objects.filter(
+            company=company,
+            is_active=True,
+            external_id__isnull=False  # Only Pluggy accounts
+        )
         
-        results = sync_service.sync_all_accounts(company)
-        
-        logger.info(f"Company sync completed: {company} - {len(results)} accounts processed")
+        results = []
+        for account in accounts:
+            task = sync_pluggy_account.delay(account.id)
+            results.append({
+                'account_id': account.id,
+                'task_id': task.id
+            })
         
         return {
             'status': 'success',
             'company_id': company_id,
-            'results': results
+            'queued_count': len(results)
         }
         
     except Company.DoesNotExist:
         logger.error(f"Company {company_id} not found")
         return {'status': 'error', 'message': 'Company not found'}
-        
-    except Exception as exc:
-        logger.error(f"Error syncing company accounts {company_id}: {exc}")
-        return {'status': 'error', 'message': str(exc)}
 
 
 @shared_task
 def periodic_account_sync():
     """
-    Periodic task to sync all active accounts
-    Runs every 4 hours via Celery Beat
+    DEPRECATED: Use sync_all_pluggy_accounts instead
+    This task is replaced by Pluggy-specific sync
     """
-    active_accounts = BankAccount.objects.filter(
-        is_active=True,
-        status='active',
-        company__subscription_status='active'
-    )
-    
-    synced_count = 0
-    error_count = 0
-    
-    for account in active_accounts:
-        try:
-            # Check if account needs sync based on frequency
-            if account.last_sync_at:
-                hours_since_sync = (timezone.now() - account.last_sync_at).total_seconds() / 3600
-                if hours_since_sync < account.sync_frequency:
-                    continue
-            
-            # Queue sync task
-            sync_bank_account.delay(account.id)
-            synced_count += 1
-            
-        except Exception as e:
-            logger.error(f"Error queuing sync for account {account}: {e}")
-            error_count += 1
-    
-    logger.info(f"Periodic sync queued: {synced_count} accounts, {error_count} errors")
-    
-    return {
-        'queued': synced_count,
-        'errors': error_count,
-        'timestamp': timezone.now().isoformat()
-    }
+    logger.warning("periodic_account_sync is deprecated. Use sync_all_pluggy_accounts instead")
+    # Redirect to Pluggy sync
+    return sync_all_pluggy_accounts.apply_async()
 
 
 @shared_task
@@ -158,44 +106,6 @@ def generate_financial_insights(company_id):
         return {'status': 'error', 'message': str(exc)}
 
 
-'''
-@shared_task
-def process_ai_categorization(transaction_id):
-   """
-   Process AI categorization for a transaction
-   
-   Args:
-       transaction_id: Transaction ID to categorize
-   """
-   try:
-       from apps.categories.services import AICategorizationService
-
-       from .models import Transaction
-       
-       transaction = Transaction.objects.get(id=transaction_id)
-       ai_service = AICategorizationService()
-       
-       result = ai_service.categorize_transaction(transaction)
-       
-       logger.info(f"AI categorization completed for transaction {transaction_id}: {result}")
-       
-       return {
-           'status': 'success',
-           'transaction_id': transaction_id,
-           'category': result.get('category'),
-           'confidence': result.get('confidence')
-       }
-       
-   except Transaction.DoesNotExist:
-       logger.error(f"Transaction {transaction_id} not found")
-       return {'status': 'error', 'message': 'Transaction not found'}
-       
-   except Exception as exc:
-       logger.error(f"Error processing AI categorization for transaction {transaction_id}: {exc}")
-       return {'status': 'error', 'message': str(exc)}
-'''
-
-
 @shared_task
 def cleanup_old_sync_logs():
    """
@@ -217,54 +127,6 @@ def cleanup_old_sync_logs():
        'cutoff_date': cutoff_date.isoformat()
    }
 
-'''
-@shared_task
-def send_low_balance_alerts():
-   """
-   Send alerts for accounts with low balance
-   """
-   from django.conf import settings
-   from django.core.mail import send_mail
-   
-   low_balance_accounts = BankAccount.objects.filter(
-       is_active=True,
-       current_balance__lt=1000,  # Less than R$ 1000
-       company__enable_notifications=True
-   ).select_related('company', 'company__owner')
-   
-   alerts_sent = 0
-   
-   for account in low_balance_accounts:
-       try:
-           send_mail(
-               subject=f'⚠️ Saldo Baixo - {account.display_name}',
-               message=f''
-               Olá {account.company.owner.first_name},
-               
-               Sua conta {account.display_name} está com saldo baixo:
-               Saldo atual: R$ {account.current_balance:,.2f}
-               
-               Recomendamos que verifique sua situação financeira.
-               
-               Atenciosamente,
-               Equipe CaixaHub
-               '',
-               from_email=settings.DEFAULT_FROM_EMAIL,
-               recipient_list=[account.company.owner.email],
-               fail_silently=False,
-           )
-           alerts_sent += 1
-           
-       except Exception as e:
-           logger.error(f"Error sending low balance alert for {account}: {e}")
-   
-   logger.info(f"Low balance alerts sent: {alerts_sent}")
-   
-   return {
-       'status': 'success',
-       'alerts_sent': alerts_sent
-   }
-'''
 
 @shared_task(bind=True, max_retries=3)
 def sync_pluggy_account(self, account_id):
