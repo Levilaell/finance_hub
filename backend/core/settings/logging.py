@@ -110,11 +110,6 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': False,
         },
-        'apps.banking.webhook_handler': {
-            'handlers': ['console', 'pluggy_file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
         'apps.payments': {
             'handlers': ['console', 'file'],
             'level': 'INFO',

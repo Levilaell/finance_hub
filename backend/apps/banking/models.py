@@ -170,21 +170,6 @@ class BankAccount(models.Model):
         if self.nickname:
             return f"{self.nickname} ({self.bank_provider.name})"
         return f"{self.bank_provider.name} - {self.masked_account}"
-    
-    def to_dict(self):
-        """Convert to dictionary for API responses"""
-        return {
-            'id': self.id,
-            'bank_name': self.bank_provider.name,
-            'account_type': self.account_type,
-            'account_number': self.masked_account,
-            'current_balance': float(self.current_balance),
-            'available_balance': float(self.available_balance),
-            'currency': 'BRL',
-            'status': self.status,
-            'last_sync_at': self.last_sync_at.isoformat() if self.last_sync_at else None,
-            'display_name': self.display_name,
-        }
 
 
 class TransactionCategory(models.Model):

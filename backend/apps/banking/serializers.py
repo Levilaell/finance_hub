@@ -183,107 +183,12 @@ class DashboardSerializer(serializers.Serializer):
     top_categories = serializers.ListField(child=serializers.DictField())
 
 
-class TransactionSummarySerializer(serializers.Serializer):
-    """
-    Transaction summary for reports
-    """
-    period = serializers.CharField()
-    income = serializers.DecimalField(max_digits=15, decimal_places=2)
-    expenses = serializers.DecimalField(max_digits=15, decimal_places=2)
-    net = serializers.DecimalField(max_digits=15, decimal_places=2)
-    transaction_count = serializers.IntegerField()
-    top_income_categories = serializers.ListField(child=serializers.DictField())
-    top_expense_categories = serializers.ListField(child=serializers.DictField())
 
 
-class CashFlowSerializer(serializers.Serializer):
-    """
-    Cash flow projection serializer
-    """
-    date = serializers.DateField()
-    projected_balance = serializers.DecimalField(max_digits=15, decimal_places=2)
-    expected_income = serializers.DecimalField(max_digits=15, decimal_places=2)
-    expected_expenses = serializers.DecimalField(max_digits=15, decimal_places=2)
-    confidence_level = serializers.FloatField()
-    alerts = serializers.ListField(child=serializers.CharField(), required=False)
 
 
-class CategoryAnalysisSerializer(serializers.Serializer):
-    """
-    Category analysis for insights
-    """
-    category_name = serializers.CharField()
-    category_icon = serializers.CharField()
-    current_period = serializers.DecimalField(max_digits=15, decimal_places=2)
-    previous_period = serializers.DecimalField(max_digits=15, decimal_places=2)
-    change_percentage = serializers.FloatField()
-    transaction_count = serializers.IntegerField()
-    average_amount = serializers.DecimalField(max_digits=15, decimal_places=2)
 
 
-'''
-class FinancialGoalSerializer(serializers.ModelSerializer):
-    """
-    Financial goal serializer for goal tracking
-    """
-    progress_percentage = serializers.FloatField(read_only=True)
-    remaining_amount = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
-    days_remaining = serializers.IntegerField(read_only=True)
-    required_monthly_amount = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
-    categories = TransactionCategorySerializer(many=True, read_only=True)
-    bank_accounts = BankAccountSerializer(many=True, read_only=True)
-    category_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        write_only=True,
-        required=False
-    )
-    account_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        write_only=True,
-        required=False
-    )
-    
-    class Meta:
-        model = FinancialGoal
-        fields = [
-            'id', 'name', 'description', 'goal_type', 'target_amount', 'current_amount',
-            'target_date', 'monthly_target', 'progress_percentage', 'remaining_amount',
-            'days_remaining', 'required_monthly_amount', 'status', 'is_automatic_tracking',
-            'send_reminders', 'reminder_frequency', 'categories', 'bank_accounts',
-            'category_ids', 'account_ids', 'created_at', 'updated_at', 'completed_at'
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'completed_at']
-    
-    def create(self, validated_data):
-        category_ids = validated_data.pop('category_ids', [])
-        account_ids = validated_data.pop('account_ids', [])
-        validated_data['company'] = self.context['request'].user.company
-        validated_data['created_by'] = self.context['request'].user
-        
-        goal = FinancialGoal.objects.create(**validated_data)
-        
-        if category_ids:
-            goal.categories.set(category_ids)
-        if account_ids:
-            goal.bank_accounts.set(account_ids)
-        
-        return goal
-    
-    def update(self, instance, validated_data):
-        category_ids = validated_data.pop('category_ids', None)
-        account_ids = validated_data.pop('account_ids', None)
-        
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        
-        if category_ids is not None:
-            instance.categories.set(category_ids)
-        if account_ids is not None:
-            instance.bank_accounts.set(account_ids)
-        
-        return instance
-'''
 
 class TimeSeriesDataSerializer(serializers.Serializer):
     """

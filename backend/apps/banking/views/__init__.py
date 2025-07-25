@@ -3,37 +3,19 @@ Banking app views
 Financial dashboard and transaction management
 """
 import logging
-import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 
 from apps.companies.decorators import requires_plan_feature
-import requests
-from django.conf import settings
 from django.db.models import Count, Max, Q, Sum
-from django.db import models
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.utils.decorators import method_decorator
-from django.views.decorators.cache import cache_page
-from ..cache_service import cache_service
 
 logger = logging.getLogger(__name__)
-
-
-class TestView(APIView):
-    """Test endpoint to debug 404 issue"""
-    permission_classes = [permissions.AllowAny]
-    
-    def get(self, request):
-        return Response({'message': 'Test endpoint working'})
-    
-    def post(self, request):
-        return Response({'message': 'Test POST working', 'data': request.data})
 
 
 class StandardResultsSetPagination(PageNumberPagination):
@@ -566,18 +548,6 @@ class EnhancedDashboardView(APIView):
         
         return Response(data)
 
-
-'''
-class FinancialGoalViewSet(viewsets.ModelViewSet):
-    """
-    Financial goal management viewset
-    """
-    serializer_class = FinancialGoalSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get_queryset(self):
-        return FinancialGoal.objects.filter(company=self.request.user.company)
-'''
 
 class TimeSeriesAnalyticsView(APIView):
     """
