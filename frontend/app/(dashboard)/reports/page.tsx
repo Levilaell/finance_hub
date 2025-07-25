@@ -146,7 +146,7 @@ export default function ReportsPage() {
 
   const { data: accounts } = useQuery({
     queryKey: ['accounts'],
-    queryFn: () => bankingService.getBankAccounts(),
+    queryFn: () => bankingService.getAccounts(),
   });
 
   const { data: categories } = useQuery({

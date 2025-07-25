@@ -23,6 +23,7 @@ import {
   ExclamationCircleIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
+import { BankAccount } from '@/types';
 import {
   Select,
   SelectContent,
@@ -63,7 +64,7 @@ export default function NewTransactionPage() {
   // Queries
   const { data: accountsData, isLoading: accountsLoading } = useQuery({
     queryKey: ['bank-accounts'],
-    queryFn: () => bankingService.getBankAccounts(),
+    queryFn: () => bankingService.getAccounts(),
     enabled: isAuthenticated,
   });
 
@@ -73,7 +74,7 @@ export default function NewTransactionPage() {
     enabled: isAuthenticated,
   });
 
-  const accounts = accountsData?.results || [];
+  const accounts = accountsData || [];
   const categories = categoriesData || [];
 
   // Form setup
@@ -254,7 +255,7 @@ export default function NewTransactionPage() {
                       </Button>
                     </div>
                   ) : (
-                    accounts.map((account) => (
+                    accounts.map((account: BankAccount) => (
                       <SelectItem key={account.id} value={account.id.toString()}>
                         <div className="flex items-center space-x-2">
                           <BanknotesIcon className="h-4 w-4" />

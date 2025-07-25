@@ -13,7 +13,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { DataTable } from '@/components/ui/data-table';
 import { bankingService } from '@/services/banking.service';
 import { categoriesService } from '@/services/categories.service';
-import { BankTransaction, TransactionFilter, Category } from '@/types';
+import { BankTransaction, TransactionFilter, Category, BankAccount } from '@/types';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { HydrationBoundary } from '@/components/hydration-boundary';
 import { useClientOnly } from '@/hooks/use-client-only';
@@ -161,7 +161,7 @@ export default function TransactionsPage() {
 
   const { data: accounts } = useQuery({
     queryKey: ['bank-accounts'],
-    queryFn: () => bankingService.getBankAccounts(),
+    queryFn: () => bankingService.getAccounts(),
   });
 
   const { data: categories = [] } = useQuery({
@@ -421,8 +421,8 @@ export default function TransactionsPage() {
       key: 'account',
       header: 'Conta',
       cell: (transaction: TransactionWithTags) => {
-        const account = accounts?.results?.find(
-          (acc) => acc.id === transaction.bank_account
+        const account = accounts?.find(
+          (acc: BankAccount) => acc.id === transaction.bank_account
         );
         return (
           <p className="text-sm text-gray-600 truncate max-w-[120px]">
@@ -827,7 +827,7 @@ function FiltersContent({ filters, setFilters, accounts, categories }: any) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as contas</SelectItem>
-            {accounts?.results?.map((account: any) => (
+            {accounts?.map((account: BankAccount) => (
               <SelectItem key={account.id} value={account.id}>
                 {account.account_name}
               </SelectItem>
