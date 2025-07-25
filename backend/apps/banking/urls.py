@@ -22,7 +22,6 @@ urlpatterns = [
     
     # Dashboard endpoints
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
-    path('dashboard/enhanced/', views.EnhancedDashboardView.as_view(), name='enhanced-dashboard'),
     
     # Pluggy integration endpoints
     path('pluggy/connect-token/', pluggy_views.PluggyConnectTokenView.as_view(), name='pluggy-connect-token'),
