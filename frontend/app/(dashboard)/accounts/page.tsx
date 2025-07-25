@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { bankingService } from '@/services/banking.service';
-import { PluggyConnect } from '@/components/banking/pluggy-connect';
+import { PluggyConnect } from 'react-pluggy-connect';
 
 interface SyncResult {
   success: boolean;
