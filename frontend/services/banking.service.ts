@@ -8,42 +8,52 @@ import {
   BankAccountForm,
 } from "@/types";
 
+import { PluggyCallbackResponse } from '@/types/banking.types';
+
+
+interface PluggyConnectTokenResponse {
+  success: boolean;
+  data: {
+    connect_token: string;
+    connect_url: string;
+    sandbox_mode: boolean;
+    expires_at?: string;
+    sandbox_credentials?: {
+      user: string;
+      password: string;
+      token: string;
+    };
+  };
+}
+
+interface SyncResult {
+  success: boolean;
+  error_code?: string;
+  message?: string;
+  reconnection_required?: boolean;
+  warning?: string;
+  data?: {
+    sync_stats?: {
+      transactions_synced?: number;
+      bank_requires_mfa?: boolean;
+    };
+    [key: string]: any;
+  };
+}
+
 class BankingService {
-  // Bank Providers - USAR PLUGGY
+  // ===== PROVIDERS =====
   async getProviders(): Promise<BankProvider[]> {
-    // ✅ CORRIGIDO: Usar endpoint Pluggy para providers
     const response = await apiClient.get<{
       success: boolean;
       data: BankProvider[];
     }>("/api/banking/pluggy/banks/");
-    
     return response.data || [];
   }
 
-  async createTransaction(data: {
-    bank_account: string;
-    amount: number;
-    description: string;
-    transaction_type: 'credit' | 'debit';
-    category?: string;
-    transaction_date: string;
-    notes?: string;
-    tags?: string[];
-  }): Promise<BankTransaction> {
-    return apiClient.post<BankTransaction>("/api/banking/transactions/", data);
-  }
-
-  async getBankProviders(): Promise<PaginatedResponse<BankProvider>> {
-    return apiClient.get<PaginatedResponse<BankProvider>>("/api/banking/providers/");
-  }
-
-  // Bank Accounts
+  // ===== ACCOUNTS =====
   async getAccounts(): Promise<BankAccount[]> {
     return apiClient.get<BankAccount[]>("/api/banking/accounts/");
-  }
-
-  async getBankAccounts(): Promise<PaginatedResponse<BankAccount>> {
-    return apiClient.get<PaginatedResponse<BankAccount>>("/api/banking/accounts/");
   }
 
   async getAccount(id: string): Promise<BankAccount> {
@@ -51,10 +61,6 @@ class BankingService {
   }
 
   async createAccount(data: BankAccountForm): Promise<BankAccount> {
-    return apiClient.post<BankAccount>("/api/banking/accounts/", data);
-  }
-
-  async createBankAccount(data: BankAccountForm): Promise<BankAccount> {
     return apiClient.post<BankAccount>("/api/banking/accounts/", data);
   }
 
@@ -66,23 +72,28 @@ class BankingService {
     return apiClient.delete(`/api/banking/accounts/${id}/`);
   }
 
-  async deleteBankAccount(id: string): Promise<void> {
-    return apiClient.delete(`/api/banking/accounts/${id}/`);
+  async syncAccount(id: string): Promise<SyncResult> {
+    // Em vez de Promise<{ message: string }>
+    const response = await apiClient.post<{
+      success: boolean;
+      error_code?: string;
+      message?: string;
+      reconnection_required?: boolean;
+      warning?: string;
+      data?: {
+        sync_stats?: {
+          transactions_synced?: number;
+          bank_requires_mfa?: boolean;
+        };
+        [key: string]: any;
+      };
+    }>(`/api/banking/pluggy/accounts/${id}/sync/`);
+    
+    return response;
   }
 
-  async syncAccount(id: string): Promise<{ message: string }> {
-    // ✅ CORRIGIDO: Usar endpoint Pluggy para sync
-    return apiClient.post(`/api/banking/pluggy/accounts/${id}/sync/`);
-  }
-
-  async syncBankAccount(id: string): Promise<{ message: string }> {
-    return apiClient.post(`/api/banking/accounts/${id}/sync/`);
-  }
-
-  // Transactions
-  async getTransactions(
-    params?: TransactionFilter & { page?: number; page_size?: number }
-  ): Promise<PaginatedResponse<BankTransaction>> {
+  // ===== TRANSACTIONS =====
+  async getTransactions(params?: TransactionFilter & { page?: number; page_size?: number }): Promise<PaginatedResponse<BankTransaction>> {
     return apiClient.get<PaginatedResponse<BankTransaction>>("/api/banking/transactions/", params);
   }
 
@@ -90,36 +101,152 @@ class BankingService {
     return apiClient.get<BankTransaction>(`/api/banking/transactions/${id}/`);
   }
 
-  async updateTransaction(
-    id: string,
-    data: { category?: string; notes?: string }
-  ): Promise<BankTransaction> {
-    // Mapear category para category_id se necessário
+  async createTransaction(data: { /* ... */ }): Promise<BankTransaction> {
+    return apiClient.post<BankTransaction>("/api/banking/transactions/", data);
+  }
+
+  async updateTransaction(id: string, data: { category?: string; notes?: string }): Promise<BankTransaction> {
     const payload: any = {};
-    
-    if (data.category !== undefined) {
-      payload.category = data.category || null; // null para remover categoria
-    }
-    
-    if (data.notes !== undefined) {
-      payload.notes = data.notes;
-    }
-    
+    if (data.category !== undefined) payload.category = data.category || null;
+    if (data.notes !== undefined) payload.notes = data.notes;
     return apiClient.patch<BankTransaction>(`/api/banking/transactions/${id}/`, payload);
   }
 
-  async bulkCategorize(data: {
-    transaction_ids: string[];
-    category_id: string;
-  }): Promise<{ updated: number }> {
+  // ===== PLUGGY INTEGRATION =====
+  async getPluggyBanks(): Promise<{ /* ... */ }> {
+    return apiClient.get("/api/banking/pluggy/banks/");
+  }
+
+  async createPluggyConnectToken(itemId?: string): Promise<{
+    success: boolean;
+    data?: {
+      connect_token: string;
+      connect_url: string;
+      sandbox_mode: boolean;
+      expires_at?: string;
+      message?: string;
+      sandbox_credentials?: {
+        user: string;
+        password: string;
+        token: string;
+      };
+    };
+    message?: string;
+  }> {
+    try {
+      const response = await apiClient.post<{
+        connect_token: string;
+        connect_url: string;
+        sandbox_mode: boolean;
+        expires_at?: string;
+        sandbox_credentials?: {
+          user: string;
+          password: string;
+          token: string;
+        };
+      }>("/api/banking/pluggy/connect-token/", {
+        item_id: itemId
+      });
+      
+      // Wrap na estrutura esperada
+      return {
+        success: true,
+        data: response
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Erro ao criar token'
+      };
+    }
+  }
+
+  async handlePluggyCallback(itemId: string): Promise<PluggyCallbackResponse> {
+    return apiClient.post<PluggyCallbackResponse>("/api/banking/pluggy/callback/", {
+      item_id: itemId
+    });
+  }
+
+  async syncPluggyAccount(accountId: string): Promise<{ /* ... */ }> {
+    return apiClient.post(`/api/banking/pluggy/accounts/${accountId}/sync/`);
+  }
+
+  async disconnectPluggyAccount(accountId: string): Promise<{ /* ... */ }> {
+    return apiClient.delete(`/api/banking/pluggy/accounts/${accountId}/disconnect/`);
+  }
+
+  async getPluggyAccountStatus(accountId: string): Promise<{ /* ... */ }> {
+    return apiClient.get(`/api/banking/pluggy/accounts/${accountId}/status/`);
+  }
+
+  async reconnectPluggyAccount(accountId: string): Promise<{
+    success: boolean;
+    data?: {
+      connect_token: string;
+      connect_url: string;
+      item_id: string;
+      sandbox_mode: boolean;
+      expires_at?: string;
+      message?: string;
+      sandbox_credentials?: {
+        user: string;
+        password: string;
+        token: string;
+      };
+    };
+    message?: string;
+  }> {
+    try {
+      // 1. Buscar a conta
+      const account = await this.getAccount(accountId);
+      
+      // 2. Verificar se tem pluggy_item_id
+      if (!account.pluggy_item_id) {
+        return {
+          success: false,
+          message: 'Conta não conectada via Pluggy'
+        };
+      }
+      
+      // 3. Criar token de reconexão
+      const tokenResponse = await this.createPluggyConnectToken(account.pluggy_item_id);
+      
+      // 4. Verificar sucesso e montar resposta
+      if (tokenResponse.success && tokenResponse.data) {
+        return {
+          success: true,
+          data: {
+            connect_token: tokenResponse.data.connect_token,
+            connect_url: tokenResponse.data.connect_url,
+            sandbox_mode: tokenResponse.data.sandbox_mode,
+            item_id: account.pluggy_item_id, // ← IMPORTANTE
+            expires_at: tokenResponse.data.expires_at,
+            message: tokenResponse.data.message,
+            sandbox_credentials: tokenResponse.data.sandbox_credentials
+          }
+        };
+      }
+      
+      // 5. Retornar erro se falhou
+      return {
+        success: false,
+        message: tokenResponse.message || 'Erro ao criar token de reconexão'
+      };
+      
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Erro ao reconectar conta'
+      };
+    }
+  }
+
+  // ===== UTILITIES =====
+  async bulkCategorize(data: { /* ... */ }): Promise<{ updated: number }> {
     return apiClient.post("/api/banking/transactions/bulk-categorize/", data);
   }
 
-  async importTransactions(accountId: string, file: File): Promise<{
-    imported: number;
-    skipped: number;
-    errors: string[];
-  }> {
+  async importTransactions(accountId: string, file: File): Promise<{ /* ... */ }> {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("account_id", accountId);
@@ -132,261 +259,6 @@ class BankingService {
       responseType: "blob",
     });
     return response as unknown as Blob;
-  }
-
-  // ===== PLUGGY INTEGRATION (CORRIGIDO) =====
-
-  /**
-   * Get available banks from Pluggy
-   */
-  async getPluggyBanks(): Promise<{
-    success: boolean;
-    data: BankProvider[];
-    total: number;
-    sandbox_mode: boolean;
-  }> {
-    return apiClient.get("/api/banking/pluggy/banks/");
-  }
-
-  /**
-   * Create Pluggy Connect Token for widget
-   */
-  async createPluggyConnectToken(itemId?: string): Promise<{
-    success: boolean;
-    data: {
-      connect_token: string;
-      connect_url: string;
-      sandbox_mode: boolean;
-      expires_at?: string;
-      message?: string;
-      sandbox_credentials?: {
-        user: string;
-        password: string;
-        token: string;
-      };
-    };
-  }> {
-    return apiClient.post("/api/banking/pluggy/connect-token/", {
-      item_id: itemId
-    });
-  }
-
-  /**
-   * Handle Pluggy callback after successful connection
-   */
-  async handlePluggyCallback(itemId: string): Promise<{
-    success: boolean;
-    data?: {
-      accounts: Array<{
-        id: number;
-        name: string;
-        balance: number;
-        account_type: string;
-        created: boolean;
-      }>;
-      message: string;
-      sandbox_mode?: boolean;
-      item_id: string;
-    };
-    message?: string;
-  }> {
-    return apiClient.post("/api/banking/pluggy/callback/", {
-      item_id: itemId
-    });
-  }
-
-  /**
-   * Sync Pluggy account transactions
-   */
-  async syncPluggyAccount(accountId: string): Promise<{
-    success: boolean;
-    data: {
-      message: string;
-      transactions_synced: number;
-      status: string;
-      sandbox_mode: boolean;
-    };
-  }> {
-    return apiClient.post(`/api/banking/pluggy/accounts/${accountId}/sync/`);
-  }
-
-  /**
-   * Disconnect Pluggy account
-   */
-  async disconnectPluggyAccount(accountId: string): Promise<{
-    success: boolean;
-    message: string;
-  }> {
-    return apiClient.delete(`/api/banking/pluggy/accounts/${accountId}/disconnect/`);
-  }
-
-  /**
-   * Get Pluggy account status
-   */
-  async getPluggyAccountStatus(accountId: string): Promise<{
-    success: boolean;
-    data: {
-      account_id: number;
-      external_id: string;
-      status: string;
-      item_status?: string;
-      last_sync: string | null;
-      balance: number;
-      pluggy_status: string;
-      last_update: string;
-      sandbox_mode: boolean;
-      needs_reconnection?: boolean;
-      reconnection_message?: string;
-    };
-  }> {
-    return apiClient.get(`/api/banking/pluggy/accounts/${accountId}/status/`);
-  }
-
-  /**
-   * Check account status (alias for getPluggyAccountStatus)
-   */
-  async checkAccountStatus(accountId: string) {
-    return this.getPluggyAccountStatus(accountId);
-  }
-
-  /**
-   * Reconnect Pluggy account
-   */
-  async reconnectPluggyAccount(accountId: string): Promise<{
-    success: boolean;
-    data: {
-      connect_token: string;
-      connect_url: string;
-      item_id: string;
-      sandbox_mode: boolean;
-      expires_at?: string;
-      message?: string;
-      sandbox_credentials?: {
-        user: string;
-        password: string;
-        token: string;
-      };
-    };
-  }> {
-    // Primeiro, obter o item_id da conta
-    const account = await this.getAccount(accountId);
-    if (!account.pluggy_item_id) {
-      throw new Error('Conta não conectada via Pluggy');
-    }
-    
-    // Usar o endpoint de connect-token passando o itemId para reconexão
-    const response = await apiClient.post<{
-      success: boolean;
-      data: {
-        connect_token: string;
-        connect_url: string;
-        sandbox_mode: boolean;
-        expires_at?: string;
-        sandbox_credentials?: {
-          user: string;
-          password: string;
-          token: string;
-        };
-      };
-    }>('/api/banking/pluggy/connect-token/', {
-      itemId: account.pluggy_item_id
-    });
-    
-    return {
-      success: response.success,
-      data: {
-        ...response.data,
-        item_id: account.pluggy_item_id
-      }
-    };
-  }
-
-  // ===== NOVA FUNÇÃO PARA CONECTAR BANCO VIA PLUGGY =====
-  
-  /**
-   * Connect bank account using Pluggy (replaces old connectBankAccount)
-   */
-  async connectBankAccount(data: {
-    bank_code: string;
-    use_pluggy?: boolean;
-  }): Promise<{
-    success: boolean;
-    data?: {
-      connect_token: string;
-      connect_url: string;
-      sandbox_mode: boolean;
-      expires_at?: string;
-      message?: string;
-      sandbox_credentials?: {
-        user: string;
-        password: string;
-        token: string;
-      };
-    };
-    message?: string;
-  }> {
-    
-    // ✅ SEMPRE usar Pluggy para conexão bancária
-    const response = await this.createPluggyConnectToken();
-    
-    
-    return response;
-  }
-
-  // ===== LEGACY OPEN BANKING (MANTER PARA COMPATIBILIDADE) =====
-
-  async initiateOpenBankingConnection(bankCode: string): Promise<{
-    status: string;
-    consent_id?: string;
-    authorization_url?: string;
-    message: string;
-  }> {
-    return apiClient.post("/api/banking/connect/", { bank_code: bankCode });
-  }
-
-  async completeOpenBankingConnection(
-    bankCode: string,
-    authorizationCode: string,
-    consentId?: string
-  ): Promise<{
-    status: string;
-    message: string;
-    account_id: string;
-    account_name: string;
-    balance: number;
-    connection_type: string;
-  }> {
-    return apiClient.post("/api/banking/connect/", {
-      bank_code: bankCode,
-      authorization_code: authorizationCode,
-      consent_id: consentId,
-    });
-  }
-
-  async handleOAuthCallback(
-    authorizationCode: string,
-    bankCode: string,
-    state?: string
-  ): Promise<{
-    status: string;
-    message: string;
-    account_id: string;
-    account_name: string;
-    balance: number;
-  }> {
-    return apiClient.post("/api/banking/oauth/callback/", {
-      code: authorizationCode,
-      bank_code: bankCode,
-      state: state,
-    });
-  }
-
-  async refreshAccountToken(accountId: string): Promise<{
-    status: string;
-    message: string;
-    expires_in: number;
-  }> {
-    return apiClient.post(`/api/banking/refresh-token/${accountId}/`);
   }
 }
 
