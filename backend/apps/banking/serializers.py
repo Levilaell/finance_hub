@@ -1,269 +1,278 @@
 """
-Banking app serializers
-Data serialization for financial models
+Banking app serializers - Pluggy Integration
+Following Pluggy's official API structure
 """
 from decimal import Decimal
+from typing import Dict, Any
 
-from django.utils import timezone
 from rest_framework import serializers
+from django.utils import timezone
 
-from .models import (BankAccount, BankProvider, BankSync, Transaction, TransactionCategory)
+from .models import (
+    PluggyConnector, PluggyItem, BankAccount, 
+    Transaction, TransactionCategory, PluggyCategory
+)
 
 
-class BankProviderSerializer(serializers.ModelSerializer):
-    """
-    Bank provider serializer for connection options
-    """
+class PluggyConnectorSerializer(serializers.ModelSerializer):
+    """Serializer for Pluggy connectors"""
+    
     class Meta:
-        model = BankProvider
+        model = PluggyConnector
         fields = [
-            'id', 'name', 'code', 'logo', 'color',
-            'is_open_banking', 'supports_pix', 'supports_ted'
+            'pluggy_id', 'name', 'institution_url', 'image_url',
+            'primary_color', 'type', 'country', 'has_mfa', 
+            'has_oauth', 'is_open_finance', 'is_sandbox',
+            'products', 'credentials'
+        ]
+        read_only_fields = ['pluggy_id']
+
+
+class PluggyItemSerializer(serializers.ModelSerializer):
+    """Serializer for Pluggy items"""
+    connector = PluggyConnectorSerializer(read_only=True)
+    accounts_count = serializers.IntegerField(source='accounts.count', read_only=True)
+    
+    class Meta:
+        model = PluggyItem
+        fields = [
+            'id', 'pluggy_id', 'connector', 'status', 'execution_status',
+            'created_at', 'updated_at', 'last_successful_update',
+            'error_code', 'error_message', 'status_detail',
+            'consent_expires_at', 'accounts_count'
+        ]
+        read_only_fields = [
+            'id', 'pluggy_id', 'status', 'execution_status',
+            'created_at', 'updated_at', 'last_successful_update',
+            'error_code', 'error_message', 'status_detail'
         ]
 
 
 class BankAccountSerializer(serializers.ModelSerializer):
-    """
-    Bank account serializer with balance and status info
-    """
-    bank_provider = BankProviderSerializer(read_only=True)
-    bank_provider_id = serializers.IntegerField(write_only=True)
-    masked_account = serializers.ReadOnlyField()
-    display_name = serializers.ReadOnlyField()
-    account_name = serializers.ReadOnlyField(source='display_name')  # Alias for frontend compatibility
-    last_sync_status = serializers.SerializerMethodField()
-    transaction_count = serializers.SerializerMethodField()
+    """Serializer for bank accounts"""
+    connector = serializers.SerializerMethodField()
+    item_status = serializers.CharField(source='item.status', read_only=True)
+    display_name = serializers.CharField(read_only=True)
+    masked_number = serializers.CharField(read_only=True)
     
     class Meta:
         model = BankAccount
         fields = [
-            'id', 'bank_provider', 'bank_provider_id', 'account_type', 'agency', 
-            'account_number', 'account_digit', 'masked_account', 'display_name',
-            'account_name', 'current_balance', 'available_balance', 'nickname',
-            'is_primary', 'is_active', 'status', 'last_sync_at',
-            'last_sync_status', 'transaction_count', 'created_at', 'updated_at',
-            'external_id', 'pluggy_item_id'  # Temporarily add these fields
+            'id', 'pluggy_id', 'type', 'subtype', 'number', 'name',
+            'marketing_name', 'owner', 'balance', 'balance_date',
+            'currency_code', 'bank_data', 'credit_data', 'is_active',
+            'created_at', 'updated_at', 'connector', 'item_status',
+            'display_name', 'masked_number'
         ]
         read_only_fields = [
-            'id', 'current_balance', 'available_balance', 'last_sync_at',
-            'status', 'masked_account', 'display_name', 'account_name', 'created_at', 'updated_at'
+            'id', 'pluggy_id', 'created_at', 'updated_at',
+            'display_name', 'masked_number'
         ]
     
-    def get_last_sync_status(self, obj):
-        """Get last sync status"""
-        last_sync = obj.sync_logs.first()
-        if last_sync:
-            return {
-                'status': last_sync.status,
-                'started_at': last_sync.started_at,
-                'transactions_new': last_sync.transactions_new
-            }
-        return None
-    
-    def get_transaction_count(self, obj):
-        """Get total transaction count for this account"""
-        return obj.transactions.count()
+    def get_connector(self, obj):
+        """Get connector info for the account"""
+        return {
+            'id': obj.item.connector.pluggy_id,
+            'name': obj.item.connector.name,
+            'image_url': obj.item.connector.image_url,
+            'primary_color': obj.item.connector.primary_color,
+            'is_open_finance': obj.item.connector.is_open_finance
+        }
 
 
 class TransactionCategorySerializer(serializers.ModelSerializer):
-    """
-    Transaction category serializer with hierarchy
-    """
-    full_name = serializers.ReadOnlyField()
-    subcategories = serializers.SerializerMethodField()
-    transaction_count = serializers.SerializerMethodField()
-    slug = serializers.SlugField(read_only=True)
+    """Serializer for transaction categories"""
+    full_name = serializers.SerializerMethodField()
     
     class Meta:
         model = TransactionCategory
         fields = [
-            'id', 'name', 'slug', 'category_type', 'parent',
-            'icon', 'color', 'full_name', 'subcategories',
-            'transaction_count', 'is_system', 'is_active'
+            'id', 'name', 'slug', 'type', 'parent', 'icon', 'color',
+            'is_system', 'is_active', 'order', 'full_name'
         ]
+        read_only_fields = ['id', 'slug']
     
-    def get_subcategories(self, obj):
-        """Get subcategories if any"""
-        if obj.subcategories.exists():
-            return TransactionCategorySerializer(
-                obj.subcategories.filter(is_active=True), 
-                many=True
-            ).data
-        return []
-    
-    def get_transaction_count(self, obj):
-        """Get transaction count for this category"""
-        request = self.context.get('request')
-        if request and hasattr(request.user, 'company'):
-            return obj.transactions.filter(
-                bank_account__company=request.user.company
-            ).count()
-        return 0
+    def get_full_name(self, obj):
+        """Get full category path"""
+        if obj.parent:
+            return f"{obj.parent.name} > {obj.name}"
+        return obj.name
 
 
 class TransactionSerializer(serializers.ModelSerializer):
-    """
-    Transaction serializer with categorization and formatting
-    """
-    bank_account_name = serializers.CharField(source='bank_account.display_name', read_only=True)
-    account_name = serializers.CharField(source='bank_account.display_name', read_only=True)  # Alias for frontend compatibility
-    category_detail = serializers.SerializerMethodField()  # Full category object for frontend
-    category_name = serializers.CharField(source='category.name', read_only=True)
-    category_icon = serializers.CharField(source='category.icon', read_only=True)
-    subcategory_name = serializers.CharField(source='subcategory.name', read_only=True)
-    formatted_amount = serializers.ReadOnlyField()
-    amount_with_sign = serializers.ReadOnlyField()
-    is_income = serializers.ReadOnlyField()
-    is_expense = serializers.ReadOnlyField()
-    external_id = serializers.CharField(read_only=True)  # Add external_id
-    
-    def get_category_detail(self, obj):
-        """Return full category object for frontend compatibility"""
-        if obj.category:
-            return {
-                'id': str(obj.category.id),
-                'name': obj.category.name,
-                'color': obj.category.color,
-                'icon': obj.category.icon
-            }
-        return None
+    """Serializer for transactions"""
+    account_info = serializers.SerializerMethodField()
+    category_detail = TransactionCategorySerializer(source='category', read_only=True)
+    amount_display = serializers.CharField(source='get_amount_display', read_only=True)
     
     class Meta:
         model = Transaction
         fields = [
-            'id', 'bank_account', 'bank_account_name', 'account_name', 'transaction_type',
-            'amount', 'formatted_amount', 'amount_with_sign', 'description',
-            'transaction_date', 'posted_date', 'counterpart_name', 'counterpart_document',
-            'category', 'category_detail', 'category_name', 'category_icon', 'subcategory',
-            'subcategory_name', 'reference_number', 'pix_key', 'notes',
-            'tags', 'status', 'is_income', 'is_expense', 'is_reconciled',
-            'created_at', 'updated_at', 'external_id'
+            'id', 'pluggy_id', 'type', 'status', 'description', 'amount',
+            'currency_code', 'date', 'merchant', 'payment_data',
+            'pluggy_category_id', 'pluggy_category_description',
+            'category', 'category_detail', 'operation_type',
+            'payment_method', 'credit_card_metadata', 'notes', 'tags',
+            'metadata', 'created_at', 'updated_at', 'account_info',
+            'amount_display', 'is_income', 'is_expense'
         ]
         read_only_fields = [
-            'formatted_amount',
-            'amount_with_sign', 'is_income', 'is_expense', 'bank_account_name',
-            'account_name', 'category_detail', 'category_name', 'category_icon', 'subcategory_name',
-            'external_id'
+            'id', 'pluggy_id', 'created_at', 'updated_at',
+            'amount_display', 'is_income', 'is_expense'
         ]
     
-    def update(self, instance, validated_data):
-        """Update transaction and mark as manually reviewed"""
-        # Campo is_manually_reviewed removido - categorização automática via Pluggy
-        return super().update(instance, validated_data)
+    def get_account_info(self, obj):
+        """Get basic account info"""
+        return {
+            'id': obj.account.id,
+            'name': obj.account.display_name,
+            'type': obj.account.type
+        }
 
 
-class BankSyncSerializer(serializers.ModelSerializer):
-    """
-    Bank synchronization log serializer
-    """
-    bank_account_name = serializers.CharField(source='bank_account.display_name', read_only=True)
-    duration = serializers.ReadOnlyField()
+class PluggyConnectTokenSerializer(serializers.Serializer):
+    """Serializer for Pluggy Connect token request"""
+    item_id = serializers.CharField(required=False, allow_blank=True)
+    client_user_id = serializers.CharField(required=False)
+    webhook_url = serializers.CharField(required=False)
+    
+    def validate(self, attrs):
+        """Validate token request"""
+        # If updating, item_id is required
+        if self.context.get('updating') and not attrs.get('item_id'):
+            raise serializers.ValidationError({
+                'item_id': 'Item ID is required for updates'
+            })
+        return attrs
+
+
+class PluggyCallbackSerializer(serializers.Serializer):
+    """Serializer for Pluggy Connect callback"""
+    item_id = serializers.CharField(required=True)
+    status = serializers.CharField(required=False)
+    error = serializers.CharField(required=False, allow_blank=True)
+    
+    def validate_item_id(self, value):
+        """Validate item ID"""
+        if not value:
+            raise serializers.ValidationError('Item ID is required')
+        return value
+
+
+class AccountSyncSerializer(serializers.Serializer):
+    """Serializer for account sync request"""
+    force = serializers.BooleanField(default=False)
+    from_date = serializers.DateField(required=False)
+    to_date = serializers.DateField(required=False)
+
+
+class BulkCategorizeSerializer(serializers.Serializer):
+    """Serializer for bulk categorization"""
+    transaction_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        min_length=1
+    )
+    category_id = serializers.UUIDField(required=True)
+    
+    def validate_category_id(self, value):
+        """Validate category exists for the user's company"""
+        request = self.context.get('request')
+        if request and hasattr(request.user, 'company'):
+            if not TransactionCategory.objects.filter(
+                id=value,
+                company__in=[request.user.company, None]  # Company specific or system
+            ).exists():
+                raise serializers.ValidationError('Invalid category')
+        return value
+
+
+class TransactionFilterSerializer(serializers.Serializer):
+    """Serializer for transaction filters"""
+    account_id = serializers.UUIDField(required=False)
+    category_id = serializers.UUIDField(required=False)
+    start_date = serializers.DateField(required=False)
+    end_date = serializers.DateField(required=False)
+    min_amount = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    max_amount = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    type = serializers.ChoiceField(choices=['DEBIT', 'CREDIT'], required=False)
+    search = serializers.CharField(max_length=200, required=False)
+    
+    def validate(self, attrs):
+        """Validate filters"""
+        # Validate date range
+        if attrs.get('start_date') and attrs.get('end_date'):
+            if attrs['start_date'] > attrs['end_date']:
+                raise serializers.ValidationError({
+                    'end_date': 'End date must be after start date'
+                })
+        
+        # Validate amount range
+        if attrs.get('min_amount') and attrs.get('max_amount'):
+            if attrs['min_amount'] > attrs['max_amount']:
+                raise serializers.ValidationError({
+                    'max_amount': 'Max amount must be greater than min amount'
+                })
+        
+        return attrs
+
+
+class DashboardTransactionSerializer(serializers.ModelSerializer):
+    """Serializer for dashboard transactions with legacy field names"""
+    transaction_date = serializers.DateField(source='date')
+    transaction_type = serializers.SerializerMethodField()
+    category_name = serializers.CharField(source='category.name', allow_null=True, read_only=True)
+    category_icon = serializers.CharField(source='category.icon', allow_null=True, read_only=True)
+    bank_account_name = serializers.CharField(source='account.display_name', read_only=True)
     
     class Meta:
-        model = BankSync
+        model = Transaction
         fields = [
-            'id', 'bank_account', 'bank_account_name', 'started_at',
-            'completed_at', 'duration', 'status', 'transactions_found',
-            'transactions_new', 'transactions_updated', 'error_message',
-            'sync_from_date', 'sync_to_date'
+            'id', 'description', 'amount', 'transaction_date', 
+            'transaction_type', 'category_name', 'category_icon', 
+            'bank_account_name'
         ]
-
-
-class DashboardSerializer(serializers.Serializer):
-    """
-    Dashboard data serializer
-    """
-    current_balance = serializers.DecimalField(max_digits=15, decimal_places=2)
-    monthly_income = serializers.DecimalField(max_digits=15, decimal_places=2)
-    monthly_expenses = serializers.DecimalField(max_digits=15, decimal_places=2)
-    monthly_net = serializers.DecimalField(max_digits=15, decimal_places=2)
-    accounts_count = serializers.IntegerField()
-    transactions_count = serializers.IntegerField()
-    recent_transactions = TransactionSerializer(many=True, read_only=True)
-    top_categories = serializers.ListField(child=serializers.DictField())
-    usage_limits = serializers.DictField(required=False)
-
-
-
-
-
-
-
-
-
-class TimeSeriesDataSerializer(serializers.Serializer):
-    """
-    Time series data for charts and analytics
-    """
-    date = serializers.DateField()
-    income = serializers.DecimalField(max_digits=15, decimal_places=2)
-    expenses = serializers.DecimalField(max_digits=15, decimal_places=2)
-    balance = serializers.DecimalField(max_digits=15, decimal_places=2)
-    net_flow = serializers.DecimalField(max_digits=15, decimal_places=2)
-
-
-class ExpenseTrendSerializer(serializers.Serializer):
-    """
-    Expense trend analysis data
-    """
-    period = serializers.CharField()
-    category = serializers.CharField()
-    amount = serializers.DecimalField(max_digits=15, decimal_places=2)
-    transaction_count = serializers.IntegerField()
-    change_from_previous = serializers.DecimalField(max_digits=15, decimal_places=2)
-    change_percentage = serializers.FloatField()
-
-
-class ComparativeAnalysisSerializer(serializers.Serializer):
-    """
-    Comparative analysis data for dashboard
-    """
-    current_period = serializers.DecimalField(max_digits=15, decimal_places=2)
-    previous_period = serializers.DecimalField(max_digits=15, decimal_places=2)
-    variance = serializers.DecimalField(max_digits=15, decimal_places=2)
-    variance_percentage = serializers.FloatField()
-    trend = serializers.CharField()  # 'up', 'down', 'stable'
     
+    def get_transaction_type(self, obj):
+        """Convert DEBIT/CREDIT to legacy format"""
+        if obj.type == 'CREDIT':
+            return 'credit'
+        elif obj.type == 'DEBIT':
+            return 'debit'
+        return obj.type.lower()
+
+
+class DashboardDataSerializer(serializers.Serializer):
+    """Serializer for dashboard data"""
+    total_balance = serializers.DecimalField(max_digits=15, decimal_places=2)
+    total_accounts = serializers.IntegerField()
+    active_accounts = serializers.IntegerField()
     
-class EnhancedDashboardSerializer(serializers.Serializer):
-    """
-    Enhanced dashboard data with all features
-    """
-    # Basic financial data
-    current_balance = serializers.DecimalField(max_digits=15, decimal_places=2)
-    monthly_income = serializers.DecimalField(max_digits=15, decimal_places=2)
-    monthly_expenses = serializers.DecimalField(max_digits=15, decimal_places=2)
-    monthly_net = serializers.DecimalField(max_digits=15, decimal_places=2)
+    current_month = serializers.DictField(child=serializers.DecimalField(max_digits=15, decimal_places=2))
+    previous_month = serializers.DictField(child=serializers.DecimalField(max_digits=15, decimal_places=2))
     
-    # Transactions
     recent_transactions = TransactionSerializer(many=True)
-    transactions_count = serializers.IntegerField()
+    category_breakdown = serializers.ListField(
+        child=serializers.DictField()
+    )
     
-    # Categories
-    top_categories = serializers.ListField()
-    
-    # Accounts
-    accounts_count = serializers.IntegerField()
-    
-    # Budget data
-    # active_budgets = BudgetSerializer(many=True)  # BudgetSerializer removed
-    budgets_summary = serializers.DictField()
-    
-    # Goals data
-    '''
-    active_goals = FinancialGoalSerializer(many=True)
-    '''
-    goals_summary = serializers.DictField()
-    
-    # Trend data
-    monthly_trends = TimeSeriesDataSerializer(many=True)
-    expense_trends = ExpenseTrendSerializer(many=True)
-    
-    # Comparative analysis
-    income_comparison = ComparativeAnalysisSerializer()
-    expense_comparison = ComparativeAnalysisSerializer()
-    
-    # Insights
-    financial_insights = serializers.ListField()
+    accounts_summary = serializers.ListField(
+        child=serializers.DictField()
+    )
 
 
+class WebhookEventSerializer(serializers.Serializer):
+    """Serializer for webhook events"""
+    event = serializers.CharField()
+    data = serializers.DictField()
+    
+    def validate_event(self, value):
+        """Validate event type"""
+        valid_events = [
+            'item.created', 'item.updated', 'item.error', 'item.deleted',
+            'item.login_succeeded', 'item.waiting_user_input',
+            'transactions.created', 'transactions.updated', 'transactions.deleted',
+            'consent.created', 'consent.updated', 'consent.revoked'
+        ]
+        if value not in valid_events:
+            raise serializers.ValidationError(f'Invalid event type: {value}')
+        return value

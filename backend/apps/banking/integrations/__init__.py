@@ -1,3 +1,1 @@
-"""
-Banking integrations package
-"""
+# Banking integrations

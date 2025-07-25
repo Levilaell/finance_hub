@@ -48,14 +48,17 @@ class PluggyClient:
         """
         # Check cache first
         cache_key = f'pluggy_api_key_{self.client_id}'
-        cached_key = cache.get(cache_key)
-        if cached_key:
-            return cached_key
+        api_key = cache.get(cache_key)
+        
+        if api_key:
+            return api_key
             
         # Create new API key
+        url = f"{self.base_url}/auth"
+        
         try:
             response = requests.post(
-                f"{self.base_url}/auth",
+                url,
                 json={
                     "clientId": self.client_id,
                     "clientSecret": self.client_secret
@@ -67,377 +70,207 @@ class PluggyClient:
             data = response.json()
             api_key = data['apiKey']
             
-            # Cache for 55 minutes (API key expires in 60 minutes)
-            cache.set(cache_key, api_key, 55 * 60)
+            # Cache for 23 hours (tokens last 24 hours)
+            cache.set(cache_key, api_key, 82800)
             
-            logger.info("Successfully created new Pluggy API key")
             return api_key
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to create API key: {e}")
-            raise PluggyError(f"Failed to authenticate with Pluggy: {str(e)}")
+            logger.error(f"Failed to get API key: {e}")
+            raise PluggyError(f"Authentication failed: {str(e)}")
     
-    def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None, params: Optional[Dict] = None) -> Any:
+    def _make_request(
+        self, 
+        method: str, 
+        endpoint: str, 
+        data: Optional[Dict] = None,
+        params: Optional[Dict] = None
+    ) -> Dict[str, Any]:
         """
         Make authenticated request to Pluggy API
         """
         if not self.api_key:
             self.api_key = self._get_api_key()
             
+        url = f"{self.base_url}/{endpoint}"
         headers = {
-            'X-API-KEY': self.api_key,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "X-API-KEY": self.api_key
         }
         
-        url = f"{self.base_url}{endpoint}"
-        
         try:
-            logger.debug(f"Making request: {method} {url} with params: {params}")
             response = requests.request(
                 method=method,
                 url=url,
+                headers=headers,
                 json=data,
                 params=params,
-                headers=headers,
                 timeout=self.timeout
             )
-
-            logger.debug(f"Response status code: {response.status_code}")
             
-            # If unauthorized, refresh API key and retry
+            # Handle 401 - token might be expired
             if response.status_code == 401:
                 logger.info("API key expired, refreshing...")
-                cache.delete(f'pluggy_api_key_{self.client_id}')
+                cache_key = f'pluggy_api_key_{self.client_id}'
+                cache.delete(cache_key)
                 self.api_key = self._get_api_key()
-                headers['X-API-KEY'] = self.api_key
                 
+                # Retry request
+                headers["X-API-KEY"] = self.api_key
                 response = requests.request(
                     method=method,
                     url=url,
+                    headers=headers,
                     json=data,
                     params=params,
-                    headers=headers,
                     timeout=self.timeout
                 )
             
             response.raise_for_status()
-            
-            # Log response for debugging
-            if response.content:
-                try:
-                    result = response.json()
-                    logger.debug(f"Response from {endpoint}: {result}")
-                    return result
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to decode JSON response from {endpoint}: {e}")
-                    logger.error(f"Raw response: {response.text}")
-                    return {}
-            else:
-                logger.warning(f"Empty response from {endpoint}")
-                return {}
+            return response.json() if response.text else {}
             
         except requests.exceptions.RequestException as e:
             logger.error(f"API request failed: {method} {endpoint} - {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                logger.error(f"Response content: {e.response.text}")
-            raise PluggyError(f"Pluggy API error: {str(e)}")
+            raise PluggyError(f"API request failed: {str(e)}")
     
-    def get_connectors(self, country: str = 'BR', type: Optional[str] = None, 
-                      sandbox: Optional[bool] = None, is_open_finance: Optional[bool] = None) -> List[Dict]:
-        """
-        List available bank connectors
-        
-        Args:
-            country: Country code (default: BR)
-            type: Connector type filter
-            sandbox: Filter sandbox connectors
-            is_open_finance: Filter Open Finance connectors
-        """
-        params = {
-            'countries': country
-        }
-        if type:
-            params['types'] = type
-        if sandbox is not None:
-            params['sandbox'] = sandbox
-        elif self.use_sandbox:
-            params['sandbox'] = True
-        if is_open_finance is not None:
-            params['isOpenFinance'] = is_open_finance
-            
-        response = self._make_request('GET', '/connectors', params=params)
-        
-        # Handle paginated response
-        if isinstance(response, dict) and 'results' in response:
-            return response['results']
-        return response
+    # ===== Connectors =====
     
-    def create_connect_token(self, 
-                           item_id: Optional[str] = None, 
-                           client_user_id: Optional[str] = None,
-                           webhook_url: Optional[str] = None,
-                           oauth_redirect_url: Optional[str] = None,
-                           avoid_duplicates: bool = True) -> Dict:
+    def get_connectors(self, **filters) -> List[Dict[str, Any]]:
         """
-        Create a connect token for Pluggy Connect widget
+        Get list of available connectors (banks)
+        """
+        params = {}
+        if self.use_sandbox:
+            params['sandbox'] = 'true'
+        params.update(filters)
         
-        Args:
-            item_id: Existing item ID for updates (required for updates)
-            client_user_id: Your internal user ID for traceability
-            webhook_url: URL to receive webhooks for items created with this token
-            oauth_redirect_url: URL to redirect after OAuth flow completion
-            avoid_duplicates: Prevent creating duplicate items (default: True)
-
-        Returns:
-            Dict with accessToken, connectUrl and expiresAt
-        """
-
-        data = {}
-        if item_id:
-            data['itemId'] = item_id
-
-        options = {
-            'avoidDuplicates': avoid_duplicates
-        }
-
-        if client_user_id:
-            options['clientUserId'] = client_user_id
-
-        if webhook_url:
-            options['webhookUrl'] = webhook_url
-
-        if oauth_redirect_url:
-            options['oauthRedirectUri'] = oauth_redirect_url
-            
-        # Add options for Open Finance
-        data['options'] = options
-            
-        response = self._make_request('POST', '/connect_token', data)
-
-        return {
-            'accessToken': response['accessToken'],
-            'connectUrl': f"{settings.PLUGGY_CONNECT_URL}?token={response['accessToken']}",
-        }
+        data = self._make_request('GET', 'connectors', params=params)
+        return data.get('results', [])
     
-    def create_item(self, connector_id: int, parameters: Dict, 
-                   client_user_id: Optional[str] = None,
-                   products: Optional[List[str]] = None) -> Dict:
+    def get_connector(self, connector_id: int) -> Dict[str, Any]:
         """
-        Create a new item (bank connection)
-        
-        For Open Finance connectors, parameters should include:
-        - For Personal: {'cpf': '12345678900'}
-        - For Business: {'cnpj': '12345678000100'}
+        Get specific connector details
+        """
+        return self._make_request('GET', f'connectors/{connector_id}')
+    
+    # ===== Items =====
+    
+    def create_item(self, connector_id: int, parameters: Dict[str, str]) -> Dict[str, Any]:
+        """
+        Create new item (connection to bank)
         """
         data = {
-            'connectorId': connector_id,
-            'parameters': parameters
+            "connectorId": connector_id,
+            "parameters": parameters
         }
-        if client_user_id:
-            data['clientUserId'] = client_user_id
-        if products:
-            data['products'] = products
-            
-        return self._make_request('POST', '/items', data)
+        return self._make_request('POST', 'items', data=data)
     
-    def get_item(self, item_id: str) -> Dict:
+    def get_item(self, item_id: str) -> Dict[str, Any]:
         """
         Get item details
         """
-        return self._make_request('GET', f'/items/{item_id}')
+        return self._make_request('GET', f'items/{item_id}')
     
-    def update_item(self, item_id: str) -> Dict:
+    def update_item(self, item_id: str, parameters: Dict[str, str]) -> Dict[str, Any]:
         """
-        Update an existing item (refresh data)
+        Update item credentials
         """
-        return self._make_request('PATCH', f'/items/{item_id}')
-    
-    def sync_item(self, item_id: str) -> Dict:
-        """
-        Force sync an item (alternative to update_item)
-        """
-        return self._make_request('POST', f'/items/{item_id}/sync')
+        data = {"parameters": parameters}
+        return self._make_request('PATCH', f'items/{item_id}', data=data)
     
     def delete_item(self, item_id: str) -> None:
         """
-        Delete an item
+        Delete item
         """
-        self._make_request('DELETE', f'/items/{item_id}')
+        self._make_request('DELETE', f'items/{item_id}')
     
-    def get_accounts(self, item_id: str) -> List[Dict]:
+    def update_item_mfa(self, item_id: str, parameters: Dict[str, str]) -> Dict[str, Any]:
+        """
+        Send MFA response
+        """
+        data = {"parameters": parameters}
+        return self._make_request('PATCH', f'items/{item_id}/mfa', data=data)
+    
+    # ===== Accounts =====
+    
+    def get_accounts(self, item_id: str) -> List[Dict[str, Any]]:
         """
         Get accounts for an item
         """
-        # Try the standard accounts endpoint with itemId parameter
-        try:
-            response = self._make_request('GET', f'/accounts', params={'itemId': item_id})
-            
-            # Debug: Log the raw API response
-            logger.info(f"[Pluggy API] Raw accounts response: {response}")
-            
-            # Handle different response formats
-            if isinstance(response, dict):
-                # Check if it's a paginated response with 'results' key
-                if 'results' in response:
-                    logger.info(f"[Pluggy API] Found 'results' key in response")
-                    return response['results']
-                # Check if response has 'data' key (some APIs use this)
-                elif 'data' in response:
-                    logger.info(f"[Pluggy API] Found 'data' key in response")
-                    return response['data']
-                # Check if it has pagination metadata but no results
-                elif 'total' in response and 'page' in response and 'results' not in response:
-                    logger.warning(f"[Pluggy API] Response has pagination metadata but no results. Total: {response.get('total')}")
-                    # Try alternative endpoint: /items/{item_id}/accounts
-                    logger.info(f"[Pluggy API] Trying alternative endpoint: /items/{item_id}/accounts")
-                    alt_response = self._make_request('GET', f'/items/{item_id}/accounts')
-                    logger.info(f"[Pluggy API] Alternative endpoint response: {alt_response}")
-                    
-                    if isinstance(alt_response, list):
-                        return alt_response
-                    elif isinstance(alt_response, dict) and 'results' in alt_response:
-                        return alt_response['results']
-                    elif isinstance(alt_response, dict) and 'data' in alt_response:
-                        return alt_response['data']
-                    else:
-                        return []
-                else:
-                    # If it's a single account object, wrap in a list
-                    logger.info(f"[Pluggy API] Response is a single object, wrapping in list")
-                    return [response] if response else []
-            elif isinstance(response, list):
-                logger.info(f"[Pluggy API] Response is already a list")
-                return response
-            else:
-                logger.error(f"[Pluggy API] Unexpected accounts response format: {type(response)}")
-                return []
-        except Exception as e:
-            logger.error(f"[Pluggy API] Error getting accounts: {e}")
-            # Try alternative endpoint as fallback
-            try:
-                logger.info(f"[Pluggy API] Trying fallback endpoint: /items/{item_id}/accounts")
-                alt_response = self._make_request('GET', f'/items/{item_id}/accounts')
-                if isinstance(alt_response, list):
-                    return alt_response
-                elif isinstance(alt_response, dict) and 'results' in alt_response:
-                    return alt_response['results']
-                else:
-                    return []
-            except Exception as fallback_error:
-                logger.error(f"[Pluggy API] Fallback also failed: {fallback_error}")
-                return []
+        data = self._make_request('GET', f'accounts', params={'itemId': item_id})
+        return data.get('results', [])
     
-    def get_account(self, account_id: str) -> Dict:
+    def get_account(self, account_id: str) -> Dict[str, Any]:
         """
-        Get specific account details
+        Get specific account
         """
-        return self._make_request('GET', f'/accounts/{account_id}')
+        return self._make_request('GET', f'accounts/{account_id}')
     
-    def get_transactions(self, account_id: str, from_date: Optional[Any] = None, 
-                        to_date: Optional[Any] = None, page: int = 1, page_size: int = 500) -> Dict:
+    # ===== Transactions =====
+    
+    def get_transactions(
+        self, 
+        account_id: str,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 500
+    ) -> Dict[str, Any]:
         """
         Get transactions for an account
         """
         params = {
             'accountId': account_id,
-            'pageSize': page_size,
-            'page': page
+            'page': page,
+            'pageSize': page_size
         }
         
-        # Handle both datetime and string dates
         if from_date:
-            if isinstance(from_date, str):
-                params['from'] = from_date
-            else:
-                params['from'] = from_date.strftime('%Y-%m-%d')
+            params['from'] = from_date
         if to_date:
-            if isinstance(to_date, str):
-                params['to'] = to_date
-            else:
-                params['to'] = to_date.strftime('%Y-%m-%d')
+            params['to'] = to_date
             
-        logger.info(f"[Pluggy API] Getting transactions for account {account_id} with params: {params}")
+        return self._make_request('GET', 'transactions', params=params)
+    
+    def get_transaction(self, transaction_id: str) -> Dict[str, Any]:
+        """
+        Get specific transaction
+        """
+        return self._make_request('GET', f'transactions/{transaction_id}')
+    
+    # ===== Categories =====
+    
+    def get_categories(self) -> List[Dict[str, Any]]:
+        """
+        Get available transaction categories
+        """
+        data = self._make_request('GET', 'categories')
+        return data.get('results', [])
+    
+    # ===== Connect Token =====
+    
+    def create_connect_token(
+        self,
+        item_id: Optional[str] = None,
+        client_user_id: Optional[str] = None,
+        webhook_url: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Create connect token for Pluggy Connect widget
+        """
+        data = {}
         
-        try:
-            result = self._make_request('GET', '/transactions', params=params)
+        if item_id:
+            data['itemId'] = item_id
+        if client_user_id:
+            data['clientUserId'] = client_user_id
+        if webhook_url:
+            data['webhookUrl'] = webhook_url
             
-            # Garantir que sempre retornamos um dict válido
-            if result is None:
-                logger.warning(f"[Pluggy API] Null response for transactions")
-                return {'results': [], 'total': 0, 'totalPages': 0, 'page': page}
-                
-            logger.info(f"[Pluggy API] Transactions response type: {type(result)}, has results: {'results' in result if isinstance(result, dict) else 'N/A'}")
-            
-            # Se a resposta não tem o formato esperado, normalizar
-            if isinstance(result, list):
-                return {
-                    'results': result,
-                    'total': len(result),
-                    'totalPages': 1,
-                    'page': 1
-                }
-            elif isinstance(result, dict) and 'results' not in result:
-                # Pode ser que o dict seja um erro ou formato diferente
-                if 'error' in result:
-                    logger.error(f"[Pluggy API] Error in transaction response: {result}")
-                    return {'results': [], 'total': 0, 'totalPages': 0, 'page': page}
-                else:
-                    # Tentar wrappear em results
-                    return {
-                        'results': [result],
-                        'total': 1,
-                        'totalPages': 1,
-                        'page': 1
-                    }
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"[Pluggy API] Error getting transactions: {e}", exc_info=True)
-            return {'results': [], 'total': 0, 'totalPages': 0, 'page': page}
-
-    def get_transaction(self, transaction_id: str) -> Dict:
-        """
-        Get specific transaction details
-        """
-        return self._make_request('GET', f'/transactions/{transaction_id}')
+        return self._make_request('POST', 'connect_token', data=data)
     
-    def get_identity(self, item_id: str) -> Dict:
-        """
-        Get identity information for an item
-        """
-        return self._make_request('GET', f'/identity?itemId={item_id}')
-    
-    def get_income_reports(self, item_id: str) -> List[Dict]:
-        """
-        Get income reports for an item
-        """
-        return self._make_request('GET', f'/income/reports?itemId={item_id}')
-    
-    def get_investments(self, item_id: str) -> List[Dict]:
-        """
-        Get investments for an item
-        """
-        return self._make_request('GET', f'/investments?itemId={item_id}')
-    
-    def get_investment_transactions(self, investment_id: str) -> List[Dict]:
-        """
-        Get transactions for a specific investment
-        """
-        return self._make_request('GET', f'/investments/{investment_id}/transactions')
-    
-    def get_loans(self, item_id: str) -> List[Dict]:
-        """
-        Get loans for an item (Open Finance)
-        """
-        return self._make_request('GET', f'/loans?itemId={item_id}')
-    
-    def get_credit_cards(self, item_id: str) -> List[Dict]:
-        """
-        Get credit cards for an item
-        """
-        return self._make_request('GET', f'/credit-cards?itemId={item_id}')
+    # ===== Webhooks =====
     
     def validate_webhook(self, signature: str, payload: str) -> bool:
         """
@@ -448,8 +281,8 @@ class PluggyClient:
         
         webhook_secret = getattr(settings, 'PLUGGY_WEBHOOK_SECRET', '')
         if not webhook_secret:
-            logger.warning("PLUGGY_WEBHOOK_SECRET not configured")
-            return False
+            logger.warning("No webhook secret configured")
+            return True  # Allow in development
             
         expected_signature = hmac.new(
             webhook_secret.encode(),
@@ -458,3 +291,20 @@ class PluggyClient:
         ).hexdigest()
         
         return hmac.compare_digest(signature, expected_signature)
+    
+    # ===== Consent (Open Finance) =====
+    
+    def get_consent(self, item_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get consent details for Open Finance item
+        """
+        try:
+            return self._make_request('GET', f'consents/{item_id}')
+        except PluggyError:
+            return None
+    
+    def revoke_consent(self, item_id: str) -> None:
+        """
+        Revoke consent for Open Finance item
+        """
+        self._make_request('DELETE', f'consents/{item_id}')

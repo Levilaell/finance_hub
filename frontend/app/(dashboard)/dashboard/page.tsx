@@ -19,7 +19,6 @@ import {
   CreditCardIcon,
   ChartBarIcon,
   DocumentTextIcon,
-  PlusIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline';
@@ -476,21 +475,6 @@ export default function DashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/transactions/new">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer bg-blue-50 border-blue-200">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2 text-blue-700">
-                <PlusIcon className="h-5 w-5" />
-                Nova Transação
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-blue-600">
-                Adicionar manualmente
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
       </div>
 
         {/* Financial Insights */}

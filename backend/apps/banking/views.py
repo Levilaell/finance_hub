@@ -1,346 +1,352 @@
 """
-Banking app views
-Financial dashboard and transaction management
+Banking app views - Pluggy Integration
+Following Pluggy's official API patterns
 """
 import logging
+import os
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Dict, List, Optional
 
-from apps.companies.decorators import requires_plan_feature
-from django.db.models import Count, Max, Q, Sum
+from django.db import transaction
+from django.db.models import Sum, Q, Count
 from django.utils import timezone
-from rest_framework import permissions, status, viewsets
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+
+from rest_framework import status, viewsets, permissions
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.pagination import PageNumberPagination
+
+from .models import (
+    PluggyConnector, PluggyItem, BankAccount,
+    Transaction, TransactionCategory, ItemWebhook
+)
+from .serializers import (
+    PluggyConnectorSerializer, PluggyItemSerializer, BankAccountSerializer,
+    TransactionSerializer, TransactionCategorySerializer,
+    PluggyConnectTokenSerializer, PluggyCallbackSerializer,
+    AccountSyncSerializer, BulkCategorizeSerializer,
+    TransactionFilterSerializer, DashboardDataSerializer,
+    WebhookEventSerializer, DashboardTransactionSerializer
+)
+from .integrations.pluggy.client import PluggyClient, PluggyError
+from .tasks import sync_bank_account, process_webhook_event
 
 logger = logging.getLogger(__name__)
 
 
-class StandardResultsSetPagination(PageNumberPagination):
-    page_size = 20
+class StandardPagination(PageNumberPagination):
+    """Standard pagination for the API"""
+    page_size = 50
     page_size_query_param = 'page_size'
-    max_page_size = 100
-
-from .models import (BankAccount, BankProvider, 
-                     Transaction, TransactionCategory)
-from .serializers import (BankAccountSerializer, BankProviderSerializer,
-                          DashboardSerializer, ExpenseTrendSerializer, TimeSeriesDataSerializer, TransactionCategorySerializer,
-                          TransactionSerializer)
+    max_page_size = 500
 
 
-class BankAccountViewSet(viewsets.ModelViewSet):
+class PluggyConnectorViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Bank account management
+    ViewSet for Pluggy connectors (banks)
     """
-    serializer_class = BankAccountSerializer
+    queryset = PluggyConnector.objects.filter(is_sandbox=False)
+    serializer_class = PluggyConnectorSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
     
     def get_queryset(self):
-        try:
-            company = self.request.user.company
-        except AttributeError:
-            # If user has no company, return empty queryset
-            return BankAccount.objects.none()
+        """Filter connectors based on query params"""
+        queryset = super().get_queryset()
         
-        return BankAccount.objects.filter(
-            company=company
-        ).select_related('bank_provider').order_by('-created_at')
+        # Filter by type
+        connector_type = self.request.query_params.get('type')
+        if connector_type:
+            queryset = queryset.filter(type=connector_type)
+        
+        # Filter by Open Finance
+        is_open_finance = self.request.query_params.get('is_open_finance')
+        if is_open_finance is not None:
+            queryset = queryset.filter(
+                is_open_finance=is_open_finance.lower() == 'true'
+            )
+        
+        # Filter by country
+        country = self.request.query_params.get('country', 'BR')
+        queryset = queryset.filter(country=country)
+        
+        return queryset.order_by('name')
     
-    @requires_plan_feature('add_bank_account')
-    def perform_create(self, serializer):
-        """Set company when creating bank account"""
+    @action(detail=False, methods=['post'])
+    def sync(self, request):
+        """Sync connectors from Pluggy API"""
         try:
-            company = self.request.user.company
-            
-            # Check if can add more bank accounts
-            if not company.can_add_bank_account():
-                limit = company.subscription_plan.max_bank_accounts if company.subscription_plan else 0
-                raise ValidationError({
-                    'error': 'limit_reached',
-                    'message': f'Você atingiu o limite de {limit} contas bancárias do seu plano.',
-                    'limit_type': 'bank_accounts',
-                    'current': company.active_bank_accounts_count,
-                    'limit': limit,
-                    'redirect': '/dashboard/subscription/upgrade'
+            with PluggyClient() as client:
+                # Get connectors from Pluggy
+                connectors = client.get_connectors()
+                
+                # Update or create connectors
+                created = 0
+                updated = 0
+                
+                for connector_data in connectors:
+                    obj, was_created = PluggyConnector.objects.update_or_create(
+                        pluggy_id=connector_data['id'],
+                        defaults={
+                            'name': connector_data['name'],
+                            'institution_url': connector_data.get('institutionUrl', ''),
+                            'image_url': connector_data.get('imageUrl', ''),
+                            'primary_color': connector_data.get('primaryColor', '#000000'),
+                            'type': connector_data['type'],
+                            'country': connector_data.get('country', 'BR'),
+                            'has_mfa': connector_data.get('hasMFA', False),
+                            'has_oauth': connector_data.get('oauth', False),
+                            'is_open_finance': connector_data.get('isOpenFinance', False),
+                            'is_sandbox': connector_data.get('sandbox', False),
+                            'products': connector_data.get('products', []),
+                            'credentials': connector_data.get('credentials', [])
+                        }
+                    )
+                    
+                    if was_created:
+                        created += 1
+                    else:
+                        updated += 1
+                
+                return Response({
+                    'success': True,
+                    'message': f'Synced {len(connectors)} connectors',
+                    'created': created,
+                    'updated': updated
                 })
-            
-            serializer.save(company=company)
-        except AttributeError:
-            raise ValidationError("Usuário não possui empresa associada")
+                
+        except PluggyError as e:
+            logger.error(f"Failed to sync connectors: {e}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class PluggyItemViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Pluggy items (connections)
+    """
+    serializer_class = PluggyItemSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardPagination
+    
+    def get_queryset(self):
+        """Get items for user's company"""
+        return PluggyItem.objects.filter(
+            company=self.request.user.company
+        ).select_related('connector').prefetch_related('accounts')
     
     @action(detail=True, methods=['post'])
     def sync(self, request, pk=None):
-        """Sync transactions for specific account"""
-        from ..tasks import sync_pluggy_account
-        
-        account = self.get_object()
-        
-        # Check if account is a Pluggy account
-        if not account.external_id:
-            return Response({
-                'status': 'error',
-                'message': 'Esta conta não está conectada via Pluggy'
-            }, status=status.HTTP_400_BAD_REQUEST)
+        """Sync specific item"""
+        item = self.get_object()
         
         try:
-            # Queue async sync task
-            task = sync_pluggy_account.delay(account.id)
+            # Queue sync task
+            task = sync_bank_account.delay(item.id)
+            
             return Response({
-                'status': 'success',
-                'message': 'Sincronização iniciada',
+                'success': True,
+                'message': 'Sync started',
                 'task_id': task.id
             })
+            
         except Exception as e:
-            return Response({
-                'status': 'error',
-                'message': str(e)
-            }, status=status.HTTP_400_BAD_REQUEST)
+            logger.error(f"Failed to start sync: {e}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['delete'])
+    def disconnect(self, request, pk=None):
+        """Disconnect item (delete from Pluggy and locally)"""
+        item = self.get_object()
+        
+        try:
+            with PluggyClient() as client:
+                # Delete from Pluggy
+                client.delete_item(item.pluggy_id)
+                
+                # Delete locally
+                item.delete()
+                
+                return Response(status=status.HTTP_204_NO_CONTENT)
+                
+        except PluggyError as e:
+            logger.error(f"Failed to disconnect item: {e}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class BankAccountViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for bank accounts
+    """
+    serializer_class = BankAccountSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
+    
+    def get_queryset(self):
+        """Get accounts for user's company"""
+        return BankAccount.objects.filter(
+            company=self.request.user.company,
+            is_active=True
+        ).select_related('item__connector').order_by('-created')
     
     @action(detail=False, methods=['get'])
     def summary(self, request):
         """Get accounts summary"""
         accounts = self.get_queryset()
         
-        total_balance = accounts.aggregate(
-            total=Sum('current_balance')
-        )['total'] or Decimal('0')
+        # Calculate totals by type
+        summary = accounts.values('type').annotate(
+            count=Count('id'),
+            total_balance=Sum('balance')
+        )
         
-        active_count = accounts.filter(is_active=True).count()
-        sync_errors = accounts.filter(status='error').count()
+        # Overall totals
+        total_balance = accounts.aggregate(
+            total=Sum('balance')
+        )['total'] or Decimal('0.00')
         
         return Response({
-            'total_accounts': accounts.count(),
-            'active_accounts': active_count,
             'total_balance': total_balance,
-            'sync_errors': sync_errors,
-            'last_sync': accounts.filter(
-                last_sync_at__isnull=False
-            ).aggregate(latest=Max('last_sync_at'))['latest']
+            'total_accounts': accounts.count(),
+            'by_type': list(summary),
+            'last_update': accounts.filter(
+                updated_at__isnull=False
+            ).order_by('-updated_at').values_list(
+                'updated_at', flat=True
+            ).first()
         })
 
 
 class TransactionViewSet(viewsets.ModelViewSet):
     """
-    Transaction management and filtering
+    ViewSet for transactions
     """
     serializer_class = TransactionSerializer
     permission_classes = [permissions.IsAuthenticated]
-    pagination_class = StandardResultsSetPagination
-    filterset_fields = ['category', 'transaction_type', 'bank_account']
-    search_fields = ['description', 'counterpart_name']
-    ordering_fields = ['transaction_date', 'amount']
-    ordering = ['-transaction_date']
+    pagination_class = StandardPagination
     
-    @requires_plan_feature('create_transaction')
-    def create(self, request, *args, **kwargs):
-        """Create a new transaction with automatic usage tracking"""
-        company = request.user.company
-        
-        # Verificar se a conta bancária pertence à empresa do usuário
-        bank_account_id = request.data.get('bank_account')
-        if bank_account_id:
-            try:
-                bank_account = BankAccount.objects.get(id=bank_account_id)
-                if bank_account.company != company:
-                    return Response({
-                        'error': 'Conta bancária não pertence à sua empresa'
-                    }, status=status.HTTP_403_FORBIDDEN)
-            except BankAccount.DoesNotExist:
-                return Response({
-                    'error': 'Conta bancária não encontrada'
-                }, status=status.HTTP_404_NOT_FOUND)
-        
-        # Criar a transação usando o método pai
-        response = super().create(request, *args, **kwargs)
-        
-        # Se criou com sucesso, incrementar contador e adicionar avisos
-        if response.status_code == 201:
-            # Incrementar contador
-            company.increment_transaction_count()
-            
-            # Calcular uso atual
-            usage_percentage = company.get_usage_percentage('transactions')
-            
-            # Adicionar informações de uso se estiver próximo do limite
-            if usage_percentage >= 80:
-                response.data['usage_warning'] = {
-                    'percentage': round(usage_percentage, 1),
-                    'used': company.current_month_transactions,
-                    'limit': company.subscription_plan.max_transactions,
-                    'remaining': company.subscription_plan.max_transactions - company.current_month_transactions,
-                    'message': f'Atenção: Você já utilizou {round(usage_percentage, 1)}% do seu limite mensal de transações.'
-                }
-                
-                # Se atingiu 90%, adicionar sugestão de upgrade
-                if usage_percentage >= 90:
-                    response.data['usage_warning']['upgrade_suggestion'] = True
-                    response.data['usage_warning']['message'] = 'Você está próximo do limite! Considere fazer upgrade do seu plano.'
-            
-            # Log para monitoramento
-            logger.info(
-                f"Transaction created for company {company.id} - "
-                f"Usage: {company.current_month_transactions}/{company.subscription_plan.max_transactions if company.subscription_plan else 'unlimited'}"
-            )
-        
-        return response
-
     def get_queryset(self):
+        """Get transactions with filters"""
+        # Base queryset
         queryset = Transaction.objects.filter(
-            bank_account__company=self.request.user.company
+            account__company=self.request.user.company
         ).select_related(
-            'bank_account', 
-            'category', 
-            'subcategory'
+            'account__item__connector',
+            'category'
         )
         
-        # Apply filters from query params
-        filters = {}
+        # Apply filters
+        filter_serializer = TransactionFilterSerializer(
+            data=self.request.query_params
+        )
         
-        # Date range filters
-        start_date = self.request.query_params.get('start_date')
-        end_date = self.request.query_params.get('end_date')
-        if start_date:
-            filters['transaction_date__gte'] = start_date
-        if end_date:
-            filters['transaction_date__lte'] = end_date
+        if filter_serializer.is_valid():
+            filters = filter_serializer.validated_data
             
-        # Category filter
-        category_id = self.request.query_params.get('category_id')
-        if category_id:
-            if category_id == 'uncategorized':
-                filters['category__isnull'] = True
-            else:
-                filters['category_id'] = category_id
+            # Account filter
+            if filters.get('account_id'):
+                queryset = queryset.filter(account_id=filters['account_id'])
             
-        # Account filter
-        account_id = self.request.query_params.get('account_id')
-        if account_id:
-            filters['bank_account_id'] = account_id
+            # Category filter
+            if filters.get('category_id'):
+                queryset = queryset.filter(category_id=filters['category_id'])
             
-        # Transaction type filter
-        transaction_type = self.request.query_params.get('transaction_type')
-        if transaction_type:
-            filters['transaction_type'] = transaction_type
+            # Date range
+            if filters.get('start_date'):
+                queryset = queryset.filter(date__gte=filters['start_date'])
+            if filters.get('end_date'):
+                queryset = queryset.filter(date__lte=filters['end_date'])
             
-        # Amount filters - aplicar no valor absoluto
-        min_amount = self.request.query_params.get('min_amount')
-        max_amount = self.request.query_params.get('max_amount')
-        
-        if min_amount or max_amount:
-            # Precisamos filtrar pelo valor absoluto, então vamos usar Q objects
-            amount_q = Q()
-            
-            if min_amount:
-                min_val = float(min_amount)
-                print(f"🔍 Backend - min_amount: {min_amount} -> {min_val}")
-                # Para valores mínimos, queremos transações onde |amount| >= min_val
-                amount_q &= (Q(amount__gte=min_val) | Q(amount__lte=-min_val))
-            
-            if max_amount:
-                max_val = float(max_amount)
-                print(f"🔍 Backend - max_amount: {max_amount} -> {max_val}")
-                # Para valores máximos, queremos transações onde |amount| <= max_val
-                amount_q &= Q(amount__lte=max_val) & Q(amount__gte=-max_val)
-            
-            # Aplicar o filtro de amount usando Q objects
-            queryset = queryset.filter(amount_q)
-            
-            # Debug para verificar se está funcionando
-            if max_amount:
-                test_exceeding = queryset.filter(
-                    Q(amount__gt=max_val) | Q(amount__lt=-max_val)
+            # Amount range
+            if filters.get('min_amount'):
+                queryset = queryset.filter(
+                    Q(amount__gte=filters['min_amount']) |
+                    Q(amount__lte=-filters['min_amount'])
                 )
-                if test_exceeding.exists():
-                    print(f"⚠️ Transações que excedem {max_val}:")
-                    for t in test_exceeding[:3]:
-                        print(f"  - Amount: {t.amount}, |Amount|: {abs(t.amount)}, Description: {t.description[:30]}")
-                else:
-                    print(f"✅ Nenhuma transação excede o valor máximo de {max_val}")
-        
-        print(f"🔍 Backend - All query params: {dict(self.request.query_params)}")
-        print(f"🔍 Backend - Final filters: {filters}")
+            if filters.get('max_amount'):
+                queryset = queryset.filter(
+                    amount__lte=filters['max_amount'],
+                    amount__gte=-filters['max_amount']
+                )
             
-        # Search filter
-        search = self.request.query_params.get('search')
-        if search:
-            queryset = queryset.filter(
-                Q(description__icontains=search) |
-                Q(counterpart_name__icontains=search) |
-                Q(notes__icontains=search)
-            )
+            # Transaction type
+            if filters.get('type'):
+                queryset = queryset.filter(type=filters['type'])
+            
+            # Search
+            if filters.get('search'):
+                search_term = filters['search']
+                queryset = queryset.filter(
+                    Q(description__icontains=search_term) |
+                    Q(merchant__name__icontains=search_term) |
+                    Q(notes__icontains=search_term)
+                )
         
-        # Apply remaining filters
-        return queryset.filter(**filters)
-
-    @action(detail=False, methods=['get'])
-    def summary(self, request):
-        """Get transaction summary for dashboard"""
-        queryset = self.get_queryset()
-        
-        # Date filtering
-        start_date = request.query_params.get('start_date')
-        end_date = request.query_params.get('end_date')
-        
-        if start_date:
-            queryset = queryset.filter(transaction_date__gte=start_date)
-        if end_date:
-            queryset = queryset.filter(transaction_date__lte=end_date)
-        
-        # Calculate summary
-        income = queryset.filter(
-            transaction_type__in=['credit', 'transfer_in', 'pix_in']
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-        
-        expenses = queryset.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-        
-        return Response({
-            'income': income,
-            'expenses': abs(expenses),
-            'net': income - abs(expenses),
-            'transaction_count': queryset.count()
-        })
+        return queryset.order_by('-date', '-created')
+    
+    def create(self, request, *args, **kwargs):
+        """Prevent manual transaction creation"""
+        return Response(
+            {"error": "Manual transaction creation is not allowed. Transactions are synced from Pluggy."},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+    
+    def destroy(self, request, *args, **kwargs):
+        """Prevent transaction deletion"""
+        return Response(
+            {"error": "Transaction deletion is not allowed. Transactions are managed by Pluggy."},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+    
+    def update(self, request, *args, **kwargs):
+        """Allow partial updates (category, notes, tags)"""
+        partial = kwargs.pop('partial', True)
+        return super().update(request, *args, partial=partial, **kwargs)
     
     @action(detail=False, methods=['post'])
     def bulk_categorize(self, request):
         """Bulk categorize transactions"""
-        transaction_ids = request.data.get('transaction_ids', [])
-        category_id = request.data.get('category_id')
+        serializer = BulkCategorizeSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
         
-        if not transaction_ids or not category_id:
-            return Response({
-                'error': 'transaction_ids e category_id são obrigatórios'
-            }, status=status.HTTP_400_BAD_REQUEST)
+        data = serializer.validated_data
         
-        try:
-            category = TransactionCategory.objects.get(id=category_id)
-            updated_count = Transaction.objects.filter(
-                id__in=transaction_ids,
-                bank_account__company=request.user.company
-            ).update(
-                category=category,
-                # Campo is_manually_reviewed removido - categorização automática via Pluggy
-            )
-            
-            return Response({
-                'status': 'success',
-                'updated_count': updated_count
-            })
-        except TransactionCategory.DoesNotExist:
-            return Response({
-                'error': 'category_id inválido'
-            }, status=status.HTTP_400_BAD_REQUEST)
+        # Update transactions
+        updated = Transaction.objects.filter(
+            id__in=data['transaction_ids'],
+            account__company=request.user.company
+        ).update(
+            category_id=data['category_id'],
+            modified=timezone.now()
+        )
+        
+        return Response({
+            'success': True,
+            'updated': updated
+        })
     
     @action(detail=False, methods=['get'])
     def export(self, request):
-        """Export transactions to CSV"""
+        """Export transactions as CSV"""
         import csv
         from django.http import HttpResponse
         
+        # Get filtered queryset
         queryset = self.get_queryset()
         
         # Create CSV response
@@ -349,21 +355,20 @@ class TransactionViewSet(viewsets.ModelViewSet):
         
         writer = csv.writer(response)
         writer.writerow([
-            'Data', 'Descrição', 'Valor', 'Tipo', 'Categoria',
-            'Conta', 'Contraparte', 'Referência', 'Status'
+            'Date', 'Description', 'Amount', 'Type', 'Category',
+            'Account', 'Bank', 'Notes'
         ])
         
         for transaction in queryset:
             writer.writerow([
-                transaction.transaction_date.strftime('%d/%m/%Y'),
+                transaction.date.strftime('%Y-%m-%d'),
                 transaction.description,
-                str(transaction.amount).replace('.', ','),
-                transaction.get_transaction_type_display(),
+                float(transaction.amount),
+                transaction.type,
                 transaction.category.name if transaction.category else '',
-                transaction.bank_account.display_name,
-                transaction.counterpart_name,
-                transaction.reference_number,
-                transaction.get_status_display()
+                transaction.account.display_name,
+                transaction.account.item.connector.name,
+                transaction.notes
             ])
         
         return response
@@ -371,162 +376,377 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
 class TransactionCategoryViewSet(viewsets.ModelViewSet):
     """
-    Transaction category management
+    ViewSet for transaction categories
     """
     serializer_class = TransactionCategorySerializer
     permission_classes = [permissions.IsAuthenticated]
-    pagination_class = None  # Disable pagination for categories
+    pagination_class = None
     
     def get_queryset(self):
-        return TransactionCategory.objects.filter(is_active=True)
+        """Get categories for user's company and system categories"""
+        return TransactionCategory.objects.filter(
+            Q(company=self.request.user.company) | Q(is_system=True)
+        ).order_by('type', 'order', 'name')
+    
+    def perform_create(self, serializer):
+        """Set company when creating category"""
+        serializer.save(company=self.request.user.company)
 
 
-class BankProviderViewSet(viewsets.ReadOnlyModelViewSet):
+class PluggyConnectView(APIView):
     """
-    Available bank providers
+    Handle Pluggy Connect integration
     """
-    serializer_class = BankProviderSerializer
     permission_classes = [permissions.IsAuthenticated]
-    queryset = BankProvider.objects.filter(is_active=True)
+    
+    def post(self, request):
+        """Create connect token"""
+        serializer = PluggyConnectTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        try:
+            with PluggyClient() as client:
+                # Create connect token
+                token_data = client.create_connect_token(
+                    item_id=serializer.validated_data.get('item_id'),
+                    client_user_id=str(request.user.id),
+                    webhook_url=serializer.validated_data.get('webhook_url')
+                )
+                
+                # Build connect URL if not provided
+                connect_url = token_data.get('connectUrl')
+                if not connect_url:
+                    connect_base = os.getenv('PLUGGY_CONNECT_URL', 'https://connect.pluggy.ai')
+                    connect_url = f"{connect_base}?token={token_data['accessToken']}"
+                
+                return Response({
+                    'success': True,
+                    'data': {
+                        'connect_token': token_data['accessToken'],
+                        'connect_url': connect_url
+                    }
+                })
+                
+        except PluggyError as e:
+            logger.error(f"Failed to create connect token: {e}")
+            return Response(
+                {
+                    'success': False,
+                    'error': str(e)
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class PluggyCallbackView(APIView):
+    """
+    Handle Pluggy Connect callback
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """Process Pluggy Connect callback"""
+        serializer = PluggyCallbackSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        item_id = serializer.validated_data['item_id']
+        
+        try:
+            with PluggyClient() as client:
+                # Get item details
+                item_data = client.get_item(item_id)
+                
+                # Get connector
+                connector = PluggyConnector.objects.get(
+                    pluggy_id=item_data['connector']['id']
+                )
+                
+                # Create or update item
+                with transaction.atomic():
+                    item, created = PluggyItem.objects.update_or_create(
+                        pluggy_id=item_id,
+                        defaults={
+                            'company': request.user.company,
+                            'connector': connector,
+                            'client_user_id': str(request.user.id),
+                            'status': item_data['status'],
+                            'execution_status': item_data.get('executionStatus', ''),
+                            'created_at': item_data['createdAt'],
+                            'updated_at': item_data['updatedAt'],
+                            'status_detail': item_data.get('statusDetail', {}),
+                            'error_code': item_data.get('error', {}).get('code', '') if item_data.get('error') else '',
+                            'error_message': item_data.get('error', {}).get('message', '') if item_data.get('error') else ''
+                        }
+                    )
+                    
+                    # Get accounts
+                    accounts_data = client.get_accounts(item_id)
+                    created_accounts = []
+                    
+                    for account_data in accounts_data:
+                        account, _ = BankAccount.objects.update_or_create(
+                            pluggy_id=account_data['id'],
+                            defaults={
+                                'item': item,
+                                'company': request.user.company,
+                                'type': account_data['type'],
+                                'subtype': account_data.get('subtype', ''),
+                                'number': account_data.get('number', ''),
+                                'name': account_data.get('name', ''),
+                                'marketing_name': account_data.get('marketingName', ''),
+                                'owner': account_data.get('owner', ''),
+                                'tax_number': account_data.get('taxNumber', ''),
+                                'balance': Decimal(str(account_data.get('balance', 0))),
+                                'currency_code': account_data.get('currencyCode', 'BRL'),
+                                'bank_data': account_data.get('bankData', {}),
+                                'credit_data': account_data.get('creditData', {}),
+                                'created_at': account_data.get('createdAt'),
+                                'updated_at': account_data.get('updatedAt')
+                            }
+                        )
+                        created_accounts.append(account)
+                    
+                    # Queue initial sync if item is ready
+                    if item.status == 'UPDATED':
+                        sync_bank_account.delay(item.id)
+                
+                return Response({
+                    'success': True,
+                    'data': {
+                        'item': PluggyItemSerializer(item).data,
+                        'accounts': BankAccountSerializer(created_accounts, many=True).data,
+                        'message': f'Successfully connected {len(created_accounts)} account(s)'
+                    }
+                })
+                
+        except Exception as e:
+            logger.error(f"Failed to process callback: {e}", exc_info=True)
+            return Response(
+                {
+                    'success': False,
+                    'error': str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class AccountSyncView(APIView):
+    """
+    Sync account data
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, account_id):
+        """Sync specific account"""
+        try:
+            account = BankAccount.objects.get(
+                id=account_id,
+                company=request.user.company
+            )
+            
+            # Check item status
+            if account.item.status in ['LOGIN_ERROR', 'INVALID_CREDENTIALS']:
+                return Response({
+                    'success': False,
+                    'error_code': 'LOGIN_ERROR',
+                    'message': 'Invalid credentials. Please reconnect the account.',
+                    'reconnection_required': True
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if account.item.status == 'WAITING_USER_INPUT':
+                return Response({
+                    'success': False,
+                    'error_code': 'MFA_REQUIRED',
+                    'message': 'Additional authentication required.',
+                    'reconnection_required': True
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Queue sync
+            sync_bank_account.delay(account.item.id, account_id=str(account.id))
+            
+            return Response({
+                'success': True,
+                'message': 'Sync started',
+                'data': {
+                    'account': BankAccountSerializer(account).data
+                }
+            })
+            
+        except BankAccount.DoesNotExist:
+            return Response(
+                {'error': 'Account not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 class DashboardView(APIView):
     """
-    Main financial dashboard data
+    Dashboard data endpoint
     """
     permission_classes = [permissions.IsAuthenticated]
     
     def get(self, request):
-        try:
-            company = request.user.company
-        except AttributeError:
-            return Response({
-                'error': 'Usuário não possui empresa associada'
-            }, status=status.HTTP_400_BAD_REQUEST)
+        """Get dashboard data"""
+        company = request.user.company
         
-        # Get current month data
+        # Get date ranges
         now = timezone.now()
-        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        previous_month_end = current_month_start - timedelta(days=1)
+        previous_month_start = previous_month_end.replace(day=1)
         
-        # Get all company accounts
-        accounts = BankAccount.objects.filter(company=company, is_active=True)
+        # Get accounts
+        accounts = BankAccount.objects.filter(
+            company=company,
+            is_active=True
+        ).select_related('item__connector')
         
-        # Current balances
+        # Calculate balances
         total_balance = accounts.aggregate(
-            total=Sum('current_balance')
-        )['total'] or Decimal('0')
+            total=Sum('balance')
+        )['total'] or Decimal('0.00')
         
-        # This month transactions (current month only)
-        transactions = Transaction.objects.filter(
-            bank_account__in=accounts,
-            transaction_date__gte=start_of_month
+        # Get transactions
+        all_transactions = Transaction.objects.filter(
+            account__company=company
         )
         
-        # Income and expenses this month
-        income = transactions.filter(
-            transaction_type__in=['credit', 'transfer_in', 'pix_in']
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        # Current month stats
+        current_month_transactions = all_transactions.filter(
+            date__gte=current_month_start
+        )
         
-        expenses = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        current_income = current_month_transactions.filter(
+            type='CREDIT'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        
+        current_expenses = current_month_transactions.filter(
+            type='DEBIT'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        
+        # Previous month stats
+        previous_month_transactions = all_transactions.filter(
+            date__gte=previous_month_start,
+            date__lt=current_month_start
+        )
+        
+        previous_income = previous_month_transactions.filter(
+            type='CREDIT'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        
+        previous_expenses = previous_month_transactions.filter(
+            type='DEBIT'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
         
         # Recent transactions
-        recent_transactions = Transaction.objects.filter(
-            bank_account__in=accounts
-        ).select_related('category', 'bank_account')[:10]
+        recent_transactions = all_transactions.select_related(
+            'account__item__connector',
+            'category'
+        ).order_by('-date')[:10]
         
-        # Top categories this month
-        top_categories = transactions.filter(
+        # Category breakdown (current month)
+        category_breakdown = current_month_transactions.filter(
             category__isnull=False
         ).values(
-            'category__name', 
-            'category__icon'
+            'category__name',
+            'category__icon',
+            'category__color'
         ).annotate(
             total=Sum('amount'),
             count=Count('id')
-        ).order_by('-total')[:5]
+        ).order_by('-total')[:10]
         
-        # Get usage limits data
-        from apps.companies.models import ResourceUsage
-        
-        usage_record = ResourceUsage.get_or_create_current_month(company)
-        plan = company.subscription_plan
-        
-        # Build usage limits info
-        if plan:
-            usage_limits = {
-                'transactions': {
-                    'limit': plan.max_transactions,
-                    'used': usage_record.transactions_count,
-                    'percentage': round((usage_record.transactions_count / plan.max_transactions * 100), 1)
-                                if plan.max_transactions and plan.max_transactions not in [0, 999999] else 0
-                },
-                'bank_accounts': {
-                    'limit': plan.max_bank_accounts,
-                    'used': accounts.count(),
-                    'percentage': round((accounts.count() / plan.max_bank_accounts * 100), 1)
-                                if plan.max_bank_accounts and plan.max_bank_accounts not in [0, 999] else 0
-                },
-                'ai_requests': {
-                    'limit': plan.max_ai_requests_per_month,
-                    'used': usage_record.total_ai_usage,
-                    'percentage': round((usage_record.total_ai_usage / plan.max_ai_requests_per_month * 100), 1)
-                                if plan.max_ai_requests_per_month and plan.max_ai_requests_per_month not in [0, 999999] else 0
-                }
-            }
-
+        # Accounts summary
+        accounts_summary = []
+        for account in accounts:
+            transactions_count = account.transactions.filter(
+                date__gte=current_month_start
+            ).count()
             
-        else:
-            # Default limits for free/trial
-            usage_limits = {
-                'transactions': {'limit': 100, 'used': usage_record.transactions_count, 'percentage': round((usage_record.transactions_count / 100 * 100), 1)},
-                'bank_accounts': {'limit': 2, 'used': accounts.count(), 'percentage': round((accounts.count() / 2 * 100), 1)},
-                'ai_requests': {'limit': 10, 'used': usage_record.total_ai_usage, 'percentage': round((usage_record.total_ai_usage / 10 * 100), 1)}
-            }
+            accounts_summary.append({
+                'id': account.id,
+                'name': account.display_name,
+                'type': account.type,
+                'balance': account.balance,
+                'connector': {
+                    'name': account.item.connector.name,
+                    'image_url': account.item.connector.image_url
+                },
+                'transactions_count': transactions_count,
+                'last_update': account.updated_at
+            })
         
+        # Build response
         data = {
             'current_balance': total_balance,
-            'monthly_income': income,
-            'monthly_expenses': abs(expenses),
-            'monthly_net': income - abs(expenses),
-            'recent_transactions': TransactionSerializer(recent_transactions, many=True).data,
-            'top_categories': top_categories,
+            'monthly_income': current_income,
+            'monthly_expenses': abs(current_expenses),
+            'monthly_net': current_income - abs(current_expenses),
+            'recent_transactions': DashboardTransactionSerializer(
+                recent_transactions, 
+                many=True
+            ).data,
+            'top_categories': list(category_breakdown),
             'accounts_count': accounts.count(),
-            'transactions_count': transactions.count(),
-            'usage_limits': usage_limits,  # Added usage limits data
+            'transactions_count': current_month_transactions.count(),
+            'total_balance': total_balance,
+            'total_accounts': accounts.count(),
+            'active_accounts': accounts.filter(item__status='UPDATED').count(),
+            'current_month': {
+                'income': current_income,
+                'expenses': abs(current_expenses),
+                'net': current_income - abs(current_expenses)
+            },
+            'previous_month': {
+                'income': previous_income,
+                'expenses': abs(previous_expenses),
+                'net': previous_income - abs(previous_expenses)
+            },
+            'category_breakdown': list(category_breakdown),
+            'accounts_summary': accounts_summary
         }
         
         return Response(data)
 
 
-
-
-class TimeSeriesAnalyticsView(APIView):
+@method_decorator(csrf_exempt, name='dispatch')
+class PluggyWebhookView(APIView):
     """
-    Time series data for charts and analytics
+    Handle Pluggy webhooks
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = []  # Webhooks come from Pluggy, not authenticated users
+    authentication_classes = []
     
-    def get(self, request):
-        from django.db.models import Sum, Q
-        from datetime import datetime, timedelta
+    def post(self, request):
+        """Process webhook event"""
+        # Verify signature
+        signature = request.headers.get('X-Pluggy-Signature', '')
         
-        company = request.user.company
-        accounts = BankAccount.objects.filter(company=company, is_active=True)
-        
-        data = []
-        
-        return Response(TimeSeriesDataSerializer(data, many=True).data)
-
-
-class ExpenseTrendsView(APIView):
-    """
-    Expense trends analysis by category
-    """
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get(self, request):
-        return Response([])
-
-
+        try:
+            # Validate webhook
+            with PluggyClient() as client:
+                if not client.validate_webhook(signature, request.body.decode()):
+                    logger.warning("Invalid webhook signature")
+                    return Response(
+                        {'error': 'Invalid signature'},
+                        status=status.HTTP_401_UNAUTHORIZED
+                    )
+            
+            # Parse event
+            serializer = WebhookEventSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            
+            event_type = serializer.validated_data['event']
+            event_data = serializer.validated_data['data']
+            
+            # Queue processing
+            process_webhook_event.delay(event_type, event_data)
+            
+            return Response({'status': 'ok'})
+            
+        except Exception as e:
+            logger.error(f"Webhook processing error: {e}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

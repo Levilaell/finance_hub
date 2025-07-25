@@ -1,431 +1,526 @@
 """
-Banking and financial transaction models
-Core financial data handling with AI categorization support
+Banking and financial transaction models - Pluggy Integration
+Following Pluggy's official documentation structure
 """
 import uuid
-import re
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from core.encryption import EncryptedTextField
 
 User = get_user_model()
 
 
-class BankProvider(models.Model):
+class PluggyConnector(models.Model):
     """
-    Supported bank providers for Open Banking integration
+    Pluggy connector information (cached from API)
+    Maps to Pluggy's connector concept
     """
-    name = models.CharField(_('bank name'), max_length=100)
-    code = models.CharField(_('bank code'), max_length=10, unique=True)
-    logo = models.ImageField(_('logo'), upload_to='bank_logos/', blank=True, null=True)
-    logo_url = models.URLField(_('logo URL'), blank=True, help_text='External logo URL (e.g., from Pluggy)')
-    color = models.CharField(_('brand color'), max_length=7, default='#000000')
-    primary_color = models.CharField(_('primary color'), max_length=7, default='#000000', blank=True)
-    is_open_banking = models.BooleanField(_('supports Open Banking'), default=True)
-    api_endpoint = models.URLField(_('API endpoint'), blank=True)
-    is_active = models.BooleanField(_('is active'), default=True)
-    is_open_finance = models.BooleanField(
-        default=False,
-        help_text='Se este provedor é um conector Open Finance'
-    )
-    # Integration settings
-    requires_agency = models.BooleanField(_('requires agency'), default=True)
-    requires_account = models.BooleanField(_('requires account'), default=True)
-    supports_pix = models.BooleanField(_('supports PIX'), default=True)
-    supports_ted = models.BooleanField(_('supports TED'), default=True)
-    supports_doc = models.BooleanField(_('supports DOC'), default=True)
+    # Pluggy connector ID
+    pluggy_id = models.IntegerField(_('Pluggy ID'), unique=True, primary_key=True)
     
-    class Meta:
-        db_table = 'bank_providers'
-        verbose_name = _('Bank Provider')
-        verbose_name_plural = _('Bank Providers')
-        ordering = ['name']
+    # Basic info
+    name = models.CharField(_('name'), max_length=200)
+    institution_url = models.URLField(_('institution URL'), blank=True)
+    image_url = models.URLField(_('image URL'), blank=True)
+    primary_color = models.CharField(_('primary color'), max_length=7, default='#000000')
     
-    def __str__(self):
-        return f"{self.name} ({self.code})"
-
-
-class BankAccount(models.Model):
-    """
-    Company bank accounts connected via Open Banking
-    """
-    ACCOUNT_TYPES = [
-        ('checking', 'Conta Corrente'),
-        ('savings', 'Conta Poupança'),
-        ('business', 'Conta Empresarial'),
-        ('digital', 'Conta Digital'),
-        ('credit_card', 'Cartão de Crédito'),
-    ]
+    # Type and classification
+    type = models.CharField(_('type'), max_length=50)  # PERSONAL_BANK, BUSINESS_BANK, etc
+    country = models.CharField(_('country'), max_length=2, default='BR')
     
-    STATUS_CHOICES = [
-        ('active', 'Ativa'),
-        ('inactive', 'Inativa'),
-        ('pending', 'Pendente'),
-        ('error', 'Erro de Conexão'),
-        ('expired', 'Token Expirado'),
-    ]
+    # Features
+    has_mfa = models.BooleanField(_('has MFA'), default=False)
+    has_oauth = models.BooleanField(_('has OAuth'), default=False)
+    is_open_finance = models.BooleanField(_('is Open Finance'), default=False)
+    is_sandbox = models.BooleanField(_('is sandbox'), default=False)
     
-    # Basic information
-    company = models.ForeignKey(
-        'companies.Company', 
-        on_delete=models.CASCADE, 
-        related_name='bank_accounts'
-    )
-    bank_provider = models.ForeignKey(BankProvider, on_delete=models.PROTECT)
+    # Supported products
+    products = models.JSONField(_('supported products'), default=list)  # ['ACCOUNTS', 'TRANSACTIONS', etc]
     
-    # Account details
-    account_type = models.CharField(_('account type'), max_length=20, choices=ACCOUNT_TYPES)
-    agency = models.CharField(_('agency'), max_length=10, blank=True, null=True)
-    account_number = models.CharField(_('account number'), max_length=20)
-    account_digit = models.CharField(_('account digit'), max_length=2, blank=True)
-    name = models.CharField(_('account name'), max_length=255, blank=True)
-    currency = models.CharField(_('currency'), max_length=3, default='BRL')
-    
-    # Open Banking integration
-    external_id = models.CharField(_('external account ID'), max_length=100, blank=True)
-    pluggy_item_id = models.CharField(_('Pluggy item ID'), max_length=255, blank=True, null=True)
-    
-    # Encrypted token storage
-    _access_token_encrypted = models.TextField(_('encrypted access token'), blank=True)
-    _refresh_token_encrypted = models.TextField(_('encrypted refresh token'), blank=True)
-    token_expires_at = models.DateTimeField(_('token expires at'), blank=True, null=True)
-    
-    # Encrypted token descriptors
-    access_token = EncryptedTextField('access_token')
-    refresh_token = EncryptedTextField('refresh_token')
-    
-    # Account status and balance
-    status = models.CharField(_('status'), max_length=20, choices=STATUS_CHOICES, default='pending')
-    current_balance = models.DecimalField(
-        _('current balance'), 
-        max_digits=15, 
-        decimal_places=2, 
-        default=Decimal('0.00')
-    )
-    available_balance = models.DecimalField(
-        _('available balance'), 
-        max_digits=15, 
-        decimal_places=2, 
-        default=Decimal('0.00')
-    )
-    last_sync_at = models.DateTimeField(_('last sync at'), blank=True, null=True)
-    sync_frequency = models.IntegerField(_('sync frequency (hours)'), default=4)
-    sync_status = models.CharField(_('sync status'), max_length=30, default='active', blank=True)
-    sync_error_message = models.TextField(_('sync error message'), blank=True)
-    
-    # Account settings
-    nickname = models.CharField(_('nickname'), max_length=100, blank=True)
-    is_primary = models.BooleanField(_('is primary account'), default=False)
-    is_active = models.BooleanField(_('is active'), default=True)
-    
-    # Additional data
-    metadata = models.JSONField(_('metadata'), default=dict, blank=True)
+    # Credentials schema
+    credentials = models.JSONField(_('credentials schema'), default=list)
     
     # Metadata
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     updated_at = models.DateTimeField(_('updated at'), auto_now=True)
     
     class Meta:
-        db_table = 'bank_accounts'
-        verbose_name = _('Bank Account')
-        verbose_name_plural = _('Bank Accounts')
-        unique_together = [('company', 'external_id')]  # Pluggy provides unique IDs
+        db_table = 'pluggy_connectors'
+        verbose_name = _('Pluggy Connector')
+        verbose_name_plural = _('Pluggy Connectors')
+        ordering = ['name']
+    
+    def __str__(self):
+        return f"{self.name} ({self.pluggy_id})"
+
+
+class PluggyItem(models.Model):
+    """
+    Represents a connection to a financial institution via Pluggy
+    Maps to Pluggy's Item concept
+    """
+    ITEM_STATUS_CHOICES = [
+        ('LOGIN_IN_PROGRESS', 'Login in Progress'),
+        ('WAITING_USER_INPUT', 'Waiting User Input'),
+        ('UPDATING', 'Updating'),
+        ('UPDATED', 'Updated'),
+        ('LOGIN_ERROR', 'Login Error'),
+        ('OUTDATED', 'Outdated'),
+        ('ERROR', 'Error'),
+    ]
+    
+    EXECUTION_STATUS_CHOICES = [
+        ('CREATED', 'Created'),
+        ('SUCCESS', 'Success'),
+        ('PARTIAL_SUCCESS', 'Partial Success'),
+        ('LOGIN_ERROR', 'Login Error'),
+        ('INVALID_CREDENTIALS', 'Invalid Credentials'),
+        ('USER_INPUT_TIMEOUT', 'User Input Timeout'),
+        ('USER_AUTHORIZATION_PENDING', 'User Authorization Pending'),
+        ('USER_AUTHORIZATION_NOT_GRANTED', 'User Authorization Not Granted'),
+        ('SITE_NOT_AVAILABLE', 'Site Not Available'),
+        ('ERROR', 'Error'),
+    ]
+    
+    # Basic fields
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    pluggy_id = models.CharField(_('Pluggy Item ID'), max_length=100, unique=True, db_index=True)
+    
+    # Relations
+    company = models.ForeignKey(
+        'companies.Company', 
+        on_delete=models.CASCADE, 
+        related_name='pluggy_items'
+    )
+    connector = models.ForeignKey(
+        PluggyConnector,
+        on_delete=models.PROTECT,
+        related_name='items'
+    )
+    
+    # User tracking
+    client_user_id = models.CharField(_('client user ID'), max_length=100, blank=True)
+    
+    # Status tracking
+    status = models.CharField(
+        _('status'), 
+        max_length=30, 
+        choices=ITEM_STATUS_CHOICES,
+        default='CREATED'
+    )
+    execution_status = models.CharField(
+        _('execution status'),
+        max_length=50,
+        choices=EXECUTION_STATUS_CHOICES,
+        blank=True
+    )
+    
+    # Dates
+    created_at = models.DateTimeField(_('created at'))
+    updated_at = models.DateTimeField(_('updated at'))
+    last_successful_update = models.DateTimeField(_('last successful update'), null=True, blank=True)
+    
+    # Error tracking
+    error_code = models.CharField(_('error code'), max_length=50, blank=True)
+    error_message = models.TextField(_('error message'), blank=True)
+    
+    # Status details from Pluggy
+    status_detail = models.JSONField(_('status detail'), default=dict, blank=True)
+    
+    # Consents (for Open Finance)
+    consent_id = models.CharField(_('consent ID'), max_length=100, blank=True)
+    consent_expires_at = models.DateTimeField(_('consent expires at'), null=True, blank=True)
+    
+    # Metadata
+    metadata = models.JSONField(_('metadata'), default=dict, blank=True)
+    
+    # Tracking
+    created = models.DateTimeField(_('created'), auto_now_add=True)
+    modified = models.DateTimeField(_('modified'), auto_now=True)
+    
+    class Meta:
+        db_table = 'pluggy_items'
+        verbose_name = _('Pluggy Item')
+        verbose_name_plural = _('Pluggy Items')
         indexes = [
             models.Index(fields=['company', 'status']),
-            models.Index(fields=['bank_provider', 'external_id']),
-            models.Index(fields=['last_sync_at']),
+            models.Index(fields=['pluggy_id']),
+            models.Index(fields=['last_successful_update']),
         ]
     
     def __str__(self):
-        return f"{self.bank_provider.name} - {self.agency}/{self.account_number}"
+        return f"{self.connector.name} - {self.pluggy_id}"
+
+
+class BankAccount(models.Model):
+    """
+    Bank account connected via Pluggy
+    """
+    ACCOUNT_TYPE_CHOICES = [
+        ('BANK', 'Bank Account'),
+        ('CREDIT', 'Credit Card'),
+        ('INVESTMENT', 'Investment'),
+        ('LOAN', 'Loan'),
+        ('OTHER', 'Other'),
+    ]
+    
+    ACCOUNT_SUBTYPE_CHOICES = [
+        ('CHECKING_ACCOUNT', 'Checking Account'),
+        ('SAVINGS_ACCOUNT', 'Savings Account'),
+        ('CREDIT_CARD', 'Credit Card'),
+        ('PREPAID_CARD', 'Prepaid Card'),
+        ('INVESTMENT_ACCOUNT', 'Investment Account'),
+        ('LOAN_ACCOUNT', 'Loan Account'),
+        ('OTHER', 'Other'),
+    ]
+    
+    # IDs
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    pluggy_id = models.CharField(_('Pluggy Account ID'), max_length=100, unique=True, db_index=True)
+    
+    # Relations
+    item = models.ForeignKey(
+        PluggyItem,
+        on_delete=models.CASCADE,
+        related_name='accounts'
+    )
+    company = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name='bank_accounts_v2'
+    )
+    
+    # Account info from Pluggy
+    type = models.CharField(_('type'), max_length=20, choices=ACCOUNT_TYPE_CHOICES)
+    subtype = models.CharField(_('subtype'), max_length=30, choices=ACCOUNT_SUBTYPE_CHOICES, blank=True)
+    number = models.CharField(_('number'), max_length=50, blank=True)
+    name = models.CharField(_('name'), max_length=200, blank=True)
+    marketing_name = models.CharField(_('marketing name'), max_length=200, blank=True, null=True)
+    
+    # Owner info
+    owner = models.CharField(_('owner'), max_length=200, blank=True, null=True)
+    tax_number = models.CharField(_('tax number'), max_length=20, blank=True, null=True)
+    
+    # Balance info
+    balance = models.DecimalField(_('balance'), max_digits=15, decimal_places=2, default=Decimal('0.00'))
+    balance_date = models.DateTimeField(_('balance date'), blank=True, null=True)
+    currency_code = models.CharField(_('currency code'), max_length=3, default='BRL')
+    
+    # Bank specific data (for BANK type)
+    bank_data = models.JSONField(_('bank data'), default=dict, blank=True, null=True)
+    
+    # Credit card specific data (for CREDIT type)
+    credit_data = models.JSONField(_('credit data'), default=dict, blank=True, null=True)
+    
+    # Status
+    is_active = models.BooleanField(_('is active'), default=True)
+    
+    # Metadata
+    created_at = models.DateTimeField(_('created at'))
+    updated_at = models.DateTimeField(_('updated at'))
+    
+    # Tracking
+    created = models.DateTimeField(_('created'), auto_now_add=True)
+    modified = models.DateTimeField(_('modified'), auto_now=True)
+    
+    class Meta:
+        db_table = 'bank_accounts_v2'
+        verbose_name = _('Bank Account')
+        verbose_name_plural = _('Bank Accounts')
+        unique_together = [['company', 'pluggy_id']]
+        indexes = [
+            models.Index(fields=['company', 'is_active']),
+            models.Index(fields=['item', 'type']),
+            models.Index(fields=['pluggy_id']),
+        ]
+    
+    def __str__(self):
+        return f"{self.name or self.number} - {self.get_type_display()}"
     
     @property
-    def masked_account(self):
+    def masked_number(self):
         """Return masked account number for security"""
-        if len(self.account_number) > 4:
-            return f"****{self.account_number[-4:]}"
-        return self.account_number
-    
-    def save(self, *args, **kwargs):
-        """Custom save method for validation"""
-        self.full_clean()
-        super().save(*args, **kwargs)
-    
-    def clean(self):
-        """Custom validation for bank accounts"""
-        super().clean()
-        
-        # For Pluggy integration, we rely on external_id for uniqueness
-        # Agency and account validation is optional since formats vary by bank
-        pass
+        if self.number and len(self.number) > 4:
+            return f"****{self.number[-4:]}"
+        return self.number
     
     @property
     def display_name(self):
         """Return display name for the account"""
-        if self.nickname:
-            return f"{self.nickname} ({self.bank_provider.name})"
-        return f"{self.bank_provider.name} - {self.masked_account}"
+        if self.name:
+            return self.name
+        elif self.marketing_name:
+            return self.marketing_name
+        else:
+            return f"{self.item.connector.name} - {self.masked_number}"
+
+
+class PluggyCategory(models.Model):
+    """
+    Pluggy's transaction categories (cached)
+    """
+    id = models.CharField(_('category ID'), max_length=100, primary_key=True)
+    description = models.CharField(_('description'), max_length=200)
+    parent_id = models.CharField(_('parent ID'), max_length=100, blank=True, null=True)
+    parent_description = models.CharField(_('parent description'), max_length=200, blank=True)
+    
+    # Mapping to internal categories
+    internal_category = models.ForeignKey(
+        'TransactionCategory',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pluggy_mappings'
+    )
+    
+    class Meta:
+        db_table = 'pluggy_categories'
+        verbose_name = _('Pluggy Category')
+        verbose_name_plural = _('Pluggy Categories')
+        ordering = ['parent_description', 'description']
+    
+    def __str__(self):
+        if self.parent_description:
+            return f"{self.parent_description} > {self.description}"
+        return self.description
+
+
+class Transaction(models.Model):
+    """
+    Financial transaction from Pluggy
+    """
+    TRANSACTION_TYPE_CHOICES = [
+        ('DEBIT', 'Debit'),
+        ('CREDIT', 'Credit'),
+    ]
+    
+    TRANSACTION_STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('POSTED', 'Posted'),
+    ]
+    
+    # IDs
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    pluggy_id = models.CharField(_('Pluggy Transaction ID'), max_length=100, unique=True, db_index=True)
+    
+    # Relations
+    account = models.ForeignKey(
+        BankAccount,
+        on_delete=models.CASCADE,
+        related_name='transactions'
+    )
+    
+    # Transaction data
+    type = models.CharField(_('type'), max_length=10, choices=TRANSACTION_TYPE_CHOICES)
+    status = models.CharField(_('status'), max_length=10, choices=TRANSACTION_STATUS_CHOICES, default='POSTED')
+    
+    description = models.CharField(_('description'), max_length=500)
+    amount = models.DecimalField(_('amount'), max_digits=15, decimal_places=2)
+    currency_code = models.CharField(_('currency code'), max_length=3, default='BRL')
+    
+    date = models.DateTimeField(_('transaction date'))
+    
+    # Merchant info
+    merchant = models.JSONField(_('merchant'), default=dict, blank=True)
+    
+    # Payment data (for Open Finance)
+    payment_data = models.JSONField(_('payment data'), default=dict, blank=True)
+    
+    # Category from Pluggy
+    pluggy_category_id = models.CharField(_('Pluggy category ID'), max_length=100, blank=True)
+    pluggy_category_description = models.CharField(_('Pluggy category'), max_length=200, blank=True)
+    
+    # Mapped internal category
+    category = models.ForeignKey(
+        'TransactionCategory',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='transactions_v2'
+    )
+    
+    # Additional fields
+    operation_type = models.CharField(_('operation type'), max_length=50, blank=True)
+    payment_method = models.CharField(_('payment method'), max_length=50, blank=True)
+    
+    # Credit card specific
+    credit_card_metadata = models.JSONField(_('credit card metadata'), default=dict, blank=True)
+    
+    # User annotations
+    notes = models.TextField(_('notes'), blank=True)
+    tags = models.JSONField(_('tags'), default=list)
+    
+    # Metadata
+    metadata = models.JSONField(_('metadata'), default=dict, blank=True)
+    created_at = models.DateTimeField(_('created at'))
+    updated_at = models.DateTimeField(_('updated at'))
+    
+    # Tracking
+    created = models.DateTimeField(_('created'), auto_now_add=True)
+    modified = models.DateTimeField(_('modified'), auto_now=True)
+    
+    class Meta:
+        db_table = 'transactions_v2'
+        verbose_name = _('Transaction')
+        verbose_name_plural = _('Transactions')
+        ordering = ['-date', '-created_at']
+        indexes = [
+            models.Index(fields=['account', 'date']),
+            models.Index(fields=['pluggy_id']),
+            models.Index(fields=['date', 'type']),
+            models.Index(fields=['pluggy_category_id']),
+            models.Index(fields=['category', 'date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.description} - {self.get_amount_display()}"
+    
+    def get_amount_display(self):
+        """Return formatted amount with sign"""
+        if self.type == 'CREDIT':
+            return f"+{self.currency_code} {abs(self.amount):,.2f}"
+        else:
+            return f"-{self.currency_code} {abs(self.amount):,.2f}"
+    
+    @property
+    def is_income(self):
+        """Check if transaction is income"""
+        return self.type == 'CREDIT'
+    
+    @property
+    def is_expense(self):
+        """Check if transaction is expense"""
+        return self.type == 'DEBIT'
 
 
 class TransactionCategory(models.Model):
     """
-    Categories for transaction classification
+    Internal transaction categories for organization
     """
-    CATEGORY_TYPES = [
-        ('income', 'Receita'),
-        ('expense', 'Despesa'),
-        ('transfer', 'Transferência'),
+    CATEGORY_TYPE_CHOICES = [
+        ('income', 'Income'),
+        ('expense', 'Expense'),
+        ('transfer', 'Transfer'),
+        ('both', 'Both'),
     ]
     
-    name = models.CharField(_('category name'), max_length=100)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(_('name'), max_length=100)
     slug = models.SlugField(_('slug'), unique=True)
-    category_type = models.CharField(_('category type'), max_length=20, choices=CATEGORY_TYPES)
-    parent = models.ForeignKey('self', on_delete=models.CASCADE, blank=True, null=True, related_name='subcategories')
+    type = models.CharField(_('type'), max_length=20, choices=CATEGORY_TYPE_CHOICES)
     
-    # Visual settings
-    icon = models.CharField(_('icon'), max_length=50, default='💰')
-    color = models.CharField(_('color'), max_length=7, default='#3B82F6')
+    # Hierarchy
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='subcategories'
+    )
     
-    # AI training data
-    keywords = models.JSONField(_('keywords for AI'), default=list, help_text="Keywords for AI categorization")
-    confidence_threshold = models.FloatField(_('confidence threshold'), default=0.7)
+    # Visual
+    icon = models.CharField(_('icon'), max_length=50, default='📁')
+    color = models.CharField(_('color'), max_length=7, default='#6B7280')
     
     # Settings
     is_system = models.BooleanField(_('is system category'), default=False)
     is_active = models.BooleanField(_('is active'), default=True)
     order = models.IntegerField(_('order'), default=0)
     
+    # Company specific
+    company = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name='transaction_categories',
+        null=True,
+        blank=True
+    )
+    
+    # Metadata
+    created = models.DateTimeField(_('created'), auto_now_add=True)
+    modified = models.DateTimeField(_('modified'), auto_now=True)
+    
     class Meta:
-        db_table = 'transaction_categories'
+        db_table = 'transaction_categories_v2'
         verbose_name = _('Transaction Category')
         verbose_name_plural = _('Transaction Categories')
-        ordering = ['category_type', 'order', 'name']
-        indexes = [
-            models.Index(fields=['category_type', 'is_active']),
-            models.Index(fields=['is_system', 'category_type']),
-            models.Index(fields=['parent', 'order']),
-        ]
+        ordering = ['type', 'order', 'name']
+        unique_together = [['company', 'slug']]
     
     def __str__(self):
-        if self.parent:
-            return f"{self.parent.name} > {self.name}"
-        return self.name
-    
-    @property
-    def full_name(self):
-        """Return full category path"""
         if self.parent:
             return f"{self.parent.name} > {self.name}"
         return self.name
     
     def save(self, *args, **kwargs):
-        """Auto-generate slug if not provided"""
         if not self.slug:
             from django.utils.text import slugify
             base_slug = slugify(self.name)
             slug = base_slug
             counter = 1
-            while TransactionCategory.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+            
+            while TransactionCategory.objects.filter(
+                slug=slug,
+                company=self.company
+            ).exclude(pk=self.pk).exists():
                 slug = f"{base_slug}-{counter}"
                 counter += 1
+            
             self.slug = slug
+        
         super().save(*args, **kwargs)
 
 
-class Transaction(models.Model):
+class ItemWebhook(models.Model):
     """
-    Financial transactions from bank accounts
+    Track webhook events for items
     """
-    TRANSACTION_TYPES = [
-        ('debit', 'Débito'),
-        ('credit', 'Crédito'),
-        ('transfer_in', 'Transferência Recebida'),
-        ('transfer_out', 'Transferência Enviada'),
-        ('pix_in', 'PIX Recebido'),
-        ('pix_out', 'PIX Enviado'),
-        ('fee', 'Taxa'),
-        ('interest', 'Juros'),
-        ('adjustment', 'Ajuste'),
+    EVENT_TYPE_CHOICES = [
+        ('item.created', 'Item Created'),
+        ('item.updated', 'Item Updated'),
+        ('item.error', 'Item Error'),
+        ('item.deleted', 'Item Deleted'),
+        ('item.login_succeeded', 'Login Succeeded'),
+        ('item.waiting_user_input', 'Waiting User Input'),
+        ('transactions.created', 'Transactions Created'),
+        ('transactions.updated', 'Transactions Updated'),
+        ('transactions.deleted', 'Transactions Deleted'),
+        ('consent.created', 'Consent Created'),
+        ('consent.updated', 'Consent Updated'),
+        ('consent.revoked', 'Consent Revoked'),
     ]
     
-    STATUS_CHOICES = [
-        ('pending', 'Pendente'),
-        ('completed', 'Concluída'),
-        ('failed', 'Falhou'),
-        ('cancelled', 'Cancelada'),
-    ]
-    
-    # Basic transaction info
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    bank_account = models.ForeignKey(BankAccount, on_delete=models.CASCADE, related_name='transactions')
-    external_id = models.CharField(_('external transaction ID'), max_length=100, blank=True)
-    
-    # Transaction details
-    transaction_type = models.CharField(_('transaction type'), max_length=20, choices=TRANSACTION_TYPES)
-    amount = models.DecimalField(_('amount'), max_digits=15, decimal_places=2)
-    description = models.CharField(_('description'), max_length=500)
-    transaction_date = models.DateTimeField(_('transaction date'))
-    posted_date = models.DateTimeField(_('posted date'), blank=True, null=True)
-    
-    # Counterpart information
-    counterpart_name = models.CharField(_('counterpart name'), max_length=200, blank=True)
-    counterpart_document = models.CharField(_('counterpart document'), max_length=20, blank=True)
-    counterpart_bank = models.CharField(_('counterpart bank'), max_length=100, blank=True)
-    counterpart_agency = models.CharField(_('counterpart agency'), max_length=10, blank=True)
-    counterpart_account = models.CharField(_('counterpart account'), max_length=20, blank=True)
-    
-    # Categorization
-    category = models.ForeignKey(
-        TransactionCategory, 
-        on_delete=models.SET_NULL, 
-        blank=True, 
-        null=True,
-        related_name='transactions'
-    )
-    subcategory = models.ForeignKey(
-        TransactionCategory, 
-        on_delete=models.SET_NULL, 
-        blank=True, 
-        null=True,
-        related_name='subcategory_transactions'
+    item = models.ForeignKey(
+        PluggyItem,
+        on_delete=models.CASCADE,
+        related_name='webhooks'
     )
     
-    # Categorization is now handled automatically by Pluggy
+    event_type = models.CharField(_('event type'), max_length=50, choices=EVENT_TYPE_CHOICES)
+    event_id = models.CharField(_('event ID'), max_length=100, unique=True)
     
-    # Additional metadata
-    reference_number = models.CharField(_('reference number'), max_length=100, blank=True)
-    pix_key = models.CharField(_('PIX key'), max_length=100, blank=True)
-    notes = models.TextField(_('notes'), blank=True)
-    tags = models.JSONField(_('tags'), default=list)
-    metadata = models.JSONField(_('metadata'), default=dict, blank=True, help_text='Additional data from Pluggy')
+    payload = models.JSONField(_('payload'))
+    processed = models.BooleanField(_('processed'), default=False)
+    processed_at = models.DateTimeField(_('processed at'), null=True, blank=True)
     
-    # Status and processing
-    status = models.CharField(_('status'), max_length=20, choices=STATUS_CHOICES, default='completed')
-    balance_after = models.DecimalField(
-        _('balance after transaction'), 
-        max_digits=15, 
-        decimal_places=2,
-        blank=True,
-        null=True
-    )
+    error = models.TextField(_('error'), blank=True)
     
-    # Reconciliation
-    is_reconciled = models.BooleanField(_('is reconciled'), default=False)
-    reconciled_at = models.DateTimeField(_('reconciled at'), blank=True, null=True)
-    reconciled_by = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        blank=True, 
-        null=True,
-        related_name='reconciled_transactions'
-    )
-    
-    # Metadata
-    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
-    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    created = models.DateTimeField(_('created'), auto_now_add=True)
     
     class Meta:
-        db_table = 'transactions'
-        verbose_name = _('Transaction')
-        verbose_name_plural = _('Transactions')
-        ordering = ['-transaction_date', '-created_at']
+        db_table = 'item_webhooks'
+        verbose_name = _('Item Webhook')
+        verbose_name_plural = _('Item Webhooks')
+        ordering = ['-created']
         indexes = [
-            # Primary filtering indexes
-            models.Index(fields=['bank_account', 'transaction_date', 'category']),
-            models.Index(fields=['bank_account', 'transaction_type', 'transaction_date']),
-            models.Index(fields=['bank_account', 'status', 'transaction_date']),
-            
-            # Dashboard and reporting indexes
-            models.Index(fields=['transaction_date', 'category', 'amount']),
-            models.Index(fields=['counterpart_name', 'transaction_date']),
-            models.Index(fields=['external_id', 'bank_account']),
-            
-            # AI categorization indexes
-            # AI categorization indexes removed - now using Pluggy automatic categorization
-            
-            # Reconciliation indexes
-            models.Index(fields=['is_reconciled', 'reconciled_at']),
-            
-            # Performance indexes for aggregations
-            # Note: Company-level filtering will use joins, not direct indexing
-            models.Index(fields=['external_id']),
+            models.Index(fields=['item', 'event_type']),
+            models.Index(fields=['processed', 'created']),
+            models.Index(fields=['event_id']),
         ]
     
     def __str__(self):
-        return f"{self.description} - R$ {self.amount} ({self.transaction_date.strftime('%d/%m/%Y')})"
-    
-    @property
-    def is_income(self):
-        """Check if transaction is income"""
-        return self.transaction_type in ['credit', 'transfer_in', 'pix_in'] and self.amount > 0
-    
-    @property
-    def is_expense(self):
-        """Check if transaction is expense"""
-        return self.transaction_type in ['debit', 'transfer_out', 'pix_out', 'fee'] or self.amount < 0
-    
-    @property
-    def formatted_amount(self):
-        """Return formatted amount with currency"""
-        return f"R$ {abs(self.amount):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-    
-    @property
-    def amount_with_sign(self):
-        """Return amount with proper sign for display"""
-        if self.is_income:
-            return abs(self.amount)
-        else:
-            return -abs(self.amount)
-
-class BankSync(models.Model):
-    """
-    Bank synchronization logs and status
-    """
-    SYNC_STATUS = [
-        ('pending', 'Pendente'),
-        ('running', 'Executando'),
-        ('completed', 'Concluído'),
-        ('failed', 'Falhou'),
-        ('partial', 'Parcial'),
-    ]
-    
-    bank_account = models.ForeignKey(BankAccount, on_delete=models.CASCADE, related_name='sync_logs')
-    started_at = models.DateTimeField(_('started at'), auto_now_add=True)
-    completed_at = models.DateTimeField(_('completed at'), blank=True, null=True)
-    status = models.CharField(_('status'), max_length=20, choices=SYNC_STATUS, default='pending')
-    
-    # Sync details
-    transactions_found = models.IntegerField(_('transactions found'), default=0)
-    transactions_new = models.IntegerField(_('new transactions'), default=0)
-    transactions_updated = models.IntegerField(_('updated transactions'), default=0)
-    
-    # Error handling
-    error_message = models.TextField(_('error message'), blank=True)
-    error_code = models.CharField(_('error code'), max_length=50, blank=True)
-    
-    # Sync range
-    sync_from_date = models.DateField(_('sync from date'))
-    sync_to_date = models.DateField(_('sync to date'))
-    
-    class Meta:
-        db_table = 'bank_syncs'
-        verbose_name = _('Bank Sync')
-        verbose_name_plural = _('Bank Syncs')
-        ordering = ['-started_at']
-    
-    def __str__(self):
-        return f"Sync {self.bank_account} - {self.status} ({self.started_at.strftime('%d/%m/%Y %H:%M')})"
-    
-    @property
-    def duration(self):
-        """Calculate sync duration"""
-        if self.completed_at and self.started_at:
-            return self.completed_at - self.started_at
-        return None
-
-
+        return f"{self.event_type} - {self.item.pluggy_id}"

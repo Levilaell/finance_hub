@@ -1,298 +1,346 @@
-import { create } from "zustand";
-import { BankAccount, BankTransaction, TransactionFilter } from "@/types";
-import { bankingService } from "@/services/banking.service";
+/**
+ * Banking store using Zustand - Pluggy Integration
+ */
+import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
+import {
+  PluggyConnector,
+  PluggyItem,
+  BankAccount,
+  Transaction,
+  TransactionCategory,
+  TransactionFilters,
+  BankingStoreState,
+  SyncResponse,
+} from '@/types/banking.types';
+import { bankingService } from '@/services/banking.service';
 
-interface BankProvider {
-  id: number;
-  name: string;
-  code: string;
-  logo?: string;
-  color?: string;
-  is_open_banking: boolean;
-  supports_pix: boolean;
-  supports_ted: boolean;
-}
-
-interface BankingState {
-  // Accounts
-  accounts: BankAccount[];
-  providers: BankProvider[];
-  selectedAccountId: string | null;
-  loading: boolean;
-  error: string | null;
-  isLoadingAccounts: boolean;
-  accountsError: string | null;
-
-  // Transactions
-  transactions: BankTransaction[];
-  transactionFilters: TransactionFilter;
-  totalTransactions: number;
-  currentPage: number;
-  pageSize: number;
-  isLoadingTransactions: boolean;
-  transactionsError: string | null;
-
-  // Actions - Accounts
-  fetchAccounts: () => Promise<void>;
-  fetchProviders: () => Promise<void>;
-  selectAccount: (accountId: string | null) => void;
-  syncAccount: (accountId: string) => Promise<{
-    success: boolean;
-    error_code?: string;
-    message?: string;
-    reconnection_required?: boolean;
-    data?: any;
-  }>;
-  deleteAccount: (accountId: string) => Promise<void>;
+interface BankingStore extends BankingStoreState {
+  // ===== Actions - Connectors =====
+  fetchConnectors: () => Promise<void>;
   
-  // Actions - Transactions
+  // ===== Actions - Items =====
+  fetchItems: () => Promise<void>;
+  syncItem: (itemId: string) => Promise<void>;
+  disconnectItem: (itemId: string) => Promise<void>;
+  
+  // ===== Actions - Accounts =====
+  fetchAccounts: () => Promise<void>;
+  selectAccount: (accountId: string | null) => void;
+  syncAccount: (accountId: string) => Promise<SyncResponse>;
+  
+  // ===== Actions - Transactions =====
   fetchTransactions: (page?: number) => Promise<void>;
-  setTransactionFilters: (filters: Partial<TransactionFilter>) => void;
+  updateTransaction: (id: string, data: Partial<Transaction>) => Promise<void>;
+  bulkCategorizeTransactions: (transactionIds: string[], categoryId: string) => Promise<void>;
+  setTransactionFilters: (filters: Partial<TransactionFilters>) => void;
   clearTransactionFilters: () => void;
-  updateTransaction: (id: string, data: Partial<BankTransaction>) => void;
-  setPageSize: (size: number) => void;
+  
+  // ===== Actions - Categories =====
+  fetchCategories: () => Promise<void>;
+  createCategory: (data: Partial<TransactionCategory>) => Promise<void>;
+  updateCategory: (id: string, data: Partial<TransactionCategory>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+  
+  // ===== Utility Actions =====
+  reset: () => void;
 }
 
-const defaultFilters: TransactionFilter = {
-  account_id: undefined,
-  category_id: undefined,
-  start_date: undefined,
-  end_date: undefined,
-  min_amount: undefined,
-  max_amount: undefined,
-  transaction_type: undefined,
-  search: undefined,
+const initialState: BankingStoreState = {
+  // Data
+  connectors: [],
+  items: [],
+  accounts: [],
+  transactions: [],
+  categories: [],
+  
+  // UI State
+  selectedAccountId: null,
+  transactionFilters: {},
+  
+  // Loading states
+  loadingConnectors: false,
+  loadingItems: false,
+  loadingAccounts: false,
+  loadingTransactions: false,
+  
+  // Errors
+  connectorsError: null,
+  itemsError: null,
+  accountsError: null,
+  transactionsError: null,
+  
+  // Pagination
+  transactionsPagination: {
+    page: 1,
+    pageSize: 50,
+    totalCount: 0,
+    totalPages: 0,
+  },
 };
 
-export const useBankingStore = create<BankingState>((set, get) => ({
-  // Initial state - Accounts
-  accounts: [],
-  providers: [],
-  selectedAccountId: null,
-  loading: false,
-  error: null,
-  isLoadingAccounts: false,
-  accountsError: null,
-
-  // Initial state - Transactions
-  transactions: [],
-  transactionFilters: defaultFilters,
-  totalTransactions: 0,
-  currentPage: 1,
-  pageSize: 20,
-  isLoadingTransactions: false,
-  transactionsError: null,
-
-  // Actions - Accounts
-  fetchAccounts: async () => {
-    set({ loading: true, error: null });
-    try {
-      const { bankingService } = await import('@/services/banking.service');
-      const response = await bankingService.getAccounts();
+export const useBankingStore = create<BankingStore>()(
+  devtools(
+    (set, get) => ({
+      ...initialState,
       
-      // A API retorna um objeto paginado, precisamos pegar o array results
-      const accounts = response.results || [];
+      // ===== Actions - Connectors =====
       
-      set({ accounts: accounts, loading: false });
-    } catch (error: any) {
-      set({
-        error: error.message || "Failed to fetch accounts",
-        loading: false,
-      });
-    }
-  },
-
-  fetchProviders: async () => {
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
-      // Try to fetch from API first if we have a token
-      if (token) {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/banking/providers/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
+      fetchConnectors: async () => {
+        set({ loadingConnectors: true, connectorsError: null });
         
-        if (response.ok) {
-          const data = await response.json();
-          set({ providers: Array.isArray(data) ? data : [] });
-          return;
+        try {
+          const connectors = await bankingService.getConnectors();
+          set({ connectors, loadingConnectors: false });
+        } catch (error: any) {
+          set({
+            connectorsError: error.message || 'Failed to fetch connectors',
+            loadingConnectors: false,
+          });
         }
-      }
+      },
       
-      // Always fallback to local data (works even without authentication)
-      const mockProviders = await import('@/data/bank-providers.json');
-      set({ providers: Array.isArray(mockProviders.default) ? mockProviders.default : [] });
-    } catch (error: any) {
-      // Use mock data as fallback
-      try {
-        const mockProviders = await import('@/data/bank-providers.json');
-        set({ providers: Array.isArray(mockProviders.default) ? mockProviders.default : [] });
-      } catch (fallbackError) {
-        set({ providers: [] });
-      }
-    }
-  },
-
-  selectAccount: (accountId) => {
-    set({ selectedAccountId: accountId });
-    // When selecting an account, update the filter and fetch transactions
-    if (accountId) {
-      get().setTransactionFilters({ account_id: accountId });
-    }
-  },
-
-  syncAccount: async (accountId) => {
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      if (!token) throw new Error('Authentication required');
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/banking/pluggy/accounts/${accountId}/sync/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // ===== Actions - Items =====
       
-      // Tentar fazer parse do JSON apenas se for JSON válido
-      let data;
-      const contentType = response.headers.get('content-type');
-      
-      if (contentType && contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        // Se não for JSON (provavelmente HTML de erro), criar estrutura de erro
-        data = {
-          error: 'Invalid response format',
-          message: 'Server returned non-JSON response'
-        };
-      }
-      
-      if (!response.ok) {
-        // Se for 403, provavelmente precisa reconectar
-        if (response.status === 403) {
-          return {
-            success: false,
-            error_code: data.error_code || 'WAITING_USER_ACTION',
-            message: data.message || 'Reautenticação necessária',
-            reconnection_required: true,
-            data: data
-          };
-        }
+      fetchItems: async () => {
+        set({ loadingItems: true, itemsError: null });
         
-        // Se for erro de MFA required
-        if (response.status === 400 && data.error === 'mfa_required') {
-          return {
-            success: false,
-            error_code: 'MFA_REQUIRED',
-            message: data.message || 'Esta conta precisa ser reconectada para continuar sincronizando.',
-            reconnection_required: true,
-            data: data.data
-          };
+        try {
+          const response = await bankingService.getItems();
+          set({ items: response.results, loadingItems: false });
+        } catch (error: any) {
+          set({
+            itemsError: error.message || 'Failed to fetch items',
+            loadingItems: false,
+          });
         }
+      },
+      
+      syncItem: async (itemId: string) => {
+        try {
+          await bankingService.syncItem(itemId);
+          // Refresh items and accounts after sync
+          await Promise.all([
+            get().fetchItems(),
+            get().fetchAccounts(),
+          ]);
+        } catch (error: any) {
+          console.error('Failed to sync item:', error);
+          throw error;
+        }
+      },
+      
+      disconnectItem: async (itemId: string) => {
+        try {
+          await bankingService.disconnectItem(itemId);
+          // Remove item and its accounts from state
+          set((state) => ({
+            items: state.items.filter((item) => item.id !== itemId),
+            accounts: state.accounts.filter(
+              (account) => !state.items.find((item) => item.id === itemId)
+            ),
+          }));
+        } catch (error: any) {
+          console.error('Failed to disconnect item:', error);
+          throw error;
+        }
+      },
+      
+      // ===== Actions - Accounts =====
+      
+      fetchAccounts: async () => {
+        set({ loadingAccounts: true, accountsError: null });
         
-        // Outros erros
-        return {
-          success: false,
-          error_code: data.error_code || data.error,
-          message: data.message || data.error || 'Failed to sync account',
-          reconnection_required: data.reconnection_required || (data.data && data.data.reconnect_required),
-          data: data
-        };
-      }
+        try {
+          const accounts = await bankingService.getAccounts();
+          set({ accounts, loadingAccounts: false });
+        } catch (error: any) {
+          set({
+            accountsError: error.message || 'Failed to fetch accounts',
+            loadingAccounts: false,
+          });
+        }
+      },
       
-      // Refresh accounts after successful sync
-      await get().fetchAccounts();
+      selectAccount: (accountId: string | null) => {
+        set({ selectedAccountId: accountId });
+        
+        // Update transaction filter when selecting account
+        if (accountId) {
+          get().setTransactionFilters({ account_id: accountId });
+        }
+      },
       
-      // Retornar dados de sucesso
-      return {
-        success: true,
-        data: data.data || data,
-        message: data.message
-      };
-    } catch (error: any) {
-      console.error('Sync account error:', error);
-      return {
-        success: false,
-        message: error.message || 'Network error',
-        error: error
-      };
+      syncAccount: async (accountId: string) => {
+        try {
+          const response = await bankingService.syncAccount(accountId);
+          
+          // If successful, refresh account data
+          if (response.success) {
+            await get().fetchAccounts();
+            
+            // If transactions were synced, refresh them too
+            if (response.data?.sync_stats?.transactions_synced) {
+              await get().fetchTransactions();
+            }
+          }
+          
+          return response;
+        } catch (error: any) {
+          console.error('Failed to sync account:', error);
+          throw error;
+        }
+      },
+      
+      // ===== Actions - Transactions =====
+      
+      fetchTransactions: async (page = 1) => {
+        const { transactionFilters, transactionsPagination } = get();
+        
+        set({ loadingTransactions: true, transactionsError: null });
+        
+        try {
+          const response = await bankingService.getTransactions({
+            ...transactionFilters,
+            page,
+            page_size: transactionsPagination.pageSize,
+          });
+          
+          set({
+            transactions: response.results,
+            transactionsPagination: {
+              ...transactionsPagination,
+              page,
+              totalCount: response.count,
+              totalPages: Math.ceil(response.count / transactionsPagination.pageSize),
+            },
+            loadingTransactions: false,
+          });
+        } catch (error: any) {
+          set({
+            transactionsError: error.message || 'Failed to fetch transactions',
+            loadingTransactions: false,
+          });
+        }
+      },
+      
+      updateTransaction: async (id: string, data: Partial<Transaction>) => {
+        try {
+          const updated = await bankingService.updateTransaction(id, {
+            category: data.category,
+            notes: data.notes,
+            tags: data.tags,
+          });
+          
+          // Update transaction in state
+          set((state) => ({
+            transactions: state.transactions.map((t) =>
+              t.id === id ? { ...t, ...updated } : t
+            ),
+          }));
+        } catch (error: any) {
+          console.error('Failed to update transaction:', error);
+          throw error;
+        }
+      },
+      
+      bulkCategorizeTransactions: async (
+        transactionIds: string[],
+        categoryId: string
+      ) => {
+        try {
+          const response = await bankingService.bulkCategorize({
+            transaction_ids: transactionIds,
+            category_id: categoryId,
+          });
+          
+          if (response.success) {
+            // Update transactions in state
+            set((state) => ({
+              transactions: state.transactions.map((t) =>
+                transactionIds.includes(t.id)
+                  ? { ...t, category: categoryId }
+                  : t
+              ),
+            }));
+          }
+        } catch (error: any) {
+          console.error('Failed to bulk categorize:', error);
+          throw error;
+        }
+      },
+      
+      setTransactionFilters: (filters: Partial<TransactionFilters>) => {
+        set((state) => ({
+          transactionFilters: { ...state.transactionFilters, ...filters },
+        }));
+        
+        // Fetch transactions with new filters
+        get().fetchTransactions(1);
+      },
+      
+      clearTransactionFilters: () => {
+        set({ transactionFilters: {} });
+        get().fetchTransactions(1);
+      },
+      
+      // ===== Actions - Categories =====
+      
+      fetchCategories: async () => {
+        try {
+          const categories = await bankingService.getCategories();
+          set({ categories });
+        } catch (error: any) {
+          console.error('Failed to fetch categories:', error);
+        }
+      },
+      
+      createCategory: async (data: Partial<TransactionCategory>) => {
+        try {
+          const category = await bankingService.createCategory(data);
+          set((state) => ({
+            categories: [...state.categories, category],
+          }));
+        } catch (error: any) {
+          console.error('Failed to create category:', error);
+          throw error;
+        }
+      },
+      
+      updateCategory: async (id: string, data: Partial<TransactionCategory>) => {
+        try {
+          const updated = await bankingService.updateCategory(id, data);
+          set((state) => ({
+            categories: state.categories.map((c) =>
+              c.id === id ? updated : c
+            ),
+          }));
+        } catch (error: any) {
+          console.error('Failed to update category:', error);
+          throw error;
+        }
+      },
+      
+      deleteCategory: async (id: string) => {
+        try {
+          await bankingService.deleteCategory(id);
+          set((state) => ({
+            categories: state.categories.filter((c) => c.id !== id),
+          }));
+        } catch (error: any) {
+          console.error('Failed to delete category:', error);
+          throw error;
+        }
+      },
+      
+      // ===== Utility Actions =====
+      
+      reset: () => {
+        set(initialState);
+      },
+    }),
+    {
+      name: 'banking-store',
     }
-  },
-
-  deleteAccount: async (accountId) => {
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      if (!token) throw new Error('Authentication required');
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/banking/accounts/${accountId}/`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) throw new Error('Failed to delete account');
-      
-      // Refresh accounts after deletion
-      await get().fetchAccounts();
-    } catch (error: any) {
-      throw error;
-    }
-  },
-
-  // Actions - Transactions
-  fetchTransactions: async (page = 1) => {
-    const { transactionFilters, pageSize } = get();
-    set({ isLoadingTransactions: true, transactionsError: null, currentPage: page });
-    
-    try {
-      const response = await bankingService.getTransactions({
-        ...transactionFilters,
-        page,
-        page_size: pageSize,
-      });
-      
-      set({
-        transactions: response.results,
-        totalTransactions: response.count,
-        isLoadingTransactions: false,
-      });
-    } catch (error: any) {
-      set({
-        transactionsError: error.message || "Failed to fetch transactions",
-        isLoadingTransactions: false,
-      });
-    }
-  },
-
-  setTransactionFilters: (filters) => {
-    set((state) => ({
-      transactionFilters: { ...state.transactionFilters, ...filters },
-    }));
-    // Fetch transactions with new filters
-    get().fetchTransactions(1);
-  },
-
-  clearTransactionFilters: () => {
-    set({ transactionFilters: defaultFilters });
-    get().fetchTransactions(1);
-  },
-
-  updateTransaction: (id, data) => {
-    set((state) => ({
-      transactions: state.transactions.map((transaction) =>
-        transaction.id === id ? { ...transaction, ...data } : transaction
-      ),
-    }));
-  },
-
-  setPageSize: (size) => {
-    set({ pageSize: size });
-    get().fetchTransactions(1);
-  },
-}));
+  )
+);

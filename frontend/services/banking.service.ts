@@ -1,223 +1,287 @@
-import apiClient from "@/lib/api-client";
+/**
+ * Banking service following Pluggy API structure
+ */
+import apiClient from '@/lib/api-client';
 import {
+  PluggyConnector,
+  PluggyItem,
+  PluggyItemStatus,
   BankAccount,
-  BankTransaction,
-  BankProvider,
+  Transaction,
+  TransactionCategory,
+  TransactionFilters,
   PaginatedResponse,
-  TransactionFilter,
-  BankAccountForm,
-} from "@/types";
-
-import { PluggyCallbackResponse } from '@/types/banking.types';
-
-
-interface PluggyConnectTokenResponse {
-  success: boolean;
-  data: {
-    connect_token: string;
-    connect_url: string;
-  };
-}
-
-interface SyncResult {
-  success: boolean;
-  error_code?: string;
-  message?: string;
-  reconnection_required?: boolean;
-  warning?: string;
-  data?: {
-    sync_stats?: {
-      transactions_synced?: number;
-      bank_requires_mfa?: boolean;
-    };
-    [key: string]: any;
-  };
-}
+  ConnectTokenRequest,
+  ConnectTokenResponse,
+  CallbackRequest,
+  CallbackResponse,
+  SyncRequest,
+  SyncResponse,
+  BulkCategorizeRequest,
+  BulkCategorizeResponse,
+  DashboardData,
+} from '@/types/banking.types';
 
 class BankingService {
-  // ===== PROVIDERS =====
-  async getProviders(): Promise<BankProvider[]> {
-    const response = await apiClient.get<{
-      success: boolean;
-      data: BankProvider[];
-    }>("/api/banking/pluggy/banks/");
-    return response.data || [];
+  // ===== Connectors (Banks) =====
+  
+  async getConnectors(params?: {
+    type?: string;
+    is_open_finance?: boolean;
+    country?: string;
+  }): Promise<PluggyConnector[]> {
+    const response = await apiClient.get<PluggyConnector[]>(
+      '/api/banking/connectors/',
+      params
+    );
+    return response;
   }
-
-  // ===== ACCOUNTS =====
-  async getAccounts(): Promise<PaginatedResponse<BankAccount>> {
-    return apiClient.get<PaginatedResponse<BankAccount>>("/api/banking/accounts/");
+  
+  async syncConnectors(): Promise<{
+    success: boolean;
+    message: string;
+    created: number;
+    updated: number;
+  }> {
+    return apiClient.post('/api/banking/connectors/sync/');
   }
-
+  
+  // ===== Items (Connections) =====
+  
+  async getItems(): Promise<PaginatedResponse<PluggyItem>> {
+    return apiClient.get<PaginatedResponse<PluggyItem>>('/api/banking/items/');
+  }
+  
+  async getItem(id: string): Promise<PluggyItem> {
+    return apiClient.get<PluggyItem>(`/api/banking/items/${id}/`);
+  }
+  
+  async syncItem(id: string): Promise<{
+    success: boolean;
+    message: string;
+    task_id?: string;
+  }> {
+    return apiClient.post(`/api/banking/items/${id}/sync/`);
+  }
+  
+  async disconnectItem(id: string): Promise<void> {
+    return apiClient.delete(`/api/banking/items/${id}/disconnect/`);
+  }
+  
+  // ===== Accounts =====
+  
+  async getAccounts(): Promise<BankAccount[]> {
+    const response = await apiClient.get<BankAccount[]>('/api/banking/accounts/');
+    return response;
+  }
+  
   async getAccount(id: string): Promise<BankAccount> {
     return apiClient.get<BankAccount>(`/api/banking/accounts/${id}/`);
   }
-
-  async createAccount(data: BankAccountForm): Promise<BankAccount> {
-    return apiClient.post<BankAccount>("/api/banking/accounts/", data);
+  
+  async getAccountsSummary(): Promise<{
+    total_balance: number;
+    total_accounts: number;
+    by_type: Array<{
+      type: string;
+      count: number;
+      total_balance: number;
+    }>;
+    last_update?: string;
+  }> {
+    return apiClient.get('/api/banking/accounts/summary/');
   }
-
-  async updateAccount(id: string, data: Partial<BankAccountForm>): Promise<BankAccount> {
-    return apiClient.patch<BankAccount>(`/api/banking/accounts/${id}/`, data);
+  
+  // ===== Transactions =====
+  
+  async getTransactions(
+    params?: TransactionFilters & { page?: number; page_size?: number }
+  ): Promise<PaginatedResponse<Transaction>> {
+    return apiClient.get<PaginatedResponse<Transaction>>(
+      '/api/banking/transactions/',
+      params
+    );
   }
-
-  async deleteAccount(id: string): Promise<void> {
-    return apiClient.delete(`/api/banking/accounts/${id}/`);
+  
+  async getTransaction(id: string): Promise<Transaction> {
+    return apiClient.get<Transaction>(`/api/banking/transactions/${id}/`);
   }
-
-  async syncAccount(id: string): Promise<SyncResult> {
-    const response = await apiClient.post<{
-      success: boolean;
-      error_code?: string;
-      message?: string;
-      reconnection_required?: boolean;
-      warning?: string;
-      data?: {
-        sync_stats?: {
-          transactions_synced?: number;
-          bank_requires_mfa?: boolean;
-        };
-        [key: string]: any;
-      };
-    }>(`/api/banking/pluggy/accounts/${id}/sync/`);
-    
+  
+  async updateTransaction(
+    id: string,
+    data: { category?: string; notes?: string; tags?: string[] }
+  ): Promise<Transaction> {
+    return apiClient.patch<Transaction>(`/api/banking/transactions/${id}/`, data);
+  }
+  
+  async bulkCategorize(
+    data: BulkCategorizeRequest
+  ): Promise<BulkCategorizeResponse> {
+    return apiClient.post<BulkCategorizeResponse>(
+      '/api/banking/transactions/bulk_categorize/',
+      data
+    );
+  }
+  
+  async exportTransactions(filters?: TransactionFilters): Promise<Blob> {
+    const response = await apiClient.get(
+      '/api/banking/transactions/export/',
+      {
+        ...filters,
+        responseType: 'blob',
+      }
+    );
+    return response as unknown as Blob;
+  }
+  
+  // ===== Categories =====
+  
+  async getCategories(): Promise<TransactionCategory[]> {
+    const response = await apiClient.get<TransactionCategory[]>(
+      '/api/banking/categories/'
+    );
     return response;
   }
-
-  // ===== TRANSACTIONS =====
-  async getTransactions(params?: TransactionFilter & { page?: number; page_size?: number }): Promise<PaginatedResponse<BankTransaction>> {
-    return apiClient.get<PaginatedResponse<BankTransaction>>("/api/banking/transactions/", params);
+  
+  async getCategory(id: string): Promise<TransactionCategory> {
+    return apiClient.get<TransactionCategory>(`/api/banking/categories/${id}/`);
   }
-
-  async getTransaction(id: string): Promise<BankTransaction> {
-    return apiClient.get<BankTransaction>(`/api/banking/transactions/${id}/`);
+  
+  async createCategory(
+    data: Partial<TransactionCategory>
+  ): Promise<TransactionCategory> {
+    return apiClient.post<TransactionCategory>('/api/banking/categories/', data);
   }
-
-  async createTransaction(data: { /* ... */ }): Promise<BankTransaction> {
-    return apiClient.post<BankTransaction>("/api/banking/transactions/", data);
+  
+  async updateCategory(
+    id: string,
+    data: Partial<TransactionCategory>
+  ): Promise<TransactionCategory> {
+    return apiClient.patch<TransactionCategory>(
+      `/api/banking/categories/${id}/`,
+      data
+    );
   }
-
-  async updateTransaction(id: string, data: { category?: string; notes?: string }): Promise<BankTransaction> {
-    const payload: any = {};
-    if (data.category !== undefined) payload.category = data.category || null;
-    if (data.notes !== undefined) payload.notes = data.notes;
-    return apiClient.patch<BankTransaction>(`/api/banking/transactions/${id}/`, payload);
+  
+  async deleteCategory(id: string): Promise<void> {
+    return apiClient.delete(`/api/banking/categories/${id}/`);
   }
-
-  // ===== PLUGGY INTEGRATION =====
-  async getPluggyBanks(): Promise<{ /* ... */ }> {
-    return apiClient.get("/api/banking/pluggy/banks/");
-  }
-
-  async createPluggyConnectToken(itemId?: string): Promise<{
-    success: boolean;
-    data?: {
-      connect_token: string;
-      connect_url: string;
-    };
-    message?: string;
-  }> {
+  
+  // ===== Pluggy Connect =====
+  
+  async createConnectToken(
+    data?: ConnectTokenRequest
+  ): Promise<ConnectTokenResponse> {
     try {
-      const response = await apiClient.post<PluggyConnectTokenResponse>("/api/banking/pluggy/connect-token/", {
-        item_id: itemId
-      });
-      
-      // A resposta já vem no formato correto
+      const response = await apiClient.post<ConnectTokenResponse>(
+        '/api/banking/pluggy/connect-token/',
+        data || {}
+      );
       return response;
     } catch (error: any) {
       return {
         success: false,
-        message: error.message || 'Erro ao criar token'
+        error: error.message || 'Failed to create connect token',
       };
     }
   }
-
-  async handlePluggyCallback(itemId: string): Promise<PluggyCallbackResponse> {
-    return apiClient.post<PluggyCallbackResponse>("/api/banking/pluggy/callback/", {
-      item_id: itemId
-    });
-  }
-
-  async syncPluggyAccount(accountId: string): Promise<{ /* ... */ }> {
-    return apiClient.post(`/api/banking/pluggy/accounts/${accountId}/sync/`);
-  }
-
-  async disconnectPluggyAccount(accountId: string): Promise<{ /* ... */ }> {
-    return apiClient.delete(`/api/banking/pluggy/accounts/${accountId}/disconnect/`);
-  }
-
-  async getPluggyAccountStatus(accountId: string): Promise<{ /* ... */ }> {
-    return apiClient.get(`/api/banking/pluggy/accounts/${accountId}/status/`);
-  }
-
-  async reconnectPluggyAccount(accountId: string): Promise<{
-    success: boolean;
-    data?: {
-      connect_token: string;
-      connect_url: string;
-      item_id: string;
-    };
-    message?: string;
-  }> {
+  
+  async handleCallback(data: CallbackRequest): Promise<CallbackResponse> {
     try {
-      // 1. Buscar a conta
-      const account = await this.getAccount(accountId);
-      
-      // 2. Verificar se tem pluggy_item_id
-      if (!account.pluggy_item_id) {
-        return {
-          success: false,
-          message: 'Conta não conectada via Pluggy'
-        };
-      }
-      
-      // 3. Criar token de reconexão
-      const tokenResponse = await this.createPluggyConnectToken(account.pluggy_item_id);
-      
-      // 4. Verificar sucesso e montar resposta
-      if (tokenResponse.success && tokenResponse.data) {
-        return {
-          success: true,
-          data: {
-            connect_token: tokenResponse.data.connect_token,
-            connect_url: tokenResponse.data.connect_url,
-            item_id: account.pluggy_item_id // ← IMPORTANTE
-          }
-        };
-      }
-      
-      // 5. Retornar erro se falhou
-      return {
-        success: false,
-        message: tokenResponse.message || 'Erro ao criar token de reconexão'
-      };
-      
+      const response = await apiClient.post<CallbackResponse>(
+        '/api/banking/pluggy/callback/',
+        data
+      );
+      return response;
     } catch (error: any) {
       return {
         success: false,
-        message: error.message || 'Erro ao reconectar conta'
+        error: error.message || 'Failed to process callback',
       };
     }
   }
-
-  // ===== UTILITIES =====
-  async bulkCategorize(data: { /* ... */ }): Promise<{ updated: number }> {
-    return apiClient.post("/api/banking/transactions/bulk-categorize/", data);
+  
+  // ===== Account Sync =====
+  
+  async syncAccount(
+    accountId: string,
+    data?: SyncRequest
+  ): Promise<SyncResponse> {
+    try {
+      const response = await apiClient.post<SyncResponse>(
+        `/api/banking/accounts/${accountId}/sync/`,
+        data || {}
+      );
+      return response;
+    } catch (error: any) {
+      // Handle specific error cases
+      if (error.response?.data) {
+        return error.response.data;
+      }
+      
+      return {
+        success: false,
+        message: error.message || 'Failed to sync account',
+      };
+    }
   }
-
-  async importTransactions(accountId: string, file: File): Promise<{ /* ... */ }> {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("account_id", accountId);
-    return apiClient.upload("/api/banking/transactions/import/", formData);
+  
+  // ===== Dashboard =====
+  
+  async getDashboard(): Promise<DashboardData> {
+    return apiClient.get<DashboardData>('/api/banking/dashboard/');
   }
-
-  async exportTransactions(params: TransactionFilter): Promise<Blob> {
-    const response = await apiClient.get("/api/banking/transactions/export/", {
-      ...params,
-      responseType: "blob",
-    });
-    return response as unknown as Blob;
+  
+  // ===== Utility Methods =====
+  
+  /**
+   * Get a connect token for updating an existing item
+   */
+  async getUpdateToken(itemId: string): Promise<ConnectTokenResponse> {
+    return this.createConnectToken({ item_id: itemId });
+  }
+  
+  /**
+   * Check if an account needs reconnection
+   */
+  needsReconnection(account: BankAccount): boolean {
+    const errorStatuses: PluggyItemStatus[] = [
+      'LOGIN_ERROR',
+      'ERROR',
+      'OUTDATED',
+      'WAITING_USER_INPUT',
+    ];
+    
+    return account.item_status ? errorStatuses.includes(account.item_status) : false;
+  }
+  
+  /**
+   * Format currency value
+   */
+  formatCurrency(value: number, currency: string = 'BRL'): string {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: currency,
+    }).format(value);
+  }
+  
+  /**
+   * Format date for display
+   */
+  formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffInDays === 0) {
+      return 'Hoje';
+    } else if (diffInDays === 1) {
+      return 'Ontem';
+    } else if (diffInDays < 7) {
+      return `${diffInDays} dias atrás`;
+    } else {
+      return date.toLocaleDateString('pt-BR');
+    }
   }
 }
 
