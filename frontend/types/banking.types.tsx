@@ -59,21 +59,17 @@ export interface BankAccount {
   last_sync_at: string | null;
   created_at: string;
   updated_at: string;
-  
-  // Relações
-  bank_provider?: string;
+
+  // ✅ Altere para "provider" aqui:
   provider?: {
     id: string;
     name: string;
     logo_url?: string;
     code: string;
   };
-  
-  // Campos específicos do Pluggy
+
   pluggy_item_id?: string;
   pluggy_account_id?: string;
-  
-  // Metadados
   metadata?: Record<string, any>;
 }
 

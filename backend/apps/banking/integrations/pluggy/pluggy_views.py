@@ -447,33 +447,48 @@ class PluggyCallbackView(APIView):
                     
                     created_accounts.append(bank_account)
                 
-                # Fetch initial transactions only if accounts were created
+                # According to Pluggy documentation:
+                # - Initial item creation includes up to 365 days of historical data
+                # - But we need to wait for the item to be UPDATED before fetching transactions
+                # - The sync happens asynchronously on Pluggy's side
+                
                 if created_accounts:
-                    logger.info(f"Syncing transactions for {len(created_accounts)} accounts")
-                    # Give Pluggy a moment to process the new connection
-                    import time
-                    time.sleep(5)
-
-                    item_check = pluggy.get_item(item_id)
-                    item_status = item_check.get('status')
-                    execution_status = item_check.get('executionStatus')
-                    logger.info(f"Item status before syncing transactions: {item_status}")
+                    logger.info(f"Successfully created/updated {len(created_accounts)} accounts")
                     
-                    # Log do statusDetail também
-                    if item_check.get('statusDetail'):
-                        logger.info(f"Status details: {json.dumps(item_check['statusDetail'], indent=2)}")
+                    # Check current item status
+                    item_status = item.get('status')
+                    execution_status = item.get('executionStatus')
+                    logger.info(f"Current item status: {item_status}, execution: {execution_status}")
                     
-                    if item_status not in ['UPDATED', 'PARTIAL_SUCCESS']:
-                        logger.warning(f"Item not ready for transaction sync. Status: {item_status}")
-                        # Talvez agendar uma tarefa assíncrona para sincronizar depois
+                    # According to docs, we should check if executionStatus is SUCCESS or PARTIAL_SUCCESS
+                    # and item status is UPDATED before attempting to fetch transactions
+                    can_sync = (
+                        item_status == 'UPDATED' and 
+                        execution_status in ['SUCCESS', 'PARTIAL_SUCCESS']
+                    )
                     
-                    else:
+                    if can_sync:
+                        logger.info("Item is ready, attempting to sync transactions")
                         for account in created_accounts:
                             try:
-                                logger.info(f"Starting transaction sync for account {account.id} (external_id: {account.external_id})")
+                                logger.info(f"Syncing transactions for account {account.id}")
                                 self._sync_transactions(account, pluggy)
                             except Exception as e:
-                                logger.error(f"Error syncing transactions for account {account.id}: {e}", exc_info=True)
+                                logger.error(f"Error syncing transactions: {e}")
+                                # Continue with other accounts
+                    else:
+                        logger.info(
+                            f"Item not ready for transaction sync. "
+                            f"Status: {item_status}, Execution: {execution_status}. "
+                            f"Transactions will be synced when user triggers manual sync."
+                        )
+                        
+                        # Update account metadata with sync status
+                        for account in created_accounts:
+                            account.metadata['initial_sync_pending'] = True
+                            account.metadata['item_status_at_creation'] = item_status
+                            account.metadata['execution_status_at_creation'] = execution_status
+                            account.save()
                 
             # Return response even if no accounts were created
             if not created_accounts:

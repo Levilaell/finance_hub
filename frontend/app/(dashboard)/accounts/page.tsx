@@ -230,13 +230,24 @@ export default function AccountsPage() {
         // Atualizar lista
         await fetchAccounts();
         
-        // Sincronizar automaticamente as novas contas
+        // According to Pluggy docs, we should NOT sync immediately
+        // The item needs time to be UPDATED before we can fetch transactions
+        // Show a message to the user about syncing
         if (response.data.accounts && response.data.accounts.length > 0) {
-          setTimeout(() => {
-            response.data!.accounts.forEach((account) => {
-              handleSyncAccount(account.id.toString());
-            });
-          }, 3000);
+          toast.info(
+            'As transações estão sendo processadas. Use o botão "Sincronizar" em alguns instantes para buscar suas transações.',
+            { duration: 8000 }
+          );
+          
+          // Check if initial sync is pending (backend tells us this)
+          const hasPendingSync = response.data.accounts.some(
+            (account: any) => account.metadata?.initial_sync_pending
+          );
+          
+          if (!hasPendingSync) {
+            // If backend already synced, just notify
+            toast.success('Transações já sincronizadas!');
+          }
         }
       } else {
         throw new Error(response.message || 'Erro ao processar conexão');
@@ -430,6 +441,15 @@ export default function AccountsPage() {
                       <div className="p-3 bg-orange-50 border border-orange-200 rounded-md">
                         <p className="text-sm text-orange-800">
                           Reconexão necessária para sincronizar
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Initial Sync Pending Alert */}
+                    {!needsReconnect && !account.last_sync_at && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <p className="text-sm text-blue-800">
+                          Aguardando primeira sincronização de transações
                         </p>
                       </div>
                     )}

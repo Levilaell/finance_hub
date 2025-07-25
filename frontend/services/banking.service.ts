@@ -45,8 +45,8 @@ class BankingService {
   }
 
   // ===== ACCOUNTS =====
-  async getAccounts(): Promise<BankAccount[]> {
-    return apiClient.get<BankAccount[]>("/api/banking/accounts/");
+  async getAccounts(): Promise<PaginatedResponse<BankAccount>> {
+    return apiClient.get<PaginatedResponse<BankAccount>>("/api/banking/accounts/");
   }
 
   async getAccount(id: string): Promise<BankAccount> {

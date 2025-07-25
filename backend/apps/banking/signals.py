@@ -69,8 +69,6 @@ def handle_account_save(sender, instance, created, **kwargs):
             logger.info(f"🏦 New bank account created: {instance.display_name}")
             
             # Send welcome notification
-            from .notifications import send_account_connected_notification
-            send_account_connected_notification(instance)
             
         else:
             # Send balance update notification

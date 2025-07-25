@@ -459,19 +459,24 @@ class DashboardView(APIView):
                 'transactions': {
                     'limit': plan.max_transactions,
                     'used': usage_record.transactions_count,
-                    'percentage': round((usage_record.transactions_count / plan.max_transactions * 100), 1) if plan.max_transactions != 999999 else 0
+                    'percentage': round((usage_record.transactions_count / plan.max_transactions * 100), 1)
+                                if plan.max_transactions and plan.max_transactions not in [0, 999999] else 0
                 },
                 'bank_accounts': {
                     'limit': plan.max_bank_accounts,
                     'used': accounts.count(),
-                    'percentage': round((accounts.count() / plan.max_bank_accounts * 100), 1) if plan.max_bank_accounts != 999 else 0
+                    'percentage': round((accounts.count() / plan.max_bank_accounts * 100), 1)
+                                if plan.max_bank_accounts and plan.max_bank_accounts not in [0, 999] else 0
                 },
                 'ai_requests': {
                     'limit': plan.max_ai_requests_per_month,
                     'used': usage_record.total_ai_usage,
-                    'percentage': round((usage_record.total_ai_usage / plan.max_ai_requests_per_month * 100), 1) if plan.max_ai_requests_per_month != 999999 else 0
+                    'percentage': round((usage_record.total_ai_usage / plan.max_ai_requests_per_month * 100), 1)
+                                if plan.max_ai_requests_per_month and plan.max_ai_requests_per_month not in [0, 999999] else 0
                 }
             }
+
+            
         else:
             # Default limits for free/trial
             usage_limits = {

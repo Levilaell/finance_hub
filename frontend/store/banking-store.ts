@@ -88,10 +88,12 @@ export const useBankingStore = create<BankingState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const { bankingService } = await import('@/services/banking.service');
-      const data = await bankingService.getAccounts();
+      const response = await bankingService.getAccounts();
       
-      // data já é BankAccount[], não precisa acessar .results
-      set({ accounts: data, loading: false });
+      // A API retorna um objeto paginado, precisamos pegar o array results
+      const accounts = response.results || [];
+      
+      set({ accounts: accounts, loading: false });
     } catch (error: any) {
       set({
         error: error.message || "Failed to fetch accounts",
