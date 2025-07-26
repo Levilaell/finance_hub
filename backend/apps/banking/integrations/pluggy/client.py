@@ -252,45 +252,24 @@ class PluggyClient:
     
     def create_connect_token(
         self,
+        client_user_id: str,
         item_id: Optional[str] = None,
-        client_user_id: Optional[str] = None,
-        webhook_url: Optional[str] = None
+        webhook_url: Optional[str] = None,
+        oauth_redirect_uri: Optional[str] = None,
+        avoid_duplicates: Optional[bool] = None
     ) -> Dict[str, Any]:
-        """
-        Create connect token for Pluggy Connect widget
-        """
-        data = {}
-        
+        payload: Dict[str, Any] = {"options": {"clientUserId": client_user_id}}
         if item_id:
-            data['itemId'] = item_id
-        if client_user_id:
-            data['clientUserId'] = client_user_id
+            payload["itemId"] = item_id
+        opts = payload["options"]
         if webhook_url:
-            data['webhookUrl'] = webhook_url
-            
-        return self._make_request('POST', 'connect_token', data=data)
-    
-    # ===== Webhooks =====
-    
-    def validate_webhook(self, signature: str, payload: str) -> bool:
-        """
-        Validate webhook signature
-        """
-        import hmac
-        import hashlib
-        
-        webhook_secret = getattr(settings, 'PLUGGY_WEBHOOK_SECRET', '')
-        if not webhook_secret:
-            logger.warning("No webhook secret configured")
-            return True  # Allow in development
-            
-        expected_signature = hmac.new(
-            webhook_secret.encode(),
-            payload.encode(),
-            hashlib.sha256
-        ).hexdigest()
-        
-        return hmac.compare_digest(signature, expected_signature)
+            opts["webhookUrl"] = webhook_url
+        if oauth_redirect_uri:
+            opts["oauthRedirectUri"] = oauth_redirect_uri
+        if avoid_duplicates is not None:
+            opts["avoidDuplicates"] = avoid_duplicates
+        return self._make_request("POST", "connect-token", data=payload)
+
     
     # ===== Consent (Open Finance) =====
     
@@ -308,3 +287,9 @@ class PluggyClient:
         Revoke consent for Open Finance item
         """
         self._make_request('DELETE', f'consents/{item_id}')
+
+    def send_item_mfa(self, item_id: str, mfa_data: Dict[str, str]) -> Dict[str, Any]:
+        """
+        Send MFA parameter for 2-step authentication
+        """
+        return self._make_request('PATCH', f'items/{item_id}/mfa', data=mfa_data)

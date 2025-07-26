@@ -90,6 +90,16 @@ export default function AccountsPage() {
   // Connect new bank
   const handleConnectBank = useCallback(async () => {
     try {
+      // Verificar se há conectores OAuth disponíveis
+      const connectors = await bankingService.getConnectors();
+      const oauthConnectors = connectors.filter(c => c.has_oauth);
+      
+      if (oauthConnectors.length > 0) {
+        // TODO: Mostrar modal para selecionar banco se houver OAuth
+        console.log('OAuth connectors available:', oauthConnectors);
+      }
+      
+      // Fluxo normal do Connect Widget
       const response = await bankingService.createConnectToken();
 
       if (response.success && response.data) {
@@ -111,7 +121,11 @@ export default function AccountsPage() {
   const handleUpdateConnection = useCallback(async (account: BankAccount) => {
     try {
       // Get the item ID from the account
-      const itemId = account.pluggy_id; // This should be from the related item
+      const itemId = account.item_pluggy_id;
+
+      if (!itemId) {
+        throw new Error('Account does not have an associated item');
+      }
       
       const response = await bankingService.getUpdateToken(itemId);
 

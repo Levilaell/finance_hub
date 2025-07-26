@@ -254,6 +254,25 @@ class BankingService {
     
     return account.item_status ? errorStatuses.includes(account.item_status) : false;
   }
+
+  async sendItemMFA(
+    itemId: string,
+    mfaData: Record<string, string>
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    item_status?: PluggyItemStatus;
+    error?: string;
+  }> {
+    try {
+      return await apiClient.post(`/api/banking/items/${itemId}/send_mfa/`, mfaData);
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to send MFA',
+      };
+    }
+  }
   
   /**
    * Format currency value

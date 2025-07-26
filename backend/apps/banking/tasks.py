@@ -153,7 +153,7 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
         from_date = last_transaction.date - timedelta(days=7)
     else:
         # Initial sync - get last 365 days for Open Finance, 90 for others
-        days_back = 365 if account.item.connector.is_open_finance else 90
+        days_back = 365
         from_date = timezone.now() - timedelta(days=days_back)
     
     to_date = timezone.now()

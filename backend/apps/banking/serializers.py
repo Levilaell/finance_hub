@@ -54,6 +54,9 @@ class BankAccountSerializer(serializers.ModelSerializer):
     item_status = serializers.CharField(source='item.status', read_only=True)
     display_name = serializers.CharField(read_only=True)
     masked_number = serializers.CharField(read_only=True)
+
+    item_id = serializers.UUIDField(source='item.id', read_only=True)
+    item_pluggy_id = serializers.CharField(source='item.pluggy_id', read_only=True)
     
     class Meta:
         model = BankAccount
@@ -62,7 +65,8 @@ class BankAccountSerializer(serializers.ModelSerializer):
             'marketing_name', 'owner', 'balance', 'balance_date',
             'currency_code', 'bank_data', 'credit_data', 'is_active',
             'created_at', 'updated_at', 'connector', 'item_status',
-            'display_name', 'masked_number'
+            'display_name', 'masked_number',
+            'item_id', 'item_pluggy_id'
         ]
         read_only_fields = [
             'id', 'pluggy_id', 'created_at', 'updated_at',
@@ -276,3 +280,27 @@ class WebhookEventSerializer(serializers.Serializer):
         if value not in valid_events:
             raise serializers.ValidationError(f'Invalid event type: {value}')
         return value
+    
+class MFASerializer(serializers.Serializer):
+    """Serializer for MFA parameters"""
+    # Campos genéricos para diferentes tipos de MFA
+    token = serializers.CharField(required=False)
+    code = serializers.CharField(required=False)
+    sms = serializers.CharField(required=False)
+    value = serializers.CharField(required=False)
+    mfa = serializers.CharField(required=False)
+    
+    # Para seleção (conta conjunta, etc)
+    selectedOwner = serializers.CharField(required=False)
+    operatorNumber = serializers.CharField(required=False)
+    selectedAccount = serializers.CharField(required=False)
+    selectedCompany = serializers.CharField(required=False)
+    phone = serializers.CharField(required=False)
+    
+    def validate(self, attrs):
+        """Pelo menos um campo deve ser fornecido"""
+        if not any(attrs.values()):
+            raise serializers.ValidationError(
+                'At least one MFA parameter must be provided'
+            )
+        return attrs
