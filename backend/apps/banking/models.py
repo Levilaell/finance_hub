@@ -19,7 +19,9 @@ class PluggyConnector(models.Model):
     Maps to Pluggy's connector concept
     """
     # Pluggy connector ID
-    pluggy_id = models.IntegerField(_('Pluggy ID'), unique=True, primary_key=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    pluggy_id = models.IntegerField(_('Pluggy ID'), unique=True, db_index=True)
     
     # Basic info
     name = models.CharField(_('name'), max_length=200)
@@ -70,6 +72,8 @@ class PluggyItem(models.Model):
         ('LOGIN_ERROR', 'Login Error'),
         ('OUTDATED', 'Outdated'),
         ('ERROR', 'Error'),
+        ('DELETED', 'Deleted'),
+        ('CONSENT_REVOKED', 'Consent Revoked'),
     ]
     
     EXECUTION_STATUS_CHOICES = [
@@ -86,8 +90,8 @@ class PluggyItem(models.Model):
     ]
     
     # Basic fields
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    pluggy_id = models.CharField(_('Pluggy Item ID'), max_length=100, unique=True, db_index=True)
+    pluggy_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    item_pluggy_id = models.CharField(_('Pluggy Item ID'), max_length=100, unique=True, db_index=True)
     
     # Relations
     company = models.ForeignKey(
@@ -98,7 +102,9 @@ class PluggyItem(models.Model):
     connector = models.ForeignKey(
         PluggyConnector,
         on_delete=models.PROTECT,
-        related_name='items'
+        related_name='items',
+        to_field='pluggy_id',
+        db_column='connector_id'
     )
     
     # User tracking

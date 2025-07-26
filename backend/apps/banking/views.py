@@ -162,6 +162,25 @@ class PluggyItemViewSet(viewsets.ModelViewSet):
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=True, methods=['post'])
+    def send_mfa(self, request, pk=None):
+        """Send MFA parameter for 2-step authentication"""
+        item = self.get_object()
+        
+        try:
+            with PluggyClient() as client:
+                response = client.update_item_mfa(
+                    item.pluggy_id, 
+                    request.data
+                )
+                # Atualizar status do item se necessário
+                return Response({'success': True, 'data': response})
+        except PluggyError as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
     
     @action(detail=True, methods=['delete'])
     def disconnect(self, request, pk=None):
@@ -170,13 +189,32 @@ class PluggyItemViewSet(viewsets.ModelViewSet):
         
         try:
             with PluggyClient() as client:
+                # Check if it's an Open Finance item that needs consent revocation
+                if item.connector.is_open_finance and item.consent_id:
+                    logger.info(f"Revoking Open Finance consent for item {item.pluggy_id}")
+                    try:
+                        client.revoke_consent(item.pluggy_id)
+                    except PluggyError as e:
+                        logger.warning(f"Failed to revoke consent: {e}")
+                        # Continue with deletion even if consent revocation fails
+                
                 # Delete from Pluggy
+                logger.info(f"Deleting item {item.pluggy_id} from Pluggy")
                 client.delete_item(item.pluggy_id)
                 
-                # Delete locally
-                item.delete()
+                # Soft delete accounts to preserve transaction history
+                item.accounts.update(is_active=False)
                 
-                return Response(status=status.HTTP_204_NO_CONTENT)
+                # Mark item as deleted but keep in database for history
+                item.status = 'DELETED'
+                item.save()
+                
+                logger.info(f"Successfully disconnected item {item.pluggy_id}")
+                
+                return Response({
+                    'success': True,
+                    'message': 'Account disconnected successfully. Transaction history has been preserved.'
+                }, status=status.HTTP_200_OK)
                 
         except PluggyError as e:
             logger.error(f"Failed to disconnect item: {e}")
@@ -200,6 +238,49 @@ class BankAccountViewSet(viewsets.ReadOnlyModelViewSet):
             company=self.request.user.company,
             is_active=True
         ).select_related('item__connector').order_by('-created')
+    
+    @action(detail=True, methods=['post'])
+    def sync(self, request, pk=None):
+        """Sync specific account"""
+        account = self.get_object()
+        
+        try:
+            # Check item status
+            if account.item.status in ['LOGIN_ERROR', 'INVALID_CREDENTIALS']:
+                return Response({
+                    'success': False,
+                    'error_code': 'LOGIN_ERROR',
+                    'message': 'Invalid credentials. Please reconnect the account.',
+                    'reconnection_required': True
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if account.item.status == 'WAITING_USER_INPUT':
+                return Response({
+                    'success': False,
+                    'error_code': 'MFA_REQUIRED',
+                    'message': 'Additional authentication required.',
+                    'reconnection_required': True
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Queue sync
+            logger.info(f"Queuing sync for account {account.id} (item {account.item.id})")
+            task = sync_bank_account.delay(str(account.item.id), account_id=str(account.id))
+            
+            return Response({
+                'success': True,
+                'message': 'Sync started',
+                'data': {
+                    'account': BankAccountSerializer(account).data,
+                    'task_id': task.id
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to sync account: {e}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @action(detail=False, methods=['get'])
     def summary(self, request):
@@ -507,8 +588,12 @@ class PluggyCallbackView(APIView):
                         created_accounts.append(account)
                     
                     # Queue initial sync if item is ready
-                    if item.status == 'UPDATED':
-                        sync_bank_account.delay(item.id)
+                    if item.status in ['UPDATED', 'OUTDATED']:
+                        logger.info(f"Queuing initial sync for item {item.id} with status {item.status}")
+                        task = sync_bank_account.delay(str(item.id))
+                        logger.info(f"Sync task queued with ID: {task.id}")
+                    else:
+                        logger.warning(f"Item {item.id} not ready for sync, status: {item.status}")
                 
                 return Response({
                     'success': True,
@@ -536,8 +621,18 @@ class AccountSyncView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
     
-    def post(self, request, account_id):
+    def post(self, request, account_id=None):
         """Sync specific account"""
+        # Get account_id from URL parameter or request body
+        if not account_id:
+            account_id = request.data.get('account_id')
+            
+        if not account_id:
+            return Response(
+                {'error': 'Account ID is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
         try:
             account = BankAccount.objects.get(
                 id=account_id,

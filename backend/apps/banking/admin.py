@@ -48,7 +48,7 @@ class PluggyItemAdmin(admin.ModelAdmin):
     list_display = ['pluggy_id', 'company', 'connector', 'status', 'execution_status', 'accounts_count', 'last_successful_update']
     list_filter = ['status', 'execution_status', 'connector__name', 'created_at']
     search_fields = ['pluggy_id', 'company__name', 'connector__name', 'client_user_id']
-    readonly_fields = ['id', 'pluggy_id', 'created_at', 'updated_at', 'last_successful_update', 'created', 'modified']
+    readonly_fields = ['pluggy_id', 'created_at', 'updated_at', 'last_successful_update', 'created', 'modified']
     raw_id_fields = ['company', 'connector']
     
     fieldsets = (

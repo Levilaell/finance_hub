@@ -68,7 +68,8 @@ export type PluggyExecutionStatus =
 
 export interface BankAccount {
   id: string;
-  pluggy_id: string;
+  item_id: string;
+  item_pluggy_id: string;
   type: BankAccountType;
   subtype?: BankAccountSubtype;
   number?: string;
@@ -91,6 +92,11 @@ export interface BankAccount {
     image_url?: string;
     primary_color?: string;
     is_open_finance: boolean;
+  };
+  item?: {
+    id: string;
+    pluggy_id: string;
+    status: PluggyItemStatus;
   };
   item_status?: PluggyItemStatus;
   display_name?: string;

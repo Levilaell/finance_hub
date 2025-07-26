@@ -70,8 +70,8 @@ class PluggyClient:
             data = response.json()
             api_key = data['apiKey']
             
-            # Cache for 23 hours (tokens last 24 hours)
-            cache.set(cache_key, api_key, 82800)
+            # Cache for 1h50min (tokens expire in 2 hours per Pluggy docs)
+            cache.set(cache_key, api_key, 6600)  # 110 minutes
             
             return api_key
             
@@ -184,6 +184,10 @@ class PluggyClient:
         Delete item
         """
         self._make_request('DELETE', f'items/{item_id}')
+
+    def send_item_mfa(self, item_id: str, mfa_data: Dict[str, str]):
+        """Send MFA parameter"""
+        return self._make_request('PATCH', f'items/{item_id}/mfa', data=mfa_data)
     
     def update_item_mfa(self, item_id: str, parameters: Dict[str, str]) -> Dict[str, Any]:
         """
@@ -254,7 +258,8 @@ class PluggyClient:
         self,
         item_id: Optional[str] = None,
         client_user_id: Optional[str] = None,
-        webhook_url: Optional[str] = None
+        webhook_url: Optional[str] = None,
+        oauth_redirect_uri: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Create connect token for Pluggy Connect widget
@@ -267,31 +272,11 @@ class PluggyClient:
             data['clientUserId'] = client_user_id
         if webhook_url:
             data['webhookUrl'] = webhook_url
+        if oauth_redirect_uri:
+            data['oauthRedirectUri'] = oauth_redirect_uri
             
         return self._make_request('POST', 'connect_token', data=data)
-    
-    # ===== Webhooks =====
-    
-    def validate_webhook(self, signature: str, payload: str) -> bool:
-        """
-        Validate webhook signature
-        """
-        import hmac
-        import hashlib
         
-        webhook_secret = getattr(settings, 'PLUGGY_WEBHOOK_SECRET', '')
-        if not webhook_secret:
-            logger.warning("No webhook secret configured")
-            return True  # Allow in development
-            
-        expected_signature = hmac.new(
-            webhook_secret.encode(),
-            payload.encode(),
-            hashlib.sha256
-        ).hexdigest()
-        
-        return hmac.compare_digest(signature, expected_signature)
-    
     # ===== Consent (Open Finance) =====
     
     def get_consent(self, item_id: str) -> Optional[Dict[str, Any]]:

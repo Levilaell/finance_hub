@@ -127,47 +127,6 @@ export interface Account {
   updated_at: string;
 }
 
-export interface BankAccount {
-  id: string;
-  provider: BankProvider;
-  account_name: string;
-  account_number: string;
-  account_type: "checking" | "savings" | "credit_card" | "investment";
-  currency: string;
-  current_balance: number;
-  available_balance: number;
-  is_active: boolean;
-  status: "active" | "inactive" | "sync_error" | "pending";
-  last_sync_at: string | null;
-  created_at: string;
-  updated_at: string;
-  external_id?: string;
-  pluggy_item_id?: string;
-}
-
-export interface BankTransaction {
-  id: string;
-  bank_account: string;
-  transaction_id: string;
-  amount: number;
-  currency: string;
-  description: string;
-  category: Category | null;
-  transaction_date: string;
-  posted_date: string;
-  transaction_type: "debit" | "credit";
-  status: "pending" | "posted" | "cancelled";
-  merchant_name: string | null;
-  merchant_category: string | null;
-  metadata: Record<string, any>;
-  tags?: string[];
-  ai_categorized?: boolean;
-  ai_confidence?: number;
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-}
-
 // Categories
 export interface Category {
   id: string;

@@ -54,15 +54,16 @@ class BankAccountSerializer(serializers.ModelSerializer):
     item_status = serializers.CharField(source='item.status', read_only=True)
     display_name = serializers.CharField(read_only=True)
     masked_number = serializers.CharField(read_only=True)
+    item = serializers.SerializerMethodField()
     
     class Meta:
         model = BankAccount
         fields = [
-            'id', 'pluggy_id', 'type', 'subtype', 'number', 'name',
+            'id', 'item_id', 'item_pluggy_id', 'type', 'subtype', 'number', 'name',
             'marketing_name', 'owner', 'balance', 'balance_date',
             'currency_code', 'bank_data', 'credit_data', 'is_active',
             'created_at', 'updated_at', 'connector', 'item_status',
-            'display_name', 'masked_number'
+            'display_name', 'masked_number', 'item'
         ]
         read_only_fields = [
             'id', 'pluggy_id', 'created_at', 'updated_at',
@@ -77,6 +78,14 @@ class BankAccountSerializer(serializers.ModelSerializer):
             'image_url': obj.item.connector.image_url,
             'primary_color': obj.item.connector.primary_color,
             'is_open_finance': obj.item.connector.is_open_finance
+        }
+    
+    def get_item(self, obj):
+        """Get minimal item info needed for updates"""
+        return {
+            'id': str(obj.item.id),
+            'pluggy_id': obj.item.pluggy_id,
+            'status': obj.item.status
         }
 
 

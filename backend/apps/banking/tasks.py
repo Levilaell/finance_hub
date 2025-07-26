@@ -151,15 +151,17 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
     if last_transaction:
         # Sync from last transaction date minus 7 days (for updates)
         from_date = last_transaction.date - timedelta(days=7)
+        logger.info(f"Found last transaction dated {last_transaction.date}, syncing from {from_date.date()}")
     else:
-        # Initial sync - get last 365 days for Open Finance, 90 for others
-        days_back = 365 if account.item.connector.is_open_finance else 90
+
+        days_back = 365
         from_date = timezone.now() - timedelta(days=days_back)
+        logger.info(f"No transactions found, initial sync for {days_back} days")
     
     to_date = timezone.now()
     
     logger.info(
-        f"Syncing transactions for {account.pluggy_id} "
+        f"Syncing transactions for account {account.pluggy_id} ({account.display_name}) "
         f"from {from_date.date()} to {to_date.date()}"
     )
     
@@ -167,14 +169,22 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
     page = 1
     total_synced = 0
     
+    # Format dates as strings in ISO format for Pluggy API
+    from_date_str = from_date.date().isoformat()
+    to_date_str = to_date.date().isoformat()
+    
+    logger.info(f"Calling Pluggy API with dates: from={from_date_str}, to={to_date_str}")
+    
     while True:
         try:
             result = client.get_transactions(
                 account.pluggy_id,
-                from_date=from_date,
-                to_date=to_date,
+                from_date=from_date_str,
+                to_date=to_date_str,
                 page=page
             )
+            
+            logger.info(f"API response page {page}: {result.get('total', 0)} total transactions, {len(result.get('results', []))} in this page")
             
             transactions = result.get('results', [])
             if not transactions:
@@ -186,6 +196,9 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
                     transaction, created = _process_transaction(account, trans_data)
                     if created:
                         total_synced += 1
+                        logger.debug(f"Created new transaction: {trans_data.get('description', 'No description')} - {trans_data.get('amount', 0)}")
+                    else:
+                        logger.debug(f"Updated existing transaction: {trans_data.get('id')}")
             
             # Check if more pages
             if page >= result.get('totalPages', 1):

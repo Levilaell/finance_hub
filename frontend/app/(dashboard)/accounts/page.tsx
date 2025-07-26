@@ -110,8 +110,12 @@ export default function AccountsPage() {
   // Update existing connection
   const handleUpdateConnection = useCallback(async (account: BankAccount) => {
     try {
-      // Get the item ID from the account
-      const itemId = account.pluggy_id; // This should be from the related item
+
+      const itemId = account.item_pluggy_id
+      
+      if (!itemId) {
+        throw new Error('Item ID not found for this account');
+      }
       
       const response = await bankingService.getUpdateToken(itemId);
 
@@ -542,12 +546,21 @@ export default function AccountsPage() {
               onClick={async () => {
                 if (selectedAccount) {
                   try {
-                    // TODO: Implement disconnect
-                    toast.success('Account removed');
+                    // Find the item for this account
+                    const itemId = selectedAccount.item?.id;
+                    if (!itemId) {
+                      toast.error('Unable to find connection information');
+                      return;
+                    }
+                    
+                    // Disconnect the item
+                    await bankingService.disconnectItem(itemId);
+                    
+                    toast.success('Account disconnected successfully');
                     setSelectedAccount(null);
                     await fetchAccounts();
-                  } catch (error) {
-                    toast.error('Failed to remove account');
+                  } catch (error: any) {
+                    toast.error(error.message || 'Failed to disconnect account');
                   }
                 }
               }}
