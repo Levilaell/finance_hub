@@ -85,6 +85,9 @@ export interface BankAccount {
   created_at: string;
   updated_at: string;
   
+  item_id: string;
+  item_pluggy_id: string;
+  
   // Computed fields
   connector?: {
     id: number;
@@ -396,4 +399,8 @@ export interface BankingStoreState {
     totalCount: number;
     totalPages: number;
   };
+}
+
+interface OAuthConnector extends PluggyConnector {
+  oauth_url?: string;
 }

@@ -153,7 +153,7 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
         from_date = last_transaction.date - timedelta(days=7)
         logger.info(f"Found last transaction dated {last_transaction.date}, syncing from {from_date.date()}")
     else:
-
+        # Initial sync - get last 365 days for Open Finance, 90 for others
         days_back = 365
         from_date = timezone.now() - timedelta(days=days_back)
         logger.info(f"No transactions found, initial sync for {days_back} days")

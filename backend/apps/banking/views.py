@@ -222,6 +222,50 @@ class PluggyItemViewSet(viewsets.ModelViewSet):
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+    @action(detail=True, methods=['post'])
+    def send_mfa(self, request, pk=None):
+        """Send MFA parameter for 2-step authentication"""
+        item = self.get_object()
+        
+        # Validar se o item está esperando MFA
+        if item.status != 'WAITING_USER_INPUT':
+            return Response(
+                {'error': 'Item is not waiting for user input'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = MFASerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        try:
+            with PluggyClient() as client:
+                # Enviar MFA
+                response = client.send_item_mfa(
+                    item.pluggy_id,
+                    serializer.validated_data
+                )
+                
+                # Atualizar status do item
+                item_data = client.get_item(item.pluggy_id)
+                item.status = item_data['status']
+                item.execution_status = item_data.get('executionStatus', '')
+                item.updated_at = item_data['updatedAt']
+                item.save()
+                
+                return Response({
+                    'success': True,
+                    'message': 'MFA sent successfully',
+                    'item_status': item.status
+                })
+                
+        except PluggyError as e:
+            logger.error(f"Failed to send MFA: {e}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
 
 
 class BankAccountViewSet(viewsets.ReadOnlyModelViewSet):
@@ -489,8 +533,8 @@ class PluggyConnectView(APIView):
             with PluggyClient() as client:
                 # Create connect token
                 token_data = client.create_connect_token(
-                    item_id=serializer.validated_data.get('item_id'),
                     client_user_id=str(request.user.id),
+                    item_id=serializer.validated_data.get('item_id'),
                     webhook_url=serializer.validated_data.get('webhook_url')
                 )
                 
