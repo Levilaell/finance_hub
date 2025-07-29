@@ -259,17 +259,36 @@ class PluggyClient:
         oauth_redirect_uri: Optional[str] = None,
         avoid_duplicates: Optional[bool] = None
     ) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {"options": {"clientUserId": client_user_id}}
+        """
+        Create a connect token for Pluggy Connect
+        
+        Args:
+            client_user_id: User reference for end-to-end traceability
+            item_id: Item ID for updating existing connection
+            webhook_url: URL to receive item events
+            oauth_redirect_uri: Redirect URL after connect flow
+            avoid_duplicates: Prevent creating duplicate items
+            
+        Returns:
+            Dict with accessToken and other connection details
+        """
+        # Build payload according to API v2 documentation
+        payload: Dict[str, Any] = {}
+        
+        # Add parameters directly to payload (not nested in options)
+        if client_user_id:
+            payload["clientUserId"] = client_user_id
         if item_id:
             payload["itemId"] = item_id
-        opts = payload["options"]
         if webhook_url:
-            opts["webhookUrl"] = webhook_url
+            payload["webhookUrl"] = webhook_url
         if oauth_redirect_uri:
-            opts["oauthRedirectUri"] = oauth_redirect_uri
+            payload["oauthRedirectUri"] = oauth_redirect_uri
         if avoid_duplicates is not None:
-            opts["avoidDuplicates"] = avoid_duplicates
-        return self._make_request("POST", "connect-token", data=payload)
+            payload["avoidDuplicates"] = avoid_duplicates
+            
+        # Use correct endpoint with underscore
+        return self._make_request("POST", "connect_token", data=payload)
     # ===== Consent (Open Finance) =====
     
     def get_consent(self, item_id: str) -> Optional[Dict[str, Any]]:
