@@ -29,12 +29,12 @@ export interface PluggyCredential {
 
 export interface PluggyItem {
   id: string;
-  pluggy_id: string;
+  pluggy_item_id: string;
   connector: PluggyConnector;
   status: PluggyItemStatus;
   execution_status?: PluggyExecutionStatus;
-  created_at: string;
-  updated_at: string;
+  pluggy_created_at: string;
+  pluggy_updated_at: string;
   last_successful_update?: string;
   error_code?: string;
   error_message?: string;
@@ -82,8 +82,8 @@ export interface BankAccount {
   bank_data?: BankData;
   credit_data?: CreditData;
   is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  pluggy_created_at: string;
+  pluggy_updated_at: string;
   
   item_id: string;
   item_pluggy_id: string;
@@ -98,7 +98,7 @@ export interface BankAccount {
   };
   item?: {
     id: string;
-    pluggy_id: string;
+    pluggy_item_id: string;
     status: PluggyItemStatus;
   };
   item_status?: PluggyItemStatus;
@@ -140,7 +140,7 @@ export interface CreditData {
 
 export interface Transaction {
   id: string;
-  pluggy_id: string;
+  pluggy_transaction_id: string;
   type: 'DEBIT' | 'CREDIT';
   status: 'PENDING' | 'POSTED';
   description: string;
@@ -184,8 +184,8 @@ export interface Transaction {
   
   // Metadata
   metadata?: Record<string, any>;
-  created_at: string;
-  updated_at: string;
+  pluggy_created_at: string;
+  pluggy_updated_at: string;
   
   // Computed fields
   account_info?: {

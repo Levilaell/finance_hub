@@ -31,16 +31,16 @@ def sync_bank_account(self, item_id: str, account_id: Optional[str] = None):
     """
     try:
         item = PluggyItem.objects.get(id=item_id)
-        logger.info(f"Starting sync for item {item.pluggy_id}")
+        logger.info(f"Starting sync for item {item.pluggy_item_id}")
         
         with PluggyClient() as client:
             # Update item status
-            item_data = client.get_item(item.pluggy_id)
+            item_data = client.get_item(item.pluggy_item_id)
             
             # Update item
             item.status = item_data['status']
             item.execution_status = item_data.get('executionStatus', '')
-            item.updated_at = item_data['updatedAt']
+            item.pluggy_updated_at = item_data['updatedAt']
             item.status_detail = item_data.get('statusDetail', {})
             
             if item_data.get('error'):
@@ -51,7 +51,7 @@ def sync_bank_account(self, item_id: str, account_id: Optional[str] = None):
             
             # Check if we can sync
             if item.status not in ['UPDATED', 'OUTDATED']:
-                logger.warning(f"Item {item.pluggy_id} not ready for sync: {item.status}")
+                logger.warning(f"Item {item.pluggy_item_id} not ready for sync: {item.status}")
                 return {
                     'success': False,
                     'reason': f'Item status: {item.status}'
@@ -106,14 +106,14 @@ def _sync_account(client: PluggyClient, account: BankAccount) -> Dict:
     Sync single account data
     """
     try:
-        logger.info(f"Syncing account {account.pluggy_id}")
+        logger.info(f"Syncing account {account.pluggy_account_id}")
         
         # Update account info
-        account_data = client.get_account(account.pluggy_id)
+        account_data = client.get_account(account.pluggy_account_id)
         
         account.balance = Decimal(str(account_data.get('balance', 0)))
         account.balance_date = timezone.now()
-        account.updated_at = account_data.get('updatedAt')
+        account.pluggy_updated_at = account_data.get('updatedAt')
         
         if account_data.get('bankData'):
             account.bank_data = account_data['bankData']
@@ -133,7 +133,7 @@ def _sync_account(client: PluggyClient, account: BankAccount) -> Dict:
         }
         
     except Exception as e:
-        logger.error(f"Error syncing account {account.pluggy_id}: {e}")
+        logger.error(f"Error syncing account {account.pluggy_account_id}: {e}")
         return {
             'success': False,
             'account_id': str(account.id),
@@ -161,7 +161,7 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
     to_date = timezone.now()
     
     logger.info(
-        f"Syncing transactions for account {account.pluggy_id} ({account.display_name}) "
+        f"Syncing transactions for account {account.pluggy_account_id} ({account.display_name}) "
         f"from {from_date.date()} to {to_date.date()}"
     )
     
@@ -178,7 +178,7 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
     while True:
         try:
             result = client.get_transactions(
-                account.pluggy_id,
+                account.pluggy_account_id,
                 from_date=from_date_str,
                 to_date=to_date_str,
                 page=page
@@ -210,7 +210,7 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
             logger.error(f"Error fetching transactions page {page}: {e}")
             break
     
-    logger.info(f"Synced {total_synced} new transactions for {account.pluggy_id}")
+    logger.info(f"Synced {total_synced} new transactions for {account.pluggy_account_id}")
     return total_synced
 
 
@@ -235,7 +235,7 @@ def _process_transaction(account: BankAccount, trans_data: Dict):
     
     # Create or update transaction
     transaction, created = Transaction.objects.update_or_create(
-        pluggy_id=trans_data['id'],
+        pluggy_transaction_id=trans_data['id'],
         defaults={
             'account': account,
             'type': trans_data['type'],
@@ -256,8 +256,8 @@ def _process_transaction(account: BankAccount, trans_data: Dict):
                 'provider_code': trans_data.get('providerCode', ''),
                 'account_id': trans_data.get('accountId', '')
             },
-            'created_at': trans_data.get('createdAt'),
-            'updated_at': trans_data.get('updatedAt')
+            'pluggy_created_at': trans_data.get('createdAt'),
+            'pluggy_updated_at': trans_data.get('updatedAt')
         }
     )
     
@@ -399,7 +399,7 @@ def process_webhook_event(event_type: str, event_data: Dict):
 def _handle_item_updated(data: Dict):
     """Handle item updated event"""
     try:
-        item = PluggyItem.objects.get(pluggy_id=data['id'])
+        item = PluggyItem.objects.get(pluggy_item_id=data['id'])
         
         # Queue sync
         sync_bank_account.delay(str(item.id))
@@ -411,7 +411,7 @@ def _handle_item_updated(data: Dict):
 def _handle_item_error(data: Dict):
     """Handle item error event"""
     try:
-        item = PluggyItem.objects.get(pluggy_id=data['id'])
+        item = PluggyItem.objects.get(pluggy_item_id=data['id'])
         
         # Update status
         item.status = 'ERROR'
@@ -426,7 +426,7 @@ def _handle_item_error(data: Dict):
 def _handle_item_deleted(data: Dict):
     """Handle item deleted event"""
     try:
-        item = PluggyItem.objects.get(pluggy_id=data['id'])
+        item = PluggyItem.objects.get(pluggy_item_id=data['id'])
         
         # Soft delete accounts
         item.accounts.update(is_active=False)
@@ -442,7 +442,7 @@ def _handle_item_deleted(data: Dict):
 def _handle_item_waiting_input(data: Dict):
     """Handle item waiting for user input"""
     try:
-        item = PluggyItem.objects.get(pluggy_id=data['id'])
+        item = PluggyItem.objects.get(pluggy_item_id=data['id'])
         
         # Update status
         item.status = 'WAITING_USER_INPUT'
@@ -461,7 +461,7 @@ def _handle_transactions_created(data: Dict):
     
     for account_id in account_ids:
         try:
-            account = BankAccount.objects.get(pluggy_id=account_id)
+            account = BankAccount.objects.get(pluggy_account_id=account_id)
             sync_bank_account.delay(
                 str(account.item.id),
                 account_id=str(account.id)
@@ -473,7 +473,7 @@ def _handle_transactions_created(data: Dict):
 def _handle_consent_revoked(data: Dict):
     """Handle consent revoked (Open Finance)"""
     try:
-        item = PluggyItem.objects.get(pluggy_id=data['id'])
+        item = PluggyItem.objects.get(pluggy_item_id=data['id'])
         
         # Update status
         item.status = 'CONSENT_REVOKED'

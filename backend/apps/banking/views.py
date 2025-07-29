@@ -171,7 +171,7 @@ class PluggyItemViewSet(viewsets.ModelViewSet):
         try:
             with PluggyClient() as client:
                 response = client.update_item_mfa(
-                    item.pluggy_id, 
+                    item.pluggy_item_id, 
                     request.data
                 )
                 # Atualizar status do item se necessário
@@ -191,16 +191,16 @@ class PluggyItemViewSet(viewsets.ModelViewSet):
             with PluggyClient() as client:
                 # Check if it's an Open Finance item that needs consent revocation
                 if item.connector.is_open_finance and item.consent_id:
-                    logger.info(f"Revoking Open Finance consent for item {item.pluggy_id}")
+                    logger.info(f"Revoking Open Finance consent for item {item.pluggy_item_id}")
                     try:
-                        client.revoke_consent(item.pluggy_id)
+                        client.revoke_consent(item.pluggy_item_id)
                     except PluggyError as e:
                         logger.warning(f"Failed to revoke consent: {e}")
                         # Continue with deletion even if consent revocation fails
                 
                 # Delete from Pluggy
-                logger.info(f"Deleting item {item.pluggy_id} from Pluggy")
-                client.delete_item(item.pluggy_id)
+                logger.info(f"Deleting item {item.pluggy_item_id} from Pluggy")
+                client.delete_item(item.pluggy_item_id)
                 
                 # Soft delete accounts to preserve transaction history
                 item.accounts.update(is_active=False)
@@ -209,7 +209,7 @@ class PluggyItemViewSet(viewsets.ModelViewSet):
                 item.status = 'DELETED'
                 item.save()
                 
-                logger.info(f"Successfully disconnected item {item.pluggy_id}")
+                logger.info(f"Successfully disconnected item {item.pluggy_item_id}")
                 
                 return Response({
                     'success': True,
@@ -242,15 +242,15 @@ class PluggyItemViewSet(viewsets.ModelViewSet):
             with PluggyClient() as client:
                 # Enviar MFA
                 response = client.send_item_mfa(
-                    item.pluggy_id,
+                    item.pluggy_item_id,
                     serializer.validated_data
                 )
                 
                 # Atualizar status do item
-                item_data = client.get_item(item.pluggy_id)
+                item_data = client.get_item(item.pluggy_item_id)
                 item.status = item_data['status']
                 item.execution_status = item_data.get('executionStatus', '')
-                item.updated_at = item_data['updatedAt']
+                item.pluggy_updated_at = item_data['updatedAt']
                 item.save()
                 
                 return Response({
@@ -347,9 +347,9 @@ class BankAccountViewSet(viewsets.ReadOnlyModelViewSet):
             'total_accounts': accounts.count(),
             'by_type': list(summary),
             'last_update': accounts.filter(
-                updated_at__isnull=False
-            ).order_by('-updated_at').values_list(
-                'updated_at', flat=True
+                pluggy_updated_at__isnull=False
+            ).order_by('-pluggy_updated_at').values_list(
+                'pluggy_updated_at', flat=True
             ).first()
         })
 
@@ -589,15 +589,15 @@ class PluggyCallbackView(APIView):
                 # Create or update item
                 with transaction.atomic():
                     item, created = PluggyItem.objects.update_or_create(
-                        pluggy_id=item_id,
+                        pluggy_item_id=item_id,
                         defaults={
                             'company': request.user.company,
                             'connector': connector,
                             'client_user_id': str(request.user.id),
                             'status': item_data['status'],
                             'execution_status': item_data.get('executionStatus', ''),
-                            'created_at': item_data['createdAt'],
-                            'updated_at': item_data['updatedAt'],
+                            'pluggy_created_at': item_data['createdAt'],
+                            'pluggy_updated_at': item_data['updatedAt'],
                             'status_detail': item_data.get('statusDetail', {}),
                             'error_code': item_data.get('error', {}).get('code', '') if item_data.get('error') else '',
                             'error_message': item_data.get('error', {}).get('message', '') if item_data.get('error') else ''
@@ -610,7 +610,7 @@ class PluggyCallbackView(APIView):
                     
                     for account_data in accounts_data:
                         account, _ = BankAccount.objects.update_or_create(
-                            pluggy_id=account_data['id'],
+                            pluggy_account_id=account_data['id'],
                             defaults={
                                 'item': item,
                                 'company': request.user.company,
@@ -625,8 +625,8 @@ class PluggyCallbackView(APIView):
                                 'currency_code': account_data.get('currencyCode', 'BRL'),
                                 'bank_data': account_data.get('bankData', {}),
                                 'credit_data': account_data.get('creditData', {}),
-                                'created_at': account_data.get('createdAt'),
-                                'updated_at': account_data.get('updatedAt')
+                                'pluggy_created_at': account_data.get('createdAt'),
+                                'pluggy_updated_at': account_data.get('updatedAt')
                             }
                         )
                         created_accounts.append(account)
@@ -812,7 +812,7 @@ class DashboardView(APIView):
                     'image_url': account.item.connector.image_url
                 },
                 'transactions_count': transactions_count,
-                'last_update': account.updated_at
+                'last_update': account.pluggy_updated_at
             })
         
         # Build response

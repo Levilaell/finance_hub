@@ -17,7 +17,7 @@ def handle_item_status_change(sender, instance, created, **kwargs):
     """
     if not created and instance.status in ['LOGIN_ERROR', 'OUTDATED', 'ERROR']:
         logger.warning(
-            f"Item {instance.pluggy_id} needs attention: {instance.status} - {instance.error_message}"
+            f"Item {instance.pluggy_item_id} needs attention: {instance.status} - {instance.error_message}"
         )
 
 

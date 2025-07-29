@@ -93,7 +93,7 @@ class PluggyItemAdmin(admin.ModelAdmin):
 
 @admin.register(BankAccount)
 class BankAccountAdmin(admin.ModelAdmin):
-    list_display = ['display_name', 'company', 'type', 'balance_display', 'item_status', 'is_active', 'updated_at']
+    list_display = ['display_name', 'company', 'type', 'balance_display', 'item_status', 'is_active', 'pluggy_updated_at']
     list_filter = ['type', 'is_active', 'item__status', 'currency_code', 'created_at']
     search_fields = ['name', 'marketing_name', 'number', 'owner', 'company__name']
     readonly_fields = ['id', 'pluggy_account_id', 'masked_number', 'pluggy_created_at', 'pluggy_updated_at', 'created_at', 'updated_at']

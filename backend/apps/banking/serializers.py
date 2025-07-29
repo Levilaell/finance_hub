@@ -36,14 +36,14 @@ class PluggyItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = PluggyItem
         fields = [
-            'id', 'pluggy_id', 'connector', 'status', 'execution_status',
-            'created_at', 'updated_at', 'last_successful_update',
+            'id', 'pluggy_item_id', 'connector', 'status', 'execution_status',
+            'pluggy_created_at', 'pluggy_updated_at', 'last_successful_update',
             'error_code', 'error_message', 'status_detail',
             'consent_expires_at', 'accounts_count'
         ]
         read_only_fields = [
-            'id', 'pluggy_id', 'status', 'execution_status',
-            'created_at', 'updated_at', 'last_successful_update',
+            'id', 'pluggy_item_id', 'status', 'execution_status',
+            'pluggy_created_at', 'pluggy_updated_at', 'last_successful_update',
             'error_code', 'error_message', 'status_detail'
         ]
 
@@ -56,7 +56,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
     masked_number = serializers.CharField(read_only=True)
     item = serializers.SerializerMethodField()
     item_id = serializers.UUIDField(source='item.id', read_only=True)
-    item_pluggy_id = serializers.CharField(source='item.pluggy_id', read_only=True)
+    item_pluggy_id = serializers.CharField(source='item.pluggy_item_id', read_only=True)
     
     class Meta:
         model = BankAccount
@@ -64,12 +64,12 @@ class BankAccountSerializer(serializers.ModelSerializer):
             'id', 'item_id', 'item_pluggy_id', 'type', 'subtype', 'number', 'name',
             'marketing_name', 'owner', 'balance', 'balance_date',
             'currency_code', 'bank_data', 'credit_data', 'is_active',
-            'created_at', 'updated_at', 'connector', 'item_status',
+            'pluggy_created_at', 'pluggy_updated_at', 'connector', 'item_status',
             'display_name', 'masked_number', 'item',
             'item_id', 'item_pluggy_id'
         ]
         read_only_fields = [
-            'id', 'pluggy_id', 'created_at', 'updated_at',
+            'id', 'pluggy_account_id', 'pluggy_created_at', 'pluggy_updated_at',
             'display_name', 'masked_number'
         ]
     
@@ -87,7 +87,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
         """Get minimal item info needed for updates"""
         return {
             'id': str(obj.item.id),
-            'pluggy_id': obj.item.pluggy_id,
+            'pluggy_item_id': obj.item.pluggy_item_id,
             'status': obj.item.status
         }
 
@@ -120,16 +120,16 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = [
-            'id', 'pluggy_id', 'type', 'status', 'description', 'amount',
+            'id', 'pluggy_transaction_id', 'type', 'status', 'description', 'amount',
             'currency_code', 'date', 'merchant', 'payment_data',
             'pluggy_category_id', 'pluggy_category_description',
             'category', 'category_detail', 'operation_type',
             'payment_method', 'credit_card_metadata', 'notes', 'tags',
-            'metadata', 'created_at', 'updated_at', 'account_info',
+            'metadata', 'pluggy_created_at', 'pluggy_updated_at', 'account_info',
             'amount_display', 'is_income', 'is_expense'
         ]
         read_only_fields = [
-            'id', 'pluggy_id', 'created_at', 'updated_at',
+            'id', 'pluggy_transaction_id', 'pluggy_created_at', 'pluggy_updated_at',
             'amount_display', 'is_income', 'is_expense'
         ]
     
