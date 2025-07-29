@@ -1,3 +1,0 @@
-"""
-Companies views package
-"""
