@@ -22,6 +22,9 @@ export interface User {
   created_at: string;
   updated_at: string;
   
+  // Company relationship
+  company?: Company;
+  
   // Computed properties
   full_name?: string;
   initials?: string;
@@ -92,7 +95,7 @@ export interface Company {
   
   // Subscription
   subscription_plan?: SubscriptionPlan;
-  subscription_status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'suspended' | 'expired';
+  subscription_status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'cancelling' | 'suspended' | 'expired';
   billing_cycle: 'monthly' | 'yearly';
   trial_ends_at?: string;
   next_billing_date?: string;

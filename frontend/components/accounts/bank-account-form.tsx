@@ -36,7 +36,7 @@ interface BankAccountFormProps {
 
 export function BankAccountForm({ isOpen, onClose, account }: BankAccountFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { providers, fetchAccounts } = useBankingStore();
+  const { connectors, fetchAccounts } = useBankingStore();
 
   const form = useForm<BankAccountFormData>({
     resolver: zodResolver(bankAccountSchema),
@@ -121,8 +121,8 @@ export function BankAccountForm({ isOpen, onClose, account }: BankAccountFormPro
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {providers.map((provider) => (
-                        <SelectItem key={provider.id} value={provider.id.toString()}>
+                      {connectors.map((provider) => (
+                        <SelectItem key={provider.pluggy_id} value={provider.pluggy_id.toString()}>
                           {provider.name}
                         </SelectItem>
                       ))}

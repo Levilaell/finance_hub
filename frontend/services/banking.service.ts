@@ -108,6 +108,19 @@ class BankingService {
     return apiClient.get<Transaction>(`/api/banking/transactions/${id}/`);
   }
   
+  async createTransaction(data: {
+    account: string;
+    type: 'DEBIT' | 'CREDIT';
+    amount: number;
+    description: string;
+    date: string;
+    category?: string;
+    notes?: string;
+    tags?: string[];
+  }): Promise<Transaction> {
+    return apiClient.post<Transaction>('/api/banking/transactions/', data);
+  }
+
   async updateTransaction(
     id: string,
     data: { category?: string; notes?: string; tags?: string[] }

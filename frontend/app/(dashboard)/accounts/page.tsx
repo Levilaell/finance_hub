@@ -121,7 +121,7 @@ export default function AccountsPage() {
   const handleUpdateConnection = useCallback(async (account: BankAccount) => {
     try {
       // Get the item ID from the account
-      const itemId = account.item_pluggy_id;
+      const itemId = account.item.pluggy_item_id;
 
       if (!itemId) {
         throw new Error('Account does not have an associated item');

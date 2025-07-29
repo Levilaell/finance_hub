@@ -2,7 +2,7 @@
  * Pluggy service for bank connections
  */
 import { apiClient } from '@/lib/api-client';
-import { BankProvider, BankAccount } from '@/types';
+import { BankAccount } from '@/types';
 
 export interface PluggyBank {
   id: number;
@@ -371,6 +371,14 @@ class PluggyService {
       throw error;
     }
   }
+
+  /**
+   * Check if Pluggy SDK is loaded
+   */
+  private isSDKLoaded(): boolean {
+    return typeof window !== 'undefined' && typeof (window as any).PluggyConnect !== 'undefined';
+  }
+
   /**
    * Preload Pluggy SDK for better performance
    */

@@ -1085,9 +1085,7 @@ export default function AIInsightsPage() {
                       🚀 Desbloqueie o Poder da IA para Suas Finanças
                     </h3>
                     <p className="text-gray-600 mb-6 text-lg">
-                      {user?.company?.subscription_plan?.plan_type === 'starter' 
-                        ? 'Transforme sua gestão financeira com insights inteligentes! Upgrade agora para Professional ou Enterprise e tome decisões baseadas em dados com nossa IA avançada.'
-                        : 'Ative seu plano premium e descubra oportunidades ocultas nos seus dados financeiros com análises automáticas de IA.'}
+                      Transforme sua gestão financeira com insights inteligentes! Upgrade agora para Professional ou Enterprise e tome decisões baseadas em dados com nossa IA avançada.
                     </p>
                     
                     {/* Plan Comparison */}

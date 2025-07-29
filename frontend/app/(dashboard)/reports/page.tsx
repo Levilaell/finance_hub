@@ -557,7 +557,7 @@ export default function ReportsPage() {
                         <SelectItem value="all">Todas as contas</SelectItem>
                         {(accounts as any)?.results?.map((account: BankAccount) => (
                           <SelectItem key={account.id} value={account.id}>
-                            {account.account_name}
+                            {account.name || account.display_name || `Conta ${account.masked_number}`}
                           </SelectItem>
                         ))}
                       </SelectContent>

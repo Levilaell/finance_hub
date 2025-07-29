@@ -452,10 +452,6 @@ export interface ConnectTokenRequest {
   };
 }
 
-export interface ConnectTokenResponse {
-  connect_token: string;
-  connect_url?: string;
-}
 
 export interface PluggyConnectOptions {
   connectToken: string;

@@ -63,7 +63,7 @@ export default function NewTransactionPage() {
   // Queries
   const { data: accountsData, isLoading: accountsLoading } = useQuery({
     queryKey: ['bank-accounts'],
-    queryFn: () => bankingService.getBankAccounts(),
+    queryFn: () => bankingService.getAccounts(),
     enabled: isAuthenticated,
   });
 
@@ -73,7 +73,7 @@ export default function NewTransactionPage() {
     enabled: isAuthenticated,
   });
 
-  const accounts = accountsData?.results || [];
+  const accounts = accountsData || [];
   const categories = categoriesData || [];
 
   // Form setup
@@ -105,12 +105,12 @@ export default function NewTransactionPage() {
       const tags = data.tags ? data.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
       
       return bankingService.createTransaction({
-        bank_account: data.bank_account,
+        account: data.bank_account,
         amount: parseFloat(data.amount),
         description: data.description,
-        transaction_type: data.transaction_type,
+        type: data.transaction_type.toUpperCase() as 'DEBIT' | 'CREDIT',
         category: data.category || undefined,
-        transaction_date: data.transaction_date,
+        date: data.transaction_date,
         notes: data.notes || undefined,
         tags: tags.length > 0 ? tags : undefined,
       });
@@ -258,9 +258,9 @@ export default function NewTransactionPage() {
                       <SelectItem key={account.id} value={account.id.toString()}>
                         <div className="flex items-center space-x-2">
                           <BanknotesIcon className="h-4 w-4" />
-                          <span>{account.account_name}</span>
+                          <span>{account.name || account.display_name || `Conta ${account.masked_number}`}</span>
                           <span className="text-gray-500 text-sm">
-                            • {formatCurrency(account.current_balance)}
+                            • {formatCurrency(account.balance)}
                           </span>
                         </div>
                       </SelectItem>

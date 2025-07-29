@@ -1,18 +1,11 @@
 import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { bankingService } from '@/services/banking.service';
-import { Transaction, TransactionFilters } from '@/types/banking.types';
-
-interface TransactionsResponse {
-  results: Transaction[];
-  count: number;
-  next: string | null;
-  previous: string | null;
-}
+import { Transaction, TransactionFilters, PaginatedResponse, BulkCategorizeResponse } from '@/types/banking.types';
 
 interface UseTransactionsOptions {
   filters?: TransactionFilters;
   page?: number;
-  queryOptions?: UseQueryOptions<TransactionsResponse>;
+  queryOptions?: UseQueryOptions<PaginatedResponse<Transaction>>;
 }
 
 export function useTransactions({ filters, page = 1, queryOptions }: UseTransactionsOptions = {}) {
@@ -30,7 +23,7 @@ export function useCategorizeTransaction(
   
   return useMutation({
     mutationFn: ({ transactionId, categoryId }) => 
-      bankingService.categorizeTransaction(transactionId, categoryId),
+      bankingService.updateTransaction(transactionId, { category: categoryId.toString() }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
@@ -39,13 +32,13 @@ export function useCategorizeTransaction(
 }
 
 export function useBulkCategorize(
-  options?: UseMutationOptions<void, Error, { transactionIds: string[]; categoryId: number }>
+  options?: UseMutationOptions<BulkCategorizeResponse, Error, { transactionIds: string[]; categoryId: string }>
 ) {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: ({ transactionIds, categoryId }) => 
-      bankingService.bulkCategorize(transactionIds, categoryId),
+      bankingService.bulkCategorize({ transaction_ids: transactionIds, category_id: categoryId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },

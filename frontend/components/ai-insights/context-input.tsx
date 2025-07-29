@@ -23,6 +23,35 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+
+const PREDEFINED_GOALS = [
+  'Aumentar receita',
+  'Reduzir custos',
+  'Melhorar fluxo de caixa',
+  'Otimizar investimentos',
+  'Crescer no mercado',
+  'Diversificar produtos',
+  'Expandir geograficamente',
+  'Melhorar eficiência operacional'
+];
+
+const PREDEFINED_CHALLENGES = [
+  'Controle de custos',
+  'Fluxo de caixa irregular',
+  'Dificuldade de crescimento',
+  'Competição no mercado',
+  'Gestão financeira complexa',
+  'Falta de capital',
+  'Sazonalidade',
+  'Inadimplência'
+];
+
+const EXAMPLE_QUESTIONS = [
+  'Como posso melhorar meu fluxo de caixa?',
+  'Quais são as principais oportunidades de redução de custos?',
+  'Como otimizar minha gestão financeira?',
+  'Qual a melhor estratégia para crescimento sustentável?'
+];
 import {
   InformationCircleIcon,
   PlusCircleIcon,

@@ -36,20 +36,23 @@ export function useNotifications() {
     setNotifications((prev) => [notification, ...prev]);
     incrementNotificationCount();
 
-    // Show toast notification
-    switch (notification.type) {
-      case "success":
-        toast.success(notification.title, {
-          description: notification.message,
-        });
-        break;
-      case "error":
+    // Show toast notification based on priority and type
+    switch (notification.notification_type) {
+      case "sync_error":
+      case "budget_exceeded":
         toast.error(notification.title, {
           description: notification.message,
         });
         break;
-      case "warning":
+      case "low_balance":
+      case "subscription_expiring":
         toast.warning(notification.title, {
+          description: notification.message,
+        });
+        break;
+      case "report_ready":
+      case "ai_insight":
+        toast.success(notification.title, {
           description: notification.message,
         });
         break;

@@ -2,16 +2,18 @@ import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOpti
 import { categoriesService } from '@/services/categories.service';
 import { bankingService } from '@/services/banking.service';
 import { Category } from '@/types';
+import { TransactionCategory } from '@/types/banking.types';
 
 interface CreateCategoryData {
   name: string;
-  type: 'income' | 'expense';
-  color: string;
-  icon: string;
+  category_type: 'income' | 'expense';
+  color?: string;
+  icon?: string;
+  parent?: number;
 }
 
 interface UpdateCategoryData extends CreateCategoryData {
-  id: number;
+  id: string;
 }
 
 export function useCategories(options?: UseQueryOptions<Category[]>) {
@@ -23,7 +25,7 @@ export function useCategories(options?: UseQueryOptions<Category[]>) {
 }
 
 // Alternative for banking service categories
-export function useBankingCategories(options?: UseQueryOptions<Category[]>) {
+export function useBankingCategories(options?: UseQueryOptions<TransactionCategory[]>) {
   return useQuery({
     queryKey: ['categories'],
     queryFn: () => bankingService.getCategories(),
@@ -55,11 +57,11 @@ export function useUpdateCategory(options?: UseMutationOptions<Category, Error, 
   });
 }
 
-export function useDeleteCategory(options?: UseMutationOptions<void, Error, number>) {
+export function useDeleteCategory(options?: UseMutationOptions<void, Error, string>) {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (id: number) => categoriesService.deleteCategory(id),
+    mutationFn: (id: string) => categoriesService.deleteCategory(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
     },
