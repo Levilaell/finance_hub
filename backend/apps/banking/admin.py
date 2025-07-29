@@ -45,15 +45,15 @@ class PluggyConnectorAdmin(admin.ModelAdmin):
 
 @admin.register(PluggyItem)
 class PluggyItemAdmin(admin.ModelAdmin):
-    list_display = ['pluggy_id', 'company', 'connector', 'status', 'execution_status', 'accounts_count', 'last_successful_update']
+    list_display = ['pluggy_item_id', 'company', 'connector', 'status', 'execution_status', 'accounts_count', 'last_successful_update']
     list_filter = ['status', 'execution_status', 'connector__name', 'created_at']
-    search_fields = ['pluggy_id', 'company__name', 'connector__name', 'client_user_id']
-    readonly_fields = ['pluggy_id', 'created_at', 'updated_at', 'last_successful_update', 'created', 'modified']
+    search_fields = ['pluggy_item_id', 'company__name', 'connector__name', 'client_user_id']
+    readonly_fields = ['pluggy_item_id', 'pluggy_created_at', 'pluggy_updated_at', 'last_successful_update', 'created_at', 'updated_at']
     raw_id_fields = ['company', 'connector']
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('id', 'pluggy_id', 'company', 'connector', 'client_user_id')
+            'fields': ('id', 'pluggy_item_id', 'company', 'connector', 'client_user_id')
         }),
         ('Status', {
             'fields': ('status', 'execution_status', 'last_successful_update')
@@ -71,7 +71,7 @@ class PluggyItemAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('Timestamps', {
-            'fields': ('created_at', 'updated_at', 'created', 'modified')
+            'fields': ('pluggy_created_at', 'pluggy_updated_at', 'created_at', 'updated_at')
         }),
     )
     
@@ -96,12 +96,12 @@ class BankAccountAdmin(admin.ModelAdmin):
     list_display = ['display_name', 'company', 'type', 'balance_display', 'item_status', 'is_active', 'updated_at']
     list_filter = ['type', 'is_active', 'item__status', 'currency_code', 'created_at']
     search_fields = ['name', 'marketing_name', 'number', 'owner', 'company__name']
-    readonly_fields = ['id', 'pluggy_id', 'masked_number', 'created_at', 'updated_at', 'created', 'modified']
+    readonly_fields = ['id', 'pluggy_account_id', 'masked_number', 'pluggy_created_at', 'pluggy_updated_at', 'created_at', 'updated_at']
     raw_id_fields = ['item', 'company']
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('id', 'pluggy_id', 'item', 'company')
+            'fields': ('id', 'pluggy_account_id', 'item', 'company')
         }),
         ('Account Details', {
             'fields': ('type', 'subtype', 'number', 'masked_number', 'name', 'marketing_name')
@@ -120,7 +120,7 @@ class BankAccountAdmin(admin.ModelAdmin):
             'fields': ('is_active',)
         }),
         ('Timestamps', {
-            'fields': ('created_at', 'updated_at', 'created', 'modified')
+            'fields': ('pluggy_created_at', 'pluggy_updated_at', 'created_at', 'updated_at')
         }),
     )
     
@@ -155,14 +155,14 @@ class BankAccountAdmin(admin.ModelAdmin):
 class TransactionAdmin(admin.ModelAdmin):
     list_display = ['date', 'description', 'amount_display', 'type', 'category', 'account_name', 'created_at']
     list_filter = ['type', 'status', 'date', 'category', 'account__type']
-    search_fields = ['description', 'pluggy_id', 'notes']
-    readonly_fields = ['id', 'pluggy_id', 'created_at', 'updated_at', 'created', 'modified']
+    search_fields = ['description', 'pluggy_transaction_id', 'notes']
+    readonly_fields = ['id', 'pluggy_transaction_id', 'pluggy_created_at', 'pluggy_updated_at', 'created_at', 'updated_at']
     raw_id_fields = ['account', 'category']
     date_hierarchy = 'date'
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('id', 'pluggy_id', 'account')
+            'fields': ('id', 'pluggy_transaction_id', 'account', 'company')
         }),
         ('Transaction Details', {
             'fields': ('type', 'status', 'description', 'amount', 'currency_code', 'date')
@@ -186,7 +186,7 @@ class TransactionAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('Timestamps', {
-            'fields': ('created_at', 'updated_at', 'created', 'modified')
+            'fields': ('pluggy_created_at', 'pluggy_updated_at', 'created_at', 'updated_at')
         }),
     )
     
@@ -216,7 +216,7 @@ class TransactionCategoryAdmin(admin.ModelAdmin):
     list_display = ['name', 'type', 'parent', 'icon', 'color_display', 'is_system', 'is_active', 'order']
     list_filter = ['type', 'is_system', 'is_active', 'parent']
     search_fields = ['name', 'slug']
-    readonly_fields = ['id', 'slug', 'created', 'modified']
+    readonly_fields = ['id', 'slug', 'created_at', 'updated_at']
     raw_id_fields = ['company', 'parent']
     
     fieldsets = (
@@ -233,7 +233,7 @@ class TransactionCategoryAdmin(admin.ModelAdmin):
             'fields': ('is_system', 'is_active', 'order')
         }),
         ('Timestamps', {
-            'fields': ('created', 'modified')
+            'fields': ('created_at', 'updated_at')
         }),
     )
     
@@ -269,10 +269,10 @@ class PluggyCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(ItemWebhook)
 class ItemWebhookAdmin(admin.ModelAdmin):
-    list_display = ['event_type', 'item', 'event_id', 'processed', 'processed_at', 'created']
-    list_filter = ['event_type', 'processed', 'created']
-    search_fields = ['event_id', 'item__pluggy_id']
-    readonly_fields = ['id', 'event_id', 'payload', 'created']
+    list_display = ['event_type', 'item', 'event_id', 'processed', 'processed_at', 'created_at']
+    list_filter = ['event_type', 'processed', 'created_at']
+    search_fields = ['event_id', 'item__pluggy_item_id']
+    readonly_fields = ['id', 'event_id', 'payload', 'created_at']
     raw_id_fields = ['item']
     
     fieldsets = (
@@ -287,7 +287,7 @@ class ItemWebhookAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('Timestamps', {
-            'fields': ('created',)
+            'fields': ('created_at',)
         }),
     )
     

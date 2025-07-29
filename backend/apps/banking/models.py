@@ -18,9 +18,7 @@ class PluggyConnector(models.Model):
     Pluggy connector information (cached from API)
     Maps to Pluggy's connector concept
     """
-    # Pluggy connector ID
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
     pluggy_id = models.IntegerField(_('Pluggy ID'), unique=True, db_index=True)
     
     # Basic info
@@ -45,7 +43,7 @@ class PluggyConnector(models.Model):
     # Credentials schema
     credentials = models.JSONField(_('credentials schema'), default=list)
     
-    # Metadata
+    # Timestamps
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     updated_at = models.DateTimeField(_('updated at'), auto_now=True)
     
@@ -54,6 +52,11 @@ class PluggyConnector(models.Model):
         verbose_name = _('Pluggy Connector')
         verbose_name_plural = _('Pluggy Connectors')
         ordering = ['name']
+        indexes = [
+            models.Index(fields=['pluggy_id']),
+            models.Index(fields=['type', 'country']),
+            models.Index(fields=['is_open_finance']),
+        ]
     
     def __str__(self):
         return f"{self.name} ({self.pluggy_id})"
@@ -89,9 +92,8 @@ class PluggyItem(models.Model):
         ('ERROR', 'Error'),
     ]
     
-    # Basic fields
-    pluggy_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    item_pluggy_id = models.CharField(_('Pluggy Item ID'), max_length=100, unique=True, db_index=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    pluggy_item_id = models.CharField(_('Pluggy Item ID'), max_length=100, unique=True, db_index=True)
     
     # Relations
     company = models.ForeignKey(
@@ -102,9 +104,7 @@ class PluggyItem(models.Model):
     connector = models.ForeignKey(
         PluggyConnector,
         on_delete=models.PROTECT,
-        related_name='items',
-        to_field='pluggy_id',
-        db_column='connector_id'
+        related_name='items'
     )
     
     # User tracking
@@ -124,9 +124,9 @@ class PluggyItem(models.Model):
         blank=True
     )
     
-    # Dates
-    created_at = models.DateTimeField(_('created at'))
-    updated_at = models.DateTimeField(_('updated at'))
+    # Dates from Pluggy API
+    pluggy_created_at = models.DateTimeField(_('Pluggy created at'))
+    pluggy_updated_at = models.DateTimeField(_('Pluggy updated at'))
     last_successful_update = models.DateTimeField(_('last successful update'), null=True, blank=True)
     
     # Error tracking
@@ -143,9 +143,9 @@ class PluggyItem(models.Model):
     # Metadata
     metadata = models.JSONField(_('metadata'), default=dict, blank=True)
     
-    # Tracking
-    created = models.DateTimeField(_('created'), auto_now_add=True)
-    modified = models.DateTimeField(_('modified'), auto_now=True)
+    # Local timestamps
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
     
     class Meta:
         db_table = 'pluggy_items'
@@ -153,12 +153,13 @@ class PluggyItem(models.Model):
         verbose_name_plural = _('Pluggy Items')
         indexes = [
             models.Index(fields=['company', 'status']),
-            models.Index(fields=['pluggy_id']),
+            models.Index(fields=['pluggy_item_id']),
             models.Index(fields=['last_successful_update']),
+            models.Index(fields=['connector', 'status']),
         ]
     
     def __str__(self):
-        return f"{self.connector.name} - {self.pluggy_id}"
+        return f"{self.connector.name} - {self.pluggy_item_id}"
 
 
 class BankAccount(models.Model):
@@ -183,9 +184,8 @@ class BankAccount(models.Model):
         ('OTHER', 'Other'),
     ]
     
-    # IDs
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    pluggy_id = models.CharField(_('Pluggy Account ID'), max_length=100, unique=True, db_index=True)
+    pluggy_account_id = models.CharField(_('Pluggy Account ID'), max_length=100, unique=True, db_index=True)
     
     # Relations
     item = models.ForeignKey(
@@ -196,7 +196,7 @@ class BankAccount(models.Model):
     company = models.ForeignKey(
         'companies.Company',
         on_delete=models.CASCADE,
-        related_name='bank_accounts_v2'
+        related_name='bank_accounts'
     )
     
     # Account info from Pluggy
@@ -224,23 +224,24 @@ class BankAccount(models.Model):
     # Status
     is_active = models.BooleanField(_('is active'), default=True)
     
-    # Metadata
-    created_at = models.DateTimeField(_('created at'))
-    updated_at = models.DateTimeField(_('updated at'))
+    # Dates from Pluggy API
+    pluggy_created_at = models.DateTimeField(_('Pluggy created at'))
+    pluggy_updated_at = models.DateTimeField(_('Pluggy updated at'))
     
-    # Tracking
-    created = models.DateTimeField(_('created'), auto_now_add=True)
-    modified = models.DateTimeField(_('modified'), auto_now=True)
+    # Local timestamps
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
     
     class Meta:
-        db_table = 'bank_accounts_v2'
+        db_table = 'bank_accounts'
         verbose_name = _('Bank Account')
         verbose_name_plural = _('Bank Accounts')
-        unique_together = [['company', 'pluggy_id']]
+        unique_together = [['company', 'pluggy_account_id']]
         indexes = [
             models.Index(fields=['company', 'is_active']),
             models.Index(fields=['item', 'type']),
-            models.Index(fields=['pluggy_id']),
+            models.Index(fields=['pluggy_account_id']),
+            models.Index(fields=['type', 'is_active']),
         ]
     
     def __str__(self):
@@ -308,13 +309,17 @@ class Transaction(models.Model):
         ('POSTED', 'Posted'),
     ]
     
-    # IDs
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    pluggy_id = models.CharField(_('Pluggy Transaction ID'), max_length=100, unique=True, db_index=True)
+    pluggy_transaction_id = models.CharField(_('Pluggy Transaction ID'), max_length=100, unique=True, db_index=True)
     
     # Relations
     account = models.ForeignKey(
         BankAccount,
+        on_delete=models.CASCADE,
+        related_name='transactions'
+    )
+    company = models.ForeignKey(
+        'companies.Company',
         on_delete=models.CASCADE,
         related_name='transactions'
     )
@@ -345,7 +350,7 @@ class Transaction(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='transactions_v2'
+        related_name='transactions'
     )
     
     # Additional fields
@@ -361,24 +366,28 @@ class Transaction(models.Model):
     
     # Metadata
     metadata = models.JSONField(_('metadata'), default=dict, blank=True)
-    created_at = models.DateTimeField(_('created at'))
-    updated_at = models.DateTimeField(_('updated at'))
     
-    # Tracking
-    created = models.DateTimeField(_('created'), auto_now_add=True)
-    modified = models.DateTimeField(_('modified'), auto_now=True)
+    # Dates from Pluggy API
+    pluggy_created_at = models.DateTimeField(_('Pluggy created at'))
+    pluggy_updated_at = models.DateTimeField(_('Pluggy updated at'))
+    
+    # Local timestamps
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
     
     class Meta:
-        db_table = 'transactions_v2'
+        db_table = 'transactions'
         verbose_name = _('Transaction')
         verbose_name_plural = _('Transactions')
         ordering = ['-date', '-created_at']
         indexes = [
             models.Index(fields=['account', 'date']),
-            models.Index(fields=['pluggy_id']),
+            models.Index(fields=['company', 'date']),
+            models.Index(fields=['pluggy_transaction_id']),
             models.Index(fields=['date', 'type']),
             models.Index(fields=['pluggy_category_id']),
             models.Index(fields=['category', 'date']),
+            models.Index(fields=['type', 'status']),
         ]
     
     def __str__(self):
@@ -445,16 +454,21 @@ class TransactionCategory(models.Model):
         blank=True
     )
     
-    # Metadata
-    created = models.DateTimeField(_('created'), auto_now_add=True)
-    modified = models.DateTimeField(_('modified'), auto_now=True)
+    # Timestamps
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
     
     class Meta:
-        db_table = 'transaction_categories_v2'
+        db_table = 'transaction_categories'
         verbose_name = _('Transaction Category')
         verbose_name_plural = _('Transaction Categories')
         ordering = ['type', 'order', 'name']
         unique_together = [['company', 'slug']]
+        indexes = [
+            models.Index(fields=['company', 'type', 'is_active']),
+            models.Index(fields=['slug']),
+            models.Index(fields=['parent', 'order']),
+        ]
     
     def __str__(self):
         if self.parent:
@@ -515,18 +529,20 @@ class ItemWebhook(models.Model):
     
     error = models.TextField(_('error'), blank=True)
     
-    created = models.DateTimeField(_('created'), auto_now_add=True)
+    # Timestamps
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     
     class Meta:
         db_table = 'item_webhooks'
         verbose_name = _('Item Webhook')
         verbose_name_plural = _('Item Webhooks')
-        ordering = ['-created']
+        ordering = ['-created_at']
         indexes = [
             models.Index(fields=['item', 'event_type']),
-            models.Index(fields=['processed', 'created']),
+            models.Index(fields=['processed', 'created_at']),
             models.Index(fields=['event_id']),
+            models.Index(fields=['event_type', 'processed']),
         ]
     
     def __str__(self):
-        return f"{self.event_type} - {self.item.pluggy_id}"
+        return f"{self.event_type} - {self.item.pluggy_item_id}"

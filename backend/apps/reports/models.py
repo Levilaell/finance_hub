@@ -73,6 +73,11 @@ class Report(models.Model):
         verbose_name = _('Report')
         verbose_name_plural = _('Reports')
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['company', 'report_type']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['is_generated', 'created_at']),
+        ]
     
     def __str__(self):
         return f"{self.title} ({self.period_start} - {self.period_end})"
@@ -120,6 +125,10 @@ class ReportTemplate(models.Model):
         db_table = 'report_templates'
         verbose_name = _('Report Template')
         verbose_name_plural = _('Report Templates')
+        indexes = [
+            models.Index(fields=['company', 'is_active']),
+            models.Index(fields=['report_type', 'is_public']),
+        ]
     
     def __str__(self):
         return self.name

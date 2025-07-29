@@ -17,9 +17,11 @@ class User(AbstractUser):
     is_phone_verified = models.BooleanField(_('phone verified'), default=False)
     avatar = models.ImageField(_('avatar'), upload_to='avatars/', blank=True, null=True)
     date_of_birth = models.DateField(_('date of birth'), blank=True, null=True)
+    last_login_ip = models.GenericIPAddressField(_('last login IP'), blank=True, null=True)
+    
+    # Timestamps - standardized naming
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     updated_at = models.DateTimeField(_('updated at'), auto_now=True)
-    last_login_ip = models.GenericIPAddressField(_('last login IP'), blank=True, null=True)
     
     # Business preferences
     preferred_language = models.CharField(
@@ -63,9 +65,14 @@ class User(AbstractUser):
     )
 
     class Meta:
-        db_table = 'auth_user'
+        db_table = 'users'
         verbose_name = _('User')
         verbose_name_plural = _('Users')
+        indexes = [
+            models.Index(fields=['email']),
+            models.Index(fields=['is_email_verified']),
+            models.Index(fields=['created_at']),
+        ]
     
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.email})"
@@ -87,15 +94,22 @@ class EmailVerification(models.Model):
     Email verification tokens
     """
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='email_verifications')
-    token = models.CharField(_('verification token'), max_length=100, unique=True)
+    token = models.CharField(_('verification token'), max_length=100, unique=True, db_index=True)
+    is_used = models.BooleanField(_('is used'), default=False)
+    
+    # Timestamps
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     expires_at = models.DateTimeField(_('expires at'))
-    is_used = models.BooleanField(_('is used'), default=False)
     
     class Meta:
         db_table = 'email_verifications'
         verbose_name = _('Email Verification')
         verbose_name_plural = _('Email Verifications')
+        indexes = [
+            models.Index(fields=['user', 'is_used']),
+            models.Index(fields=['token']),
+            models.Index(fields=['expires_at']),
+        ]
     
     def __str__(self):
         return f"Verification for {self.user.email}"
@@ -106,15 +120,22 @@ class PasswordReset(models.Model):
     Password reset tokens
     """
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_resets')
-    token = models.CharField(_('reset token'), max_length=100, unique=True)
+    token = models.CharField(_('reset token'), max_length=100, unique=True, db_index=True)
+    is_used = models.BooleanField(_('is used'), default=False)
+    
+    # Timestamps
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     expires_at = models.DateTimeField(_('expires at'))
-    is_used = models.BooleanField(_('is used'), default=False)
     
     class Meta:
         db_table = 'password_resets'
         verbose_name = _('Password Reset')
         verbose_name_plural = _('Password Resets')
+        indexes = [
+            models.Index(fields=['user', 'is_used']),
+            models.Index(fields=['token']),
+            models.Index(fields=['expires_at']),
+        ]
     
     def __str__(self):
         return f"Password reset for {self.user.email}"

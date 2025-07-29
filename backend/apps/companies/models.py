@@ -324,7 +324,6 @@ class Company(models.Model):
             usage_info = f"{count}/{self.subscription_plan.max_bank_accounts} contas"
             return limit_reached, usage_info
             
-            
         elif limit_type == 'ai_requests':
             limit_reached = self.current_month_ai_requests >= self.subscription_plan.max_ai_requests_per_month
             usage_info = f"{self.current_month_ai_requests}/{self.subscription_plan.max_ai_requests_per_month} requisições IA"
@@ -347,7 +346,6 @@ class Company(models.Model):
             if self.subscription_plan.max_bank_accounts == 0:
                 return 0
             return (count / self.subscription_plan.max_bank_accounts) * 100
-            
             
         elif limit_type == 'ai_requests':
             if self.subscription_plan.max_ai_requests_per_month == 0:
@@ -704,8 +702,8 @@ class ResourceUsage(models.Model):
         
         # Always recalculate transaction count to ensure accuracy
         actual_count = Transaction.objects.filter(
-            bank_account__company=company,
-            transaction_date__gte=month_start_datetime
+            company=company,
+            date__gte=month_start_datetime
         ).count()
         
         # Update if different
