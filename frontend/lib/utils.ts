@@ -107,3 +107,70 @@ export function debounce<T extends (...args: any[]) => any>(
     timeoutId = setTimeout(() => func(...args), wait);
   };
 }
+
+/**
+ * Format phone to (XX) XXXXX-XXXX or (XX) XXXX-XXXX
+ */
+export function formatPhone(phone: string): string {
+  const cleanPhone = phone.replace(/[^\d]/g, '');
+
+  if (cleanPhone.length === 11) {
+    return cleanPhone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+  } else if (cleanPhone.length === 10) {
+    return cleanPhone.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+  }
+
+  return phone;
+}
+
+/**
+ * Format CNPJ to XX.XXX.XXX/XXXX-XX
+ */
+export function formatCNPJ(cnpj: string): string {
+  const cleanCNPJ = cnpj.replace(/[^\d]/g, '');
+  
+  if (cleanCNPJ.length !== 14) {
+    return cnpj;
+  }
+
+  return cleanCNPJ.replace(
+    /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
+    '$1.$2.$3/$4-$5'
+  );
+}
+
+/**
+ * CNPJ input mask
+ */
+export function cnpjMask(value: string): string {
+  const cleanValue = value.replace(/[^\d]/g, '');
+  
+  if (cleanValue.length <= 2) {
+    return cleanValue;
+  } else if (cleanValue.length <= 5) {
+    return cleanValue.replace(/(\d{2})(\d)/, '$1.$2');
+  } else if (cleanValue.length <= 8) {
+    return cleanValue.replace(/(\d{2})(\d{3})(\d)/, '$1.$2.$3');
+  } else if (cleanValue.length <= 12) {
+    return cleanValue.replace(/(\d{2})(\d{3})(\d{3})(\d)/, '$1.$2.$3/$4');
+  } else {
+    return cleanValue.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d)/, '$1.$2.$3/$4-$5');
+  }
+}
+
+/**
+ * Phone input mask
+ */
+export function phoneMask(value: string): string {
+  const cleanValue = value.replace(/[^\d]/g, '');
+  
+  if (cleanValue.length <= 2) {
+    return cleanValue.length > 0 ? `(${cleanValue}` : '';
+  } else if (cleanValue.length <= 6) {
+    return `(${cleanValue.slice(0, 2)}) ${cleanValue.slice(2)}`;
+  } else if (cleanValue.length <= 10) {
+    return `(${cleanValue.slice(0, 2)}) ${cleanValue.slice(2, 6)}-${cleanValue.slice(6)}`;
+  } else {
+    return `(${cleanValue.slice(0, 2)}) ${cleanValue.slice(2, 7)}-${cleanValue.slice(7, 11)}`;
+  }
+}

@@ -2,6 +2,7 @@
  * Banking service following Pluggy API structure
  */
 import apiClient from '@/lib/api-client';
+import { formatCurrency } from '@/lib/utils';
 import {
   PluggyConnector,
   PluggyItem,
@@ -275,13 +276,10 @@ class BankingService {
   }
   
   /**
-   * Format currency value
+   * Format currency value (delegates to shared utility)
    */
   formatCurrency(value: number, currency: string = 'BRL'): string {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: currency,
-    }).format(value);
+    return formatCurrency(value, currency);
   }
   
   /**

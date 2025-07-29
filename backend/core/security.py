@@ -252,68 +252,16 @@ def sanitize_user_input(data: dict) -> dict:
 
 
 def validate_cpf(cpf: str) -> bool:
-    """Validate Brazilian CPF"""
-    # Remove non-digits
-    cpf = ''.join(filter(str.isdigit, cpf))
-    
-    # CPF must have 11 digits
-    if len(cpf) != 11:
-        return False
-    
-    # Check for known invalid patterns
-    if cpf in ['00000000000', '11111111111', '22222222222', '33333333333',
-               '44444444444', '55555555555', '66666666666', '77777777777',
-               '88888888888', '99999999999']:
-        return False
-    
-    # Validate check digits
-    # First digit
-    sum_digit = sum(int(cpf[i]) * (10 - i) for i in range(9))
-    first_digit = 11 - (sum_digit % 11)
-    if first_digit >= 10:
-        first_digit = 0
-    
-    if int(cpf[9]) != first_digit:
-        return False
-    
-    # Second digit
-    sum_digit = sum(int(cpf[i]) * (11 - i) for i in range(10))
-    second_digit = 11 - (sum_digit % 11)
-    if second_digit >= 10:
-        second_digit = 0
-    
-    return int(cpf[10]) == second_digit
+    """Validate Brazilian CPF - wrapper for common validator"""
+    from .common_validators import validate_cpf as _validate_cpf
+    return _validate_cpf(cpf)
 
 
 def validate_cnpj(cnpj: str) -> bool:
-    """Validate Brazilian CNPJ"""
-    # Remove non-digits
-    cnpj = ''.join(filter(str.isdigit, cnpj))
-    
-    # CNPJ must have 14 digits
-    if len(cnpj) != 14:
+    """Validate Brazilian CNPJ - wrapper for common validator"""
+    from .common_validators import validate_cnpj as _validate_cnpj
+    try:
+        _validate_cnpj(cnpj)
+        return True
+    except:
         return False
-    
-    # Check for known invalid patterns
-    if cnpj == '00000000000000':
-        return False
-    
-    # Validate check digits
-    # First digit
-    weights = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-    sum_digit = sum(int(cnpj[i]) * weights[i] for i in range(12))
-    first_digit = 11 - (sum_digit % 11)
-    if first_digit >= 10:
-        first_digit = 0
-    
-    if int(cnpj[12]) != first_digit:
-        return False
-    
-    # Second digit
-    weights = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-    sum_digit = sum(int(cnpj[i]) * weights[i] for i in range(13))
-    second_digit = 11 - (sum_digit % 11)
-    if second_digit >= 10:
-        second_digit = 0
-    
-    return int(cnpj[13]) == second_digit

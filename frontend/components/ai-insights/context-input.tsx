@@ -51,35 +51,7 @@ export interface BusinessContext {
   customQuestions: string[];
 }
 
-const PREDEFINED_GOALS = [
-  'Aumentar faturamento em 20%',
-  'Reduzir custos operacionais',
-  'Expandir para novos mercados',
-  'Melhorar margem de lucro',
-  'Automatizar processos',
-  'Contratar mais funcionários',
-  'Lançar novo produto/serviço',
-  'Melhorar fluxo de caixa',
-];
-
-const PREDEFINED_CHALLENGES = [
-  'Alto custo de aquisição de clientes',
-  'Concorrência acirrada',
-  'Falta de capital de giro',
-  'Dificuldade para escalar',
-  'Alta rotatividade de funcionários',
-  'Dependência de poucos clientes',
-  'Sazonalidade nas vendas',
-  'Processos manuais ineficientes',
-];
-
-const EXAMPLE_QUESTIONS = [
-  'Como posso reduzir meu CAC (Custo de Aquisição de Cliente)?',
-  'Qual a melhor estratégia para aumentar o ticket médio?',
-  'Como otimizar meu fluxo de caixa nos próximos 3 meses?',
-  'Devo investir em marketing digital ou tradicional?',
-  'Como me preparar para a sazonalidade do fim de ano?',
-];
+// Constants are now imported from @/constants/ui
 
 export function ContextInput({ onContextUpdate, initialContext }: ContextInputProps) {
   const [context, setContext] = useState<BusinessContext>(initialContext || {

@@ -9,83 +9,26 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
 
-
-def validate_cnpj(value):
-    """
-    Validates Brazilian CNPJ (Corporate Taxpayer Registry)
-    """
-    if not value:
-        return
-        
-    # Remove non-numeric characters
-    cnpj = re.sub(r'[^0-9]', '', str(value))
-    
-    # Check length
-    if len(cnpj) != 14:
-        raise ValidationError(_('CNPJ deve conter 14 dígitos.'))
-    
-    # Check for sequential numbers (invalid CNPJs)
-    if cnpj in ['00000000000000', '11111111111111', '22222222222222',
-                '33333333333333', '44444444444444', '55555555555555',
-                '66666666666666', '77777777777777', '88888888888888',
-                '99999999999999']:
-        raise ValidationError(_('CNPJ inválido.'))
-    
-    # Validate check digits
-    def calculate_digit(cnpj_partial, weights):
-        total = sum(int(digit) * weight for digit, weight in zip(cnpj_partial, weights))
-        remainder = total % 11
-        return 0 if remainder < 2 else 11 - remainder
-    
-    # First check digit
-    weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-    digit1 = calculate_digit(cnpj[:12], weights1)
-    
-    # Second check digit
-    weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-    digit2 = calculate_digit(cnpj[:13], weights2)
-    
-    if int(cnpj[12]) != digit1 or int(cnpj[13]) != digit2:
-        raise ValidationError(_('CNPJ inválido.'))
+# Import common validators
+from .common_validators import (
+    validate_cnpj as _validate_cnpj,
+    validate_phone as _validate_phone,
+    validate_email_unique as _validate_email_unique,
+    format_cnpj,
+    format_phone,
+    format_cpf,
+    validate_cpf
+)
 
 
-def validate_phone(value):
-    """
-    Validates Brazilian phone numbers
-    """
-    if not value:
-        return
-        
-    # Remove non-numeric characters
-    phone = re.sub(r'[^0-9]', '', str(value))
-    
-    # Check length (10-11 digits)
-    if len(phone) < 10 or len(phone) > 11:
-        raise ValidationError(_('Telefone deve ter 10 ou 11 dígitos.'))
-    
-    # Check if starts with valid area code (11-99)
-    if len(phone) >= 2:
-        area_code = int(phone[:2])
-        if area_code < 11 or area_code > 99:
-            raise ValidationError(_('Código de área inválido.'))
-    
-    # For 11-digit numbers, 9th digit must be 9 (mobile)
-    if len(phone) == 11 and phone[2] != '9':
-        raise ValidationError(_('Para celular, o número deve começar com 9.'))
+# Re-export common validators with the same interface
+validate_cnpj = _validate_cnpj
 
 
-def validate_email_unique(email, exclude_user=None):
-    """
-    Validates email uniqueness
-    """
-    User = get_user_model()
-    queryset = User.objects.filter(email=email)
-    
-    if exclude_user:
-        queryset = queryset.exclude(pk=exclude_user.pk)
-    
-    if queryset.exists():
-        raise ValidationError(_('Este e-mail já está cadastrado.'))
+validate_phone = _validate_phone
+
+
+validate_email_unique = _validate_email_unique
 
 
 def validate_password_strength(password):

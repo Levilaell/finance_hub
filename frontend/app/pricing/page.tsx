@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { formatCurrency } from '@/lib/utils';
 
 interface PricingPlan {
   id: string;
@@ -108,11 +109,10 @@ function PricingContent() {
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 0,
-    }).format(price);
+    // Use shared formatCurrency with minimumFractionDigits: 0
+    const formatted = formatCurrency(price);
+    // Remove decimal places if they are .00
+    return formatted.replace(/,00$/, '');
   };
 
   const getDiscountPercentage = (monthly: number, yearly: number) => {
