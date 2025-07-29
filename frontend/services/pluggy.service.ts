@@ -371,6 +371,31 @@ class PluggyService {
       throw error;
     }
   }
+  /**
+   * Preload Pluggy SDK for better performance
+   */
+  preloadSDK(): void {
+    if (typeof window !== 'undefined' && !this.isSDKLoaded()) {
+      this.loadPluggySDK().catch(error => {
+        console.warn('Failed to preload Pluggy SDK:', error);
+      });
+    }
+  }
+
+  /**
+   * Get SDK version info
+   */
+  getSDKInfo(): { loaded: boolean; version?: string } {
+    const loaded = this.isSDKLoaded();
+    let version: string | undefined;
+    
+    if (loaded && typeof window !== 'undefined') {
+      const sdk = (window as any).PluggyConnect;
+      version = sdk?.version || sdk?.VERSION || 'unknown';
+    }
+    
+    return { loaded, version };
+  }
 }
 
 export const pluggyService = new PluggyService();

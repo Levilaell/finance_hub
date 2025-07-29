@@ -42,6 +42,12 @@ interface BankingStore extends BankingStoreState {
   updateCategory: (id: string, data: Partial<TransactionCategory>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   
+  // ===== Connect State Actions =====
+  setConnectState: (state: Partial<BankingStoreState['connectState']>) => void;
+  addSyncError: (error: any) => void;
+  clearSyncErrors: () => void;
+  setSyncingAccount: (accountId: string, syncing: boolean) => void;
+  
   // ===== Utility Actions =====
   reset: () => void;
 }
@@ -57,18 +63,25 @@ const initialState: BankingStoreState = {
   // UI State
   selectedAccountId: null,
   transactionFilters: {},
+  connectState: {
+    isOpen: false,
+    token: null,
+    mode: 'connect',
+  },
   
   // Loading states
   loadingConnectors: false,
   loadingItems: false,
   loadingAccounts: false,
   loadingTransactions: false,
+  syncingAccounts: [],
   
   // Errors
   connectorsError: null,
   itemsError: null,
   accountsError: null,
   transactionsError: null,
+  syncErrors: [],
   
   // Pagination
   transactionsPagination: {
@@ -172,6 +185,9 @@ export const useBankingStore = create<BankingStore>()(
       },
       
       syncAccount: async (accountId: string) => {
+        // Add account to syncing list
+        get().setSyncingAccount(accountId, true);
+        
         try {
           const response = await bankingService.syncAccount(accountId);
           
@@ -183,12 +199,30 @@ export const useBankingStore = create<BankingStore>()(
             if (response.data?.sync_stats?.transactions_synced) {
               await get().fetchTransactions();
             }
+          } else if (response.reconnection_required) {
+            // Add sync error if reconnection required
+            get().addSyncError({
+              accountId,
+              accountName: get().accounts.find(a => a.id === accountId)?.name || 'Unknown',
+              message: response.message || 'Reconnection required',
+              requiresReconnect: true,
+              errorCode: response.error_code
+            });
           }
           
           return response;
         } catch (error: any) {
           console.error('Failed to sync account:', error);
+          get().addSyncError({
+            accountId,
+            accountName: get().accounts.find(a => a.id === accountId)?.name || 'Unknown',
+            message: error.message || 'Sync failed',
+            requiresReconnect: false
+          });
           throw error;
+        } finally {
+          // Remove account from syncing list
+          get().setSyncingAccount(accountId, false);
         }
       },
       
@@ -331,6 +365,32 @@ export const useBankingStore = create<BankingStore>()(
           console.error('Failed to delete category:', error);
           throw error;
         }
+      },
+      
+      // ===== Connect State Actions =====
+      
+      setConnectState: (newState: Partial<BankingStoreState['connectState']>) => {
+        set((state) => ({
+          connectState: { ...state.connectState, ...newState }
+        }));
+      },
+      
+      addSyncError: (error: any) => {
+        set((state) => ({
+          syncErrors: [...state.syncErrors.filter(e => e.accountId !== error.accountId), error]
+        }));
+      },
+      
+      clearSyncErrors: () => {
+        set({ syncErrors: [] });
+      },
+      
+      setSyncingAccount: (accountId: string, syncing: boolean) => {
+        set((state) => ({
+          syncingAccounts: syncing 
+            ? [...state.syncingAccounts.filter(id => id !== accountId), accountId]
+            : state.syncingAccounts.filter(id => id !== accountId)
+        }));
       },
       
       // ===== Utility Actions =====

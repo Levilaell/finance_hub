@@ -30,7 +30,13 @@ export interface PluggyCredential {
 export interface PluggyItem {
   id: string;
   pluggy_item_id: string;
+  company: string;
   connector: PluggyConnector;
+  client_user_id?: string;
+  webhook_url?: string;
+  next_auto_sync_at?: string;
+  products: string[];
+  parameter?: Record<string, any>;
   status: PluggyItemStatus;
   execution_status?: PluggyExecutionStatus;
   pluggy_created_at: string;
@@ -39,7 +45,13 @@ export interface PluggyItem {
   error_code?: string;
   error_message?: string;
   status_detail?: Record<string, any>;
+  consent_id?: string;
   consent_expires_at?: string;
+  metadata?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  
+  // Computed properties
   accounts_count?: number;
 }
 
@@ -50,7 +62,9 @@ export type PluggyItemStatus =
   | 'UPDATED'
   | 'LOGIN_ERROR'
   | 'OUTDATED'
-  | 'ERROR';
+  | 'ERROR'
+  | 'DELETED'
+  | 'CONSENT_REVOKED';
 
 export type PluggyExecutionStatus =
   | 'CREATED'
@@ -68,25 +82,28 @@ export type PluggyExecutionStatus =
 
 export interface BankAccount {
   id: string;
-  item_id: string;
-  item_pluggy_id: string;
+  pluggy_account_id: string;
+  item: PluggyItem;
+  company: string;
   type: BankAccountType;
   subtype?: BankAccountSubtype;
   number?: string;
   name?: string;
   marketing_name?: string;
   owner?: string;
+  tax_number?: string;
   balance: number;
+  balance_in_account_currency?: number;
   balance_date?: string;
   currency_code: string;
+  investment_status?: string;
   bank_data?: BankData;
   credit_data?: CreditData;
   is_active: boolean;
   pluggy_created_at: string;
   pluggy_updated_at: string;
-  
-  item_id: string;
-  item_pluggy_id: string;
+  created_at: string;
+  updated_at: string;
   
   // Computed fields
   connector?: {
@@ -95,11 +112,6 @@ export interface BankAccount {
     image_url?: string;
     primary_color?: string;
     is_open_finance: boolean;
-  };
-  item?: {
-    id: string;
-    pluggy_item_id: string;
-    status: PluggyItemStatus;
   };
   item_status?: PluggyItemStatus;
   display_name?: string;
@@ -141,12 +153,21 @@ export interface CreditData {
 export interface Transaction {
   id: string;
   pluggy_transaction_id: string;
+  account: BankAccount;
+  company: string;
   type: 'DEBIT' | 'CREDIT';
   status: 'PENDING' | 'POSTED';
   description: string;
+  description_raw?: string;
   amount: number;
+  amount_in_account_currency?: number;
+  balance?: number;
   currency_code: string;
   date: string;
+  
+  // Provider information
+  provider_code?: string;
+  provider_id?: string;
   
   // Merchant info
   merchant?: {
@@ -180,12 +201,14 @@ export interface Transaction {
   
   // User fields
   notes?: string;
-  tags?: string[];
+  tags: string[];
   
   // Metadata
   metadata?: Record<string, any>;
   pluggy_created_at: string;
   pluggy_updated_at: string;
+  created_at: string;
+  updated_at: string;
   
   // Computed fields
   account_info?: {
@@ -231,6 +254,7 @@ export interface TransactionFilters {
   min_amount?: number;
   max_amount?: number;
   type?: 'DEBIT' | 'CREDIT';
+  status?: 'PENDING' | 'POSTED';
   search?: string;
 }
 
@@ -267,9 +291,11 @@ export interface CallbackResponse {
   data?: {
     item: PluggyItem;
     accounts: BankAccount[];
+    sync_scheduled?: boolean;
     message: string;
   };
   error?: string;
+  warning?: string;
 }
 
 export interface SyncRequest {
@@ -284,15 +310,15 @@ export interface SyncResponse {
   error_code?: string;
   reconnection_required?: boolean;
   data?: {
-    account?: BankAccount;
+    item?: PluggyItem;
+    accounts?: BankAccount[];
     sync_stats?: {
       transactions_synced?: number;
+      accounts_synced?: number;
       sync_from?: string;
       sync_to?: string;
       days_searched?: number;
     };
-    item_status?: PluggyItemStatus;
-    execution_status?: PluggyExecutionStatus;
   };
 }
 
@@ -379,18 +405,21 @@ export interface BankingStoreState {
   // UI State
   selectedAccountId: string | null;
   transactionFilters: TransactionFilters;
+  connectState: PluggyConnectState;
   
   // Loading states
   loadingConnectors: boolean;
   loadingItems: boolean;
   loadingAccounts: boolean;
   loadingTransactions: boolean;
+  syncingAccounts: string[]; // Array of account IDs being synced
   
   // Errors
   connectorsError: string | null;
   itemsError: string | null;
   accountsError: string | null;
   transactionsError: string | null;
+  syncErrors: SyncError[];
   
   // Pagination
   transactionsPagination: {
@@ -399,6 +428,68 @@ export interface BankingStoreState {
     totalCount: number;
     totalPages: number;
   };
+}
+
+// Pluggy Category
+export interface PluggyCategory {
+  id: string;
+  description: string;
+  parent_id?: string;
+  parent_description?: string;
+  internal_category?: string;
+}
+
+// Pluggy Connect Types
+export interface ConnectTokenRequest {
+  item_id?: string;
+  client_user_id?: string;
+  webhook_url?: string;
+  update_mode?: 'add' | 'replace';
+  include_accounts?: string[];
+  options?: {
+    update_mode?: 'add' | 'replace';
+    webhook_url?: string;
+  };
+}
+
+export interface ConnectTokenResponse {
+  connect_token: string;
+  connect_url?: string;
+}
+
+export interface PluggyConnectOptions {
+  connectToken: string;
+  includeSandbox?: boolean;
+  connectorTypes?: string[];
+  connectorIds?: number[];
+  products?: string[];
+  clientUserId?: string;
+  webhookUrl?: string;
+  language?: 'en' | 'es' | 'pt';
+  updateMode?: 'add' | 'replace';
+  skipSelectConnector?: boolean;
+  skipSuccessScreen?: boolean;
+  onSuccess: (itemData: PluggyConnectSuccessData) => void;
+  onError: (error: PluggyConnectError) => void;
+  onOpen?: () => void;
+  onClose?: () => void;
+  onEvent?: (eventName: string, metadata: any) => void;
+}
+
+export interface PluggyConnectSuccessData {
+  item: {
+    id: string;
+    connector: {
+      id: number;
+      name: string;
+    };
+  };
+}
+
+export interface PluggyConnectError {
+  type: string;
+  code?: string;
+  message: string;
 }
 
 interface OAuthConnector extends PluggyConnector {

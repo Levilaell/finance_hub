@@ -6,7 +6,8 @@ class NotificationsService {
     page?: number;
     page_size?: number;
     is_read?: boolean;
-    category?: Notification["category"];
+    notification_type?: Notification["notification_type"];
+    priority?: Notification["priority"];
   }): Promise<PaginatedResponse<Notification>> {
     return apiClient.get<PaginatedResponse<Notification>>("/api/notifications/", params);
   }
