@@ -281,7 +281,7 @@ class BankAccountViewSet(viewsets.ReadOnlyModelViewSet):
         return BankAccount.objects.filter(
             company=self.request.user.company,
             is_active=True
-        ).select_related('item__connector').order_by('-created')
+        ).select_related('item__connector').order_by('-created_at')
     
     @action(detail=True, methods=['post'])
     def sync(self, request, pk=None):
@@ -419,7 +419,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                     Q(notes__icontains=search_term)
                 )
         
-        return queryset.order_by('-date', '-created')
+        return queryset.order_by('-date', '-created_at')
     
     def create(self, request, *args, **kwargs):
         """Prevent manual transaction creation"""

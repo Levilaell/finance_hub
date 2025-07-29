@@ -270,7 +270,6 @@ class RegisterSerializer(serializers.ModelSerializer):
                     price_yearly=490,
                     max_transactions=500,
                     max_bank_accounts=2,
-                    max_users=3,
                     has_ai_categorization=False,
                     enable_ai_insights=False,
                     enable_ai_reports=False,

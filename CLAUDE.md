@@ -4,164 +4,211 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Finance Hub (CaixaHub) is a financial management SaaS platform with Django backend and Next.js frontend. The platform integrates with financial institutions through Pluggy API for Open Banking connectivity.
+Finance Hub (CaixaHub) is a financial management SaaS platform with a Django REST API backend and Next.js frontend. The platform integrates with Pluggy API for Open Banking connections, allowing users to sync bank accounts, categorize transactions, generate reports, and manage subscriptions.
 
-## Key Architecture
+## Development Commands
 
 ### Backend (Django)
-- **Framework**: Django 5.0 with Django REST Framework
-- **Database**: PostgreSQL (production), SQLite (testing)
-- **Task Queue**: Celery with Redis
-- **Real-time**: Django Channels with Redis
-- **Authentication**: JWT via djangorestframework-simplejwt
-- **Payment Processing**: Stripe and MercadoPago
-- **Banking Integration**: Pluggy API for Open Banking
 
-### Frontend (Next.js)
-- **Framework**: Next.js 14 with TypeScript
-- **State Management**: Zustand
-- **Data Fetching**: React Query (TanStack Query)
-- **UI Components**: Radix UI with Tailwind CSS
-- **Banking Connect**: Pluggy Connect SDK
-- **Form Handling**: React Hook Form with Zod validation
-
-## Common Development Commands
-
-### Backend
 ```bash
-# Run development server
+# Install dependencies
 cd backend
-python manage.py runserver
+pip install -r requirements.txt
 
-# Run with specific settings
-python manage.py runserver --settings=core.settings.development
-
-# Run migrations
+# Database migrations
 python manage.py migrate
-
-# Create migrations
-python manage.py makemigrations
-
-# Run tests
-python manage.py test
-
-# Run Celery worker
-celery -A core worker -l info
-
-# Run Celery beat (scheduler)
-celery -A core beat -l info
 
 # Create superuser
 python manage.py createsuperuser
 
-# Sync Pluggy connectors
-python manage.py sync_pluggy_connectors
+# Run development server
+python manage.py runserver
 
-# Seed subscription plans
-python manage.py seed_plans
+# Run tests
+python manage.py test
+
+# Run specific app tests
+python manage.py test apps.banking.tests
+python manage.py test apps.authentication.tests
+
+# Run Celery worker (for async tasks)
+celery -A core worker -l info
+
+# Run Celery beat (for scheduled tasks)
+celery -A core beat -l info
+
+# Static files collection (production)
+python manage.py collectstatic --noinput
 ```
 
-### Frontend
+### Frontend (Next.js)
+
 ```bash
-# Run development server
+# Install dependencies
 cd frontend
+npm install
+
+# Run development server
 npm run dev
 
 # Build for production
 npm run build
 
+# Start production server
+npm start
+
 # Run tests
 npm test
+
+# Run tests in watch mode
+npm run test:watch
 
 # Run tests with coverage
 npm run test:coverage
 
-# Lint code
+# Run linter
 npm run lint
 ```
 
 ### Docker
+
 ```bash
 # Start all services
-docker-compose up
-
-# Start in background
 docker-compose up -d
 
-# Start with development profile (includes pgAdmin, Mailhog)
-docker-compose --profile dev up
+# Start with development profile (includes pgAdmin and Mailhog)
+docker-compose --profile dev up -d
 
-# Rebuild containers
-docker-compose build
+# View logs
+docker-compose logs -f backend
+docker-compose logs -f frontend
 
-# Run migrations in container
+# Execute Django commands in container
 docker-compose exec backend python manage.py migrate
+docker-compose exec backend python manage.py createsuperuser
 ```
 
-## Project Structure
+## Architecture
 
-### Key Backend Apps
-- **authentication**: Custom user model, JWT auth, email verification
-- **companies**: Multi-tenant companies, subscription plans, usage tracking
-- **banking**: Pluggy integration, bank accounts, transactions
-- **categories**: Transaction categorization with AI assistance
-- **reports**: Financial reports, AI insights
-- **notifications**: WebSocket notifications, email service
-- **payments**: Stripe/MercadoPago webhooks, subscription management
+### Backend Structure
+
+The Django backend follows a modular app structure:
+
+- **apps/authentication**: Custom user model, JWT authentication, email verification
+- **apps/banking**: Pluggy API integration for Open Banking, account/transaction sync
+- **apps/categories**: Transaction categorization system
+- **apps/companies**: Multi-tenant company management, subscription billing
+- **apps/reports**: Financial reports and AI-powered insights (OpenAI integration)
+- **apps/notifications**: WebSocket notifications via Django Channels
+- **apps/payments**: Stripe and MercadoPago payment processing
+
+Key integrations:
+- **Pluggy API**: Open Banking connections (OAuth flow, webhook processing)
+- **Stripe**: Subscription billing and payment processing
+- **OpenAI**: AI-powered financial insights and report generation
+- **Celery**: Async task processing (bank sync, report generation)
+- **Redis**: Caching and Celery broker
+- **PostgreSQL**: Primary database
 
 ### Frontend Structure
-- **app/(auth)**: Authentication pages (login, register, forgot password)
-- **app/(dashboard)**: Main application pages
-- **components/banking**: Banking-specific components (Pluggy Connect)
-- **services**: API client services for each backend app
-- **store**: Zustand stores for auth and banking state
-- **hooks**: Custom hooks including Pluggy Connect integration
 
-## Pluggy Integration Points
+Next.js 14 app with App Router:
 
-The banking integration uses Pluggy API v2:
-- **PluggyConnector**: Cached bank connector information
-- **PluggyItem**: User's bank connection
-- **BankAccount**: Individual bank accounts
-- **Transaction**: Financial transactions with categorization
+- **app/(auth)**: Authentication pages (login, register, password reset)
+- **app/(dashboard)**: Protected dashboard pages
+- **components**: Reusable UI components using shadcn/ui
+- **hooks**: Custom React hooks for data fetching and state management
+- **services**: API client services for backend communication
+- **store**: Zustand stores for global state management
 
-Key Pluggy workflows:
-1. User connects bank via Pluggy Connect SDK
-2. Backend creates PluggyItem and syncs accounts
-3. Celery tasks periodically sync transactions
-4. Webhooks handle real-time updates
+Key libraries:
+- **React Query (TanStack Query)**: Server state management and caching
+- **Zustand**: Client state management
+- **shadcn/ui**: Component library built on Radix UI
+- **React Hook Form + Zod**: Form handling and validation
+- **Pluggy Connect SDK**: Bank connection widget integration
+
+## Critical Patterns
+
+### Authentication Flow
+- JWT tokens stored in httpOnly cookies (backend) and localStorage (frontend)
+- Access token lifetime: 60 minutes, Refresh token: 7 days
+- Automatic token refresh on 401 responses
+- Email verification required for new accounts
+
+### Bank Connection Flow
+1. Frontend requests Connect Token from backend
+2. Backend generates token via Pluggy API
+3. Frontend opens Pluggy Connect widget
+4. User authenticates with bank (OAuth or credentials)
+5. Widget returns itemId to frontend
+6. Frontend creates BankConnection via backend API
+7. Backend starts async sync task via Celery
+8. Webhook notifications trigger real-time updates
+
+### Multi-tenancy
+- Company-based isolation using Django's auth system
+- Users can belong to multiple companies
+- All queries filtered by user's active company
+- Subscription limits enforced at company level
+
+### API Patterns
+- RESTful endpoints with consistent naming
+- Django REST Framework with JWT authentication
+- Pagination on list endpoints (default 20 items)
+- Throttling configured per endpoint type
+- Custom exception handler for consistent error responses
 
 ## Environment Variables
 
-Backend requires:
-- `DATABASE_URL`: PostgreSQL connection
-- `REDIS_URL`: Redis connection
-- `SECRET_KEY`: Django secret
-- `PLUGGY_CLIENT_ID`, `PLUGGY_CLIENT_SECRET`: Pluggy API credentials
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`: Stripe API
-- `OPENAI_API_KEY`: For AI features
+Backend (.env):
+```
+DJANGO_SETTINGS_MODULE=core.settings.development
+SECRET_KEY=your-secret-key
+DATABASE_URL=postgresql://user:pass@localhost/dbname
+REDIS_URL=redis://localhost:6379/0
+PLUGGY_CLIENT_ID=your-pluggy-id
+PLUGGY_CLIENT_SECRET=your-pluggy-secret
+PLUGGY_WEBHOOK_SECRET=your-webhook-secret
+STRIPE_SECRET_KEY=your-stripe-key
+STRIPE_WEBHOOK_SECRET=your-stripe-webhook
+OPENAI_API_KEY=your-openai-key
+```
 
-Frontend requires:
-- `NEXT_PUBLIC_API_URL`: Backend API URL
-- `NEXT_PUBLIC_PLUGGY_CLIENT_ID`: Pluggy client ID for Connect SDK
+Frontend (.env.local):
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_PLUGGY_CONNECT_URL=https://connect.pluggy.ai
+```
 
 ## Testing Approach
 
-Backend uses Django's test framework:
-- Unit tests in each app's `tests/` directory
-- Test settings in `core/settings/test.py`
-- In-memory SQLite for fast tests
+### Backend
+- Unit tests for models and serializers
+- Integration tests for API endpoints
+- Mock external APIs (Pluggy, Stripe, OpenAI)
+- Use Django's TestCase and APITestCase
 
-Frontend uses Jest with React Testing Library:
-- Test files in `__tests__/` directory
-- Component tests with mocked dependencies
-- Coverage reports via `npm run test:coverage`
+### Frontend
+- Jest + React Testing Library for component tests
+- Mock API responses for service tests
+- Test user interactions and state changes
+- Coverage targets: 80% for critical paths
 
-## Important Patterns
+## Common Development Tasks
 
-1. **Multi-tenancy**: All models filtered by company
-2. **Subscription Limits**: Check limits before operations via `companies.middleware`
-3. **Async Tasks**: Heavy operations use Celery tasks
-4. **Error Handling**: Custom exception handler in `core.error_handlers`
-5. **API Throttling**: Rate limits configured per endpoint type
-6. **Banking Sync**: Periodic Celery tasks update account balances and transactions
+### Adding a New Bank Connection
+1. Use management command to test Pluggy auth: `python manage.py test_pluggy_auth`
+2. Sync connectors: `python manage.py sync_pluggy_connectors`
+3. Test webhook locally using ngrok or similar
+
+### Debugging Subscription Issues
+1. Check user's company subscription: `python manage.py check_user_companies <email>`
+2. View usage counters: `python manage.py check_usage_api`
+3. Fix counter issues: `python manage.py fix_all_counters`
+
+### Performance Monitoring
+- Django Debug Toolbar available in development
+- Sentry integration for error tracking
+- Custom logging configuration in core/settings/logging.py
+- Separate log files: django.log, banking.log, pluggy.log, errors.log

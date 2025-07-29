@@ -18,9 +18,7 @@ export const API_ENDPOINTS = {
   CONNECTORS: '/api/banking/connectors/',
   ITEMS: '/api/banking/items/',
   CONNECT_TOKEN: '/api/banking/connect-token/',
-  
-  // Categories
-  CATEGORIES: '/api/categories/',
+  CATEGORIES: '/api/banking/categories/',
   
   // Companies
   COMPANIES: '/api/companies/',

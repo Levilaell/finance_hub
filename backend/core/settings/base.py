@@ -37,7 +37,6 @@ LOCAL_APPS = [
     'apps.authentication',
     'apps.companies',
     'apps.banking',
-    'apps.categories',
     'apps.reports',
     'apps.notifications',
 ]
