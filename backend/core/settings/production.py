@@ -140,6 +140,10 @@ PLUGGY_CLIENT_SECRET = config('PLUGGY_CLIENT_SECRET', default='')
 PLUGGY_USE_SANDBOX = config('PLUGGY_USE_SANDBOX', default=False, cast=bool)
 PLUGGY_CONNECT_URL = config('PLUGGY_CONNECT_URL', default='https://connect.pluggy.ai')
 
+# Webhook settings
+PLUGGY_WEBHOOK_SECRET = config('PLUGGY_WEBHOOK_SECRET', default='')
+PLUGGY_WEBHOOK_URL = config('PLUGGY_WEBHOOK_URL', default='')
+
 # Sentry
 if SENTRY_AVAILABLE and config('SENTRY_DSN', default=''):
     sentry_sdk.init(

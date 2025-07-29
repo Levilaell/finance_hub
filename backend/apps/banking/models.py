@@ -110,6 +110,18 @@ class PluggyItem(models.Model):
     # User tracking
     client_user_id = models.CharField(_('client user ID'), max_length=100, blank=True)
     
+    # Webhook configuration
+    webhook_url = models.URLField(_('webhook URL'), blank=True)
+    
+    # Scheduling
+    next_auto_sync_at = models.DateTimeField(_('next auto sync at'), null=True, blank=True)
+    
+    # Products enabled for this item
+    products = models.JSONField(_('products'), default=list, blank=True)  # ['ACCOUNTS', 'TRANSACTIONS', etc]
+    
+    # MFA parameter for waiting user input
+    parameter = models.JSONField(_('parameter'), default=dict, blank=True)  # For MFA responses
+    
     # Status tracking
     status = models.CharField(
         _('status'), 
@@ -212,8 +224,12 @@ class BankAccount(models.Model):
     
     # Balance info
     balance = models.DecimalField(_('balance'), max_digits=15, decimal_places=2, default=Decimal('0.00'))
+    balance_in_account_currency = models.DecimalField(_('balance in account currency'), max_digits=15, decimal_places=2, null=True, blank=True)
     balance_date = models.DateTimeField(_('balance date'), blank=True, null=True)
     currency_code = models.CharField(_('currency code'), max_length=3, default='BRL')
+    
+    # Investment specific fields
+    investment_status = models.CharField(_('investment status'), max_length=50, blank=True)
     
     # Bank specific data (for BANK type)
     bank_data = models.JSONField(_('bank data'), default=dict, blank=True, null=True)
@@ -329,10 +345,17 @@ class Transaction(models.Model):
     status = models.CharField(_('status'), max_length=10, choices=TRANSACTION_STATUS_CHOICES, default='POSTED')
     
     description = models.CharField(_('description'), max_length=500)
+    description_raw = models.TextField(_('description raw'), blank=True)  # Raw description from API
     amount = models.DecimalField(_('amount'), max_digits=15, decimal_places=2)
+    amount_in_account_currency = models.DecimalField(_('amount in account currency'), max_digits=15, decimal_places=2, null=True, blank=True)
+    balance = models.DecimalField(_('transaction balance'), max_digits=15, decimal_places=2, null=True, blank=True)  # Account balance after transaction
     currency_code = models.CharField(_('currency code'), max_length=3, default='BRL')
     
     date = models.DateTimeField(_('transaction date'))
+    
+    # Provider information
+    provider_code = models.CharField(_('provider code'), max_length=50, blank=True)
+    provider_id = models.CharField(_('provider ID'), max_length=100, blank=True)
     
     # Merchant info
     merchant = models.JSONField(_('merchant'), default=dict, blank=True)
@@ -499,18 +522,36 @@ class ItemWebhook(models.Model):
     Track webhook events for items
     """
     EVENT_TYPE_CHOICES = [
+        # Data Events
         ('item.created', 'Item Created'),
         ('item.updated', 'Item Updated'),
         ('item.error', 'Item Error'),
         ('item.deleted', 'Item Deleted'),
         ('item.login_succeeded', 'Login Succeeded'),
         ('item.waiting_user_input', 'Waiting User Input'),
+        ('connector.status_updated', 'Connector Status Updated'),
         ('transactions.created', 'Transactions Created'),
         ('transactions.updated', 'Transactions Updated'),
         ('transactions.deleted', 'Transactions Deleted'),
         ('consent.created', 'Consent Created'),
         ('consent.updated', 'Consent Updated'),
         ('consent.revoked', 'Consent Revoked'),
+        
+        # Payment Events (if using Pluggy Payments)
+        ('payment_intent.created', 'Payment Intent Created'),
+        ('payment_intent.completed', 'Payment Intent Completed'),
+        ('payment_intent.waiting_payer_authorization', 'Payment Intent Waiting Payer Authorization'),
+        ('payment_intent.error', 'Payment Intent Error'),
+        ('scheduled_payment.created', 'Scheduled Payment Created'),
+        ('scheduled_payment.completed', 'Scheduled Payment Completed'),
+        ('scheduled_payment.error', 'Scheduled Payment Error'),
+        ('scheduled_payment.canceled', 'Scheduled Payment Canceled'),
+        ('payment_refund.completed', 'Payment Refund Completed'),
+        ('payment_refund.error', 'Payment Refund Error'),
+        ('automatic_pix_payment.created', 'Automatic PIX Payment Created'),
+        ('automatic_pix_payment.completed', 'Automatic PIX Payment Completed'),
+        ('automatic_pix_payment.error', 'Automatic PIX Payment Error'),
+        ('automatic_pix_payment.canceled', 'Automatic PIX Payment Canceled'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

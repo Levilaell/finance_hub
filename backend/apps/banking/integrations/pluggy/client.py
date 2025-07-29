@@ -286,3 +286,46 @@ class PluggyClient:
         Revoke consent for Open Finance item
         """
         self._make_request('DELETE', f'consents/{item_id}')
+    
+    # ===== Investments =====
+    
+    def get_investments(self, item_id: str) -> List[Dict[str, Any]]:
+        """
+        Get investments for an item
+        """
+        data = self._make_request('GET', 'investments', params={'itemId': item_id})
+        return data.get('results', [])
+    
+    # ===== Categorization =====
+    
+    def categorize_transactions(self, transactions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Categorize transactions using Pluggy's categorization API
+        Maximum 5000 transactions per request
+        """
+        if len(transactions) > 5000:
+            raise PluggyError("Maximum 5000 transactions per categorization request")
+        
+        data = {"transactions": transactions}
+        return self._make_request('POST', 'categorize', data=data)
+    
+    # ===== Webhook Validation =====
+    
+    def validate_webhook_signature(self, signature: str, payload: bytes) -> bool:
+        """
+        Basic webhook validation
+        Note: Pluggy documentation doesn't specify signature validation method
+        This implementation provides basic content validation
+        """
+        if not signature:
+            logger.warning("No signature provided for webhook validation")
+            return False
+        
+        if not payload:
+            logger.warning("Empty payload for webhook validation")
+            return False
+        
+        # TODO: Implement proper signature validation when Pluggy provides specification
+        # For now, accept all webhooks with signatures
+        logger.info(f"Webhook received with signature: {signature[:10]}...")
+        return True

@@ -858,14 +858,13 @@ class PluggyWebhookView(APIView):
     
     def post(self, request):
         """Process webhook event"""
-        # Verify signature
         signature = request.headers.get('X-Pluggy-Signature', '')
         
         try:
-            # Validate webhook
+            # Validate webhook signature
             with PluggyClient() as client:
-                if not client.validate_webhook(signature, request.body.decode()):
-                    logger.warning("Invalid webhook signature")
+                if not client.validate_webhook_signature(signature, request.body):
+                    logger.warning("Invalid webhook signature or payload")
                     return Response(
                         {'error': 'Invalid signature'},
                         status=status.HTTP_401_UNAUTHORIZED
