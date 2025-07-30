@@ -345,7 +345,7 @@ class Transaction(models.Model):
     status = models.CharField(_('status'), max_length=10, choices=TRANSACTION_STATUS_CHOICES, default='POSTED')
     
     description = models.CharField(_('description'), max_length=500)
-    description_raw = models.TextField(_('description raw'), blank=True)  # Raw description from API
+    description_raw = models.TextField(_('description raw'), blank=True, null=True)  # Raw description from API
     amount = models.DecimalField(_('amount'), max_digits=15, decimal_places=2)
     amount_in_account_currency = models.DecimalField(_('amount in account currency'), max_digits=15, decimal_places=2, null=True, blank=True)
     balance = models.DecimalField(_('transaction balance'), max_digits=15, decimal_places=2, null=True, blank=True)  # Account balance after transaction
@@ -358,10 +358,10 @@ class Transaction(models.Model):
     provider_id = models.CharField(_('provider ID'), max_length=100, blank=True)
     
     # Merchant info
-    merchant = models.JSONField(_('merchant'), default=dict, blank=True)
+    merchant = models.JSONField(_('merchant'), default=dict, blank=True, null=True)
     
     # Payment data (for Open Finance)
-    payment_data = models.JSONField(_('payment data'), default=dict, blank=True)
+    payment_data = models.JSONField(_('payment data'), default=dict, blank=True, null=True)
     
     # Category from Pluggy
     pluggy_category_id = models.CharField(_('Pluggy category ID'), max_length=100, blank=True)
@@ -381,11 +381,11 @@ class Transaction(models.Model):
     payment_method = models.CharField(_('payment method'), max_length=50, blank=True)
     
     # Credit card specific
-    credit_card_metadata = models.JSONField(_('credit card metadata'), default=dict, blank=True)
+    credit_card_metadata = models.JSONField(_('credit card metadata'), default=dict, blank=True, null=True)
     
     # User annotations
     notes = models.TextField(_('notes'), blank=True)
-    tags = models.JSONField(_('tags'), default=list)
+    tags = models.JSONField(_('tags'), default=list, blank=True, null=True)
     
     # Metadata
     metadata = models.JSONField(_('metadata'), default=dict, blank=True)

@@ -52,9 +52,22 @@ def sync_bank_account(self, item_id: str, account_id: Optional[str] = None):
             # Check if we can sync
             if item.status not in ['UPDATED', 'OUTDATED']:
                 logger.warning(f"Item {item.pluggy_item_id} not ready for sync: {item.status}")
+                
+                # If item is still processing, retry later
+                if item.status in ['LOGIN_IN_PROGRESS', 'UPDATING']:
+                    logger.info(f"Item {item.pluggy_item_id} is still processing, will retry")
+                    # Retry with exponential backoff
+                    raise self.retry(
+                        exc=Exception(f"Item still processing: {item.status}"),
+                        countdown=60 * (self.request.retries + 1),
+                        max_retries=5
+                    )
+                
+                # For error states, don't retry
                 return {
                     'success': False,
-                    'reason': f'Item status: {item.status}'
+                    'reason': f'Item status: {item.status}',
+                    'requires_reconnection': item.status in ['LOGIN_ERROR', 'INVALID_CREDENTIALS']
                 }
             
             # Get accounts to sync
@@ -78,11 +91,16 @@ def sync_bank_account(self, item_id: str, account_id: Optional[str] = None):
                 item.last_successful_update = timezone.now()
                 item.save()
             
+            # Calculate total transactions synced
+            total_transactions = sum(r.get('transactions_synced', 0) for r in sync_results if r['success'])
+            
             return {
                 'success': True,
                 'item_id': str(item.id),
                 'accounts_synced': len(sync_results),
-                'results': sync_results
+                'transactions_synced': total_transactions,
+                'results': sync_results,
+                'message': f'Synced {total_transactions} transactions from {len(sync_results)} accounts'
             }
             
     except PluggyItem.DoesNotExist:
@@ -145,6 +163,10 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
     """
     Sync transactions for an account
     """
+    logger.info(f"=== Starting transaction sync for account {account.pluggy_account_id} ===")
+    logger.info(f"Account: {account.display_name} (Type: {account.type})")
+    logger.info(f"Current balance: {account.balance}")
+    
     # Determine sync period
     last_transaction = account.transactions.order_by('-date').first()
     
@@ -177,6 +199,7 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
     
     while True:
         try:
+            logger.info(f"Fetching transactions page {page}...")
             result = client.get_transactions(
                 account.pluggy_account_id,
                 from_date=from_date_str,
@@ -184,7 +207,8 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
                 page=page
             )
             
-            logger.info(f"API response page {page}: {result.get('total', 0)} total transactions, {len(result.get('results', []))} in this page")
+            logger.info(f"API response page {page}: {result}")
+            logger.info(f"Total transactions: {result.get('total', 0)}, This page: {len(result.get('results', []))}")
             
             transactions = result.get('results', [])
             if not transactions:
@@ -238,24 +262,26 @@ def _process_transaction(account: BankAccount, trans_data: Dict):
         pluggy_transaction_id=trans_data['id'],
         defaults={
             'account': account,
+            'company': account.company,  # Add company field
             'type': trans_data['type'],
             'status': trans_data.get('status', 'POSTED'),
             'description': trans_data.get('description', '')[:500],
+            'description_raw': trans_data.get('descriptionRaw') or '',  # Use existing field
             'amount': Decimal(str(trans_data.get('amount', 0))),
+            'amount_in_account_currency': Decimal(str(trans_data.get('amountInAccountCurrency', 0))) if trans_data.get('amountInAccountCurrency') else None,
+            'balance': Decimal(str(trans_data.get('balance', 0))) if trans_data.get('balance') else None,
             'currency_code': trans_data.get('currencyCode', 'BRL'),
             'date': trans_date,
-            'merchant': merchant,
-            'payment_data': trans_data.get('paymentData', {}),
-            'pluggy_category_id': trans_data.get('category', ''),
-            'pluggy_category_description': trans_data.get('categoryDescription', ''),
+            'provider_code': trans_data.get('providerCode') or '',
+            'provider_id': trans_data.get('providerId') or '',
+            'merchant': merchant if merchant else None,  # Handle None case
+            'payment_data': trans_data.get('paymentData') or {},
+            'pluggy_category_id': trans_data.get('categoryId') or '',  # Use categoryId
+            'pluggy_category_description': trans_data.get('category') or '',  # Use category
             'category': category,
-            'operation_type': trans_data.get('operationType', ''),
-            'payment_method': trans_data.get('paymentMethod', ''),
-            'credit_card_metadata': trans_data.get('creditCardMetadata', {}),
-            'metadata': {
-                'provider_code': trans_data.get('providerCode', ''),
-                'account_id': trans_data.get('accountId', '')
-            },
+            'credit_card_metadata': trans_data.get('creditCardMetadata') or {},
+            'notes': '',  # Initialize empty
+            'tags': [],  # Initialize empty
             'pluggy_created_at': trans_data.get('createdAt'),
             'pluggy_updated_at': trans_data.get('updatedAt')
         }

@@ -59,32 +59,50 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: celery -A core worker -l info
+    command: celery -A core worker -l info -Q celery,banking,billing,reports,notifications --concurrency=4
     volumes:
       - ./backend:/app
+      - ./backend/logs:/app/logs
     environment:
       - DATABASE_URL=postgresql://finance_user:finance_password@db:5432/finance_db
       - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - ./backend/.env
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A core inspect ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Celery Beat (Scheduler)
   celery_beat:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: celery -A core beat -l info
+    command: celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     volumes:
       - ./backend:/app
+      - ./backend/logs:/app/logs
     environment:
       - DATABASE_URL=postgresql://finance_user:finance_password@db:5432/finance_db
       - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      celery_worker:
+        condition: service_started
     env_file:
       - ./backend/.env
 

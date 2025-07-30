@@ -888,3 +888,86 @@ class PluggyWebhookView(APIView):
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class CeleryHealthCheckView(APIView):
+    """
+    Check Celery worker and Redis health status
+    """
+    permission_classes = []  # Public endpoint
+    
+    def get(self, request):
+        """Check Celery and Redis status"""
+        from celery import current_app
+        from django.core.cache import cache
+        from django.conf import settings
+        import redis
+        
+        health_status = {
+            'celery': {
+                'status': 'unknown',
+                'active_queues': [],
+                'registered_tasks': 0,
+                'active_workers': 0
+            },
+            'redis': {
+                'status': 'unknown',
+                'info': {}
+            },
+            'overall': 'unhealthy'
+        }
+        
+        # Check Redis
+        try:
+            r = redis.from_url(settings.REDIS_URL)
+            r.ping()
+            health_status['redis']['status'] = 'healthy'
+            info = r.info()
+            health_status['redis']['info'] = {
+                'version': info.get('redis_version'),
+                'connected_clients': info.get('connected_clients'),
+                'used_memory_human': info.get('used_memory_human'),
+                'uptime_in_days': info.get('uptime_in_days')
+            }
+        except Exception as e:
+            health_status['redis']['status'] = 'unhealthy'
+            health_status['redis']['error'] = str(e)
+        
+        # Check Celery
+        try:
+            # Get worker stats
+            stats = current_app.control.inspect().stats()
+            if stats:
+                health_status['celery']['status'] = 'healthy'
+                health_status['celery']['active_workers'] = len(stats)
+                
+                # Get active queues
+                active_queues = current_app.control.inspect().active_queues()
+                if active_queues:
+                    all_queues = set()
+                    for worker_queues in active_queues.values():
+                        for queue in worker_queues:
+                            all_queues.add(queue['name'])
+                    health_status['celery']['active_queues'] = list(all_queues)
+                
+                # Get registered tasks count
+                registered = current_app.control.inspect().registered()
+                if registered:
+                    total_tasks = sum(len(tasks) for tasks in registered.values())
+                    health_status['celery']['registered_tasks'] = total_tasks
+            else:
+                health_status['celery']['status'] = 'unhealthy'
+                health_status['celery']['error'] = 'No active workers found'
+        except Exception as e:
+            health_status['celery']['status'] = 'unhealthy'
+            health_status['celery']['error'] = str(e)
+        
+        # Overall status
+        if (health_status['celery']['status'] == 'healthy' and 
+            health_status['redis']['status'] == 'healthy'):
+            health_status['overall'] = 'healthy'
+        
+        # Return appropriate status code
+        status_code = 200 if health_status['overall'] == 'healthy' else 503
+        
+        return Response(health_status, status=status_code)

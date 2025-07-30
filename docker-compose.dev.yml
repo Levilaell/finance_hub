@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # Override backend for development
+  backend:
+    command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      - DEBUG=True
+      - CELERY_TASK_ALWAYS_EAGER=False
+    volumes:
+      - ./backend:/app
+      - ./backend/logs:/app/logs
+
+  # Celery Worker with auto-reload for development
+  celery_worker:
+    command: watchmedo auto-restart --directory=./ --pattern=*.py --recursive -- celery -A core worker -l debug -Q celery,banking,billing,reports,notifications --concurrency=2
+    environment:
+      - DEBUG=True
+      - CELERY_TASK_ALWAYS_EAGER=False
+    volumes:
+      - ./backend:/app
+      - ./backend/logs:/app/logs
+
+  # Frontend development server
+  frontend:
+    command: npm run dev
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+  # Flower - Celery monitoring tool
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A core flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      - DATABASE_URL=postgresql://finance_user:finance_password@db:5432/finance_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+      - celery_worker
+    env_file:
+      - ./backend/.env
+
+  # Remove nginx in development
+  nginx:
+    profiles:
+      - production

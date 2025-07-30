@@ -15,7 +15,8 @@ from .views import (
     PluggyCallbackView,
     AccountSyncView,
     DashboardView,
-    PluggyWebhookView
+    PluggyWebhookView,
+    CeleryHealthCheckView
 )
 
 app_name = 'banking'
@@ -45,6 +46,9 @@ urlpatterns = [
     
     # Webhooks
     path('webhooks/pluggy/', PluggyWebhookView.as_view(), name='pluggy-webhook'),
+    
+    # Health check
+    path('health/celery/', CeleryHealthCheckView.as_view(), name='celery-health'),
     
     # Legacy endpoints for compatibility
     path('pluggy/banks/', PluggyConnectorViewSet.as_view({'get': 'list'}), name='pluggy-banks'),

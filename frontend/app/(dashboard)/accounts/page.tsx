@@ -152,18 +152,34 @@ export default function AccountsPage() {
     setSyncError(null);
 
     try {
+      // Show initial toast
+      toast.info('Starting sync...', {
+        duration: 2000,
+        icon: <ArrowPathIcon className="h-4 w-4 animate-spin" />,
+      });
+
       const response = await syncAccount(accountId);
 
       if (response.success) {
-        const txCount = response.data?.sync_stats?.transactions_synced || 0;
-        
-        if (txCount > 0) {
-          toast.success(`Synced ${txCount} new transactions`);
-        } else {
-          toast.info('No new transactions found');
+        // Show estimated time if available
+        if (response.data?.estimated_time) {
+          toast.info(`Syncing transactions... Estimated time: ${response.data.estimated_time}`, {
+            duration: 5000,
+            icon: <ArrowPathIcon className="h-4 w-4 animate-spin" />,
+          });
         }
 
+        // Wait a bit for the sync to complete
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Fetch updated accounts
         await fetchAccounts();
+        
+        // Show success message
+        toast.success('Sync completed successfully!', {
+          description: 'Your transactions are now up to date.',
+          duration: 4000,
+        });
       } else {
         // Handle specific errors
         if (response.error_code === 'MFA_REQUIRED' || 
@@ -428,10 +444,22 @@ export default function AccountsPage() {
                     </div>
                   )}
 
+                  {/* Sync Status */}
+                  {isSyncing && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <div className="flex items-center gap-2">
+                        <ArrowPathIcon className="h-4 w-4 text-blue-600 animate-spin" />
+                        <p className="text-sm text-blue-800">
+                          Syncing transactions...
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Last Update */}
                   <p className="text-sm text-gray-500">
-                    {account.updated_at
-                      ? `Updated ${bankingService.formatDate(account.updated_at)}`
+                    {account.pluggy_updated_at
+                      ? `Last sync: ${bankingService.formatDate(account.pluggy_updated_at)}`
                       : 'Never synced'}
                   </p>
 
@@ -453,14 +481,14 @@ export default function AccountsPage() {
                         size="sm"
                         className="flex-1"
                         onClick={() => handleSyncAccount(account.id)}
-                        disabled={isSyncing}
+                        disabled={isSyncing || loadingAccounts}
                       >
                         <ArrowPathIcon
                           className={`h-4 w-4 mr-1 ${
                             isSyncing ? 'animate-spin' : ''
                           }`}
                         />
-                        {isSyncing ? 'Syncing...' : 'Sync'}
+                        {isSyncing ? 'Syncing...' : 'Sync Now'}
                       </Button>
                     )}
                     <Button
