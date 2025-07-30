@@ -10,6 +10,8 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from .managers import ActiveTransactionManager
+
 User = get_user_model()
 
 
@@ -401,6 +403,10 @@ class Transaction(models.Model):
     # Local timestamps
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    
+    # Managers
+    objects = models.Manager()  # Default manager
+    active = ActiveTransactionManager()  # Active transactions only
     
     class Meta:
         db_table = 'transactions'

@@ -377,9 +377,9 @@ class TransactionViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Get transactions with filters"""
-        # Base queryset
-        queryset = Transaction.objects.filter(
-            account__company=self.request.user.company
+        # Use active manager to exclude transactions from deleted or inactive accounts
+        queryset = Transaction.active.for_company(
+            self.request.user.company
         ).select_related(
             'account__item__connector',
             'category'
@@ -802,10 +802,8 @@ class DashboardView(APIView):
             total=Sum('balance')
         )['total'] or Decimal('0.00')
         
-        # Get transactions
-        all_transactions = Transaction.objects.filter(
-            account__company=company
-        )
+        # Get transactions - exclude from deleted or inactive accounts
+        all_transactions = Transaction.active.for_company(company)
         
         # Current month stats
         current_month_transactions = all_transactions.filter(
@@ -869,7 +867,7 @@ class DashboardView(APIView):
                     'image_url': account.item.connector.image_url
                 },
                 'transactions_count': transactions_count,
-                'last_update': account.pluggy_updated_at
+                'last_update': account.pluggy_updated_at.isoformat() if account.pluggy_updated_at else None
             })
         
         # Build response

@@ -252,7 +252,7 @@ class TransactionFilterSerializer(serializers.Serializer):
 
 class DashboardTransactionSerializer(serializers.ModelSerializer):
     """Serializer for dashboard transactions with legacy field names"""
-    transaction_date = serializers.DateField(source='date')
+    transaction_date = serializers.DateTimeField(source='date')
     transaction_type = serializers.SerializerMethodField()
     category_name = serializers.CharField(source='category.name', allow_null=True, read_only=True)
     category_icon = serializers.CharField(source='category.icon', allow_null=True, read_only=True)

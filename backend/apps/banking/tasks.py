@@ -9,6 +9,7 @@ from typing import Optional, List, Dict
 
 from celery import shared_task
 from django.db import transaction as db_transaction
+from django.db import IntegrityError
 from django.utils import timezone
 
 from .models import (
@@ -348,54 +349,100 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
 
 def _process_transaction(account: BankAccount, trans_data: Dict):
     """
-    Process single transaction
+    Process single transaction with duplicate prevention
     """
-    # Parse date
-    date_str = trans_data.get('date')
-    if date_str:
-        trans_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-    else:
-        trans_date = timezone.now()
-    
-    # Get category
-    category = None
-    if trans_data.get('category'):
-        category = _get_or_create_category(trans_data['category'])
-    
-    # Extract merchant
-    merchant = trans_data.get('merchant', {})
-    
-    # Create or update transaction
-    transaction, created = Transaction.objects.update_or_create(
-        pluggy_transaction_id=trans_data['id'],
-        defaults={
-            'account': account,
-            'company': account.company,  # Add company field
-            'type': trans_data['type'],
-            'status': trans_data.get('status', 'POSTED'),
-            'description': trans_data.get('description', '')[:500],
-            'description_raw': trans_data.get('descriptionRaw') or '',  # Use existing field
-            'amount': Decimal(str(trans_data.get('amount', 0))),
-            'amount_in_account_currency': Decimal(str(trans_data.get('amountInAccountCurrency', 0))) if trans_data.get('amountInAccountCurrency') else None,
-            'balance': Decimal(str(trans_data.get('balance', 0))) if trans_data.get('balance') else None,
-            'currency_code': trans_data.get('currencyCode', 'BRL'),
-            'date': trans_date,
-            'provider_code': trans_data.get('providerCode') or '',
-            'provider_id': trans_data.get('providerId') or '',
-            'merchant': merchant if merchant else None,  # Handle None case
-            'payment_data': trans_data.get('paymentData') or {},
-            'pluggy_category_id': trans_data.get('categoryId') or '',  # Use categoryId
-            'pluggy_category_description': trans_data.get('category') or '',  # Use category
-            'category': category,
-            'credit_card_metadata': trans_data.get('creditCardMetadata') or {},
-            'notes': '',  # Initialize empty
-            'tags': [],  # Initialize empty
-            'pluggy_created_at': trans_data.get('createdAt'),
-            'pluggy_updated_at': trans_data.get('updatedAt')
-        }
-    )
-    
-    return transaction, created
+    try:
+        # Parse date
+        date_str = trans_data.get('date')
+        if date_str:
+            trans_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        else:
+            trans_date = timezone.now()
+        
+        # Get category
+        category = None
+        if trans_data.get('category'):
+            category = _get_or_create_category(trans_data['category'])
+        
+        # Extract merchant
+        merchant = trans_data.get('merchant', {})
+        
+        # Use atomic transaction to prevent race conditions
+        with db_transaction.atomic():
+            # Try to get existing transaction first
+            try:
+                transaction = Transaction.objects.select_for_update().get(
+                    pluggy_transaction_id=trans_data['id']
+                )
+                created = False
+                
+                # Update existing transaction
+                transaction.account = account
+                transaction.company = account.company
+                transaction.type = trans_data['type']
+                transaction.status = trans_data.get('status', 'POSTED')
+                transaction.description = trans_data.get('description', '')[:500]
+                transaction.description_raw = trans_data.get('descriptionRaw') or ''
+                transaction.amount = Decimal(str(trans_data.get('amount', 0)))
+                transaction.amount_in_account_currency = Decimal(str(trans_data.get('amountInAccountCurrency', 0))) if trans_data.get('amountInAccountCurrency') else None
+                transaction.balance = Decimal(str(trans_data.get('balance', 0))) if trans_data.get('balance') else None
+                transaction.currency_code = trans_data.get('currencyCode', 'BRL')
+                transaction.date = trans_date
+                transaction.provider_code = trans_data.get('providerCode') or ''
+                transaction.provider_id = trans_data.get('providerId') or ''
+                transaction.merchant = merchant if merchant else None
+                transaction.payment_data = trans_data.get('paymentData') or {}
+                transaction.pluggy_category_id = trans_data.get('categoryId') or ''
+                transaction.pluggy_category_description = trans_data.get('category') or ''
+                transaction.category = category
+                transaction.credit_card_metadata = trans_data.get('creditCardMetadata') or {}
+                transaction.pluggy_created_at = trans_data.get('createdAt')
+                transaction.pluggy_updated_at = trans_data.get('updatedAt')
+                transaction.save()
+                
+            except Transaction.DoesNotExist:
+                # Create new transaction
+                transaction = Transaction.objects.create(
+                    pluggy_transaction_id=trans_data['id'],
+                    account=account,
+                    company=account.company,
+                    type=trans_data['type'],
+                    status=trans_data.get('status', 'POSTED'),
+                    description=trans_data.get('description', '')[:500],
+                    description_raw=trans_data.get('descriptionRaw') or '',
+                    amount=Decimal(str(trans_data.get('amount', 0))),
+                    amount_in_account_currency=Decimal(str(trans_data.get('amountInAccountCurrency', 0))) if trans_data.get('amountInAccountCurrency') else None,
+                    balance=Decimal(str(trans_data.get('balance', 0))) if trans_data.get('balance') else None,
+                    currency_code=trans_data.get('currencyCode', 'BRL'),
+                    date=trans_date,
+                    provider_code=trans_data.get('providerCode') or '',
+                    provider_id=trans_data.get('providerId') or '',
+                    merchant=merchant if merchant else None,
+                    payment_data=trans_data.get('paymentData') or {},
+                    pluggy_category_id=trans_data.get('categoryId') or '',
+                    pluggy_category_description=trans_data.get('category') or '',
+                    category=category,
+                    credit_card_metadata=trans_data.get('creditCardMetadata') or {},
+                    notes='',
+                    tags=[],
+                    pluggy_created_at=trans_data.get('createdAt'),
+                    pluggy_updated_at=trans_data.get('updatedAt')
+                )
+                created = True
+        
+        return transaction, created
+        
+    except IntegrityError as e:
+        # Handle race condition where another process created the transaction
+        logger.warning(f"IntegrityError for transaction {trans_data['id']}: {e}")
+        
+        # Try to get the existing transaction
+        try:
+            transaction = Transaction.objects.get(pluggy_transaction_id=trans_data['id'])
+            return transaction, False
+        except Transaction.DoesNotExist:
+            # Re-raise if we still can't find it
+            raise
 
 
 def _get_or_create_category(category_str: str) -> Optional[TransactionCategory]:
