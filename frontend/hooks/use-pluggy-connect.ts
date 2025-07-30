@@ -5,7 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { bankingService } from '@/services/banking.service';
 import { BankingErrorHandler } from '@/utils/banking-errors';
-import type { PluggyConnectConfig, CreateConnectionForm } from '@/types/banking.types';
+import type { ConnectTokenRequest } from '@/types/banking.types';
 
 declare global {
   interface Window {
@@ -27,7 +27,7 @@ export function usePluggyConnect(options?: UsePluggyConnectOptions) {
 
   // Create connect token
   const createToken = useMutation({
-    mutationFn: (params?: CreateConnectionForm) => bankingService.createConnectToken(params),
+    mutationFn: (params?: ConnectTokenRequest) => bankingService.createConnectToken(params),
     onError: (error: any) => {
       toast.error(error.response?.data?.error || 'Erro ao criar token de conexão');
     }
@@ -77,7 +77,7 @@ export function usePluggyConnect(options?: UsePluggyConnectOptions) {
   }, []);
 
   // Open Pluggy Connect
-  const openConnect = useCallback(async (params?: CreateConnectionForm) => {
+  const openConnect = useCallback(async (params?: ConnectTokenRequest) => {
     if (!isSDKLoaded || !window.PluggyConnect) {
       toast.error('SDK do Pluggy ainda está carregando. Por favor, aguarde.');
       return;
@@ -100,12 +100,12 @@ export function usePluggyConnect(options?: UsePluggyConnectOptions) {
       }
       
       // Configure Pluggy Connect
-      const config: PluggyConnectConfig = {
+      const config: any = {
         connectToken: tokenResponse.data.connect_token,
         includeSandbox: false, // Always use production connectors
         language: 'pt',
         theme: 'light',
-        onSuccess: async (data) => {
+        onSuccess: async (data: any) => {
           console.log('Pluggy Connect success:', data);
           const itemId = data.item?.id || data.itemId;
           
@@ -141,7 +141,7 @@ export function usePluggyConnect(options?: UsePluggyConnectOptions) {
             }
           }
         },
-        onError: (error) => {
+        onError: (error: any) => {
           console.error('Pluggy Connect error:', error);
           
           // Handle specific Pluggy errors
@@ -166,7 +166,7 @@ export function usePluggyConnect(options?: UsePluggyConnectOptions) {
             setPluggyConnect(null);
           }
         },
-        onEvent: (event, data) => {
+        onEvent: (event: any, data: any) => {
           console.log('Pluggy Connect event:', event, data);
           
           // Track important events
@@ -218,7 +218,7 @@ export function usePluggyConnect(options?: UsePluggyConnectOptions) {
 
   // Update existing connection
   const updateConnection = useCallback(async (itemId: string) => {
-    await openConnect({ update_item_id: itemId });
+    await openConnect({ item_id: itemId });
   }, [openConnect]);
 
   // Close Pluggy Connect

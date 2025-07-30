@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
     """
 
     dependencies = [
-        ('banking', '0019_auto_20240101_0000'),  # Update this to your latest migration
+        ('banking', '0004_alter_transaction_fields'),
     ]
 
     operations = [

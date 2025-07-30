@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { bankingService } from '@/services/banking.service';
 import { usePluggyConnect } from '@/hooks/use-pluggy-connect';
-import type { BankProvider as Institution } from '@/types/banking.types';
+import type { PluggyConnector as Institution } from '@/types/banking.types';
 import { cn } from '@/lib/utils';
 
 interface ConnectBankDialogProps {
@@ -34,10 +34,15 @@ export function ConnectBankDialog({
   const [selectedInstitution, setSelectedInstitution] = useState<Institution | null>(null);
 
   const { data: institutions, isLoading } = useQuery({
-    queryKey: ['institutions', search],
+    queryKey: ['connectors', search],
     queryFn: async () => {
-      const response = await bankingService.getInstitutions({ search });
-      return response.results;
+      const response = await bankingService.getConnectors();
+      if (search) {
+        return response.filter(connector => 
+          connector.name.toLowerCase().includes(search.toLowerCase())
+        );
+      }
+      return response;
     },
     enabled: open,
   });
@@ -54,7 +59,7 @@ export function ConnectBankDialog({
 
   const handleConnect = () => {
     if (selectedInstitution) {
-      openConnect({ institution_id: selectedInstitution.pluggy_connector_id });
+      openConnect();
     }
   };
 
@@ -106,11 +111,11 @@ export function ConnectBankDialog({
               <div className="grid grid-cols-2 gap-3">
                 {filteredInstitutions.map((institution) => (
                   <button
-                    key={institution.id}
+                    key={institution.pluggy_id}
                     onClick={() => setSelectedInstitution(institution)}
                     className={cn(
                       "flex items-center gap-3 p-3 rounded-lg border transition-all hover:shadow-sm",
-                      selectedInstitution?.id === institution.id
+                      selectedInstitution?.pluggy_id === institution.pluggy_id
                         ? "border-primary bg-primary/5"
                         : "border-gray-200 hover:border-gray-300"
                     )}

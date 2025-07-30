@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('banking', '0020_pluggy_webhook_validation'),
+        ('banking', '0005_pluggy_webhook_validation'),
     ]
 
     operations = [

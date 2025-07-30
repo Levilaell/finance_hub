@@ -5,13 +5,24 @@ import { create } from 'zustand';
 import { devtools, subscribeWithSelector } from 'zustand/middleware';
 import { bankingService } from '@/services/banking.service';
 import { BankingCache } from '@/utils/banking-cache';
-import type { BankAccount, AccountSummary } from '@/types/banking.types';
+import type { BankAccount } from '@/types/banking.types';
+
+interface AccountsSummaryData {
+  total_balance: number;
+  total_accounts: number;
+  by_type: Array<{
+    type: string;
+    count: number;
+    total_balance: number;
+  }>;
+  last_update?: string;
+}
 
 interface AccountsState {
   // Data
   accounts: BankAccount[];
   selectedAccountId: string | null;
-  summary: AccountSummary | null;
+  summary: AccountsSummaryData | null;
 
   // Loading states
   isLoading: boolean;
@@ -74,7 +85,7 @@ export const useAccountsStore = create<AccountsState>()(
         
         // Check cache first
         if (!forceRefresh) {
-          const cached = BankingCache.get<AccountSummary>(cacheKey);
+          const cached = BankingCache.get<AccountsSummaryData>(cacheKey);
           if (cached) {
             set({ summary: cached });
             return;
@@ -113,8 +124,6 @@ export const useAccountsStore = create<AccountsState>()(
             // Clear specific cache entries
             BankingCache.remove(BankingCache.createKey('transactions', accountId));
           }
-          
-          return response;
         } finally {
           // Clear syncing state
           set((state) => {

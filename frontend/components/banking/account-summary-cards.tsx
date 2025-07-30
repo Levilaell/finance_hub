@@ -3,10 +3,19 @@
 import { CreditCard, Wallet, TrendingUp, PiggyBank } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { AccountSummary } from '@/types/banking.types';
+interface BankingSummary {
+  total_balance: number;
+  total_accounts: number;
+  by_type: Array<{
+    type: string;
+    count: number;
+    total_balance: number;
+  }>;
+  last_update?: string;
+}
 
 interface AccountSummaryCardsProps {
-  summary: AccountSummary | undefined;
+  summary: BankingSummary | undefined;
   isLoading: boolean;
 }
 
@@ -20,29 +29,28 @@ export function AccountSummaryCards({ summary, isLoading }: AccountSummaryCardsP
 
   const cards = [
     {
-      title: 'Saldo em Contas',
-      value: summary?.bank_accounts.total_balance || 0,
+      title: 'Saldo Total',
+      value: summary?.total_balance || 0,
       icon: Wallet,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
-      description: `${summary?.bank_accounts.count || 0} conta${(summary?.bank_accounts.count || 0) !== 1 ? 's' : ''}`
+      description: `${summary?.total_accounts || 0} conta${(summary?.total_accounts || 0) !== 1 ? 's' : ''}`
     },
     {
-      title: 'Cartões de Crédito',
-      value: summary?.credit_cards.total_balance || 0,
+      title: 'Contas Correntes',
+      value: summary?.by_type?.find(t => t.type === 'CHECKING')?.total_balance || 0,
       icon: CreditCard,
       color: 'text-purple-600',
       bgColor: 'bg-purple-50',
-      description: `Limite: ${formatCurrency(summary?.credit_cards.total_limit || 0)}`,
-      isNegative: true
+      description: `${summary?.by_type?.find(t => t.type === 'CHECKING')?.count || 0} conta${(summary?.by_type?.find(t => t.type === 'CHECKING')?.count || 0) !== 1 ? 's' : ''}`,
     },
     {
-      title: 'Patrimônio Líquido',
-      value: summary?.net_worth || 0,
-      icon: TrendingUp,
+      title: 'Poupança',
+      value: summary?.by_type?.find(t => t.type === 'SAVINGS')?.total_balance || 0,
+      icon: PiggyBank,
       color: 'text-green-600',
       bgColor: 'bg-green-50',
-      description: 'Total de ativos'
+      description: `${summary?.by_type?.find(t => t.type === 'SAVINGS')?.count || 0} conta${(summary?.by_type?.find(t => t.type === 'SAVINGS')?.count || 0) !== 1 ? 's' : ''}`
     },
     {
       title: 'Reserva de Emergência',
@@ -90,8 +98,7 @@ export function AccountSummaryCards({ summary, isLoading }: AccountSummaryCardsP
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {card.isNegative && card.value > 0 && '-'}
-                {formatCurrency(Math.abs(card.value))}
+                {formatCurrency(card.value)}
               </div>
               <p className="text-xs text-muted-foreground">
                 {card.description}

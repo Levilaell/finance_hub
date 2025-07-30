@@ -20,12 +20,8 @@ export function useBankAccounts(options?: UseAccountsOptions) {
   } = useQuery({
     queryKey: ['bankAccounts', options],
     queryFn: async () => {
-      const response = await bankingService.getAccounts({
-        type: options?.type,
-        subtype: options?.subtype,
-        is_active: options?.isActive
-      });
-      return response.results;
+      const response = await bankingService.getAccounts();
+      return response;
     },
     staleTime: 60 * 1000, // 1 minute
   });
@@ -36,7 +32,7 @@ export function useBankAccounts(options?: UseAccountsOptions) {
     isLoading: isLoadingSummary
   } = useQuery({
     queryKey: ['accountSummary'],
-    queryFn: bankingService.getAccountSummary,
+    queryFn: bankingService.getAccountsSummary,
     staleTime: 60 * 1000,
   });
 
@@ -91,7 +87,10 @@ export function useBankAccount(id: string) {
     isLoading: isLoadingHistory
   } = useQuery({
     queryKey: ['accountBalanceHistory', id],
-    queryFn: () => bankingService.getAccountBalanceHistory(id, 30),
+    queryFn: async () => {
+      // Placeholder - this method doesn't exist in the service yet
+      return [];
+    },
     enabled: !!id,
   });
 

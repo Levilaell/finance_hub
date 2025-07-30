@@ -21,12 +21,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import type { BankConnection } from '@/types/banking.types';
-import { CONNECTION_STATUS_MESSAGES } from '@/types/banking.types';
+import type { PluggyItem } from '@/types/banking.types';
 import { cn } from '@/lib/utils';
 
+const CONNECTION_STATUS_MESSAGES: Record<string, string> = {
+  'LOGIN_ERROR': 'Erro de login',
+  'OUTDATED': 'Desatualizado',
+  'UPDATING': 'Atualizando',
+  'UPDATED': 'Atualizado',
+  'ERROR': 'Erro',
+  'WAITING_USER_INPUT': 'Aguardando ação',
+  'CREATING': 'Criando',
+  'MERGING': 'Mesclando',
+  'LOGIN_IN_PROGRESS': 'Fazendo login',
+  'DELETED': 'Deletado'
+};
+
 interface BankConnectionCardProps {
-  connection: BankConnection;
+  connection: PluggyItem;
   onSync: (id: string) => void;
   onDelete: (id: string) => void;
   onUpdateCredentials: (id: string) => void;
@@ -46,16 +58,16 @@ export function BankConnectionCard({
 
   const getStatusBadge = () => {
     const statusConfig = {
-      UPDATED: { variant: 'success' as const, icon: null },
+      UPDATED: { variant: 'outline' as const, icon: null },
       UPDATING: { variant: 'default' as const, icon: <RefreshCw className="w-3 h-3 animate-spin mr-1" /> },
       LOGIN_IN_PROGRESS: { variant: 'default' as const, icon: <RefreshCw className="w-3 h-3 animate-spin mr-1" /> },
       LOGIN_ERROR: { variant: 'destructive' as const, icon: <AlertCircle className="w-3 h-3 mr-1" /> },
-      WAITING_USER_INPUT: { variant: 'warning' as const, icon: <Shield className="w-3 h-3 mr-1" /> },
+      WAITING_USER_INPUT: { variant: 'secondary' as const, icon: <Shield className="w-3 h-3 mr-1" /> },
       OUTDATED: { variant: 'secondary' as const, icon: <AlertCircle className="w-3 h-3 mr-1" /> },
       ERROR: { variant: 'destructive' as const, icon: <AlertCircle className="w-3 h-3 mr-1" /> },
     };
 
-    const config = statusConfig[connection.status];
+    const config = statusConfig[connection.status as keyof typeof statusConfig] || { variant: 'default' as const, icon: null };
     
     return (
       <Badge variant={config.variant} className="flex items-center">
@@ -76,24 +88,24 @@ export function BankConnectionCard({
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              {connection.institution.image_url ? (
+              {connection.connector.image_url ? (
                 <img
-                  src={connection.institution.image_url}
-                  alt={connection.institution.name}
+                  src={connection.connector.image_url}
+                  alt={connection.connector.name}
                   className="w-10 h-10 rounded-lg object-contain bg-white p-1 border"
                 />
               ) : (
                 <div 
                   className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
-                  style={{ backgroundColor: connection.institution.primary_color || '#6366f1' }}
+                  style={{ backgroundColor: connection.connector.primary_color || '#6366f1' }}
                 >
-                  {connection.institution.name.charAt(0)}
+                  {connection.connector.name.charAt(0)}
                 </div>
               )}
               <div>
-                <h3 className="font-semibold">{connection.institution.name}</h3>
+                <h3 className="font-semibold">{connection.connector.name}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {connection.accounts.length} conta{connection.accounts.length !== 1 ? 's' : ''}
+                  Conexão bancária
                 </p>
               </div>
             </div>
@@ -108,12 +120,10 @@ export function BankConnectionCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {connection.can_sync && (
-                    <DropdownMenuItem onClick={() => onSync(connection.id)} disabled={isLoading}>
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Sincronizar
-                    </DropdownMenuItem>
-                  )}
+                  <DropdownMenuItem onClick={() => onSync(connection.id)} disabled={isLoading}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Sincronizar
+                  </DropdownMenuItem>
                   
                   {connection.status === 'LOGIN_ERROR' && (
                     <DropdownMenuItem onClick={() => onUpdateCredentials(connection.id)}>
@@ -144,37 +154,17 @@ export function BankConnectionCard({
         
         <CardContent>
           <div className="space-y-3">
-            {connection.accounts.map((account) => (
-              <div key={account.id} className="flex items-center justify-between py-2 border-t first:border-0">
-                <div>
-                  <p className="font-medium text-sm">{account.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {account.type === 'BANK' ? 'Conta bancária' : 'Cartão de crédito'} • {account.number}
-                  </p>
-                </div>
-                <p className="font-semibold">
-                  {account.formatted_balance || 
-                    new Intl.NumberFormat('pt-BR', {
-                      style: 'currency',
-                      currency: account.currency_code
-                    }).format(account.balance)
-                  }
-                </p>
-              </div>
-            ))}
+            <div className="text-sm text-muted-foreground">
+              ID: {connection.pluggy_item_id}
+            </div>
           </div>
           
-          {connection.last_sync_display && (
+          {connection.next_auto_sync_at && (
             <p className="text-xs text-muted-foreground mt-3">
-              Última sincronização: {connection.last_sync_display}
+              Próxima sincronização: {new Date(connection.next_auto_sync_at).toLocaleString('pt-BR')}
             </p>
           )}
           
-          {connection.error_message && (
-            <div className="mt-3 p-2 bg-red-50 rounded-md">
-              <p className="text-xs text-red-600">{connection.error_message}</p>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -183,7 +173,7 @@ export function BankConnectionCard({
           <AlertDialogHeader>
             <AlertDialogTitle>Remover conexão bancária</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja remover a conexão com {connection.institution.name}? 
+              Tem certeza que deseja remover a conexão com {connection.connector.name}? 
               Esta ação não pode ser desfeita e todos os dados sincronizados serão mantidos.
             </AlertDialogDescription>
           </AlertDialogHeader>
