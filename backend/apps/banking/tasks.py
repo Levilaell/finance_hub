@@ -482,27 +482,29 @@ def _get_or_create_category(category_str: str) -> Optional[TransactionCategory]:
 def process_webhook_event(event_type: str, event_data: Dict):
     """
     Process webhook event from Pluggy
-    Following the documentation: https://docs.pluggy.ai/docs/webhooks
+    Following best practices from: https://docs.pluggy.ai/docs/webhooks
+    
+    IMPORTANT: Per Pluggy documentation, we should always fetch the latest
+    data from the API instead of relying on webhook payload data.
     """
     try:
         logger.info(f"Processing webhook event: {event_type}")
         logger.info(f"Event data: {event_data}")
         
         # Get item ID based on event type
-        # Some events have 'id' field, others might have different structure
+        # Some events have 'id' field, others use 'itemId'
         item_id = event_data.get('id') or event_data.get('itemId')
         
-        if not item_id and event_type != 'transactions.created':
-            logger.error(f"No item ID in webhook data: {event_data}")
+        # Some events like connector status updates might not have item ID
+        if not item_id and event_type not in ['transactions.created', 'connector.status_updated']:
+            logger.error(f"No item ID in webhook data for event {event_type}: {event_data}")
             return
         
-        # Save webhook record
-        webhook = ItemWebhook.objects.create(
-            item_id=item_id or '',
-            event_type=event_type,
+        # Webhook already saved in the view, just update processing status
+        webhook = ItemWebhook.objects.filter(
             event_id=event_data.get('eventId', ''),
-            payload=event_data
-        )
+            event_type=event_type
+        ).first()
         
         try:
             # Process based on event type - according to Pluggy documentation
@@ -549,27 +551,48 @@ def process_webhook_event(event_type: str, event_data: Dict):
 
 
 def _handle_item_updated(data: Dict):
-    """Handle item updated event"""
+    """
+    Handle item updated event
+    
+    Best practice: Fetch latest item data from API instead of relying on webhook payload
+    """
     try:
         item = PluggyItem.objects.get(pluggy_item_id=data['id'])
         
-        # Update status from webhook data if provided
-        status_changed = False
-        if 'status' in data:
-            old_status = item.status
-            item.status = data['status']
-            status_changed = old_status != item.status
-            logger.info(f"Item {item.pluggy_item_id} status changed: {old_status} -> {item.status}")
-        
-        if 'executionStatus' in data:
-            item.execution_status = data['executionStatus']
-            logger.info(f"Item {item.pluggy_item_id} execution status: {item.execution_status}")
-        
-        if 'updatedAt' in data:
-            item.pluggy_updated_at = data['updatedAt']
-        
-        # Save changes
-        item.save()
+        # Fetch latest item data from Pluggy API
+        try:
+            with PluggyClient() as client:
+                logger.info(f"Fetching latest data for item {item.pluggy_item_id}")
+                item_data = client.get_item(item.pluggy_item_id)
+                
+                # Update item with latest data from API
+                old_status = item.status
+                item.status = item_data.get('status', item.status)
+                item.execution_status = item_data.get('executionStatus', '')
+                item.error_code = item_data.get('error', {}).get('code', '')
+                item.error_message = item_data.get('error', {}).get('message', '')
+                item.pluggy_updated_at = item_data.get('updatedAt', item.pluggy_updated_at)
+                
+                # Update additional fields if available
+                if 'parameter' in item_data:
+                    item.parameter = item_data['parameter']
+                if 'webhookUrl' in item_data:
+                    item.webhook_url = item_data['webhookUrl']
+                    
+                item.save()
+                
+                status_changed = old_status != item.status
+                logger.info(f"Item {item.pluggy_item_id} updated - Status: {old_status} -> {item.status}")
+                
+        except Exception as e:
+            logger.error(f"Failed to fetch item data from API: {e}")
+            # Fall back to webhook data if API call fails
+            if 'status' in data:
+                old_status = item.status
+                item.status = data['status']
+                status_changed = old_status != item.status
+                item.save()
+                logger.info(f"Item {item.pluggy_item_id} status updated from webhook: {old_status} -> {item.status}")
         
         # Queue sync if status indicates data is available
         if item.status in ['UPDATED', 'OUTDATED'] or (item.status == 'UPDATING' and status_changed):
@@ -581,15 +604,39 @@ def _handle_item_updated(data: Dict):
 
 
 def _handle_item_error(data: Dict):
-    """Handle item error event"""
+    """
+    Handle item error event
+    
+    Fetch latest error details from API for accuracy
+    """
     try:
         item = PluggyItem.objects.get(pluggy_item_id=data['id'])
         
-        # Update status
-        item.status = 'ERROR'
-        item.error_code = data.get('error', {}).get('code', '')
-        item.error_message = data.get('error', {}).get('message', '')
+        # Try to fetch latest item data from API for complete error details
+        try:
+            with PluggyClient() as client:
+                logger.info(f"Fetching latest error data for item {item.pluggy_item_id}")
+                item_data = client.get_item(item.pluggy_item_id)
+                
+                # Update with latest error information
+                item.status = item_data.get('status', 'ERROR')
+                item.error_code = item_data.get('error', {}).get('code', '')
+                item.error_message = item_data.get('error', {}).get('message', '')
+                item.execution_status = item_data.get('executionStatus', '')
+                item.pluggy_updated_at = item_data.get('updatedAt', item.pluggy_updated_at)
+                
+        except Exception as e:
+            logger.error(f"Failed to fetch item error data from API: {e}")
+            # Fall back to webhook data
+            item.status = 'ERROR'
+            item.error_code = data.get('error', {}).get('code', '')
+            item.error_message = data.get('error', {}).get('message', '')
+        
         item.save()
+        logger.error(f"Item {item.pluggy_item_id} error: {item.error_code} - {item.error_message}")
+        
+        # Notify user about the error
+        # TODO: Implement user notification
         
     except PluggyItem.DoesNotExist:
         logger.warning(f"Item {data['id']} not found for error event")
@@ -682,39 +729,93 @@ def _handle_item_login_succeeded(data: Dict):
 
 
 def _handle_transactions_updated(data: Dict):
-    """Handle transactions updated event"""
-    # Similar to transactions created, queue sync for affected accounts
-    _handle_transactions_created(data)
+    """
+    Handle updated transactions event
+    
+    Transactions were modified (category, description, etc.)
+    """
+    transaction_ids = data.get('transactionIds', [])
+    item_id = data.get('itemId')
+    
+    logger.info(f"Transactions updated - Item: {item_id}, Count: {len(transaction_ids)}")
+    
+    # Queue sync to update modified transactions
+    if item_id:
+        try:
+            item = PluggyItem.objects.get(pluggy_item_id=item_id)
+            sync_bank_account.delay(str(item.id))
+        except PluggyItem.DoesNotExist:
+            logger.warning(f"Item {item_id} not found for transactions updated event")
 
 
 def _handle_transactions_deleted(data: Dict):
-    """Handle transactions deleted event"""
-    logger.warning(f"Transactions deleted event: {data}")
-    # According to our business logic, we don't delete transactions
-    # Just log for monitoring
+    """
+    Handle deleted transactions event
+    
+    Transactions were removed from the account
+    """
+    transaction_ids = data.get('transactionIds', [])
+    item_id = data.get('itemId')
+    
+    logger.info(f"Transactions deleted - Item: {item_id}, Count: {len(transaction_ids)}")
+    
+    # Mark transactions as deleted if we have the IDs
+    if transaction_ids:
+        # Instead of hard deleting, we soft delete to maintain history
+        deleted_count = Transaction.objects.filter(
+            pluggy_transaction_id__in=transaction_ids
+        ).update(is_deleted=True, deleted_at=timezone.now())
+        
+        logger.info(f"Marked {deleted_count} transactions as deleted")
+    
+    # Queue sync to ensure consistency
+    if item_id:
+        try:
+            item = PluggyItem.objects.get(pluggy_item_id=item_id)
+            sync_bank_account.delay(str(item.id))
+        except PluggyItem.DoesNotExist:
+            logger.warning(f"Item {item_id} not found for transactions deleted event")
 
 
 def _handle_accounts_created(data: Dict):
-    """Handle accounts created event"""
-    try:
-        item = PluggyItem.objects.get(pluggy_item_id=data.get('itemId'))
-        
-        # Queue sync to fetch new accounts
-        sync_bank_account.delay(str(item.id))
-        
-    except PluggyItem.DoesNotExist:
-        logger.warning(f"Item {data.get('itemId')} not found for accounts created event")
+    """
+    Handle accounts created event
+    
+    New accounts were added to an existing item
+    """
+    item_id = data.get('itemId')
+    account_ids = data.get('accountIds', [])
+    
+    logger.info(f"Accounts created - Item: {item_id}, Account count: {len(account_ids)}")
+    
+    if item_id:
+        try:
+            item = PluggyItem.objects.get(pluggy_item_id=item_id)
+            # Queue sync to fetch new accounts
+            logger.info(f"Queuing sync to fetch new accounts for item {item_id}")
+            sync_bank_account.delay(str(item.id))
+        except PluggyItem.DoesNotExist:
+            logger.warning(f"Item {item_id} not found for accounts created event")
 
 
 def _handle_accounts_updated(data: Dict):
-    """Handle accounts updated event"""
-    # Queue sync for the item
-    try:
-        item = PluggyItem.objects.get(pluggy_item_id=data.get('itemId'))
-        sync_bank_account.delay(str(item.id))
-        
-    except PluggyItem.DoesNotExist:
-        logger.warning(f"Item {data.get('itemId')} not found for accounts updated event")
+    """
+    Handle accounts updated event
+    
+    Account information was modified (balance, name, etc.)
+    """
+    item_id = data.get('itemId')
+    account_ids = data.get('accountIds', [])
+    
+    logger.info(f"Accounts updated - Item: {item_id}, Account count: {len(account_ids)}")
+    
+    if item_id:
+        try:
+            item = PluggyItem.objects.get(pluggy_item_id=item_id)
+            # Sync to update account information
+            sync_bank_account.delay(str(item.id))
+        except PluggyItem.DoesNotExist:
+            logger.warning(f"Item {item_id} not found for accounts updated event")
 
 
 @shared_task

@@ -18,6 +18,7 @@ from .views import (
     PluggyWebhookView,
     CeleryHealthCheckView
 )
+from .webhooks import pluggy_webhook
 
 app_name = 'banking'
 
@@ -45,7 +46,9 @@ urlpatterns = [
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
     
     # Webhooks
-    path('webhooks/pluggy/', PluggyWebhookView.as_view(), name='pluggy-webhook'),
+    path('webhooks/pluggy/', pluggy_webhook, name='pluggy-webhook'),
+    # Alternative webhook endpoint (for backward compatibility)
+    path('webhooks/pluggy/v2/', PluggyWebhookView.as_view(), name='pluggy-webhook-v2'),
     
     # Health check
     path('health/celery/', CeleryHealthCheckView.as_view(), name='celery-health'),

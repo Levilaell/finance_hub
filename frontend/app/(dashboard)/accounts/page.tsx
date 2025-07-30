@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 
@@ -15,9 +14,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { useBankingStore } from '@/store/banking-store';
 import { bankingService } from '@/services/banking.service';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -29,29 +26,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 
 import {
   CreditCardIcon,
-  ArrowPathIcon,
   LinkIcon,
-  BuildingLibraryIcon,
-  EllipsisVerticalIcon,
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  XCircleIcon,
 } from '@heroicons/react/24/outline';
+import { BankAccountCard } from '@/components/banking/bank-account-card';
 
 import {
   BankAccount,
   PluggyConnectState,
   SyncError,
-  PluggyItemStatus,
 } from '@/types/banking.types';
 
 export default function AccountsPage() {
@@ -153,31 +138,45 @@ export default function AccountsPage() {
 
     try {
       // Show initial toast
-      toast.info('Starting sync...', {
+      toast.info('Iniciando sincronização...', {
         duration: 2000,
-        icon: <ArrowPathIcon className="h-4 w-4 animate-spin" />,
       });
 
       const response = await syncAccount(accountId);
 
       if (response.success) {
-        // Show estimated time if available
-        if (response.data?.estimated_time) {
-          toast.info(`Syncing transactions... Estimated time: ${response.data.estimated_time}`, {
-            duration: 5000,
-            icon: <ArrowPathIcon className="h-4 w-4 animate-spin" />,
-          });
-        }
+        // Show sync progress
+        toast.info('Sincronizando transações...', {
+          duration: 5000,
+        });
 
         // Wait a bit for the sync to complete
         await new Promise(resolve => setTimeout(resolve, 3000));
         
-        // Fetch updated accounts
+        // Fetch updated accounts - try multiple times to ensure status is updated
         await fetchAccounts();
         
+        // If account is still updating after 5 seconds, fetch again
+        setTimeout(async () => {
+          const account = accounts.find(a => a.id === accountId);
+          if (account?.item_status === 'UPDATING') {
+            console.log('Account still updating, fetching again...');
+            await fetchAccounts();
+          }
+        }, 5000);
+        
+        // And again after 10 seconds if needed
+        setTimeout(async () => {
+          const account = accounts.find(a => a.id === accountId);
+          if (account?.item_status === 'UPDATING') {
+            console.log('Account still updating after 10s, fetching again...');
+            await fetchAccounts();
+          }
+        }, 10000);
+        
         // Show success message
-        toast.success('Sync completed successfully!', {
-          description: 'Your transactions are now up to date.',
+        toast.success('Sincronização concluída!', {
+          description: 'Suas transações estão atualizadas.',
           duration: 4000,
         });
       } else {
@@ -189,7 +188,7 @@ export default function AccountsPage() {
           const account = accounts.find(a => a.id === accountId);
           setSyncError({
             accountId,
-            accountName: account?.display_name || 'Bank account',
+            accountName: account?.display_name || 'Conta bancária',
             errorCode: response.error_code,
             message: response.message || 'Authentication required',
             requiresReconnect: true,
@@ -259,36 +258,6 @@ export default function AccountsPage() {
     setPluggyConnect({ isOpen: false, token: null, mode: 'connect' });
   }, []);
 
-  // UI Helpers
-  const getAccountTypeInfo = (type: string) => {
-    const types: Record<string, { label: string; color: string }> = {
-      BANK: { label: 'Bank Account', color: 'bg-blue-100 text-blue-800' },
-      CREDIT: { label: 'Credit Card', color: 'bg-purple-100 text-purple-800' },
-      INVESTMENT: { label: 'Investment', color: 'bg-green-100 text-green-800' },
-      LOAN: { label: 'Loan', color: 'bg-orange-100 text-orange-800' },
-      OTHER: { label: 'Other', color: 'bg-gray-100 text-gray-800' },
-    };
-    return types[type] || types.OTHER;
-  };
-
-  const getStatusIcon = (status?: PluggyItemStatus) => {
-    switch (status) {
-      case 'UPDATED':
-        return <CheckCircleIcon className="h-5 w-5 text-green-600" />;
-      case 'LOGIN_ERROR':
-      case 'ERROR':
-        return <XCircleIcon className="h-5 w-5 text-red-600" />;
-      case 'WAITING_USER_INPUT':
-      case 'OUTDATED':
-        return <ExclamationTriangleIcon className="h-5 w-5 text-amber-600" />;
-      default:
-        return <ArrowPathIcon className="h-5 w-5 text-gray-400 animate-spin" />;
-    }
-  };
-
-  const needsReconnection = (account: BankAccount) => {
-    return bankingService.needsReconnection(account);
-  };
 
   // Loading state
   if (authLoading) {
@@ -308,7 +277,7 @@ export default function AccountsPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <LoadingSpinner />
-          <p className="mt-4 text-gray-600">Loading accounts...</p>
+          <p className="mt-4 text-gray-600">Carregando contas...</p>
         </div>
       </div>
     );
@@ -345,7 +314,7 @@ export default function AccountsPage() {
         </div>
         <Button onClick={handleConnectBank} className="w-full sm:w-auto">
           <LinkIcon className="h-4 w-4 mr-2" />
-          Connect Bank
+          Conectar Banco
         </Button>
       </div>
 
@@ -353,154 +322,17 @@ export default function AccountsPage() {
       {accounts.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {accounts.map((account) => {
-            const typeInfo = getAccountTypeInfo(account.type);
             const isSyncing = syncingAccountId === account.id;
-            const needsReconnect = needsReconnection(account);
 
             return (
-              <Card key={account.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      {account.connector?.image_url ? (
-                        <Image
-                          src={account.connector.image_url}
-                          alt={account.connector.name}
-                          width={32}
-                          height={32}
-                          className="object-contain"
-                        />
-                      ) : (
-                        <BuildingLibraryIcon className="h-8 w-8 text-gray-400" />
-                      )}
-                      <div>
-                        <CardTitle className="text-lg">
-                          {account.display_name || account.name}
-                        </CardTitle>
-                        <p className="text-sm text-gray-600">
-                          {account.connector?.name}
-                        </p>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <EllipsisVerticalIcon className="h-5 w-5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleSyncAccount(account.id)}
-                          disabled={isSyncing || needsReconnect}
-                        >
-                          <ArrowPathIcon className="h-4 w-4 mr-2" />
-                          Sync
-                        </DropdownMenuItem>
-                        {needsReconnect && (
-                          <DropdownMenuItem
-                            onClick={() => handleUpdateConnection(account)}
-                          >
-                            <LinkIcon className="h-4 w-4 mr-2" />
-                            Reconnect
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => setSelectedAccount(account)}
-                        >
-                          Remove
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Account Info */}
-                  <div className="flex items-center justify-between">
-                    <Badge variant="secondary" className={typeInfo.color}>
-                      {typeInfo.label}
-                    </Badge>
-                    {getStatusIcon(account.item_status)}
-                  </div>
-
-                  {/* Balance */}
-                  <div>
-                    <p className="text-2xl font-bold">
-                      {bankingService.formatCurrency(account.balance)}
-                    </p>
-                    {account.masked_number && (
-                      <p className="text-sm text-gray-600">
-                        {account.masked_number}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Status */}
-                  {needsReconnect && (
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-                      <p className="text-sm text-amber-800">
-                        Reconnection required to sync
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Sync Status */}
-                  {isSyncing && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                      <div className="flex items-center gap-2">
-                        <ArrowPathIcon className="h-4 w-4 text-blue-600 animate-spin" />
-                        <p className="text-sm text-blue-800">
-                          Syncing transactions...
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Last Update */}
-                  <p className="text-sm text-gray-500">
-                    {account.pluggy_updated_at
-                      ? `Last sync: ${bankingService.formatDate(account.pluggy_updated_at)}`
-                      : 'Never synced'}
-                  </p>
-
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    {needsReconnect ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => handleUpdateConnection(account)}
-                      >
-                        <LinkIcon className="h-4 w-4 mr-1" />
-                        Reconnect
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => handleSyncAccount(account.id)}
-                        disabled={isSyncing || loadingAccounts}
-                      >
-                        <ArrowPathIcon
-                          className={`h-4 w-4 mr-1 ${
-                            isSyncing ? 'animate-spin' : ''
-                          }`}
-                        />
-                        {isSyncing ? 'Syncing...' : 'Sync Now'}
-                      </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/transactions?account=${account.id}`)}
-                    >
-                      View Transactions
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <BankAccountCard
+                key={account.id}
+                account={account}
+                isSyncing={isSyncing}
+                onSync={handleSyncAccount}
+                onReconnect={handleUpdateConnection}
+                onRemove={setSelectedAccount}
+              />
             );
           })}
         </div>
@@ -512,7 +344,7 @@ export default function AccountsPage() {
           action={
             <Button onClick={handleConnectBank}>
               <LinkIcon className="h-4 w-4 mr-2" />
-              Connect Bank
+              Conectar Banco
             </Button>
           }
         />

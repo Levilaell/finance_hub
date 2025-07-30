@@ -361,6 +361,12 @@ class PluggyClient:
     
     # ===== Webhook Validation =====
     
+    def validate_webhook(self, signature: str, payload: str) -> bool:
+        """
+        Validate webhook signature (alias for backward compatibility)
+        """
+        return self.validate_webhook_signature(signature, payload.encode('utf-8'))
+    
     def validate_webhook_signature(self, signature: str, payload: bytes) -> bool:
         """
         Validate webhook signature using HMAC-SHA256

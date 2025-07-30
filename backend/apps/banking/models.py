@@ -394,6 +394,10 @@ class Transaction(models.Model):
     pluggy_created_at = models.DateTimeField(_('Pluggy created at'))
     pluggy_updated_at = models.DateTimeField(_('Pluggy updated at'))
     
+    # Soft delete support
+    is_deleted = models.BooleanField(_('is deleted'), default=False)
+    deleted_at = models.DateTimeField(_('deleted at'), null=True, blank=True)
+    
     # Local timestamps
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     updated_at = models.DateTimeField(_('updated at'), auto_now=True)
@@ -567,6 +571,21 @@ class ItemWebhook(models.Model):
     payload = models.JSONField(_('payload'))
     processed = models.BooleanField(_('processed'), default=False)
     processed_at = models.DateTimeField(_('processed at'), null=True, blank=True)
+    
+    # Who triggered the webhook
+    TRIGGER_CHOICES = [
+        ('USER', 'User Action'),
+        ('CLIENT', 'Client Action'), 
+        ('SYNC', 'Sync Process'),
+        ('INTERNAL', 'Internal Process'),
+    ]
+    triggered_by = models.CharField(
+        _('triggered by'), 
+        max_length=20, 
+        choices=TRIGGER_CHOICES,
+        blank=True,
+        help_text=_('Who or what triggered this webhook event')
+    )
     
     error = models.TextField(_('error'), blank=True)
     

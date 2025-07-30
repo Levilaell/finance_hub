@@ -1,5 +1,6 @@
 """
 Webhook handlers for Pluggy events
+Following official documentation: https://docs.pluggy.ai/docs/webhooks
 """
 import json
 import logging
@@ -7,10 +8,11 @@ from django.http import JsonResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
+# timezone imported if needed for future use
 
-from .models import BankConnection, SyncHistory
+from .models import BankAccount, ItemWebhook, PluggyItem
 from .integrations.pluggy.client import PluggyClient
-from .tasks import sync_bank_connection, process_webhook_event
+from .tasks import sync_bank_account, process_webhook_event
 
 logger = logging.getLogger(__name__)
 
@@ -21,39 +23,64 @@ def pluggy_webhook(request):
     """
     Endpoint to receive Pluggy webhook notifications
     
-    Events handled:
-    - item/created
-    - item/updated
-    - item/deleted
-    - item/error
-    - transactions/created
-    - transactions/updated
-    - transactions/deleted
+    Following best practices from https://docs.pluggy.ai/docs/webhooks:
+    - Respond with 2XX immediately
+    - Process webhook data asynchronously
+    - Retrieve latest item data via GET request after receiving webhook
+    
+    Main events handled:
+    - item/created: Item successfully connected
+    - item/updated: Item synced successfully  
+    - item/deleted: Item deleted
+    - item/error: Item encountered an error
+    - item/waiting_user_input: MFA or additional auth required
+    - transactions/created: New transactions available
+    - transactions/updated: Transactions modified
+    - transactions/deleted: Transactions removed
+    - connector/status_updated: Connector status change
     """
     try:
         # Parse request body
         payload = request.body.decode('utf-8')
         data = json.loads(payload)
         
-        # Validate webhook signature
-        signature = request.headers.get('X-Pluggy-Signature', '')
-        client = PluggyClient()
+        # Log webhook receipt
+        logger.info(f"Received webhook from IP: {request.META.get('REMOTE_ADDR')}")
+        logger.info(f"Webhook headers: {dict(request.headers)}")
         
-        if not client.validate_webhook(signature, payload):
-            logger.warning(f"Invalid webhook signature from {request.META.get('REMOTE_ADDR')}")
-            return HttpResponseBadRequest("Invalid signature")
+        # Validate webhook signature if configured
+        if hasattr(settings, 'PLUGGY_WEBHOOK_SECRET') and settings.PLUGGY_WEBHOOK_SECRET:
+            signature = request.headers.get('X-Pluggy-Signature', '')
+            client = PluggyClient()
+            
+            if not client.validate_webhook(signature, payload):
+                logger.warning(f"Invalid webhook signature from {request.META.get('REMOTE_ADDR')}")
+                return HttpResponseBadRequest("Invalid signature")
         
         # Extract event data
         event_type = data.get('event')
-        item_id = data.get('itemId')
+        event_id = data.get('eventId')
+        item_id = data.get('itemId') or data.get('id')  # Some events use 'id' field
+        client_id = data.get('clientId')
+        triggered_by = data.get('triggeredBy')  # USER, CLIENT, SYNC, INTERNAL
         
-        logger.info(f"Received webhook event: {event_type} for item: {item_id}")
+        logger.info(f"Webhook event: {event_type}, eventId: {event_id}, itemId: {item_id}, triggeredBy: {triggered_by}")
         
-        # Process event asynchronously
+        # Store webhook for audit trail
+        ItemWebhook.objects.create(
+            item_id=item_id or '',
+            event_type=event_type,
+            event_id=event_id or '',
+            payload=data,
+            triggered_by=triggered_by
+        )
+        
+        # Process event asynchronously following best practices
+        # The task will fetch latest data from Pluggy API instead of relying on webhook payload
         process_webhook_event.delay(event_type, data)
         
-        # Return immediate response
-        return JsonResponse({"status": "accepted"}, status=200)
+        # Return immediate 2XX response as required by Pluggy
+        return JsonResponse({"status": "accepted", "eventId": event_id}, status=200)
         
     except json.JSONDecodeError:
         logger.error("Invalid JSON in webhook payload")
@@ -61,93 +88,3 @@ def pluggy_webhook(request):
     except Exception as e:
         logger.error(f"Error processing webhook: {str(e)}")
         return JsonResponse({"error": "Internal error"}, status=500)
-
-
-def handle_item_updated(data):
-    """Handle item/updated webhook event"""
-    item_id = data.get('itemId')
-    
-    try:
-        connection = BankConnection.objects.get(pluggy_item_id=item_id)
-        
-        # Check item status from Pluggy
-        client = PluggyClient()
-        item_data = client.get_item(item_id)
-        
-        # Update connection status
-        old_status = connection.status
-        connection.status = item_data.get('status', 'ERROR')
-        connection.save()
-        
-        # If status changed to UPDATED, trigger sync
-        if old_status != 'UPDATED' and connection.status == 'UPDATED':
-            sync_bank_connection.delay(connection.id)
-            
-        # Create sync history entry
-        SyncHistory.objects.create(
-            connection=connection,
-            status='SUCCESS',
-            sync_type='WEBHOOK',
-            details={
-                'event': 'item/updated',
-                'old_status': old_status,
-                'new_status': connection.status
-            }
-        )
-        
-    except BankConnection.DoesNotExist:
-        logger.warning(f"Connection not found for item: {item_id}")
-
-
-def handle_item_error(data):
-    """Handle item/error webhook event"""
-    item_id = data.get('itemId')
-    error_data = data.get('error', {})
-    
-    try:
-        connection = BankConnection.objects.get(pluggy_item_id=item_id)
-        
-        # Update connection with error
-        connection.status = 'ERROR'
-        connection.error_message = error_data.get('message', 'Unknown error')
-        connection.save()
-        
-        # Create sync history entry
-        SyncHistory.objects.create(
-            connection=connection,
-            status='FAILED',
-            sync_type='WEBHOOK',
-            error_message=connection.error_message,
-            details={
-                'event': 'item/error',
-                'error': error_data
-            }
-        )
-        
-    except BankConnection.DoesNotExist:
-        logger.warning(f"Connection not found for item: {item_id}")
-
-
-def handle_transactions_webhook(event_type, data):
-    """Handle transaction webhook events"""
-    item_id = data.get('itemId')
-    
-    try:
-        connection = BankConnection.objects.get(pluggy_item_id=item_id)
-        
-        # Trigger sync to update transactions
-        sync_bank_connection.delay(connection.id)
-        
-        # Log webhook event
-        SyncHistory.objects.create(
-            connection=connection,
-            status='SUCCESS',
-            sync_type='WEBHOOK',
-            details={
-                'event': event_type,
-                'trigger': 'transaction_change'
-            }
-        )
-        
-    except BankConnection.DoesNotExist:
-        logger.warning(f"Connection not found for item: {item_id}")
