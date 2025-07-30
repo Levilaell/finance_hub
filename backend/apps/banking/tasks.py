@@ -20,22 +20,40 @@ from .integrations.pluggy.client import PluggyClient, PluggyError
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True, max_retries=3)
-def sync_bank_account(self, item_id: str, account_id: Optional[str] = None):
+@shared_task(bind=True, max_retries=5, default_retry_delay=60)
+def sync_bank_account(self, item_id: str, account_id: Optional[str] = None, force_update: bool = False):
     """
     Sync bank account data from Pluggy
     
     Args:
         item_id: PluggyItem ID
         account_id: Optional specific account ID to sync
+        force_update: Force update even if item status is not ideal
+        
+    Retry strategy:
+        - Max 5 retries with exponential backoff
+        - Different retry behavior based on error type
     """
     try:
         item = PluggyItem.objects.get(id=item_id)
-        logger.info(f"Starting sync for item {item.pluggy_item_id}")
+        logger.info(f"Starting sync for item {item.pluggy_item_id} (attempt {self.request.retries + 1}/{self.max_retries + 1})")
         
         with PluggyClient() as client:
             # Update item status
-            item_data = client.get_item(item.pluggy_item_id)
+            try:
+                item_data = client.get_item(item.pluggy_item_id)
+            except PluggyError as e:
+                # Handle API errors with retry
+                if 'RATE_LIMIT' in str(e):
+                    # Rate limit - retry with longer delay
+                    raise self.retry(exc=e, countdown=300)  # 5 minutes
+                elif 'TIMEOUT' in str(e) or 'CONNECTION' in str(e):
+                    # Temporary network issue - retry with exponential backoff
+                    raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
+                else:
+                    # Other API errors - log and don't retry
+                    logger.error(f"Pluggy API error: {e}")
+                    return {'success': False, 'error': str(e)}
             
             # Update item
             item.status = item_data['status']
@@ -49,26 +67,80 @@ def sync_bank_account(self, item_id: str, account_id: Optional[str] = None):
             
             item.save()
             
+            # Handle different item statuses
+            if item.status in ['LOGIN_ERROR', 'INVALID_CREDENTIALS']:
+                # Credential errors - don't retry
+                logger.error(f"Item {item.pluggy_item_id} has credential error: {item.status}")
+                return {
+                    'success': False,
+                    'reason': f'Invalid credentials: {item.status}',
+                    'requires_reconnection': True,
+                    'error_code': item.error_code,
+                    'error_message': item.error_message
+                }
+            
+            elif item.status == 'WAITING_USER_INPUT':
+                # MFA required - don't retry
+                logger.info(f"Item {item.pluggy_item_id} requires user input")
+                return {
+                    'success': False,
+                    'reason': 'MFA required',
+                    'requires_mfa': True,
+                    'error_code': 'MFA_REQUIRED'
+                }
+            
+            elif item.status == 'ERROR':
+                # Generic error - check if recoverable
+                if item.error_code in ['SITE_NOT_AVAILABLE', 'CONNECTION_ERROR']:
+                    # Temporary error - retry
+                    logger.warning(f"Temporary error for item {item.pluggy_item_id}: {item.error_code}")
+                    raise self.retry(
+                        exc=Exception(f"Temporary error: {item.error_code}"),
+                        countdown=120 * (self.request.retries + 1)
+                    )
+                else:
+                    # Permanent error - don't retry
+                    logger.error(f"Permanent error for item {item.pluggy_item_id}: {item.error_code}")
+                    return {
+                        'success': False,
+                        'reason': f'Item error: {item.error_code}',
+                        'error_message': item.error_message
+                    }
+            
             # Check if we can sync
-            if item.status not in ['UPDATED', 'OUTDATED']:
+            if not force_update and item.status not in ['UPDATED', 'OUTDATED', 'UPDATING']:
                 logger.warning(f"Item {item.pluggy_item_id} not ready for sync: {item.status}")
                 
-                # If item is still processing, retry later
-                if item.status in ['LOGIN_IN_PROGRESS', 'UPDATING']:
-                    logger.info(f"Item {item.pluggy_item_id} is still processing, will retry")
+                # For other states, don't retry
+                return {
+                    'success': False,
+                    'reason': f'Item status: {item.status}',
+                    'requires_reconnection': False
+                }
+            
+            if force_update:
+                logger.info(f"Force update enabled, proceeding regardless of status: {item.status}")
+            
+            # For UPDATING status, check if data is actually available
+            if item.status == 'UPDATING':
+                # Check statusDetail to see if data is ready
+                status_detail = item.status_detail or {}
+                
+                # Check if accounts and transactions are updated
+                accounts_ready = status_detail.get('accounts', {}).get('isUpdated', False)
+                transactions_ready = status_detail.get('transactions', {}).get('isUpdated', False)
+                
+                if accounts_ready and transactions_ready:
+                    logger.info(f"Item {item.pluggy_item_id} is UPDATING but data is available, proceeding with sync")
+                    # Allow sync to proceed - data is available even though status is UPDATING
+                else:
+                    logger.info(f"Item {item.pluggy_item_id} is still UPDATING, will retry")
                     # Retry with exponential backoff
                     raise self.retry(
                         exc=Exception(f"Item still processing: {item.status}"),
                         countdown=60 * (self.request.retries + 1),
-                        max_retries=5
+                        max_retries=10
                     )
-                
-                # For error states, don't retry
-                return {
-                    'success': False,
-                    'reason': f'Item status: {item.status}',
-                    'requires_reconnection': item.status in ['LOGIN_ERROR', 'INVALID_CREDENTIALS']
-                }
             
             # Get accounts to sync
             if account_id:
@@ -76,15 +148,21 @@ def sync_bank_account(self, item_id: str, account_id: Optional[str] = None):
                     id=account_id,
                     item=item
                 )
+                logger.info(f"Syncing specific account {account_id}")
             else:
                 accounts = item.accounts.filter(is_active=True)
+                logger.info(f"Syncing all active accounts for item {item.id}")
+            
+            logger.info(f"Found {accounts.count()} accounts to sync")
             
             # Sync each account
             sync_results = []
             
             for account in accounts:
+                logger.info(f"Starting sync for account {account.id} ({account.pluggy_account_id})")
                 result = _sync_account(client, account)
                 sync_results.append(result)
+                logger.info(f"Sync result for account {account.id}: {result}")
             
             # Update last successful update
             if any(r['success'] for r in sync_results):
@@ -166,14 +244,23 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
     logger.info(f"=== Starting transaction sync for account {account.pluggy_account_id} ===")
     logger.info(f"Account: {account.display_name} (Type: {account.type})")
     logger.info(f"Current balance: {account.balance}")
+    logger.info(f"Account Django ID: {account.id}, Company: {account.company.id}")
     
     # Determine sync period
     last_transaction = account.transactions.order_by('-date').first()
     
     if last_transaction:
         # Sync from last transaction date minus 7 days (for updates)
+        # But also ensure we check at least the last 3 days for very recent transactions
         from_date = last_transaction.date - timedelta(days=7)
-        logger.info(f"Found last transaction dated {last_transaction.date}, syncing from {from_date.date()}")
+        min_from_date = timezone.now() - timedelta(days=3)
+        
+        # Use the more recent date to ensure we don't miss new transactions
+        if min_from_date > from_date:
+            from_date = min_from_date
+            logger.info(f"Using minimum sync window of 3 days from today")
+        else:
+            logger.info(f"Found last transaction dated {last_transaction.date}, syncing from {from_date.date()}")
     else:
         # Initial sync - get last 365 days for Open Finance, 90 for others
         days_back = 365
@@ -217,12 +304,17 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
             # Process transactions
             with db_transaction.atomic():
                 for trans_data in transactions:
-                    transaction, created = _process_transaction(account, trans_data)
-                    if created:
-                        total_synced += 1
-                        logger.debug(f"Created new transaction: {trans_data.get('description', 'No description')} - {trans_data.get('amount', 0)}")
-                    else:
-                        logger.debug(f"Updated existing transaction: {trans_data.get('id')}")
+                    try:
+                        transaction, created = _process_transaction(account, trans_data)
+                        if created:
+                            total_synced += 1
+                            logger.info(f"Created new transaction: {trans_data.get('description', 'No description')} - {trans_data.get('amount', 0)} - ID: {trans_data.get('id')}")
+                        else:
+                            logger.info(f"Updated existing transaction: {trans_data.get('id')}")
+                    except Exception as e:
+                        logger.error(f"Error processing transaction {trans_data.get('id')}: {e}", exc_info=True)
+                        logger.error(f"Transaction data: {trans_data}")
+                        raise
             
             # Check if more pages
             if page >= result.get('totalPages', 1):
@@ -374,27 +466,33 @@ def _get_or_create_category(category_str: str) -> Optional[TransactionCategory]:
 def process_webhook_event(event_type: str, event_data: Dict):
     """
     Process webhook event from Pluggy
+    Following the documentation: https://docs.pluggy.ai/docs/webhooks
     """
     try:
         logger.info(f"Processing webhook event: {event_type}")
+        logger.info(f"Event data: {event_data}")
         
-        # Get item
-        item_id = event_data.get('id')
-        if not item_id:
+        # Get item ID based on event type
+        # Some events have 'id' field, others might have different structure
+        item_id = event_data.get('id') or event_data.get('itemId')
+        
+        if not item_id and event_type != 'transactions.created':
             logger.error(f"No item ID in webhook data: {event_data}")
             return
         
         # Save webhook record
         webhook = ItemWebhook.objects.create(
-            item_id=item_id,
+            item_id=item_id or '',
             event_type=event_type,
             event_id=event_data.get('eventId', ''),
             payload=event_data
         )
         
         try:
-            # Process based on event type
-            if event_type == 'item.updated':
+            # Process based on event type - according to Pluggy documentation
+            if event_type == 'item.created':
+                _handle_item_created(event_data)
+            elif event_type == 'item.updated':
                 _handle_item_updated(event_data)
             elif event_type == 'item.error':
                 _handle_item_error(event_data)
@@ -402,10 +500,22 @@ def process_webhook_event(event_type: str, event_data: Dict):
                 _handle_item_deleted(event_data)
             elif event_type == 'item.waiting_user_input':
                 _handle_item_waiting_input(event_data)
+            elif event_type == 'item.login_succeeded':
+                _handle_item_login_succeeded(event_data)
             elif event_type == 'transactions.created':
                 _handle_transactions_created(event_data)
+            elif event_type == 'transactions.updated':
+                _handle_transactions_updated(event_data)
+            elif event_type == 'transactions.deleted':
+                _handle_transactions_deleted(event_data)
             elif event_type == 'consent.revoked':
                 _handle_consent_revoked(event_data)
+            elif event_type == 'accounts.created':
+                _handle_accounts_created(event_data)
+            elif event_type == 'accounts.updated':
+                _handle_accounts_updated(event_data)
+            else:
+                logger.warning(f"Unknown webhook event type: {event_type}")
             
             # Mark as processed
             webhook.processed = True
@@ -511,6 +621,64 @@ def _handle_consent_revoked(data: Dict):
         
     except PluggyItem.DoesNotExist:
         logger.warning(f"Item {data['id']} not found for consent revoked event")
+
+
+def _handle_item_created(data: Dict):
+    """Handle item created event"""
+    logger.info(f"Item created event for {data.get('id')}")
+    # Usually we create items through our API, so this is just for logging
+
+
+def _handle_item_login_succeeded(data: Dict):
+    """Handle successful login - queue sync"""
+    try:
+        item = PluggyItem.objects.get(pluggy_item_id=data['id'])
+        
+        # Update status
+        item.status = 'UPDATING'
+        item.save()
+        
+        # Queue sync
+        sync_bank_account.delay(str(item.id))
+        
+    except PluggyItem.DoesNotExist:
+        logger.warning(f"Item {data['id']} not found for login succeeded event")
+
+
+def _handle_transactions_updated(data: Dict):
+    """Handle transactions updated event"""
+    # Similar to transactions created, queue sync for affected accounts
+    _handle_transactions_created(data)
+
+
+def _handle_transactions_deleted(data: Dict):
+    """Handle transactions deleted event"""
+    logger.warning(f"Transactions deleted event: {data}")
+    # According to our business logic, we don't delete transactions
+    # Just log for monitoring
+
+
+def _handle_accounts_created(data: Dict):
+    """Handle accounts created event"""
+    try:
+        item = PluggyItem.objects.get(pluggy_item_id=data.get('itemId'))
+        
+        # Queue sync to fetch new accounts
+        sync_bank_account.delay(str(item.id))
+        
+    except PluggyItem.DoesNotExist:
+        logger.warning(f"Item {data.get('itemId')} not found for accounts created event")
+
+
+def _handle_accounts_updated(data: Dict):
+    """Handle accounts updated event"""
+    # Queue sync for the item
+    try:
+        item = PluggyItem.objects.get(pluggy_item_id=data.get('itemId'))
+        sync_bank_account.delay(str(item.id))
+        
+    except PluggyItem.DoesNotExist:
+        logger.warning(f"Item {data.get('itemId')} not found for accounts updated event")
 
 
 @shared_task

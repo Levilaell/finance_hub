@@ -143,17 +143,36 @@ class PluggyItemViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def sync(self, request, pk=None):
-        """Sync specific item"""
+        """Sync specific item - triggers manual update via Pluggy API"""
         item = self.get_object()
         
         try:
+            # First, trigger an update via Pluggy API for manual sync
+            with PluggyClient() as client:
+                try:
+                    # According to docs, send empty JSON {} to update without changing credentials
+                    logger.info(f"Triggering manual update for item {item.pluggy_item_id}")
+                    update_response = client.update_item(item.pluggy_item_id, {})
+                    logger.info(f"Update response: {update_response}")
+                    
+                    # Update item status from response
+                    item.status = update_response.get('status', item.status)
+                    item.execution_status = update_response.get('executionStatus', '')
+                    item.pluggy_updated_at = update_response.get('updatedAt', item.pluggy_updated_at)
+                    item.save()
+                    
+                except PluggyError as e:
+                    logger.warning(f"Failed to trigger Pluggy update: {e}")
+                    # Continue with sync even if update trigger fails
+            
             # Queue sync task
-            task = sync_bank_account.delay(item.id)
+            task = sync_bank_account.delay(str(item.id), force_update=True)
             
             return Response({
                 'success': True,
-                'message': 'Sync started',
-                'task_id': task.id
+                'message': 'Manual sync triggered successfully',
+                'task_id': task.id,
+                'item_status': item.status
             })
             
         except Exception as e:
@@ -168,15 +187,35 @@ class PluggyItemViewSet(viewsets.ModelViewSet):
         """Send MFA parameter for 2-step authentication"""
         item = self.get_object()
         
+        # Validate if the item is waiting for MFA
+        if item.status != 'WAITING_USER_INPUT':
+            return Response(
+                {'error': 'Item is not waiting for user input'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         try:
             with PluggyClient() as client:
+                # Send MFA parameters according to documentation
                 response = client.update_item_mfa(
                     item.pluggy_item_id, 
                     request.data
                 )
-                # Atualizar status do item se necessário
-                return Response({'success': True, 'data': response})
+                
+                # Update item status from response
+                if response:
+                    item.status = response.get('status', item.status)
+                    item.execution_status = response.get('executionStatus', '')
+                    item.pluggy_updated_at = response.get('updatedAt', item.pluggy_updated_at)
+                    item.save()
+                
+                return Response({
+                    'success': True,
+                    'message': 'MFA sent successfully',
+                    'item_status': item.status
+                })
         except PluggyError as e:
+            logger.error(f"Failed to send MFA: {e}")
             return Response(
                 {'error': str(e)}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -222,49 +261,6 @@ class PluggyItemViewSet(viewsets.ModelViewSet):
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-    @action(detail=True, methods=['post'])
-    def send_mfa(self, request, pk=None):
-        """Send MFA parameter for 2-step authentication"""
-        item = self.get_object()
-        
-        # Validar se o item está esperando MFA
-        if item.status != 'WAITING_USER_INPUT':
-            return Response(
-                {'error': 'Item is not waiting for user input'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        serializer = MFASerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        try:
-            with PluggyClient() as client:
-                # Enviar MFA
-                response = client.send_item_mfa(
-                    item.pluggy_item_id,
-                    serializer.validated_data
-                )
-                
-                # Atualizar status do item
-                item_data = client.get_item(item.pluggy_item_id)
-                item.status = item_data['status']
-                item.execution_status = item_data.get('executionStatus', '')
-                item.pluggy_updated_at = item_data['updatedAt']
-                item.save()
-                
-                return Response({
-                    'success': True,
-                    'message': 'MFA sent successfully',
-                    'item_status': item.status
-                })
-                
-        except PluggyError as e:
-            logger.error(f"Failed to send MFA: {e}")
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
 
 
 
@@ -285,7 +281,7 @@ class BankAccountViewSet(viewsets.ReadOnlyModelViewSet):
     
     @action(detail=True, methods=['post'])
     def sync(self, request, pk=None):
-        """Sync specific account"""
+        """Sync specific account - triggers manual update"""
         account = self.get_object()
         
         try:
@@ -306,16 +302,33 @@ class BankAccountViewSet(viewsets.ReadOnlyModelViewSet):
                     'reconnection_required': True
                 }, status=status.HTTP_400_BAD_REQUEST)
             
+            # First, trigger an update via Pluggy API for manual sync
+            with PluggyClient() as client:
+                try:
+                    logger.info(f"Triggering manual update for item {account.item.pluggy_item_id}")
+                    update_response = client.update_item(account.item.pluggy_item_id, {})
+                    
+                    # Update item status
+                    account.item.status = update_response.get('status', account.item.status)
+                    account.item.execution_status = update_response.get('executionStatus', '')
+                    account.item.pluggy_updated_at = update_response.get('updatedAt', account.item.pluggy_updated_at)
+                    account.item.save()
+                    
+                except PluggyError as e:
+                    logger.warning(f"Failed to trigger Pluggy update: {e}")
+                    # Continue with sync even if update trigger fails
+            
             # Queue sync
             logger.info(f"Queuing sync for account {account.id} (item {account.item.id})")
-            task = sync_bank_account.delay(str(account.item.id), account_id=str(account.id))
+            task = sync_bank_account.delay(str(account.item.id), account_id=str(account.id), force_update=True)
             
             return Response({
                 'success': True,
-                'message': 'Sync started',
+                'message': 'Manual sync triggered successfully',
                 'data': {
                     'account': BankAccountSerializer(account).data,
-                    'task_id': task.id
+                    'task_id': task.id,
+                    'item_status': account.item.status
                 }
             })
             
