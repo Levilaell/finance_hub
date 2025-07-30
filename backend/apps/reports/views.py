@@ -428,23 +428,23 @@ class AnalyticsView(APIView):
         
         # Get transactions for period
         transactions = Transaction.objects.filter(
-            bank_account__in=accounts,
-            transaction_date__gte=start_datetime,
-            transaction_date__lte=end_datetime
+            account__in=accounts,
+            date__gte=start_datetime,
+            date__lte=end_datetime
         )
         
         # Income vs Expenses
         income = transactions.filter(
-            transaction_type__in=['credit', 'transfer_in', 'pix_in']
+            type='CREDIT'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
         
         expenses = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+            type='DEBIT'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
         
         # Top income sources
         top_income_sources = transactions.filter(
-            transaction_type__in=['credit', 'transfer_in', 'pix_in'],
+            type='CREDIT',
             counterpart_name__isnull=False
         ).values('counterpart_name').annotate(
             total=Sum('amount'),
@@ -453,7 +453,7 @@ class AnalyticsView(APIView):
         
         # Top expense categories
         top_expense_categories = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee'],
+            type='DEBIT',
             category__isnull=False
         ).values('category__name', 'category__icon').annotate(
             total=Sum('amount'),
@@ -476,16 +476,16 @@ class AnalyticsView(APIView):
             week_end_datetime = datetime.combine(week_end, datetime.max.time())
             
             week_transactions = transactions.filter(
-                transaction_date__gte=week_start_datetime,
-                transaction_date__lte=week_end_datetime
+                date__gte=week_start_datetime,
+                date__lte=week_end_datetime
             )
             
             week_income = week_transactions.filter(
-                transaction_type__in=['credit', 'transfer_in', 'pix_in']
+                type='CREDIT'
             ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
             
             week_expenses = week_transactions.filter(
-                transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+                type='DEBIT'
             ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
             
             weekly_trend.append({
@@ -572,18 +572,18 @@ class DashboardStatsView(APIView):
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
         transactions = Transaction.objects.filter(
-            bank_account__in=accounts,
-            transaction_date__gte=month_start
+            account__in=accounts,
+            date__gte=month_start
         )
         
         total_balance = accounts.aggregate(total=Sum('current_balance'))['total'] or Decimal('0')
         
         income = transactions.filter(
-            transaction_type__in=['credit', 'transfer_in', 'pix_in']
+            type='CREDIT'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
         
         expenses = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+            type='DEBIT'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
         
         return Response({
@@ -625,16 +625,16 @@ class CashFlowDataView(APIView):
         
         while current_date <= end_date:
             transactions = Transaction.objects.filter(
-                bank_account__in=accounts,
-                transaction_date__date=current_date
+                account__in=accounts,
+                date__date=current_date
             )
             
             daily_income = transactions.filter(
-                transaction_type__in=['credit', 'transfer_in', 'pix_in']
+                type='CREDIT'
             ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
             
             daily_expenses = transactions.filter(
-                transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+                type='DEBIT'
             ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
             
             running_balance += daily_income - abs(daily_expenses)
@@ -679,15 +679,15 @@ class CategorySpendingView(APIView):
         end_datetime = datetime.combine(end_date, datetime.max.time())
         
         if category_type == 'expense':
-            transaction_types = ['debit', 'transfer_out', 'pix_out', 'fee']
+            transaction_type = 'DEBIT'
         else:
-            transaction_types = ['credit', 'transfer_in', 'pix_in']
+            transaction_type = 'CREDIT'
         
         category_data = Transaction.objects.filter(
-            bank_account__in=accounts,
-            transaction_date__gte=start_datetime,
-            transaction_date__lte=end_datetime,
-            transaction_type__in=transaction_types,
+            account__in=accounts,
+            date__gte=start_datetime,
+            date__lte=end_datetime,
+            type=transaction_type,
             category__isnull=False
         ).values('category__name', 'category__icon').annotate(
             amount=Sum('amount'),
@@ -755,17 +755,17 @@ class IncomeVsExpensesView(APIView):
             month_end_datetime = datetime.combine(month_end, datetime.max.time())
             
             transactions = Transaction.objects.filter(
-                bank_account__in=accounts,
-                transaction_date__gte=current_datetime,
-                transaction_date__lte=month_end_datetime
+                account__in=accounts,
+                date__gte=current_datetime,
+                date__lte=month_end_datetime
             )
             
             income = transactions.filter(
-                transaction_type__in=['credit', 'transfer_in', 'pix_in']
+                type='CREDIT'
             ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
             
             expenses = transactions.filter(
-                transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+                type='DEBIT'
             ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
             
             monthly_data.append({
