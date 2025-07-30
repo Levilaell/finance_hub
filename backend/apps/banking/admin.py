@@ -125,7 +125,9 @@ class BankAccountAdmin(admin.ModelAdmin):
     )
     
     def balance_display(self, obj):
-        return f'{obj.currency_code} {obj.balance:,.2f}'
+        if obj.balance is not None:
+            return f'{obj.currency_code} {obj.balance:,.2f}'
+        return f'{obj.currency_code} -'
     balance_display.short_description = 'Balance'
     
     def item_status(self, obj):
@@ -194,11 +196,11 @@ class TransactionAdmin(admin.ModelAdmin):
         color = 'green' if obj.type == 'CREDIT' else 'red'
         sign = '+' if obj.type == 'CREDIT' else '-'
         return format_html(
-            '<span style="color: {};">{}{} {:.2f}</span>',
+            '<span style="color: {};">{}{} {}</span>',
             color,
             sign,
             obj.currency_code,
-            abs(obj.amount)
+            '{:.2f}'.format(abs(float(obj.amount)))
         )
     amount_display.short_description = 'Amount'
     
