@@ -167,6 +167,22 @@ def sync_bank_account(self, item_id: str, account_id: Optional[str] = None, forc
             # Update last successful update
             if any(r['success'] for r in sync_results):
                 item.last_successful_update = timezone.now()
+                
+                # Update status to UPDATED if sync was successful and we're in UPDATING status
+                if item.status == 'UPDATING':
+                    # Check with Pluggy API for latest status
+                    try:
+                        latest_item_data = client.get_item(item.pluggy_item_id)
+                        item.status = latest_item_data.get('status', item.status)
+                        item.execution_status = latest_item_data.get('executionStatus', item.execution_status)
+                        logger.info(f"Updated item status from API: {item.status}, execution: {item.execution_status}")
+                    except Exception as e:
+                        logger.warning(f"Failed to get latest status from API: {e}")
+                        # If we can't get from API but sync was successful, update to UPDATED
+                        if item.execution_status in ['SUCCESS', 'PARTIAL_SUCCESS']:
+                            item.status = 'UPDATED'
+                            logger.info(f"Updated item status to UPDATED based on successful sync")
+                
                 item.save()
             
             # Calculate total transactions synced
@@ -537,8 +553,28 @@ def _handle_item_updated(data: Dict):
     try:
         item = PluggyItem.objects.get(pluggy_item_id=data['id'])
         
-        # Queue sync
-        sync_bank_account.delay(str(item.id))
+        # Update status from webhook data if provided
+        status_changed = False
+        if 'status' in data:
+            old_status = item.status
+            item.status = data['status']
+            status_changed = old_status != item.status
+            logger.info(f"Item {item.pluggy_item_id} status changed: {old_status} -> {item.status}")
+        
+        if 'executionStatus' in data:
+            item.execution_status = data['executionStatus']
+            logger.info(f"Item {item.pluggy_item_id} execution status: {item.execution_status}")
+        
+        if 'updatedAt' in data:
+            item.pluggy_updated_at = data['updatedAt']
+        
+        # Save changes
+        item.save()
+        
+        # Queue sync if status indicates data is available
+        if item.status in ['UPDATED', 'OUTDATED'] or (item.status == 'UPDATING' and status_changed):
+            logger.info(f"Queuing sync for item {item.pluggy_item_id} with status {item.status}")
+            sync_bank_account.delay(str(item.id))
         
     except PluggyItem.DoesNotExist:
         logger.warning(f"Item {data['id']} not found for update event")
