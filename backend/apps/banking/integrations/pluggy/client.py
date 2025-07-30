@@ -257,7 +257,11 @@ class PluggyClient:
         item_id: Optional[str] = None,
         webhook_url: Optional[str] = None,
         oauth_redirect_uri: Optional[str] = None,
-        avoid_duplicates: Optional[bool] = None
+        avoid_duplicates: Optional[bool] = None,
+        country_codes: Optional[List[str]] = None,
+        connector_types: Optional[List[str]] = None,
+        connector_ids: Optional[List[int]] = None,
+        products_types: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Create a connect token for Pluggy Connect
@@ -268,6 +272,10 @@ class PluggyClient:
             webhook_url: URL to receive item events
             oauth_redirect_uri: Redirect URL after connect flow
             avoid_duplicates: Prevent creating duplicate items
+            country_codes: List of country codes to filter connectors (e.g., ['BR', 'US'])
+            connector_types: List of connector types to filter (e.g., ['PERSONAL_BANK', 'BUSINESS_BANK'])
+            connector_ids: List of specific connector IDs to show
+            products_types: List of product types to enable (e.g., ['ACCOUNTS', 'TRANSACTIONS'])
             
         Returns:
             Dict with accessToken and other connection details
@@ -286,6 +294,14 @@ class PluggyClient:
             payload["oauthRedirectUri"] = oauth_redirect_uri
         if avoid_duplicates is not None:
             payload["avoidDuplicates"] = avoid_duplicates
+        if country_codes:
+            payload["countryCodes"] = country_codes
+        if connector_types:
+            payload["connectorTypes"] = connector_types
+        if connector_ids:
+            payload["connectorIds"] = connector_ids
+        if products_types:
+            payload["productsTypes"] = products_types
             
         # Use correct endpoint with underscore
         return self._make_request("POST", "connect_token", data=payload)
@@ -328,13 +344,33 @@ class PluggyClient:
         data = {"transactions": transactions}
         return self._make_request('POST', 'categorize', data=data)
     
+    def update_transaction_category(self, transaction_id: str, category_id: str) -> Dict[str, Any]:
+        """
+        Update a transaction's category
+        This provides feedback to Pluggy's categorization model
+        
+        Args:
+            transaction_id: The transaction ID to update
+            category_id: The new category ID
+            
+        Returns:
+            Updated transaction data
+        """
+        data = {"categoryId": category_id}
+        return self._make_request('PATCH', f'transactions/{transaction_id}', data=data)
+    
     # ===== Webhook Validation =====
     
     def validate_webhook_signature(self, signature: str, payload: bytes) -> bool:
         """
-        Basic webhook validation
-        Note: Pluggy documentation doesn't specify signature validation method
-        This implementation provides basic content validation
+        Validate webhook signature using HMAC-SHA256
+        
+        Args:
+            signature: The X-Pluggy-Signature header value
+            payload: The raw request body bytes
+            
+        Returns:
+            bool: True if signature is valid, False otherwise
         """
         if not signature:
             logger.warning("No signature provided for webhook validation")
@@ -344,7 +380,33 @@ class PluggyClient:
             logger.warning("Empty payload for webhook validation")
             return False
         
-        # TODO: Implement proper signature validation when Pluggy provides specification
-        # For now, accept all webhooks with signatures
-        logger.info(f"Webhook received with signature: {signature[:10]}...")
-        return True
+        # Get webhook secret from settings
+        webhook_secret = getattr(settings, 'PLUGGY_WEBHOOK_SECRET', None)
+        if not webhook_secret:
+            logger.warning("PLUGGY_WEBHOOK_SECRET not configured, accepting webhook without validation")
+            return True
+        
+        try:
+            import hmac
+            import hashlib
+            
+            # Compute expected signature
+            expected_signature = hmac.new(
+                webhook_secret.encode('utf-8'),
+                payload,
+                hashlib.sha256
+            ).hexdigest()
+            
+            # Compare signatures (constant time comparison to prevent timing attacks)
+            is_valid = hmac.compare_digest(signature.lower(), expected_signature.lower())
+            
+            if not is_valid:
+                logger.warning(f"Invalid webhook signature. Expected: {expected_signature[:10]}..., Got: {signature[:10]}...")
+            else:
+                logger.info("Webhook signature validated successfully")
+                
+            return is_valid
+            
+        except Exception as e:
+            logger.error(f"Error validating webhook signature: {e}")
+            return False

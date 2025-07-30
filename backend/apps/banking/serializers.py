@@ -147,6 +147,28 @@ class PluggyConnectTokenSerializer(serializers.Serializer):
     item_id = serializers.CharField(required=False, allow_blank=True)
     client_user_id = serializers.CharField(required=False)
     webhook_url = serializers.CharField(required=False)
+    oauth_redirect_uri = serializers.CharField(required=False)
+    avoid_duplicates = serializers.BooleanField(required=False, default=None)
+    country_codes = serializers.ListField(
+        child=serializers.CharField(max_length=2),
+        required=False,
+        help_text="List of country codes (e.g., ['BR', 'US'])"
+    )
+    connector_types = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        help_text="List of connector types (e.g., ['PERSONAL_BANK', 'BUSINESS_BANK'])"
+    )
+    connector_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        help_text="List of specific connector IDs to show"
+    )
+    products_types = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        help_text="List of product types (e.g., ['ACCOUNTS', 'TRANSACTIONS'])"
+    )
     
     def validate(self, attrs):
         """Validate token request"""

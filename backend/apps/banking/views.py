@@ -436,9 +436,47 @@ class TransactionViewSet(viewsets.ModelViewSet):
         )
     
     def update(self, request, *args, **kwargs):
-        """Allow partial updates (category, notes, tags)"""
-        partial = kwargs.pop('partial', True)
-        return super().update(request, *args, partial=partial, **kwargs)
+        """Allow partial updates (category, notes, tags) and sync with Pluggy"""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        
+        # Check if category is being updated
+        if 'category' in serializer.validated_data:
+            new_category = serializer.validated_data['category']
+            if new_category and instance.pluggy_transaction_id:
+                try:
+                    # Find the Pluggy category ID for this category
+                    pluggy_category = None
+                    if hasattr(new_category, 'pluggy_mappings'):
+                        # Get the first Pluggy mapping if available
+                        pluggy_mapping = new_category.pluggy_mappings.first()
+                        if pluggy_mapping:
+                            pluggy_category = pluggy_mapping.id
+                    
+                    # If we have a Pluggy category ID, sync with Pluggy
+                    if pluggy_category:
+                        with PluggyClient() as client:
+                            client.update_transaction_category(
+                                instance.pluggy_transaction_id,
+                                pluggy_category
+                            )
+                            logger.info(f"Synced category update to Pluggy for transaction {instance.pluggy_transaction_id}")
+                    else:
+                        logger.warning(f"No Pluggy category mapping found for category {new_category.name}")
+                        
+                except PluggyError as e:
+                    logger.error(f"Failed to sync category with Pluggy: {e}")
+                    # Continue with local update even if Pluggy sync fails
+                except Exception as e:
+                    logger.error(f"Unexpected error syncing with Pluggy: {e}")
+        
+        self.perform_update(serializer)
+        
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+            
+        return Response(serializer.data)
     
     @action(detail=False, methods=['post'])
     def bulk_categorize(self, request):
@@ -531,11 +569,17 @@ class PluggyConnectView(APIView):
         
         try:
             with PluggyClient() as client:
-                # Create connect token
+                # Create connect token with all supported parameters
                 token_data = client.create_connect_token(
                     client_user_id=str(request.user.id),
                     item_id=serializer.validated_data.get('item_id'),
-                    webhook_url=serializer.validated_data.get('webhook_url')
+                    webhook_url=serializer.validated_data.get('webhook_url'),
+                    oauth_redirect_uri=serializer.validated_data.get('oauth_redirect_uri'),
+                    avoid_duplicates=serializer.validated_data.get('avoid_duplicates'),
+                    country_codes=serializer.validated_data.get('country_codes'),
+                    connector_types=serializer.validated_data.get('connector_types'),
+                    connector_ids=serializer.validated_data.get('connector_ids'),
+                    products_types=serializer.validated_data.get('products_types')
                 )
                 
                 # Build connect URL if not provided
