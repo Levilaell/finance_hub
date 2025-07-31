@@ -97,6 +97,36 @@ app.conf.beat_schedule = {
             'expires': 60 * 60 * 6,  # Expire after 6 hours if not executed
         }
     },
+    
+    # AI Insights tasks
+    'generate-daily-insights': {
+        'task': 'apps.ai_insights.tasks.generate_all_company_insights',
+        'schedule': crontab(hour=7, minute=0),  # Daily at 7 AM
+        'options': {
+            'expires': 60 * 60 * 4,  # Expire after 4 hours if not executed
+        }
+    },
+    'reset-ai-monthly-credits': {
+        'task': 'apps.ai_insights.tasks.reset_monthly_credits',
+        'schedule': crontab(day_of_month=1, hour=0, minute=30),  # 1st of each month at 00:30
+        'options': {
+            'expires': 60 * 60 * 6,  # Expire after 6 hours if not executed
+        }
+    },
+    'cleanup-old-ai-insights': {
+        'task': 'apps.ai_insights.tasks.cleanup_old_insights',
+        'schedule': crontab(day_of_week=0, hour=2, minute=0),  # Weekly on Sunday at 2 AM
+        'options': {
+            'expires': 60 * 60 * 4,  # Expire after 4 hours if not executed
+        }
+    },
+    'sync-ai-credit-metrics': {
+        'task': 'apps.ai_insights.tasks.sync_credit_usage_metrics',
+        'schedule': 60.0 * 60.0,  # Every hour
+        'options': {
+            'expires': 60 * 30,  # Expire after 30 minutes if not executed
+        }
+    },
 }
 
 # Timezone configuration
@@ -108,6 +138,7 @@ app.conf.task_routes = {
     'apps.companies.tasks.*': {'queue': 'billing'},
     'apps.reports.tasks.*': {'queue': 'reports'},
     'apps.notifications.tasks.*': {'queue': 'notifications'},
+    'apps.ai_insights.tasks.*': {'queue': 'ai_insights'},
 }
 
 # Task result backend configuration

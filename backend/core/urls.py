@@ -48,6 +48,7 @@ def api_root(request):
             'reports': '/api/reports/',
             'notifications': '/api/notifications/',
             'payments': '/api/payments/',
+            'ai_insights': '/api/ai-insights/',
             'documentation': '/swagger/',
             'admin': '/admin/'
         }
@@ -73,6 +74,7 @@ schema_view = get_schema_view(
             path('reports/', include('apps.reports.urls')),
             path('notifications/', include('apps.notifications.urls')),
             path('payments/', include('apps.payments.urls')),
+            path('ai-insights/', include('apps.ai_insights.urls')),
         ])),
     ],
 )
@@ -93,6 +95,7 @@ urlpatterns = [
     path('api/reports/', include('apps.reports.urls')),
     path('api/notifications/', include('apps.notifications.urls')),
     path('api/payments/', include('apps.payments.urls')),
+    path('api/ai-insights/', include('apps.ai_insights.urls')),
     
     # API Documentation
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
