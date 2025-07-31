@@ -2,13 +2,12 @@
 Authentication views
 """
 import secrets
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import generics, status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
+from rest_framework.throttling import AnonRateThrottle
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
@@ -16,7 +15,6 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.views import TokenRefreshView
 
 from .models import EmailVerification, PasswordReset
 from .serializers import (
@@ -26,9 +24,7 @@ from .serializers import (
     LoginSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
-    RefreshTokenSerializer,
     RegisterSerializer,
-    TokenSerializer,
     UserSerializer,
 )
 from .utils import (
@@ -42,9 +38,6 @@ from .utils import (
 )
 
 User = get_user_model()
-
-
-# Debug endpoint removed for security in production
 
 
 # Custom throttle classes  
@@ -389,17 +382,6 @@ class CustomTokenRefreshView(APIView):
             )
 
 
-# Health check endpoint removed - not used by frontend
-# @api_view(['GET'])
-# @permission_classes([AllowAny])
-# def health_check(request):
-#     """Health check endpoint"""
-#     return Response({
-#         'status': 'healthy',
-#         'timestamp': timezone.now()
-#     })
-
-
 @method_decorator(ratelimit(key='user', rate='5/h', method='GET'), name='dispatch')
 class Setup2FAView(APIView):
     """Setup 2FA for user"""
@@ -490,30 +472,6 @@ class Disable2FAView(APIView):
         return Response({
             'message': '2FA desativada com sucesso'
         })
-
-
-# BackupCodesView removed - not used by frontend
-# class BackupCodesView(APIView):
-#     """Regenerate backup codes"""
-#     permission_classes = [IsAuthenticated]
-#     
-#     def post(self, request):
-#         user = request.user
-#         
-#         if not user.is_two_factor_enabled:
-#             return Response({
-#                 'error': '2FA não está ativada'
-#             }, status=status.HTTP_400_BAD_REQUEST)
-#         
-#         # Regenerate hashed backup codes
-#         backup_codes = generate_backup_codes()
-#         user.backup_codes = hash_backup_codes(backup_codes)
-#         user.save()
-#         
-#         return Response({
-#             'backup_codes': backup_codes,  # Show plain codes only once
-#             'message': 'Novos códigos de backup gerados. Por favor, guarde-os com segurança.'
-#         })
 
 
 @method_decorator(ratelimit(key='user', rate='3/h', method='POST'), name='dispatch')
