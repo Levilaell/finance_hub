@@ -184,14 +184,13 @@ CELERY_RESULT_SERIALIZER = 'json'
 ASGI_APPLICATION = 'core.asgi.application'
 
 # Enhanced Security Settings
+# DEBUG will be set in environment-specific settings
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_AGE = 3600  # 1 hour
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 CSRF_COOKIE_HTTPONLY = True
-CSRF_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SAMESITE = 'Strict'
 CSRF_USE_SESSIONS = True
 
@@ -203,14 +202,13 @@ X_FRAME_OPTIONS = 'DENY'
 # JWT Cookie Configuration
 JWT_ACCESS_COOKIE_NAME = 'access_token'
 JWT_REFRESH_COOKIE_NAME = 'refresh_token'
-JWT_COOKIE_SECURE = not DEBUG
 JWT_COOKIE_HTTPONLY = True
 JWT_COOKIE_SAMESITE = 'Lax'
 JWT_COOKIE_PATH = '/'
 JWT_COOKIE_DOMAIN = os.environ.get('JWT_COOKIE_DOMAIN', None)
 
 # Request Signing
-REQUEST_SIGNING_KEY = os.environ.get('REQUEST_SIGNING_KEY', SECRET_KEY)
+REQUEST_SIGNING_KEY = os.environ.get('REQUEST_SIGNING_KEY', get_random_secret_key())
 
 # File Upload Settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
@@ -240,9 +238,8 @@ except Exception as e:
         'SIGNING_KEY': jwt_secret,
     })
 
-# Enhanced Security Settings
+# Authentication Backends
 AUTHENTICATION_BACKENDS = [
-    'apps.authentication.backends.EnhancedAuthenticationBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
