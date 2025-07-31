@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
-from apps.companies.models import Company, Plan, Subscription
+from apps.companies.models import Company, SubscriptionPlan
 from apps.ai_insights.models import AICredit, AICreditTransaction, AIConversation, AIMessage
 from apps.ai_insights.services.credit_service import CreditService, InsufficientCreditsError
 from apps.ai_insights.services.ai_service import AIService
@@ -21,93 +21,106 @@ class CreditServiceTest(TestCase):
     def setUp(self):
         self.service = CreditService()
         self.user = User.objects.create_user(
+            username='testuser',
             email='test@example.com',
-            password='testpass123'
+            password='testpass123',
+            first_name='Test',
+            last_name='User'
         )
-        self.plan = Plan.objects.create(
+        self.plan = SubscriptionPlan.objects.create(
             name='Professional',
+            slug='professional',
             plan_type='professional',
-            price=Decimal('99.90'),
+            price_monthly=Decimal('99.90'),
+            price_yearly=Decimal('999.00'),
             max_bank_accounts=10
         )
         self.company = Company.objects.create(
             name='Test Company',
-            owner=self.user
+            owner=self.user,
+            cnpj='12345678901234',
+            company_type='ltda',
+            business_sector='technology'
         )
-        self.subscription = Subscription.objects.create(
-            company=self.company,
-            plan=self.plan,
-            status='active'
-        )
+        # Set subscription plan on company
+        self.company.subscription_plan = self.plan
+        self.company.subscription_status = 'active'
+        self.company.save()
     
-    def test_get_or_create_credit_balance(self):
-        """Test getting or creating credit balance"""
-        # First call creates
-        credit = self.service.get_or_create_credit_balance(self.company)
-        self.assertIsNotNone(credit)
-        self.assertEqual(credit.company, self.company)
+    def test_check_credits(self):
+        """Test checking credit availability"""
+        # First call should create credits and return availability
+        has_credits, message = self.service.check_credits(self.company)
+        self.assertTrue(has_credits)
+        self.assertIn('créditos disponíveis', message)
         
-        # Second call gets existing
-        credit2 = self.service.get_or_create_credit_balance(self.company)
-        self.assertEqual(credit.id, credit2.id)
+        # Verify credit was created
+        credit = AICredit.objects.get(company=self.company)
+        self.assertIsNotNone(credit)
     
-    def test_has_sufficient_credits(self):
-        """Test checking credit sufficiency"""
+    def test_check_credits_with_balance(self):
+        """Test checking credits with existing balance"""
         # Create credit with balance
         AICredit.objects.create(
             company=self.company,
-            balance=10
+            balance=50
         )
         
         # Test sufficient credits
-        self.assertTrue(self.service.has_sufficient_credits(self.company, 'chat_message'))
+        has_credits, message = self.service.check_credits(self.company)
+        self.assertTrue(has_credits)
+        self.assertIn('50', message)
         
-        # Test insufficient credits
-        self.assertFalse(self.service.has_sufficient_credits(self.company, 'report_generation'))
+        # Test no credits
+        credit = AICredit.objects.get(company=self.company)
+        credit.balance = 0
+        credit.bonus_credits = 0
+        credit.save()
+        
+        has_credits, message = self.service.check_credits(self.company)
+        self.assertFalse(has_credits)
+        self.assertIn('Sem créditos', message)
     
-    def test_debit_credits(self):
-        """Test debiting credits"""
+    def test_use_credits(self):
+        """Test using credits"""
         # Create initial balance
         credit = AICredit.objects.create(
             company=self.company,
             balance=50
         )
         
-        # Debit credits
-        new_balance = self.service.debit_credits(
+        # Use credits
+        result = self.service.use_credits(
             company=self.company,
             amount=5,
-            description='Test debit',
+            description='Test usage',
             metadata={'test': True}
         )
         
-        self.assertEqual(new_balance, 45)
+        self.assertEqual(result['credits_used'], 5)
+        self.assertEqual(result['credits_remaining'], 45)
         
         # Check transaction was created
-        transaction = AICreditTransaction.objects.filter(
-            company=self.company,
-            type='usage'
-        ).first()
-        
+        transaction = result['transaction']
         self.assertIsNotNone(transaction)
         self.assertEqual(transaction.amount, -5)
         self.assertEqual(transaction.balance_before, 50)
         self.assertEqual(transaction.balance_after, 45)
         self.assertTrue(transaction.metadata['test'])
     
-    def test_debit_credits_insufficient(self):
-        """Test debiting with insufficient credits"""
+    def test_use_credits_insufficient(self):
+        """Test using credits with insufficient balance"""
         AICredit.objects.create(
             company=self.company,
             balance=3
         )
         
-        # Try to debit more than available
+        # Try to use more than available
         with self.assertRaises(InsufficientCreditsError):
-            self.service.debit_credits(
+            self.service.use_credits(
                 company=self.company,
                 amount=5,
-                description='Test debit'
+                description='Test usage'
             )
     
     def test_add_credits(self):
@@ -143,47 +156,58 @@ class CreditServiceTest(TestCase):
         self.assertEqual(transaction.amount, 100)
         self.assertEqual(transaction.metadata['payment_id'], 'pay_123')
     
-    def test_add_monthly_credits(self):
-        """Test adding monthly plan credits"""
+    def test_monthly_credit_reset(self):
+        """Test monthly credit reset functionality"""
+        # Create old credit record
+        old_date = timezone.now() - timezone.timedelta(days=35)
         credit = AICredit.objects.create(
             company=self.company,
             balance=5,
-            monthly_allowance=0
+            monthly_allowance=100,
+            last_reset=old_date
         )
         
-        # Mock plan credits
-        with patch.object(self.service, '_get_plan_credits', return_value=100):
-            self.service.add_monthly_credits(self.company)
+        # Check credits should trigger reset
+        has_credits, message = self.service.check_credits(self.company)
         
+        # Verify reset occurred
         credit.refresh_from_db()
-        self.assertEqual(credit.balance, 105)  # 5 + 100
+        self.assertEqual(credit.balance, 100)  # Reset to monthly allowance
         
-        # Check transaction
+        # Check transaction was created
         transaction = AICreditTransaction.objects.filter(
             company=self.company,
             type='monthly_reset'
         ).first()
         
         self.assertIsNotNone(transaction)
-        self.assertEqual(transaction.amount, 100)
     
-    def test_check_and_reset_monthly_credits(self):
-        """Test monthly credit reset logic"""
-        # Create credit with old reset date
-        old_reset = timezone.now() - timezone.timedelta(days=35)
-        credit = AICredit.objects.create(
+    def test_get_credit_history(self):
+        """Test getting credit history and statistics"""
+        # Create some transactions
+        AICredit.objects.create(
             company=self.company,
             balance=50,
             monthly_allowance=100,
-            last_reset=old_reset
+            total_purchased=200
         )
         
-        with patch.object(self.service, '_get_plan_credits', return_value=100):
-            self.service.check_and_reset_monthly_credits(self.company)
+        AICreditTransaction.objects.create(
+            company=self.company,
+            type='usage',
+            amount=-5,
+            balance_before=50,
+            balance_after=45,
+            description='Test usage'
+        )
         
-        credit.refresh_from_db()
-        self.assertEqual(credit.balance, 100)  # Reset to plan amount
-        self.assertGreater(credit.last_reset, old_reset)
+        # Get history
+        history = self.service.get_credit_history(self.company, days=30)
+        
+        self.assertEqual(history['current_balance'], 50)
+        self.assertEqual(history['monthly_allowance'], 100)
+        self.assertEqual(history['total_purchased'], 200)
+        self.assertIn('usage', history['statistics'])
 
 
 class AIServiceTest(TestCase):
@@ -192,12 +216,18 @@ class AIServiceTest(TestCase):
     def setUp(self):
         self.service = AIService()
         self.user = User.objects.create_user(
+            username='testuser',
             email='test@example.com',
-            password='testpass123'
+            password='testpass123',
+            first_name='Test',
+            last_name='User'
         )
         self.company = Company.objects.create(
             name='Test Company',
-            owner=self.user
+            owner=self.user,
+            cnpj='12345678901234',
+            company_type='ltda',
+            business_sector='technology'
         )
         self.conversation = AIConversation.objects.create(
             company=self.company,

@@ -43,15 +43,8 @@ PLUGGY_CLIENT_ID = 'test-pluggy-client-id'
 PLUGGY_CLIENT_SECRET = 'test-pluggy-client-secret'
 PLUGGY_USE_SANDBOX = True
 
-# Disable migrations during tests
-class DisableMigrations:
-    def __contains__(self, item):
-        return True
-
-    def __getitem__(self, item):
-        return None
-
-MIGRATION_MODULES = DisableMigrations()
+# Enable migrations for tests
+# MIGRATION_MODULES = {}
 
 # Password hashers - use faster hasher for tests
 PASSWORD_HASHERS = [
@@ -85,3 +78,17 @@ DEFAULT_TRIAL_DAYS = 14
 
 # Currency Settings
 DEFAULT_CURRENCY = 'BRL'
+
+# Disable middleware that requires additional dependencies in tests
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'apps.companies.middleware.TrialExpirationMiddleware',
+    # Skip AnomalyDetectionMiddleware in tests
+]

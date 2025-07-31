@@ -16,7 +16,6 @@ from .views import (
     Setup2FAView,
     Enable2FAView,
     Disable2FAView,
-    DebugRegisterView,
 )
 
 app_name = 'authentication'
@@ -50,5 +49,5 @@ urlpatterns = [
 # Debug endpoints only in development
 if settings.DEBUG:
     urlpatterns += [
-        path('register/debug/', DebugRegisterView.as_view(), name='register_debug'),
+        # Debug endpoints can be added here when needed
     ]

@@ -5,12 +5,18 @@ Gerenciamento de créditos AI
 from typing import Tuple, Dict, Any
 from decimal import Decimal
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 from datetime import timedelta
 
 from apps.companies.models import Company, PaymentMethod
 from apps.payments.services import StripeService
 from ..models import AICredit, AICreditTransaction
+
+
+class InsufficientCreditsError(Exception):
+    """Exception raised when company doesn't have enough credits"""
+    pass
 
 
 class CreditService:
@@ -97,7 +103,7 @@ class CreditService:
             # Verifica disponibilidade
             total_available = ai_credit.balance + ai_credit.bonus_credits
             if total_available < amount:
-                raise ValueError(
+                raise InsufficientCreditsError(
                     f"Créditos insuficientes. Disponível: {total_available}, "
                     f"Necessário: {amount}"
                 )

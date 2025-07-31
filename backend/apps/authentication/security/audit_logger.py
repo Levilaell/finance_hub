@@ -616,7 +616,7 @@ class SecurityReporter:
             'recommendations': self._generate_system_recommendations(),
         }
     
-    def _generate_security_recommendations(self, user: EnhancedUser, logs) -> List[str]:
+    def _generate_security_recommendations(self, user: EnhancedUser, logs) -> list[str]:
         """Generate personalized security recommendations"""
         recommendations = []
         
@@ -646,7 +646,7 @@ class SecurityReporter:
         
         return recommendations
     
-    def _generate_system_recommendations(self) -> List[str]:
+    def _generate_system_recommendations(self) -> list[str]:
         """Generate system-wide security recommendations"""
         recommendations = [
             "Review and investigate high-risk authentication events",

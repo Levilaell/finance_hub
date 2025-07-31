@@ -147,6 +147,7 @@ class AIConversationSerializer(serializers.ModelSerializer):
     """Serializer para conversas"""
     user_name = serializers.CharField(source='user.full_name', read_only=True)
     company_name = serializers.CharField(source='company.name', read_only=True)
+    company = serializers.CharField(source='company.id', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     last_message = serializers.SerializerMethodField()
     
@@ -160,7 +161,7 @@ class AIConversationSerializer(serializers.ModelSerializer):
             'updated_at', 'last_message_at'
         ]
         read_only_fields = [
-            'id', 'message_count', 'total_credits_used',
+            'id', 'user', 'message_count', 'total_credits_used',
             'insights_generated', 'created_at', 'updated_at',
             'last_message_at'
         ]

@@ -2,6 +2,7 @@
 Tests for AI Insights WebSocket consumers
 """
 import json
+from decimal import Decimal
 from unittest.mock import patch, MagicMock, AsyncMock
 from channels.testing import WebsocketCommunicator
 from channels.db import database_sync_to_async
@@ -9,7 +10,7 @@ from django.test import TransactionTestCase
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.companies.models import Company, Plan, Subscription
+from apps.companies.models import Company, SubscriptionPlan
 from apps.ai_insights.models import AICredit, AIConversation, AIMessage
 from apps.ai_insights.consumers import ChatConsumer
 from apps.ai_insights.routing import websocket_urlpatterns
@@ -39,17 +40,18 @@ class ChatConsumerTest(TransactionTestCase):
         self.user.save()
         
         # Create plan and subscription
-        self.plan = Plan.objects.create(
+        self.plan = SubscriptionPlan.objects.create(
             name='Professional',
+            slug='professional',
             plan_type='professional',
-            price=99.90
+            price_monthly=Decimal('99.90'),
+            price_yearly=Decimal('999.00')
         )
         
-        Subscription.objects.create(
-            company=self.company,
-            plan=self.plan,
-            status='active'
-        )
+        # Set subscription plan on company
+        self.company.subscription_plan = self.plan
+        self.company.subscription_status = 'active'
+        self.company.save()
         
         # Create AI credits
         AICredit.objects.create(

@@ -3,7 +3,7 @@ Enhanced authentication models with comprehensive security features
 """
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
-from django.utils import timezone
+from django.utils import timezone as django_timezone
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinLengthValidator
 from .security.encryption import default_encryption
@@ -95,7 +95,7 @@ class EnhancedUser(AbstractBaseUser, PermissionsMixin):
     # Timestamps
     created_at = models.DateTimeField(_('created at'), auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(_('updated at'), auto_now=True)
-    date_joined = models.DateTimeField(_('date joined'), default=timezone.now)
+    date_joined = models.DateTimeField(_('date joined'), default=django_timezone.now)
     
     # Payment Integration
     payment_customer_id = models.CharField(
@@ -167,7 +167,7 @@ class EnhancedUser(AbstractBaseUser, PermissionsMixin):
     def increment_failed_login(self):
         """Increment failed login attempts and lock if necessary"""
         self.failed_login_attempts += 1
-        self.last_failed_login = timezone.now()
+        self.last_failed_login = django_timezone.now()
         
         # Lock account after 5 failed attempts
         if self.failed_login_attempts >= 5:
@@ -184,7 +184,7 @@ class EnhancedUser(AbstractBaseUser, PermissionsMixin):
     def lock_account(self, duration_hours=1):
         """Lock account for specified duration"""
         self.is_locked = True
-        self.locked_until = timezone.now() + timedelta(hours=duration_hours)
+        self.locked_until = django_timezone.now() + timedelta(hours=duration_hours)
         self.save()
     
     def unlock_account(self):
@@ -197,7 +197,7 @@ class EnhancedUser(AbstractBaseUser, PermissionsMixin):
     def is_account_locked(self):
         """Check if account is currently locked"""
         if self.is_locked:
-            if self.locked_until and self.locked_until <= timezone.now():
+            if self.locked_until and self.locked_until <= django_timezone.now():
                 self.unlock_account()
                 return False
             return True
@@ -211,12 +211,12 @@ class EnhancedUser(AbstractBaseUser, PermissionsMixin):
         
         self.password_history.insert(0, {
             'hash': password_hash,
-            'created_at': timezone.now().isoformat()
+            'created_at': django_timezone.now().isoformat()
         })
         
         # Keep only last 5 passwords
         self.password_history = self.password_history[:5]
-        self.password_changed_at = timezone.now()
+        self.password_changed_at = django_timezone.now()
         self.save()
     
     def is_password_in_history(self, password):
@@ -233,8 +233,8 @@ class EnhancedUser(AbstractBaseUser, PermissionsMixin):
         self.active_sessions[session_key] = {
             'ip_address': ip_address,
             'user_agent': user_agent,
-            'created_at': timezone.now().isoformat(),
-            'last_activity': timezone.now().isoformat()
+            'created_at': django_timezone.now().isoformat(),
+            'last_activity': django_timezone.now().isoformat()
         }
         self.save()
     
@@ -256,8 +256,8 @@ class EnhancedUser(AbstractBaseUser, PermissionsMixin):
             'id': device_id,
             'name': name,
             'user_agent': user_agent,
-            'trusted_at': timezone.now().isoformat(),
-            'last_used': timezone.now().isoformat()
+            'trusted_at': django_timezone.now().isoformat(),
+            'last_used': django_timezone.now().isoformat()
         }
         
         if not isinstance(self.trusted_devices, list):
@@ -290,7 +290,7 @@ class EnhancedUser(AbstractBaseUser, PermissionsMixin):
             score += min(self.failed_login_attempts * 0.1, 0.3)
         
         # Account age
-        account_age = (timezone.now() - self.created_at).days
+        account_age = (django_timezone.now() - self.created_at).days
         if account_age < 7:
             score += 0.2
         elif account_age < 30:
@@ -302,7 +302,7 @@ class EnhancedUser(AbstractBaseUser, PermissionsMixin):
         
         # Password age
         if self.password_changed_at:
-            password_age = (timezone.now() - self.password_changed_at).days
+            password_age = (django_timezone.now() - self.password_changed_at).days
             if password_age > 90:
                 score += 0.1
         
@@ -346,7 +346,7 @@ class AuthenticationAuditLog(models.Model):
         related_name='audit_logs'
     )
     event_type = models.CharField(max_length=50, choices=EVENT_TYPES, db_index=True)
-    timestamp = models.DateTimeField(default=timezone.now, db_index=True)
+    timestamp = models.DateTimeField(default=django_timezone.now, db_index=True)
     
     # Request Information
     ip_address = models.GenericIPAddressField(null=True, db_index=True)
@@ -426,12 +426,12 @@ class SecureToken(models.Model):
         return (
             self.is_active and
             not self.used_at and
-            self.expires_at > timezone.now()
+            self.expires_at > django_timezone.now()
         )
     
     def mark_as_used(self):
         """Mark token as used"""
-        self.used_at = timezone.now()
+        self.used_at = django_timezone.now()
         self.is_active = False
         self.save()
 
@@ -446,7 +446,7 @@ class EmailVerificationToken(SecureToken):
     
     def save(self, *args, **kwargs):
         if not self.expires_at:
-            self.expires_at = timezone.now() + timedelta(days=7)
+            self.expires_at = django_timezone.now() + timedelta(days=7)
         super().save(*args, **kwargs)
 
 
@@ -460,7 +460,7 @@ class PasswordResetToken(SecureToken):
     
     def save(self, *args, **kwargs):
         if not self.expires_at:
-            self.expires_at = timezone.now() + timedelta(hours=2)  # Reduced from 24 hours
+            self.expires_at = django_timezone.now() + timedelta(hours=2)  # Reduced from 24 hours
         super().save(*args, **kwargs)
 
 
@@ -573,11 +573,11 @@ class RememberMeToken(models.Model):
     
     def is_valid(self):
         """Check if token is still valid"""
-        return self.is_active and self.expires_at > timezone.now()
+        return self.is_active and self.expires_at > django_timezone.now()
     
     def update_last_used(self):
         """Update last used timestamp"""
-        self.last_used = timezone.now()
+        self.last_used = django_timezone.now()
         self.save()
 
 
@@ -614,7 +614,7 @@ class SecurityEvent(models.Model):
         ]
     )
     
-    timestamp = models.DateTimeField(default=timezone.now, db_index=True)
+    timestamp = models.DateTimeField(default=django_timezone.now, db_index=True)
     
     # Event Details
     ip_address = models.GenericIPAddressField(null=True)

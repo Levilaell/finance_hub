@@ -63,7 +63,7 @@ export default function ForgotPasswordPage() {
         <CardContent>
           <div className="space-y-4">
             <p className="text-sm text-center text-gray-600">
-              O link expirará em 24 horas por questões de segurança.
+              O link expirará em 2 horas por questões de segurança.
             </p>
             <p className="text-sm text-center text-gray-600">
               Não recebeu o e-mail? Verifique sua pasta de spam ou{' '}

@@ -47,16 +47,16 @@ LOCAL_APPS = [
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
+    'apps.authentication.middleware.SecurityHeadersMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
-    'apps.authentication.middleware.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    'apps.authentication.middleware.CSRFExemptionMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'apps.authentication.middleware.SessionSecurityMiddleware',
-    'apps.authentication.middleware.RequestLoggingMiddleware',
+    'apps.authentication.middleware.SecureJWTAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -183,11 +183,34 @@ CELERY_RESULT_SERIALIZER = 'json'
 # Channels Configuration
 ASGI_APPLICATION = 'core.asgi.application'
 
-# Security Settings
+# Enhanced Security Settings
 SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_AGE = 3600  # 1 hour
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
 CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SAMESITE = 'Strict'
+CSRF_USE_SESSIONS = True
+
 SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 X_FRAME_OPTIONS = 'DENY'
+
+# JWT Cookie Configuration
+JWT_ACCESS_COOKIE_NAME = 'access_token'
+JWT_REFRESH_COOKIE_NAME = 'refresh_token'
+JWT_COOKIE_SECURE = not DEBUG
+JWT_COOKIE_HTTPONLY = True
+JWT_COOKIE_SAMESITE = 'Lax'
+JWT_COOKIE_PATH = '/'
+JWT_COOKIE_DOMAIN = os.environ.get('JWT_COOKIE_DOMAIN', None)
+
+# Request Signing
+REQUEST_SIGNING_KEY = os.environ.get('REQUEST_SIGNING_KEY', SECRET_KEY)
 
 # File Upload Settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB

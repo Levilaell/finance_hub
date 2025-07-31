@@ -2,6 +2,7 @@
 AI Insights views
 APIs para chat com IA, gerenciamento de créditos e insights
 """
+import logging
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -9,6 +10,8 @@ from django.db.models import Q, Count, Sum, Avg
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from django.core.exceptions import ValidationError
+from rest_framework.throttling import UserRateThrottle
 
 from apps.companies.models import Company
 from apps.companies.permissions import IsCompanyOwnerOrStaff
@@ -33,6 +36,42 @@ from .serializers import (
 )
 from .services import AIService, CreditService
 from .services.export_service import ExportService
+from .services.credit_service import InsufficientCreditsError
+
+logger = logging.getLogger(__name__)
+
+
+class AIInsightsRateThrottle(UserRateThrottle):
+    """Custom throttle for AI operations"""
+    scope = 'ai_operations'
+    rate = '100/hour'  # Max 100 AI operations per hour per user
+
+
+class StandardAPIResponse:
+    """Standardized API response format"""
+    
+    @staticmethod
+    def success(data=None, message=None, status_code=status.HTTP_200_OK):
+        """Success response format"""
+        response_data = {
+            'success': True,
+            'data': data,
+            'message': message,
+            'timestamp': timezone.now().isoformat()
+        }
+        return Response(response_data, status=status_code)
+    
+    @staticmethod
+    def error(error=None, message=None, status_code=status.HTTP_400_BAD_REQUEST, error_code=None):
+        """Error response format"""
+        response_data = {
+            'success': False,
+            'error': error,
+            'message': message,
+            'error_code': error_code,
+            'timestamp': timezone.now().isoformat()
+        }
+        return Response(response_data, status=status_code)
 
 
 class AICreditViewSet(viewsets.ReadOnlyModelViewSet):
@@ -84,13 +123,16 @@ class AICreditViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = AICreditTransactionSerializer(queryset, many=True)
         return Response(serializer.data)
     
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['post'], throttle_classes=[AIInsightsRateThrottle])
     def purchase(self, request):
         """Compra de créditos avulsos"""
-        serializer = CreditPurchaseSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
         try:
+            serializer = CreditPurchaseSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            
+            # Log attempt
+            logger.info(f"Credit purchase attempt by user {request.user.id} for company {request.user.company.id}")
+            
             # Processa compra via CreditService
             result = CreditService.purchase_credits(
                 company=request.user.company,
@@ -99,18 +141,40 @@ class AICreditViewSet(viewsets.ReadOnlyModelViewSet):
                 user=request.user
             )
             
-            return Response({
-                'success': True,
-                'transaction_id': result['transaction'].id,
-                'new_balance': result['new_balance'],
-                'message': f"{serializer.validated_data['amount']} créditos adicionados com sucesso!"
-            })
+            logger.info(f"Credit purchase successful: {result['transaction'].id}")
             
+            return StandardAPIResponse.success(
+                data={
+                    'transaction_id': str(result['transaction'].id),
+                    'new_balance': result['new_balance'],
+                    'credits_purchased': serializer.validated_data['amount']
+                },
+                message=f"{serializer.validated_data['amount']} créditos adicionados com sucesso!",
+                status_code=status.HTTP_201_CREATED
+            )
+            
+        except ValidationError as e:
+            logger.warning(f"Credit purchase validation error: {str(e)}")
+            return StandardAPIResponse.error(
+                error=str(e),
+                message="Dados de compra inválidos",
+                error_code="VALIDATION_ERROR"
+            )
+        except ValueError as e:
+            logger.warning(f"Credit purchase value error: {str(e)}")
+            return StandardAPIResponse.error(
+                error=str(e),
+                message="Pacote de créditos inválido",
+                error_code="INVALID_PACKAGE"
+            )
         except Exception as e:
-            return Response({
-                'success': False,
-                'error': str(e)
-            }, status=status.HTTP_400_BAD_REQUEST)
+            logger.error(f"Credit purchase error: {str(e)}", exc_info=True)
+            return StandardAPIResponse.error(
+                error="Erro interno no processamento",
+                message="Erro ao processar compra de créditos",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                error_code="PURCHASE_ERROR"
+            )
 
 
 class AIConversationViewSet(viewsets.ModelViewSet):
@@ -232,32 +296,41 @@ class AIConversationViewSet(viewsets.ModelViewSet):
             'top_expenses': top_expense_categories
         }
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], throttle_classes=[AIInsightsRateThrottle])
     def send_message(self, request, pk=None):
         """Envia mensagem no chat"""
-        conversation = self.get_object()
-        
-        # Verifica se conversa está ativa
-        if conversation.status != 'active':
-            return Response({
-                'error': 'Conversa arquivada ou excluída'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Valida dados
-        serializer = ChatMessageSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        # Verifica créditos
-        has_credits, message = CreditService.check_credits(
-            conversation.company
-        )
-        if not has_credits:
-            return Response({
-                'error': message,
-                'credits_available': 0
-            }, status=status.HTTP_402_PAYMENT_REQUIRED)
-        
         try:
+            conversation = self.get_object()
+            
+            # Verifica se conversa está ativa
+            if conversation.status != 'active':
+                logger.warning(f"Attempt to send message to inactive conversation {pk}")
+                return StandardAPIResponse.error(
+                    error="Conversa não está ativa",
+                    message="Esta conversa foi arquivada ou excluída",
+                    error_code="CONVERSATION_INACTIVE"
+                )
+            
+            # Valida dados
+            serializer = ChatMessageSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            
+            # Verifica créditos
+            has_credits, credit_message = CreditService.check_credits(
+                conversation.company
+            )
+            if not has_credits:
+                logger.warning(f"Insufficient credits for company {conversation.company.id}")
+                return StandardAPIResponse.error(
+                    error=credit_message,
+                    message="Créditos insuficientes para processar mensagem",
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    error_code="INSUFFICIENT_CREDITS"
+                )
+            
+            # Log message processing attempt
+            logger.info(f"Processing AI message for conversation {pk} by user {request.user.id}")
+            
             # Processa mensagem via AIService
             result = AIService.process_message(
                 conversation=conversation,
@@ -269,18 +342,46 @@ class AIConversationViewSet(viewsets.ModelViewSet):
             # Serializa resposta
             message_serializer = AIMessageSerializer(result['ai_message'])
             
-            return Response({
-                'success': True,
-                'message': message_serializer.data,
-                'credits_used': result['credits_used'],
-                'credits_remaining': result['credits_remaining'],
-                'insights': result.get('insights', [])
-            })
+            logger.info(f"AI message processed successfully: {result['ai_message'].id}")
             
+            return StandardAPIResponse.success(
+                data={
+                    'message': message_serializer.data,
+                    'credits_used': result['credits_used'],
+                    'credits_remaining': result['credits_remaining'],
+                    'insights': [{
+                        'id': str(insight.id),
+                        'title': insight.title,
+                        'priority': insight.priority
+                    } for insight in result.get('insights', [])]
+                },
+                message="Mensagem processada com sucesso",
+                status_code=status.HTTP_201_CREATED
+            )
+            
+        except InsufficientCreditsError as e:
+            logger.warning(f"Insufficient credits error: {str(e)}")
+            return StandardAPIResponse.error(
+                error=str(e),
+                message="Créditos insuficientes",
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                error_code="INSUFFICIENT_CREDITS"
+            )
+        except ValidationError as e:
+            logger.warning(f"Message validation error: {str(e)}")
+            return StandardAPIResponse.error(
+                error=str(e),
+                message="Dados da mensagem inválidos",
+                error_code="VALIDATION_ERROR"
+            )
         except Exception as e:
-            return Response({
-                'error': f'Erro ao processar mensagem: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error(f"Error processing AI message: {str(e)}", exc_info=True)
+            return StandardAPIResponse.error(
+                error="Erro interno no processamento",
+                message="Erro ao processar mensagem com IA",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                error_code="MESSAGE_PROCESSING_ERROR"
+            )
     
     @action(detail=True, methods=['post'])
     def archive(self, request, pk=None):

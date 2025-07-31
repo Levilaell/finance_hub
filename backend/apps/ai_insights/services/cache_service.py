@@ -73,13 +73,13 @@ class CacheService:
             
             # Saldo atual total
             current_balance = accounts.aggregate(
-                total=Sum('current_balance')
+                total=Sum('balance')
             )['total'] or 0
             
             # Transações do período
             transactions = Transaction.objects.filter(
-                bank_account__company_id=company_id,
-                transaction_date__gte=start_date
+                account__company_id=company_id,
+                date__gte=start_date
             )
             
             # Estatísticas básicas
@@ -113,15 +113,15 @@ class CacheService:
             previous_week = now - timedelta(days=14)
             
             recent_flow = transactions.filter(
-                transaction_date__gte=last_week
+                date__gte=last_week
             ).aggregate(
                 income=Sum('amount', filter=Q(amount__gt=0)),
                 expenses=Sum('amount', filter=Q(amount__lt=0))
             )
             
             previous_flow = transactions.filter(
-                transaction_date__gte=previous_week,
-                transaction_date__lt=last_week
+                date__gte=previous_week,
+                date__lt=last_week
             ).aggregate(
                 income=Sum('amount', filter=Q(amount__gt=0)),
                 expenses=Sum('amount', filter=Q(amount__lt=0))
@@ -216,9 +216,9 @@ class CacheService:
                 
                 # Transações do mês
                 month_transactions = Transaction.objects.filter(
-                    bank_account__company_id=company_id,
-                    transaction_date__gte=month_start,
-                    transaction_date__lt=month_end
+                    account__company_id=company_id,
+                    date__gte=month_start,
+                    date__lt=month_end
                 )
                 
                 # Estatísticas do mês
@@ -275,8 +275,8 @@ class CacheService:
             start_date = now - timedelta(days=days)
             
             transactions = Transaction.objects.filter(
-                bank_account__company_id=company_id,
-                transaction_date__gte=start_date
+                account__company_id=company_id,
+                date__gte=start_date
             )
             
             # Estatísticas por tipo

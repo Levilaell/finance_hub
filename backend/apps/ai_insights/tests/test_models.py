@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
-from apps.companies.models import Company, Plan, Subscription
+from apps.companies.models import Company, SubscriptionPlan
 from apps.ai_insights.models import (
     AICredit, AICreditTransaction, AIConversation, 
     AIMessage, AIInsight
@@ -21,27 +21,31 @@ class AICreditModelTest(TestCase):
     
     def setUp(self):
         self.user = User.objects.create_user(
+            username='testuser',
             email='test@example.com',
-            password='testpass123'
+            password='testpass123',
+            first_name='Test',
+            last_name='User'
         )
-        self.plan = Plan.objects.create(
+        self.plan = SubscriptionPlan.objects.create(
             name='Professional',
+            slug='professional',
             plan_type='professional',
-            price=Decimal('99.90'),
+            price_monthly=Decimal('99.90'),
+            price_yearly=Decimal('999.00'),
             max_bank_accounts=10,
-            max_transactions=5000,
-            max_users=5
+            max_transactions=5000
         )
         self.company = Company.objects.create(
             name='Test Company',
             owner=self.user,
-            document='12345678901234'
+            cnpj='12345678901234',
+            company_type='ltda',
+            business_sector='technology'
         )
-        Subscription.objects.create(
-            company=self.company,
-            plan=self.plan,
-            status='active'
-        )
+        self.company.subscription_plan = self.plan
+        self.company.subscription_status = 'active'
+        self.company.save()
     
     def test_create_ai_credit(self):
         """Test creating AI credit for company"""
@@ -78,7 +82,7 @@ class AICreditModelTest(TestCase):
             balance=150
         )
         
-        expected = f"AI Credits - {self.company.name}: 150"
+        expected = f"{self.company.name} - 150 créditos"
         self.assertEqual(str(credit), expected)
 
 
@@ -87,8 +91,11 @@ class AICreditTransactionModelTest(TestCase):
     
     def setUp(self):
         self.user = User.objects.create_user(
+            username='testuser',
             email='test@example.com',
-            password='testpass123'
+            password='testpass123',
+            first_name='Test',
+            last_name='User'
         )
         self.company = Company.objects.create(
             name='Test Company',
@@ -167,8 +174,11 @@ class AIConversationModelTest(TestCase):
     
     def setUp(self):
         self.user = User.objects.create_user(
+            username='testuser',
             email='test@example.com',
-            password='testpass123'
+            password='testpass123',
+            first_name='Test',
+            last_name='User'
         )
         self.company = Company.objects.create(
             name='Test Company',
@@ -228,8 +238,11 @@ class AIMessageModelTest(TestCase):
     
     def setUp(self):
         self.user = User.objects.create_user(
+            username='testuser',
             email='test@example.com',
-            password='testpass123'
+            password='testpass123',
+            first_name='Test',
+            last_name='User'
         )
         self.company = Company.objects.create(
             name='Test Company',
@@ -318,8 +331,11 @@ class AIInsightModelTest(TestCase):
     
     def setUp(self):
         self.user = User.objects.create_user(
+            username='testuser',
             email='test@example.com',
-            password='testpass123'
+            password='testpass123',
+            first_name='Test',
+            last_name='User'
         )
         self.company = Company.objects.create(
             name='Test Company',
@@ -410,8 +426,8 @@ class AIInsightModelTest(TestCase):
         self.assertEqual(insight.actual_impact, Decimal('8500.00'))
         
         # Calculate effectiveness
-        effectiveness = (insight.actual_impact / insight.potential_impact) * 100
-        self.assertEqual(effectiveness, 85)  # 85% of predicted savings
+        effectiveness = (insight.actual_impact / insight.potential_impact) * Decimal('100')
+        self.assertEqual(effectiveness, Decimal('85'))  # 85% of predicted savings
     
     def test_insight_expiration(self):
         """Test insight expiration"""

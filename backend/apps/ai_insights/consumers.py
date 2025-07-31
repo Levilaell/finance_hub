@@ -10,6 +10,8 @@ from channels.db import database_sync_to_async
 from django.core.exceptions import ValidationError
 from rest_framework_simplejwt.tokens import UntypedToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from django.db import transaction
+import asyncio
 
 from apps.authentication.models import User
 from apps.companies.models import Company
@@ -34,35 +36,56 @@ class ChatConsumer(AsyncWebsocketConsumer):
         
     async def connect(self):
         """Handle WebSocket connection"""
-        self.conversation_id = self.scope['url_route']['kwargs']['conversation_id']
-        self.room_group_name = f'chat_{self.conversation_id}'
-        
-        # Authenticate user from query string token
-        if not await self.authenticate_user():
-            await self.close(code=4001)
-            return
-        
-        # Verify user has permission to access this conversation
-        if not await self.has_permission():
-            await self.close(code=4003)
-            return
-        
-        # Join room group
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
-        
-        await self.accept()
-        
-        # Send connection established message
-        await self.send(text_data=json.dumps({
-            'type': 'connection_established',
-            'message': 'Conectado ao Assistente Financeiro AI',
-            'conversation_id': self.conversation_id
-        }))
-        
-        logger.info(f"WebSocket connected: User {self.user.id} to conversation {self.conversation_id}")
+        try:
+            self.conversation_id = self.scope['url_route']['kwargs']['conversation_id']
+            self.room_group_name = f'chat_{self.conversation_id}'
+            
+            # Validate conversation_id format
+            if not self.conversation_id or not str(self.conversation_id).isdigit():
+                await self.close(code=4000)  # Bad request
+                return
+            
+            # Authenticate user from query string token
+            auth_result = await self.authenticate_user()
+            if not auth_result:
+                logger.warning(f"Authentication failed for conversation {self.conversation_id}")
+                await self.close(code=4001)  # Unauthorized
+                return
+            
+            # Verify user has permission to access this conversation
+            permission_result = await self.has_permission()
+            if not permission_result:
+                logger.warning(f"Permission denied for user {self.user.id} to conversation {self.conversation_id}")
+                await self.close(code=4003)  # Forbidden
+                return
+            
+            # Join room group
+            await self.channel_layer.group_add(
+                self.room_group_name,
+                self.channel_name
+            )
+            
+            await self.accept()
+            
+            # Get initial credits balance
+            credits_balance = await self.get_credits_balance()
+            
+            # Send connection established message with enhanced info
+            await self.send(text_data=json.dumps({
+                'type': 'connection_established',
+                'message': 'Conectado ao Assistente Financeiro AI',
+                'conversation_id': str(self.conversation_id),
+                'user_id': str(self.user.id),
+                'company_id': str(self.company.id),
+                'credits_available': credits_balance,
+                'timestamp': timezone.now().isoformat()
+            }))
+            
+            logger.info(f"WebSocket connected: User {self.user.id} to conversation {self.conversation_id}")
+            
+        except Exception as e:
+            logger.error(f"Error in WebSocket connect: {str(e)}", exc_info=True)
+            await self.close(code=4000)
     
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection"""
@@ -98,32 +121,59 @@ class ChatConsumer(AsyncWebsocketConsumer):
     
     async def handle_message(self, data: Dict[str, Any]):
         """Process incoming chat message"""
-        message_content = data.get('message', '').strip()
-        
-        if not message_content:
-            await self.send_error("Message content cannot be empty")
-            return
-        
-        # Send typing indicator
-        await self.send(text_data=json.dumps({
-            'type': 'assistant_typing',
-            'typing': True
-        }))
-        
         try:
+            message_content = data.get('message', '').strip()
+            
+            # Validate message content
+            if not message_content:
+                await self.send_error("Message content cannot be empty", error_code="EMPTY_MESSAGE")
+                return
+            
+            if len(message_content) > 4000:  # Max message length
+                await self.send_error("Message too long. Maximum 4000 characters.", error_code="MESSAGE_TOO_LONG")
+                return
+            
+            # Check rate limiting (basic implementation)
+            if not await self.check_rate_limit():
+                await self.send_error("Rate limit exceeded. Please wait before sending another message.", error_code="RATE_LIMITED")
+                return
+            
+            # Check credits before processing
+            credits_available = await self.get_credits_balance()
+            if credits_available <= 0:
+                await self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'error': 'insufficient_credits',
+                    'error_code': 'INSUFFICIENT_CREDITS',
+                    'message': 'Créditos insuficientes. Compre mais créditos para continuar.',
+                    'credits_remaining': 0
+                }))
+                return
+            
+            # Send typing indicator
+            await self.send(text_data=json.dumps({
+                'type': 'assistant_typing',
+                'typing': True,
+                'timestamp': timezone.now().isoformat()
+            }))
+            
             # Process message with AI service
             response = await self.process_ai_message(message_content)
             
-            # Send AI response
+            # Send AI response with enhanced structure
             await self.send(text_data=json.dumps({
                 'type': 'ai_response',
-                'message': response['content'],
-                'message_id': response['message_id'],
-                'credits_used': response['credits_used'],
-                'credits_remaining': response['credits_remaining'],
-                'structured_data': response.get('structured_data'),
-                'insights': response.get('insights', []),
-                'created_at': response['created_at']
+                'success': True,
+                'data': {
+                    'message': response['content'],
+                    'message_id': response['message_id'],
+                    'credits_used': response['credits_used'],
+                    'credits_remaining': response['credits_remaining'],
+                    'structured_data': response.get('structured_data'),
+                    'insights': response.get('insights', []),
+                    'created_at': response['created_at']
+                },
+                'timestamp': timezone.now().isoformat()
             }))
             
             # Broadcast to other clients in the same conversation
@@ -136,22 +186,31 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
             
-        except InsufficientCreditsError:
+        except InsufficientCreditsError as e:
+            logger.warning(f"Insufficient credits for user {self.user.id}: {str(e)}")
             await self.send(text_data=json.dumps({
                 'type': 'error',
                 'error': 'insufficient_credits',
+                'error_code': 'INSUFFICIENT_CREDITS',
                 'message': 'Créditos insuficientes. Compre mais créditos para continuar.',
                 'credits_remaining': await self.get_credits_balance()
             }))
         except Exception as e:
             logger.error(f"Error processing AI message: {str(e)}", exc_info=True)
-            await self.send_error(f"Erro ao processar mensagem: {str(e)}")
+            await self.send_error(
+                f"Erro ao processar mensagem: {str(e)}",
+                error_code="MESSAGE_PROCESSING_ERROR"
+            )
         finally:
-            # Stop typing indicator
-            await self.send(text_data=json.dumps({
-                'type': 'assistant_typing',
-                'typing': False
-            }))
+            # Always stop typing indicator
+            try:
+                await self.send(text_data=json.dumps({
+                    'type': 'assistant_typing',
+                    'typing': False,
+                    'timestamp': timezone.now().isoformat()
+                }))
+            except Exception as e:
+                logger.error(f"Error stopping typing indicator: {str(e)}")
     
     async def handle_typing(self, data: Dict[str, Any]):
         """Handle typing indicator"""
@@ -255,38 +314,45 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def process_ai_message(self, content: str) -> Dict[str, Any]:
         """Process message with AI service"""
         try:
-            # Get conversation
-            conversation = AIConversation.objects.get(id=self.conversation_id)
-            
-            # Create user message
-            user_message = AIMessage.objects.create(
-                conversation=conversation,
-                role='user',
-                content=content,
-                type='text'
-            )
-            
-            # Process with AI service
-            result = self.ai_service.process_message(
-                company=self.company,
-                user=self.user,
-                conversation=conversation,
-                message=content
-            )
-            
-            # Get remaining credits
-            credit_balance = AICredit.objects.get(company=self.company)
-            
-            return {
-                'message_id': str(result['message_id']),
-                'content': result['content'],
-                'credits_used': result['credits_used'],
-                'credits_remaining': credit_balance.balance,
-                'structured_data': result.get('structured_data'),
-                'insights': result.get('insights', []),
-                'created_at': timezone.now().isoformat()
-            }
-            
+            with transaction.atomic():
+                # Get conversation with select_for_update to prevent race conditions
+                conversation = AIConversation.objects.select_for_update().get(
+                    id=self.conversation_id,
+                    company=self.company
+                )
+                
+                # Validate conversation is active
+                if conversation.status != 'active':
+                    raise ValidationError("Conversation is not active")
+                
+                # Process with AI service using the updated method signature
+                result = AIService.process_message(
+                    conversation=conversation,
+                    user_message=content,
+                    context_data={},
+                    request_type='general'
+                )
+                
+                # Get remaining credits
+                credit_balance = AICredit.objects.get(company=self.company)
+                
+                return {
+                    'message_id': str(result['ai_message'].id),
+                    'content': result['ai_message'].content,
+                    'credits_used': result['credits_used'],
+                    'credits_remaining': credit_balance.balance + credit_balance.bonus_credits,
+                    'structured_data': result['ai_message'].structured_data,
+                    'insights': [{
+                        'id': str(insight.id),
+                        'title': insight.title,
+                        'priority': insight.priority
+                    } for insight in result.get('insights', [])],
+                    'created_at': result['ai_message'].created_at.isoformat()
+                }
+                
+        except AIConversation.DoesNotExist:
+            logger.error(f"Conversation {self.conversation_id} not found")
+            raise ValidationError("Conversation not found")
         except Exception as e:
             logger.error(f"Error in process_ai_message: {str(e)}", exc_info=True)
             raise
@@ -311,9 +377,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logger.error(f"Error marking message as read: {str(e)}")
     
-    async def send_error(self, error_message: str):
+    async def send_error(self, error_message: str, error_code: str = None):
         """Send error message to client"""
         await self.send(text_data=json.dumps({
             'type': 'error',
-            'message': error_message
+            'success': False,
+            'error': error_message,
+            'error_code': error_code,
+            'timestamp': timezone.now().isoformat()
         }))
+    
+    @database_sync_to_async
+    def check_rate_limit(self) -> bool:
+        """Basic rate limiting check"""
+        # Simple implementation - could be enhanced with Redis
+        from django.core.cache import cache
+        
+        cache_key = f"ws_rate_limit_{self.user.id}"
+        current_count = cache.get(cache_key, 0)
+        
+        if current_count >= 60:  # Max 60 messages per minute
+            return False
+        
+        cache.set(cache_key, current_count + 1, 60)  # 1 minute timeout
+        return True

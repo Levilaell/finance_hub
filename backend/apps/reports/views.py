@@ -576,7 +576,7 @@ class DashboardStatsView(APIView):
             date__gte=month_start
         )
         
-        total_balance = accounts.aggregate(total=Sum('current_balance'))['total'] or Decimal('0')
+        total_balance = accounts.aggregate(total=Sum('balance'))['total'] or Decimal('0')
         
         income = transactions.filter(
             type='CREDIT'
