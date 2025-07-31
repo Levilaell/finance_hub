@@ -4,6 +4,7 @@ Base settings for CaixaHub project
 import os
 from datetime import timedelta
 from pathlib import Path
+from django.core.management.utils import get_random_secret_key
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -49,10 +50,13 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'apps.authentication.middleware.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.authentication.middleware.SessionSecurityMiddleware',
+    'apps.authentication.middleware.RequestLoggingMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -150,18 +154,20 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'core.error_handlers.custom_exception_handler'
 }
 
-# JWT Settings
+# JWT Settings - Enhanced Security
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),  # Reduced for security
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=3),     # Reduced for security
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
-    'ALGORITHM': 'HS256',
+    'ALGORITHM': 'RS256',  # Enhanced security with asymmetric keys
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
+    'TOKEN_OBTAIN_SERIALIZER': 'apps.authentication.serializers.CustomTokenObtainSerializer',
+    'TOKEN_REFRESH_SERIALIZER': 'apps.authentication.serializers.CustomTokenRefreshSerializer',
 }
 
 # Celery Configuration
@@ -189,3 +195,63 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 
 # Import logging configuration
 from .logging import LOGGING
+
+# JWT Key Configuration
+try:
+    from core.security import get_jwt_private_key, get_jwt_public_key
+    SIMPLE_JWT.update({
+        'SIGNING_KEY': get_jwt_private_key(),
+        'VERIFYING_KEY': get_jwt_public_key(),
+    })
+except Exception as e:
+    # Fallback to environment variable during development
+    import os
+    jwt_secret = os.environ.get('JWT_SECRET_KEY')
+    if not jwt_secret:
+        # Generate a temporary secret for development
+        jwt_secret = get_random_secret_key()
+        print(f"Warning: Using temporary JWT secret. Set JWT_SECRET_KEY environment variable.")
+    
+    SIMPLE_JWT.update({
+        'ALGORITHM': 'HS256',  # Fallback to symmetric key
+        'SIGNING_KEY': jwt_secret,
+    })
+
+# Enhanced Security Settings
+AUTHENTICATION_BACKENDS = [
+    'apps.authentication.backends.EnhancedAuthenticationBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# Session Security
+SESSION_COOKIE_AGE = 86400  # 24 hours
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Strict'
+
+# Enhanced Password Validation
+AUTH_PASSWORD_VALIDATORS.extend([
+    {
+        'NAME': 'apps.authentication.validators.ComprehensivePasswordValidator',
+    },
+])
+
+# Rate Limiting Configuration
+RATELIMIT_CACHE_BACKEND = 'default'
+RATELIMIT_ENABLE = True
+
+# Security Headers
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# Enhanced Authentication Settings
+AUTH_MAX_LOGIN_ATTEMPTS = 3
+AUTH_LOCKOUT_DURATION = 3600  # 1 hour
+AUTH_ATTEMPT_RESET_PERIOD = 86400  # 24 hours
+MAX_SESSIONS_PER_USER = 3
+VALIDATE_SESSION_IP = False  # Set to True in production if needed
+SESSION_TIMEOUT = 3600  # 1 hour
+SESSION_ABSOLUTE_TIMEOUT = 86400  # 24 hours
+REMEMBER_ME_LIFETIME = 2592000  # 30 days

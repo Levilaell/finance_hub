@@ -44,38 +44,7 @@ from .utils import (
 User = get_user_model()
 
 
-class DebugRegisterView(APIView):
-    """Temporary debug endpoint for registration validation"""
-    permission_classes = (AllowAny,)
-    
-    def post(self, request):
-        """Debug endpoint to test registration validation"""
-        from .serializers import RegisterSerializer
-        import json
-        
-        # Log incoming data
-        logger = logging.getLogger(__name__)
-        logger.info(f"Debug: Received data: {json.dumps(request.data, indent=2)}")
-        
-        # Test serializer validation
-        serializer = RegisterSerializer(data=request.data)
-        
-        if not serializer.is_valid():
-            return Response({
-                'status': 'validation_failed',
-                'errors': serializer.errors,
-                'received_data': request.data,
-                'debug_info': {
-                    'fields_with_errors': list(serializer.errors.keys()),
-                    'total_errors': sum(len(errors) for errors in serializer.errors.values())
-                }
-            }, status=status.HTTP_200_OK)  # Return 200 for debug
-        
-        return Response({
-            'status': 'validation_passed',
-            'message': 'All validations passed successfully',
-            'validated_data': serializer.validated_data
-        }, status=status.HTTP_200_OK)
+# Debug endpoint removed for security in production
 
 
 # Custom throttle classes  
@@ -264,12 +233,12 @@ class PasswordResetRequestView(APIView):
         email = serializer.validated_data['email']
         user = User.objects.get(email=email)
         
-        # Create reset token
+        # Create reset token (2 hour expiry for security)
         reset_token = secrets.token_urlsafe(32)
         PasswordReset.objects.create(
             user=user,
             token=reset_token,
-            expires_at=timezone.now() + timedelta(hours=24)
+            expires_at=timezone.now() + timedelta(hours=2)
         )
         
         # Send password reset email
