@@ -17,6 +17,8 @@ from apps.companies.models import Company
 from .models import AIInsight, AICredit, AICreditTransaction
 from .services.ai_service import AIService
 from .services.credit_service import CreditService
+from .services.anomaly_detection import AnomalyDetectionService
+from .services.cache_service import CacheService
 
 logger = logging.getLogger(__name__)
 
@@ -246,36 +248,43 @@ def analyze_financial_anomalies(company_id: str):
         logger.info(f"Starting anomaly analysis for company {company_id}")
         
         company = Company.objects.get(id=company_id)
-        ai_service = AIService()
+        anomaly_service = AnomalyDetectionService()
         
-        # Run anomaly detection
-        anomalies = ai_service.detect_transaction_anomalies(company)
+        # Run advanced anomaly detection
+        anomalies = anomaly_service.generate_automated_insights(company_id)
         
         if anomalies:
-            # Create insights for significant anomalies
+            # Create insights for anomalies
+            created_insights = []
             for anomaly in anomalies[:5]:  # Top 5 anomalies
-                AIInsight.objects.create(
+                insight = AIInsight.objects.create(
                     company=company,
-                    type='anomaly',
-                    priority=anomaly['priority'],
-                    title=anomaly['title'],
-                    description=anomaly['description'],
+                    type=anomaly.get('type', 'anomaly'),
+                    priority=anomaly.get('priority', 'medium'),
+                    title=anomaly.get('title', 'Anomalia detectada'),
+                    description=anomaly.get('description', ''),
                     data_context=anomaly.get('data_context', {}),
                     potential_impact=anomaly.get('potential_impact'),
-                    is_automated=True,
-                    action_items=[
+                    action_items=anomaly.get('action_items', [
                         'Verificar a transação nos detalhes bancários',
                         'Confirmar se foi autorizada',
                         'Investigar possível fraude se não reconhecida'
-                    ]
+                    ]),
+                    is_automated=True,
+                    expires_at=timezone.now() + timedelta(days=30)
                 )
+                created_insights.append(insight)
             
-            logger.info(f"Created {len(anomalies)} anomaly insights for company {company_id}")
+            # Invalidate cache after creating new insights
+            CacheService.invalidate_company_cache(company_id)
+            
+            logger.info(f"Created {len(created_insights)} anomaly insights for company {company_id}")
         
         return {
             'status': 'success',
             'company_id': str(company_id),
-            'anomalies_found': len(anomalies)
+            'anomalies_found': len(anomalies),
+            'insights_created': len(created_insights) if anomalies else 0
         }
         
     except Exception as e:
@@ -378,3 +387,57 @@ def sync_credit_usage_metrics():
     logger.info(f"Credit usage metrics: {metrics}")
     
     return metrics
+
+
+@shared_task
+def warm_company_cache(company_id: str):
+    """
+    Pre-warm cache for company financial data
+    Runs daily to improve response times
+    """
+    try:
+        logger.info(f"Warming cache for company {company_id}")
+        
+        # Pre-warm main cache entries
+        CacheService.warm_cache(company_id)
+        
+        logger.info(f"Cache warmed successfully for company {company_id}")
+        
+        return {
+            'status': 'success',
+            'company_id': str(company_id),
+            'timestamp': timezone.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error warming cache for company {company_id}: {str(e)}", exc_info=True)
+        return {
+            'status': 'error',
+            'company_id': str(company_id),
+            'error': str(e)
+        }
+
+
+@shared_task
+def warm_all_companies_cache():
+    """
+    Warm cache for all active companies
+    Runs daily in off-peak hours
+    """
+    logger.info("Starting cache warming for all companies")
+    
+    companies = Company.objects.filter(
+        is_active=True,
+        subscription__status='active'
+    ).values_list('id', flat=True)
+    
+    results = []
+    for company_id in companies:
+        result = warm_company_cache.delay(str(company_id))
+        results.append(result.id)
+    
+    logger.info(f"Queued cache warming for {len(companies)} companies")
+    return {
+        'companies_processed': len(companies),
+        'task_ids': results
+    }

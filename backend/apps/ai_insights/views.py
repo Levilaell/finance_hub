@@ -32,6 +32,7 @@ from .serializers import (
     ChatMessageSerializer
 )
 from .services import AIService, CreditService
+from .services.export_service import ExportService
 
 
 class AICreditViewSet(viewsets.ReadOnlyModelViewSet):
@@ -310,6 +311,69 @@ class AIConversationViewSet(viewsets.ModelViewSet):
             'success': True,
             'message': 'Conversa reativada com sucesso'
         })
+    
+    @action(detail=True, methods=['get'], url_path='export/json')
+    def export_json(self, request, pk=None):
+        """Exporta conversa em formato JSON"""
+        try:
+            conversation = self.get_object()
+            data = ExportService.export_conversation_to_json(conversation)
+            
+            filename = f"conversa_{conversation.id}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.json"
+            
+            return ExportService.create_export_response(
+                data=data,
+                filename=filename,
+                content_type='application/json',
+                format_type='json'
+            )
+            
+        except Exception as e:
+            return Response({
+                'error': f'Erro ao exportar conversa: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['get'], url_path='export/csv')
+    def export_csv(self, request, pk=None):
+        """Exporta conversa em formato CSV"""
+        try:
+            conversation = self.get_object()
+            data = ExportService.export_conversation_to_csv(conversation)
+            
+            filename = f"conversa_{conversation.id}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            
+            return ExportService.create_export_response(
+                data=data,
+                filename=filename,
+                content_type='text/csv',
+                format_type='csv'
+            )
+            
+        except Exception as e:
+            return Response({
+                'error': f'Erro ao exportar conversa: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['get'], url_path='export/pdf')
+    def export_pdf(self, request, pk=None):
+        """Exporta conversa em formato PDF"""
+        try:
+            conversation = self.get_object()
+            data = ExportService.export_conversation_to_pdf(conversation)
+            
+            filename = f"conversa_{conversation.id}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            
+            return ExportService.create_export_response(
+                data=data,
+                filename=filename,
+                content_type='application/pdf',
+                format_type='pdf'
+            )
+            
+        except Exception as e:
+            return Response({
+                'error': f'Erro ao exportar conversa: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AIMessageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -482,3 +546,73 @@ class AIInsightViewSet(viewsets.ModelViewSet):
                 'roi': float(stats['total_actual_impact'] or 0)
             }
         })
+    
+    @action(detail=False, methods=['get'], url_path='export/json')
+    def export_json(self, request):
+        """Exporta insights em formato JSON"""
+        try:
+            user_company = request.user.company
+            insights = AIInsight.objects.filter(company=user_company)
+            
+            # Aplicar filtros se fornecidos
+            status_filter = request.query_params.get('status')
+            if status_filter:
+                insights = insights.filter(status=status_filter)
+            
+            priority_filter = request.query_params.get('priority')
+            if priority_filter:
+                insights = insights.filter(priority=priority_filter)
+            
+            type_filter = request.query_params.get('type')
+            if type_filter:
+                insights = insights.filter(type=type_filter)
+            
+            data = ExportService.export_insights_to_json(list(insights))
+            filename = f"insights_{user_company.name}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.json"
+            
+            return ExportService.create_export_response(
+                data=data,
+                filename=filename,
+                content_type='application/json',
+                format_type='json'
+            )
+            
+        except Exception as e:
+            return Response({
+                'error': f'Erro ao exportar insights: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['get'], url_path='export/csv')
+    def export_csv(self, request):
+        """Exporta insights em formato CSV"""
+        try:
+            user_company = request.user.company
+            insights = AIInsight.objects.filter(company=user_company)
+            
+            # Aplicar filtros se fornecidos
+            status_filter = request.query_params.get('status')
+            if status_filter:
+                insights = insights.filter(status=status_filter)
+            
+            priority_filter = request.query_params.get('priority')
+            if priority_filter:
+                insights = insights.filter(priority=priority_filter)
+            
+            type_filter = request.query_params.get('type')
+            if type_filter:
+                insights = insights.filter(type=type_filter)
+            
+            data = ExportService.export_insights_to_csv(list(insights))
+            filename = f"insights_{user_company.name}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            
+            return ExportService.create_export_response(
+                data=data,
+                filename=filename,
+                content_type='text/csv',
+                format_type='csv'
+            )
+            
+        except Exception as e:
+            return Response({
+                'error': f'Erro ao exportar insights: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

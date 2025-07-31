@@ -23,6 +23,8 @@ from ..models import (
     AICreditTransaction
 )
 from .credit_service import CreditService
+from .anomaly_detection import AnomalyDetectionService
+from .cache_service import CacheService
 
 
 logger = logging.getLogger(__name__)
@@ -204,10 +206,9 @@ Cada recomendação deve incluir:
             'content': system_prompt
         })
         
-        # Contexto financeiro
-        financial_context = cls._format_financial_context(
-            conversation.financial_context
-        )
+        # Contexto financeiro do cache
+        cached_context = CacheService.get_financial_context(str(conversation.company.id))
+        financial_context = cls._format_financial_context(cached_context)
         messages.append({
             'role': 'system',
             'content': f"Contexto financeiro atual:\n{financial_context}"
@@ -696,63 +697,92 @@ Cada recomendação deve incluir:
     
     @classmethod
     def _detect_anomalies(cls, company: 'Company') -> List[AIInsight]:
-        """Detecta transações anômalas usando ML simples"""
+        """Detecta transações anômalas usando ML avançado"""
+        insights = []
+        
+        try:
+            # Usa o serviço de detecção de anomalias avançado
+            anomaly_service = AnomalyDetectionService()
+            anomaly_data = anomaly_service.generate_automated_insights(company.id)
+            
+            # Converte dados em objetos AIInsight
+            for anomaly in anomaly_data:
+                try:
+                    insight = AIInsight.objects.create(
+                        company=company,
+                        type=anomaly.get('type', 'anomaly'),
+                        priority=anomaly.get('priority', 'medium'),
+                        title=anomaly.get('title', 'Anomalia detectada'),
+                        description=anomaly.get('description', ''),
+                        action_items=anomaly.get('action_items', []),
+                        potential_impact=anomaly.get('potential_impact', 0),
+                        impact_percentage=anomaly.get('impact_percentage'),
+                        data_context=anomaly.get('data_context', {}),
+                        is_automated=True,
+                        expires_at=timezone.now() + timedelta(days=30)
+                    )
+                    insights.append(insight)
+                    
+                except Exception as e:
+                    logger.error(f"Erro ao criar insight de anomalia: {str(e)}")
+                    continue
+            
+            logger.info(f"Detectadas {len(insights)} anomalias para {company.name}")
+            
+        except Exception as e:
+            logger.error(f"Erro na detecção de anomalias para {company.name}: {str(e)}")
+            
+            # Fallback para detecção simples em caso de erro
+            insights = cls._detect_anomalies_simple(company)
+        
+        return insights[:5]  # Limita a 5 anomalias por execução
+    
+    @classmethod
+    def _detect_anomalies_simple(cls, company: 'Company') -> List[AIInsight]:
+        """Método simples de detecção de anomalias como fallback"""
         insights = []
         now = timezone.now()
         
-        # Analisa transações dos últimos 30 dias
-        recent_transactions = Transaction.objects.filter(
-            company=company,
-            date__gte=now - timedelta(days=30)
-        ).values('amount', 'description')
-        
-        # Detecta outliers gerais (sem categorias)
-        amounts = [abs(txn['amount']) for txn in recent_transactions]
-        
-        if len(amounts) >= 10:  # Precisa de dados suficientes
-            # Calcula média e desvio padrão
-            import statistics
-            mean = statistics.mean(amounts)
-            stdev = statistics.stdev(amounts) if len(amounts) > 1 else 0
+        try:
+            # Analisa transações dos últimos 30 dias
+            recent_transactions = Transaction.objects.filter(
+                bank_account__company=company,
+                transaction_date__gte=now - timedelta(days=30)
+            ).values('amount', 'description', 'transaction_date')
             
-            # Identifica outliers (> 2.5 desvios padrão)
-            outliers = [a for a in amounts if a > mean + 2.5 * stdev]
+            amounts = [abs(float(txn['amount'])) for txn in recent_transactions if txn['amount']]
             
-            if outliers and stdev > 0:
-                max_outlier = max(outliers)
+            if len(amounts) >= 10:
+                import statistics
+                mean = statistics.mean(amounts)
+                stdev = statistics.stdev(amounts) if len(amounts) > 1 else 0
                 
-                # Encontra a transação correspondente
-                outlier_txn = next(
-                    (t for t in recent_transactions if abs(t['amount']) == max_outlier),
-                    None
-                )
+                # Identifica outliers (> 2.5 desvios padrão)
+                outliers = [a for a in amounts if a > mean + 2.5 * stdev]
                 
-                insight = AIInsight.objects.create(
-                    company=company,
-                    type='anomaly',
-                    priority='medium',
-                    title=f'Transação atípica detectada',
-                    description=(
-                        f'Detectada transação de R$ {max_outlier:,.2f}, '
-                        f'muito acima da média de R$ {mean:,.2f}. '
-                        f'Isso representa {max_outlier/mean:.1f}x o valor normal. '
-                        f'Descrição: {outlier_txn["description"] if outlier_txn else "N/A"}'
-                    ),
-                    action_items=[
-                        'Verificar se a transação está correta',
-                        'Confirmar se não há cobrança duplicada',
-                        'Analisar o contexto da transação'
-                    ],
-                    potential_impact=max_outlier - mean,
-                    data_context={
-                        'outlier_amount': float(max_outlier),
-                        'average_amount': float(mean),
-                        'standard_deviation': float(stdev),
-                        'description': outlier_txn['description'] if outlier_txn else None
-                    },
-                    is_automated=True,
-                    expires_at=now + timedelta(days=7)
-                )
-                insights.append(insight)
+                if outliers and stdev > 0:
+                    max_outlier = max(outliers)
+                    
+                    insight = AIInsight.objects.create(
+                        company=company,
+                        type='anomaly',
+                        priority='medium',
+                        title='Transação atípica detectada',
+                        description=(
+                            f'Detectada transação de R$ {max_outlier:,.2f}, '
+                            f'muito acima da média de R$ {mean:,.2f}.'
+                        ),
+                        action_items=[
+                            'Verificar se a transação está correta',
+                            'Confirmar se não há cobrança duplicada'
+                        ],
+                        potential_impact=max_outlier - mean,
+                        is_automated=True,
+                        expires_at=now + timedelta(days=7)
+                    )
+                    insights.append(insight)
         
-        return insights[:2]  # Limita a 2 anomalias por execução
+        except Exception as e:
+            logger.error(f"Erro na detecção simples de anomalias: {str(e)}")
+        
+        return insights
