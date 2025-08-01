@@ -15,7 +15,7 @@ export function useCredits() {
       const data = await aiInsightsService.getCredits();
       setCredits(data);
     } catch (err) {
-      console.error('Error fetching credits:', err);
+      // Error fetching credits
       setError('Erro ao carregar créditos');
       toast.error('Não foi possível carregar os créditos');
     } finally {
@@ -37,7 +37,7 @@ export function useCredits() {
       
       return response;
     } catch (err) {
-      console.error('Error purchasing credits:', err);
+      // Error purchasing credits
       toast.error('Não foi possível processar sua compra. Tente novamente.');
       throw err;
     }

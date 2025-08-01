@@ -10,8 +10,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 from apps.companies.models import Company
-# PaymentMethod should be moved to payments app
-# from apps.companies.models import PaymentMethod
+from apps.payments.models import PaymentMethod
 from apps.payments.services import StripeService
 from ..models import AICredit, AICreditTransaction
 

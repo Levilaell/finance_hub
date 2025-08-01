@@ -21,7 +21,7 @@ export function useInsights(options: UseInsightsOptions = {}) {
       const data = await aiInsightsService.getInsights(options);
       setInsights(data);
     } catch (err) {
-      console.error('Error fetching insights:', err);
+      // Error fetching insights
       setError('Erro ao carregar insights');
       toast.error('Não foi possível carregar os insights');
     } finally {
@@ -40,7 +40,7 @@ export function useInsights(options: UseInsightsOptions = {}) {
           : insight
       ));
     } catch (err) {
-      console.error('Error marking insight as viewed:', err);
+      // Error marking insight as viewed
     }
   }, []);
 
@@ -68,7 +68,7 @@ export function useInsights(options: UseInsightsOptions = {}) {
       
       toast.success('O insight foi marcado como concluído.');
     } catch (err) {
-      console.error('Error taking action on insight:', err);
+      // Error taking action on insight
       toast.error('Não foi possível registrar a ação');
     }
   }, []);
@@ -86,7 +86,7 @@ export function useInsights(options: UseInsightsOptions = {}) {
       
       toast.success('O insight foi removido da lista.');
     } catch (err) {
-      console.error('Error dismissing insight:', err);
+      // Error dismissing insight
       toast.error('Não foi possível descartar o insight');
     }
   }, []);

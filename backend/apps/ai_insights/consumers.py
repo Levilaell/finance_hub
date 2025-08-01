@@ -18,12 +18,13 @@ from apps.companies.models import Company
 from .models import AIConversation, AIMessage, AICredit
 from .services.ai_service import AIService
 from .services.credit_service import CreditService, InsufficientCreditsError
+from .websocket_security import WebSocketSecurityMixin
 
 logger = logging.getLogger(__name__)
 
 
-class ChatConsumer(AsyncWebsocketConsumer):
-    """WebSocket consumer for AI chat conversations"""
+class ChatConsumer(WebSocketSecurityMixin, AsyncWebsocketConsumer):
+    """WebSocket consumer for AI chat conversations with enhanced security"""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -99,10 +100,30 @@ class ChatConsumer(AsyncWebsocketConsumer):
         logger.info(f"WebSocket disconnected: User {self.user.id if self.user else 'Unknown'} from conversation {self.conversation_id}")
     
     async def receive(self, text_data):
-        """Handle incoming WebSocket messages"""
+        """Handle incoming WebSocket messages with security checks"""
         try:
+            # Update activity timestamp
+            await self.update_activity()
+            
+            # Check activity timeout
+            if not await self.check_activity_timeout():
+                return
+            
+            # Validate message size
+            if not await self.validate_message_size(text_data):
+                return
+            
+            # Parse and sanitize message
             data = json.loads(text_data)
+            data = await self.sanitize_message(data)
+            
             message_type = data.get('type', 'message')
+            
+            # Check rate limiting for messages
+            if hasattr(self.scope, 'rate_limiter'):
+                if not self.scope['rate_limiter'].check_message_rate(str(self.user.id)):
+                    await self.send_error("Rate limit exceeded. Please slow down.", error_code="RATE_LIMITED")
+                    return
             
             if message_type == 'message':
                 await self.handle_message(data)
@@ -110,14 +131,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 await self.handle_typing(data)
             elif message_type == 'read_receipt':
                 await self.handle_read_receipt(data)
+            elif message_type == 'ping':
+                # Handle ping for connection keep-alive
+                await self.send(text_data=json.dumps({'type': 'pong'}))
             else:
                 await self.send_error(f"Unknown message type: {message_type}")
                 
         except json.JSONDecodeError:
-            await self.send_error("Invalid JSON format")
+            await self.send_error("Invalid JSON format", error_code="INVALID_JSON")
         except Exception as e:
             logger.error(f"Error in receive: {str(e)}", exc_info=True)
-            await self.send_error(f"Error processing message: {str(e)}")
+            await self.send_error("Error processing message", error_code="PROCESSING_ERROR")
     
     async def handle_message(self, data: Dict[str, Any]):
         """Process incoming chat message"""
@@ -256,10 +280,36 @@ class ChatConsumer(AsyncWebsocketConsumer):
     # Helper methods
     @database_sync_to_async
     def authenticate_user(self):
-        """Authenticate user from token in query string"""
+        """Authenticate user with enhanced security"""
+        # Check if already authenticated by middleware
+        if hasattr(self.scope, 'user') and self.scope['user']:
+            self.user = self.scope['user']
+            
+            # Get user's active company
+            if hasattr(self.user, 'company'):
+                self.company = self.user.company
+            else:
+                # Get first company user belongs to
+                company_user = self.user.company_users.filter(is_active=True).first()
+                if company_user:
+                    self.company = company_user.company
+                else:
+                    logger.warning(f"User {self.user.id} has no active company")
+                    return False
+            
+            return True
+        
+        # Fallback to query string auth (less secure, for backward compatibility)
         query_string = self.scope.get('query_string', b'').decode()
         params = dict(param.split('=') for param in query_string.split('&') if '=' in param)
         token = params.get('token')
+        
+        if not token:
+            # Try to get from headers
+            headers = dict(self.scope.get('headers', []))
+            auth_header = headers.get(b'authorization', b'').decode('utf-8')
+            if auth_header.startswith('Bearer '):
+                token = auth_header[7:]
         
         if not token:
             logger.warning("No token provided in WebSocket connection")

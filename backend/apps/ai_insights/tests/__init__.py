@@ -1,3 +1,0 @@
-"""
-AI Insights tests package
-"""

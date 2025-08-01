@@ -10,6 +10,7 @@ from django.core.cache import cache
 from django.db.models import Sum, Count, Avg, Q
 from django.utils import timezone
 from apps.banking.models import Transaction, BankAccount
+from .encryption_service import encryption_service
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,9 @@ class CacheService:
             cached_data = cache.get(cache_key)
             if cached_data:
                 logger.debug(f"Cache hit para contexto financeiro: {company_id}")
+                # Decrypt the cached data
+                if isinstance(cached_data, dict):
+                    return encryption_service.decrypt_dict(cached_data)
                 return cached_data
         
         logger.debug(f"Gerando contexto financeiro: {company_id}")
@@ -165,10 +169,13 @@ class CacheService:
                 'generated_at': now.isoformat()
             }
             
+            # Encrypt sensitive data before caching
+            encrypted_context = encryption_service.encrypt_financial_context(context)
+            
             # Cache o resultado
             cache.set(
                 cache_key,
-                context,
+                encrypted_context,
                 cls.CACHE_DURATIONS['financial_context']
             )
             
@@ -391,17 +398,12 @@ class CacheService:
         """
         try:
             from django.core.cache import cache
-            from django.core.cache.backends.base import InvalidCacheBackendError
             
-            # Tenta obter estatísticas do Redis
-            if hasattr(cache, '_cache') and hasattr(cache._cache, 'get_stats'):
-                return cache._cache.get_stats()
-            
-            # Retorna informações básicas
+            # Retorna informações básicas (Redis stats removed for simplicity)
             return {
                 'backend': str(type(cache)),
                 'cache_durations': cls.CACHE_DURATIONS,
-                'message': 'Estatísticas detalhadas não disponíveis para este backend'
+                'status': 'active'
             }
             
         except Exception as e:

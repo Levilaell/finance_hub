@@ -8,7 +8,6 @@ from typing import Dict, Any, List, Optional
 from decimal import Decimal
 from datetime import datetime, timedelta
 
-import openai
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -25,6 +24,7 @@ from ..models import (
 from .credit_service import CreditService
 from .anomaly_detection import AnomalyDetectionService
 from .cache_service import CacheService
+from .openai_wrapper import openai_wrapper, OpenAIError
 
 
 logger = logging.getLogger(__name__)
@@ -32,9 +32,6 @@ logger = logging.getLogger(__name__)
 
 class AIService:
     """Serviço para processamento de AI e geração de insights"""
-    
-    # Configuração do OpenAI
-    openai.api_key = settings.OPENAI_API_KEY
     
     # Modelos e seus custos em créditos
     MODEL_COSTS = {
@@ -121,34 +118,51 @@ Cada recomendação deve incluir:
                 message=user_msg
             )
             
-            # Chama OpenAI
-            response = openai.ChatCompletion.create(
-                model=model,
-                messages=messages,
-                temperature=0.7,
-                max_tokens=2000,
-                functions=cls._get_functions() if request_type != 'general' else None,
-                function_call='auto' if request_type != 'general' else None
-            )
+            # Chama OpenAI com error handling robusto
+            try:
+                response = openai_wrapper.create_completion(
+                    messages=messages,
+                    model=model,
+                    temperature=0.7,
+                    max_tokens=2000,
+                    request_type=request_type
+                )
+                
+                # Verifica se é fallback
+                if response.get('is_fallback', False):
+                    logger.warning(f"Using fallback response for conversation {conversation.id}")
+                    # Em caso de fallback, reembolsa os créditos
+                    CreditService.add_credits(
+                        company=conversation.company,
+                        amount=credit_cost,
+                        description='Reembolso - Serviço temporariamente indisponível',
+                        metadata={'reason': 'openai_fallback', 'conversation_id': conversation.id}
+                    )
+                
+                # Processa resposta
+                ai_content = response['content']
+                tokens_used = response.get('usage', {}).get('total_tokens', 0)
+                
+            except OpenAIError as e:
+                logger.error(f"OpenAI error in conversation {conversation.id}: {str(e)}")
+                # Reembolsa créditos em caso de erro
+                CreditService.add_credits(
+                    company=conversation.company,
+                    amount=credit_cost,
+                    description='Reembolso - Erro no processamento',
+                    metadata={'error': str(e), 'conversation_id': conversation.id}
+                )
+                raise
             
-            # Processa resposta
-            ai_content = response.choices[0].message.content
-            tokens_used = response.usage.total_tokens
-            
-            # Extrai insights se houver function calls
+            # Extrai insights se não for fallback
             insights = []
-            if hasattr(response.choices[0].message, 'function_call'):
-                insights = cls._process_function_call(
-                    function_call=response.choices[0].message.function_call,
+            if not response.get('is_fallback', False):
+                # Detecta insights no conteúdo
+                detected_insights = cls._detect_insights_in_content(
+                    content=ai_content,
                     conversation=conversation
                 )
-            
-            # Detecta insights no conteúdo
-            detected_insights = cls._detect_insights_in_content(
-                content=ai_content,
-                conversation=conversation
-            )
-            insights.extend(detected_insights)
+                insights.extend(detected_insights)
             
             # Salva mensagem AI
             ai_msg = AIMessage.objects.create(
@@ -156,9 +170,9 @@ Cada recomendação deve incluir:
                 role='assistant',
                 type=request_type,
                 content=ai_content,
-                credits_used=credit_cost,
+                credits_used=credit_cost if not response.get('is_fallback', False) else 0,
                 tokens_used=tokens_used,
-                model_used=model,
+                model_used=response.get('model', model),
                 structured_data=context_data,
                 insights=[{
                     'id': i.id,
@@ -169,16 +183,21 @@ Cada recomendação deve incluir:
             
             # Atualiza métricas da conversa
             conversation.message_count += 2  # user + assistant
-            conversation.total_credits_used += credit_cost
+            if not response.get('is_fallback', False):
+                conversation.total_credits_used += credit_cost
             conversation.insights_generated += len(insights)
             conversation.last_message_at = timezone.now()
             conversation.save()
             
+            # Ajusta créditos retornados se for fallback
+            actual_credits_used = 0 if response.get('is_fallback', False) else credit_cost
+            
             return {
                 'ai_message': ai_msg,
-                'credits_used': credit_cost,
-                'credits_remaining': credit_result['credits_remaining'],
-                'insights': insights
+                'credits_used': actual_credits_used,
+                'credits_remaining': credit_result['credits_remaining'] + (credit_cost if response.get('is_fallback', False) else 0),
+                'insights': insights,
+                'is_fallback': response.get('is_fallback', False)
             }
             
         except Exception as e:

@@ -8,7 +8,7 @@ from django.db import connections
 from django.core.cache import cache
 from django.conf import settings
 from channels.layers import get_channel_layer
-import openai
+from apps.ai_insights.services.openai_wrapper import openai_wrapper
 import redis
 
 logger = logging.getLogger(__name__)
@@ -85,36 +85,13 @@ def check_openai_connection() -> Tuple[bool, str, Dict[str, Any]]:
         Tuple[bool, str, Dict]: (is_healthy, message, details)
     """
     try:
-        # Check if API key is configured
-        api_key = getattr(settings, 'OPENAI_API_KEY', None)
-        if not api_key:
-            return False, "OpenAI API key not configured", {'api_key': 'missing'}
+        # Use the wrapper's health check
+        health_status = openai_wrapper.health_check()
         
-        # Test API connection with a minimal request
-        openai.api_key = api_key
-        
-        # Simple model list request to test connectivity
-        response = openai.Model.list()
-        
-        if not response or not response.get('data'):
-            return False, "OpenAI API returned invalid response", {'response': response}
-        
-        # Check for available models we use
-        models = [model['id'] for model in response['data']]
-        required_models = ['gpt-4o-mini', 'gpt-4o']
-        available_models = [model for model in required_models if model in models]
-        
-        details = {
-            'api_key': 'configured',
-            'connection': 'successful',
-            'available_models': available_models,
-            'total_models': len(models),
-        }
-        
-        if not available_models:
-            return False, "Required AI models not available", details
-        
-        return True, "OpenAI API is healthy", details
+        if health_status['status'] == 'healthy':
+            return True, "OpenAI API is healthy", health_status
+        else:
+            return False, f"OpenAI API is unhealthy: {health_status.get('error', 'Unknown error')}", health_status
         
     except Exception as e:
         logger.error(f"OpenAI health check failed: {str(e)}")

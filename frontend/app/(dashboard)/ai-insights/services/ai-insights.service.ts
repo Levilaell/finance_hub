@@ -97,7 +97,7 @@ class AIInsightsService {
     page_size?: number;
   }): Promise<AIInsight[]> {
     const response = await apiClient.get<{ results?: AIInsight[]; data?: AIInsight[] }>(`${this.baseUrl}/insights/`, params);
-    return response.results || response.data || [];
+    return response?.results || response?.data || [];
   }
 
   async getInsight(id: string): Promise<AIInsight> {

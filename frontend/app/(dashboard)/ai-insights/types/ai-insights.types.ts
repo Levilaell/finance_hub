@@ -144,13 +144,18 @@ export interface WSChatMessage extends WSMessage {
 
 export interface WSAIResponse extends WSMessage {
   type: 'ai_response';
-  message: string;
-  message_id: string;
-  credits_used: number;
-  credits_remaining: number;
-  structured_data?: any;
-  insights?: AIInsightPreview[];
-  created_at: string;
+  success: boolean;
+  data: {
+    message: string;
+    message_id: string;
+    credits_used: number;
+    credits_remaining: number;
+    structured_data?: any;
+    insights?: AIInsightPreview[];
+    created_at: string;
+    is_fallback?: boolean;
+  };
+  timestamp: string;
 }
 
 export interface WSTypingIndicator extends WSMessage {
@@ -162,6 +167,7 @@ export interface WSTypingIndicator extends WSMessage {
 export interface WSError extends WSMessage {
   type: 'error';
   error?: string;
+  error_code?: string;
   message: string;
   credits_remaining?: number;
 }
