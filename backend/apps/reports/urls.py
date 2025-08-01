@@ -4,7 +4,7 @@ Reports app URLs
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from .views import (
+from .views_optimized import (
     ReportViewSet,
     ReportTemplateViewSet,
     QuickReportsView,
@@ -13,6 +13,7 @@ from .views import (
     CashFlowDataView,
     CategorySpendingView,
     IncomeVsExpensesView,
+    SecureReportDownloadView,
 )
 
 app_name = 'reports'
@@ -36,6 +37,9 @@ urlpatterns = [
     path('dashboard/cash-flow/', CashFlowDataView.as_view(), name='cash-flow-data'),
     path('dashboard/category-spending/', CategorySpendingView.as_view(), name='category-spending'),
     path('dashboard/income-vs-expenses/', IncomeVsExpensesView.as_view(), name='income-vs-expenses'),
+    
+    # Secure download endpoint
+    path('secure-download/<str:signed_id>/', SecureReportDownloadView.as_view(), name='secure-download'),
     
     # AI Insights
 ]

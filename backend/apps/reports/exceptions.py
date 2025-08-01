@@ -38,3 +38,24 @@ class ReportQuotaExceededError(APIException):
     status_code = status.HTTP_429_TOO_MANY_REQUESTS
     default_detail = 'Report generation quota exceeded. Please try again later.'
     default_code = 'report_quota_exceeded'
+
+
+class ReportGenerationInProgressError(APIException):
+    """Raised when report generation is already in progress"""
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = 'Report generation already in progress for this period.'
+    default_code = 'report_generation_in_progress'
+
+
+class ReportDataInsufficientError(APIException):
+    """Raised when there's insufficient data for report generation"""
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    default_detail = 'Insufficient data for report generation.'
+    default_code = 'report_data_insufficient'
+
+
+class ReportFileSizeExceededError(APIException):
+    """Raised when generated report exceeds size limits"""
+    status_code = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+    default_detail = 'Generated report exceeds maximum file size limit.'
+    default_code = 'report_file_size_exceeded'

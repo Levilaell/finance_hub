@@ -1,158 +1,277 @@
-import { useQuery } from '@tanstack/react-query';
-import { reportsService } from '@/services/reports.service';
 import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { reportsService } from '@/services/reports.service';
+import { bankingService } from '@/services/banking.service';
+import { categoriesService } from '@/services/categories.service';
+import type { Report, DateRange, ReportData } from '@/types/reports';
 
-interface DateRange {
-  start_date: Date | null;
-  end_date: Date | null;
+interface UseReportDataOptions {
+  initialPeriod?: DateRange;
+  retryAttempts?: number;
+  staleTime?: number;
+  cacheTime?: number;
+  onError?: (error: any) => void;
 }
 
-export const useReportData = (initialPeriod?: DateRange) => {
-  const [selectedPeriod, setSelectedPeriod] = useState<DateRange>(
-    initialPeriod || {
-      start_date: null,
-      end_date: null,
-    }
-  );
+interface UseReportDataReturn {
+  reports: Report[] | undefined;
+  accounts: any[] | undefined;
+  categories: any[] | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  error: any;
+  refetch: () => void;
+  refetchAll: () => Promise<void>;
+  selectedPeriod: DateRange | undefined;
+  setSelectedPeriod: (period: DateRange) => void;
+  retryCount: number;
+}
 
-  // Set default dates on client side
+const DEFAULT_RETRY_ATTEMPTS = 3;
+const DEFAULT_STALE_TIME = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_CACHE_TIME = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * Custom hook for fetching and managing report data with enhanced error handling
+ */
+export function useReportData(options: UseReportDataOptions = {}): UseReportDataReturn {
+  const {
+    initialPeriod,
+    retryAttempts = DEFAULT_RETRY_ATTEMPTS,
+    staleTime = DEFAULT_STALE_TIME,
+    cacheTime = DEFAULT_CACHE_TIME,
+    onError
+  } = options;
+
+  const queryClient = useQueryClient();
+  const [selectedPeriod, setSelectedPeriod] = useState<DateRange | undefined>(initialPeriod);
+  const [retryCount, setRetryCount] = useState(0);
+
+  // Common query options with retry logic
+  const commonQueryOptions: Partial<UseQueryOptions> = {
+    staleTime,
+    cacheTime,
+    retry: (failureCount, error) => {
+      if (failureCount < retryAttempts) {
+        setRetryCount(failureCount);
+        // Exponential backoff
+        const delay = Math.min(1000 * 2 ** failureCount, 30000);
+        console.log(`Retrying request (attempt ${failureCount + 1}/${retryAttempts}) after ${delay}ms`);
+        return true;
+      }
+      return false;
+    },
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+    onError: (error: any) => {
+      console.error('Query error:', error);
+      
+      // Handle specific error types
+      if (error.response?.status === 401) {
+        toast.error('Sessão expirada. Por favor, faça login novamente.');
+        // Redirect to login or refresh token
+      } else if (error.response?.status === 429) {
+        toast.error('Muitas requisições. Por favor, aguarde um momento.');
+      } else if (error.response?.status >= 500) {
+        toast.error('Erro no servidor. Tentando novamente...');
+      } else {
+        toast.error('Erro ao carregar dados. Por favor, tente novamente.');
+      }
+      
+      // Call custom error handler if provided
+      if (onError) {
+        onError(error);
+      }
+    }
+  };
+
+  // Fetch reports with error recovery
+  const {
+    data: reports,
+    isLoading: reportsLoading,
+    isError: reportsError,
+    error: reportsErrorObj,
+    refetch: refetchReports
+  } = useQuery({
+    queryKey: ['reports', selectedPeriod],
+    queryFn: async () => {
+      try {
+        const data = await reportsService.getReports(selectedPeriod);
+        setRetryCount(0); // Reset retry count on success
+        return data;
+      } catch (error) {
+        // Check if we have cached data to fall back on
+        const cachedData = queryClient.getQueryData(['reports']);
+        if (cachedData) {
+          console.log('Using cached reports data as fallback');
+          toast.info('Usando dados em cache enquanto reconectamos...');
+          return cachedData;
+        }
+        throw error;
+      }
+    },
+    ...commonQueryOptions
+  });
+
+  // Fetch accounts with prefetching
+  const {
+    data: accounts,
+    isLoading: accountsLoading,
+    isError: accountsError
+  } = useQuery({
+    queryKey: ['accounts'],
+    queryFn: () => bankingService.getAccounts(),
+    ...commonQueryOptions
+  });
+
+  // Fetch categories with prefetching
+  const {
+    data: categories,
+    isLoading: categoriesLoading,
+    isError: categoriesError
+  } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => categoriesService.getCategories(),
+    ...commonQueryOptions
+  });
+
+  // Prefetch related data on mount
   useEffect(() => {
-    if (!selectedPeriod.start_date && !selectedPeriod.end_date) {
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      setSelectedPeriod({
-        start_date: startOfMonth,
-        end_date: now,
+    // Prefetch next likely queries
+    const prefetchRelatedData = async () => {
+      // Prefetch common report types
+      await queryClient.prefetchQuery({
+        queryKey: ['report-templates'],
+        queryFn: () => reportsService.getReportTemplates(),
+        staleTime: 60 * 60 * 1000 // 1 hour
       });
+
+      // Prefetch analytics data if reports are loaded
+      if (reports && reports.length > 0) {
+        await queryClient.prefetchQuery({
+          queryKey: ['analytics', selectedPeriod],
+          queryFn: () => reportsService.getAnalytics(selectedPeriod),
+          staleTime: 15 * 60 * 1000 // 15 minutes
+        });
+      }
+    };
+
+    prefetchRelatedData();
+  }, [reports, selectedPeriod, queryClient]);
+
+  // Refetch all data with proper error handling
+  const refetchAll = useCallback(async () => {
+    try {
+      setRetryCount(0);
+      await Promise.all([
+        refetchReports(),
+        queryClient.invalidateQueries(['accounts']),
+        queryClient.invalidateQueries(['categories'])
+      ]);
+      toast.success('Dados atualizados com sucesso!');
+    } catch (error) {
+      console.error('Error refetching data:', error);
+      toast.error('Erro ao atualizar dados. Tente novamente.');
     }
-  }, []);
+  }, [refetchReports, queryClient]);
 
-  // Cash flow data
-  const cashFlowQuery = useQuery({
-    queryKey: ['cash-flow', selectedPeriod],
-    queryFn: () => {
-      if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
-      return reportsService.getCashFlowData({
-        start_date: selectedPeriod.start_date,
-        end_date: selectedPeriod.end_date,
-      });
-    },
-    enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
-  });
+  // Combined loading and error states
+  const isLoading = reportsLoading || accountsLoading || categoriesLoading;
+  const isError = reportsError || accountsError || categoriesError;
+  const error = reportsErrorObj || (accountsError ? 'Error loading accounts' : null) || 
+                (categoriesError ? 'Error loading categories' : null);
 
-  // Category spending data
-  const categorySpendingQuery = useQuery({
-    queryKey: ['category-spending', selectedPeriod],
-    queryFn: () => {
-      if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
-      return reportsService.getCategorySpending({
-        start_date: selectedPeriod.start_date,
-        end_date: selectedPeriod.end_date,
-      });
-    },
-    enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 10 * 60 * 1000,
-  });
+  // Set up automatic retry on network recovery
+  useEffect(() => {
+    const handleOnline = () => {
+      if (isError) {
+        console.log('Network recovered, retrying failed queries...');
+        toast.info('Conexão restaurada. Atualizando dados...');
+        refetchAll();
+      }
+    };
 
-  // Income vs expenses data
-  const incomeVsExpensesQuery = useQuery({
-    queryKey: ['income-vs-expenses', selectedPeriod],
-    queryFn: () => {
-      if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
-      return reportsService.getIncomeVsExpenses({
-        start_date: selectedPeriod.start_date,
-        end_date: selectedPeriod.end_date,
-      });
-    },
-    enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 10 * 60 * 1000,
-  });
-
-  // Analytics data
-  const analyticsQuery = useQuery({
-    queryKey: ['analytics', selectedPeriod],
-    queryFn: () => {
-      if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
-      const days = Math.ceil(
-        (selectedPeriod.end_date.getTime() - selectedPeriod.start_date.getTime()) / 
-        (1000 * 60 * 60 * 24)
-      );
-      return reportsService.getAnalytics(days);
-    },
-    enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
-    staleTime: 5 * 60 * 1000,
-    cacheTime: 10 * 60 * 1000,
-  });
-
-  // Quick period selection
-  const handleQuickPeriod = useCallback((periodId: string) => {
-    const now = new Date();
-    let start: Date;
-    let end: Date = now;
-
-    switch (periodId) {
-      case 'current_month':
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
-      case 'last_month':
-        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        end = new Date(now.getFullYear(), now.getMonth(), 0);
-        break;
-      case 'quarterly':
-        const quarter = Math.floor(now.getMonth() / 3);
-        start = new Date(now.getFullYear(), quarter * 3, 1);
-        break;
-      case 'year_to_date':
-        start = new Date(now.getFullYear(), 0, 1);
-        break;
-      default:
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
-
-    setSelectedPeriod({ start_date: start, end_date: end });
-  }, []);
-
-  // Refresh all data
-  const refreshData = useCallback(() => {
-    cashFlowQuery.refetch();
-    categorySpendingQuery.refetch();
-    incomeVsExpensesQuery.refetch();
-    analyticsQuery.refetch();
-  }, [cashFlowQuery, categorySpendingQuery, incomeVsExpensesQuery, analyticsQuery]);
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [isError, refetchAll]);
 
   return {
+    reports,
+    accounts,
+    categories,
+    isLoading,
+    isError,
+    error,
+    refetch: refetchAll,
+    refetchAll,
     selectedPeriod,
     setSelectedPeriod,
-    handleQuickPeriod,
-    refreshData,
-    cashFlow: {
-      data: cashFlowQuery.data,
-      isLoading: cashFlowQuery.isLoading,
-      error: cashFlowQuery.error,
-    },
-    categorySpending: {
-      data: categorySpendingQuery.data,
-      isLoading: categorySpendingQuery.isLoading,
-      error: categorySpendingQuery.error,
-    },
-    incomeVsExpenses: {
-      data: incomeVsExpensesQuery.data,
-      isLoading: incomeVsExpensesQuery.isLoading,
-      error: incomeVsExpensesQuery.error,
-    },
-    analytics: {
-      data: analyticsQuery.data,
-      isLoading: analyticsQuery.isLoading,
-      error: analyticsQuery.error,
-    },
-    isLoading: 
-      cashFlowQuery.isLoading || 
-      categorySpendingQuery.isLoading || 
-      incomeVsExpensesQuery.isLoading ||
-      analyticsQuery.isLoading,
+    retryCount
   };
-};
+}
+
+/**
+ * Hook for managing report generation with progress tracking
+ */
+export function useReportGeneration() {
+  const queryClient = useQueryClient();
+  const [generatingReports, setGeneratingReports] = useState<Set<string>>(new Set());
+
+  const generateReport = useCallback(async (params: any) => {
+    const reportId = `${params.report_type}_${params.period_start}_${params.period_end}`;
+    
+    try {
+      setGeneratingReports(prev => new Set(prev).add(reportId));
+      
+      const report = await reportsService.generateReport(params);
+      
+      // Poll for completion
+      const checkStatus = async () => {
+        const status = await reportsService.getReportStatus(report.id);
+        
+        if (status.is_generated) {
+          toast.success('Relatório gerado com sucesso!');
+          queryClient.invalidateQueries(['reports']);
+          setGeneratingReports(prev => {
+            const next = new Set(prev);
+            next.delete(reportId);
+            return next;
+          });
+          return status;
+        } else if (status.error_message) {
+          throw new Error(status.error_message);
+        } else {
+          // Continue polling
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return checkStatus();
+        }
+      };
+      
+      return await checkStatus();
+      
+    } catch (error: any) {
+      setGeneratingReports(prev => {
+        const next = new Set(prev);
+        next.delete(reportId);
+        return next;
+      });
+      
+      if (error.response?.status === 409) {
+        toast.error('Relatório já está sendo gerado. Aguarde a conclusão.');
+      } else {
+        toast.error(`Erro ao gerar relatório: ${error.message}`);
+      }
+      
+      throw error;
+    }
+  }, [queryClient]);
+
+  return {
+    generateReport,
+    isGenerating: (reportType: string, startDate: string, endDate: string) => {
+      const reportId = `${reportType}_${startDate}_${endDate}`;
+      return generatingReports.has(reportId);
+    },
+    generatingCount: generatingReports.size
+  };
+}

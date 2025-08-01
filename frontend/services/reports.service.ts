@@ -76,12 +76,61 @@ export const reportsService = {
     }
   },
 
-  // Download report file
+  // Get report status
+  async getReportStatus(reportId: string): Promise<Report> {
+    const response = await api.get(`/api/reports/reports/${reportId}/`);
+    return response.data;
+  },
+
+  // Download report file with signed URL
   async downloadReport(reportId: string) {
-    const response = await api.get(`/api/reports/reports/${reportId}/download/`, {
+    // First get the signed download URL
+    const response = await api.get(`/api/reports/reports/${reportId}/download/`);
+    const { download_url } = response.data;
+    
+    // Then download using the signed URL
+    const downloadResponse = await api.get(download_url, {
       responseType: 'blob',
     });
+    return downloadResponse.data;
+  },
+  
+  // Regenerate a failed or completed report
+  async regenerateReport(reportId: string): Promise<{ message: string; report_id: number }> {
+    const response = await api.post(`/api/reports/reports/${reportId}/regenerate/`);
     return response.data;
+  },
+  
+  // Poll for report completion
+  async pollReportStatus(
+    reportId: string,
+    onProgress?: (status: string) => void,
+    maxAttempts: number = 60,
+    interval: number = 2000
+  ): Promise<Report> {
+    let attempts = 0;
+    
+    while (attempts < maxAttempts) {
+      const report = await this.getReportStatus(reportId);
+      
+      if (onProgress) {
+        onProgress(report.status || 'processing');
+      }
+      
+      if (report.is_generated) {
+        return report;
+      }
+      
+      if (report.error_message) {
+        throw new Error(report.error_message);
+      }
+      
+      // Wait before next attempt
+      await new Promise(resolve => setTimeout(resolve, interval));
+      attempts++;
+    }
+    
+    throw new Error('Report generation timed out');
   },
 
   // Get report summary with statistics
