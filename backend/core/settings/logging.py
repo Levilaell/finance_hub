@@ -30,6 +30,10 @@ LOGGING = {
             'style': '{',
             'datefmt': '%Y-%m-%d %H:%M:%S',
         },
+        'json': {
+            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+            'format': '%(asctime)s %(name)s %(levelname)s %(message)s'
+        },
     },
     'filters': {
         'require_debug_false': {
@@ -74,6 +78,22 @@ LOGGING = {
             'backupCount': 5,
             'formatter': 'detailed',
         },
+        'security_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOGS_DIR / 'security.log'),
+            'maxBytes': 1024 * 1024 * 50,  # 50MB - security logs are important
+            'backupCount': 20,  # Keep more history for security
+            'formatter': 'detailed',
+        },
+        'security_json': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOGS_DIR / 'security.json'),
+            'maxBytes': 1024 * 1024 * 50,  # 50MB
+            'backupCount': 20,
+            'formatter': 'json',
+        },
     },
     'root': {
         'level': 'INFO',
@@ -117,6 +137,16 @@ LOGGING = {
         },
         'celery': {
             'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'security': {
+            'handlers': ['console', 'security_file', 'security_json'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'apps.authentication': {
+            'handlers': ['console', 'file', 'security_file'],
             'level': 'INFO',
             'propagate': False,
         },

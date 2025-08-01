@@ -29,6 +29,7 @@ class APIError(OpenBankingError):
     pass
 
 logger = logging.getLogger(__name__)
+security_logger = logging.getLogger('security')
 
 
 class FinanceAppError(APIException):
@@ -102,12 +103,30 @@ def format_error_response(
     return response
 
 
-def sanitize_error_message(error: Exception, user_facing: bool = True) -> str:
-    """Sanitize error messages for user consumption"""
+def sanitize_error_message(error: Exception, user_facing: bool = True, error_type: str = None) -> str:
+    """Sanitize error messages for user consumption and prevent information disclosure"""
     if not user_facing or settings.DEBUG:
         return str(error)
     
-    # Map internal errors to user-friendly messages
+    # In production, return generic messages based on error type to prevent information disclosure
+    if error_type:
+        generic_messages = {
+            'authentication': 'Authentication failed. Please check your credentials.',
+            'authorization': 'Access denied. You do not have permission to perform this action.',
+            'validation': 'Invalid input data provided.',
+            'not_found': 'The requested resource was not found.',
+            'server_error': 'Internal server error. Please try again later.',
+            'rate_limit': 'Rate limit exceeded. Please wait before trying again.',
+            'database': 'Data processing error. Please try again later.',
+            'external_api': 'External service unavailable. Please try again later.',
+            'security': 'Request rejected for security reasons.',
+            'csrf': 'CSRF verification failed. Please refresh the page and try again.',
+            'suspicious': 'Suspicious activity detected. Request blocked.',
+        }
+        
+        return generic_messages.get(error_type, 'An error occurred. Please try again later.')
+    
+    # Map internal errors to user-friendly messages (legacy support)
     error_mappings = {
         'Connection refused': 'Service is temporarily unavailable. Please try again later.',
         'Timeout': 'Request timed out. Please try again.',
@@ -115,6 +134,9 @@ def sanitize_error_message(error: Exception, user_facing: bool = True) -> str:
         'Insufficient funds': 'Insufficient funds for this transaction.',
         'Invalid account': 'Bank account information is invalid.',
         'Rate limit': 'Too many requests. Please wait before trying again.',
+        'csrf': 'CSRF verification failed. Please refresh the page.',
+        'permission': 'Access denied.',
+        'authentication': 'Authentication failed.',
     }
     
     error_str = str(error).lower()
@@ -125,25 +147,138 @@ def sanitize_error_message(error: Exception, user_facing: bool = True) -> str:
     return 'An unexpected error occurred. Please try again later.'
 
 
+def get_client_ip(request):
+    """Get client IP address from request"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+
+def log_security_error(request, error, error_type='unknown'):
+    """
+    Log security-related errors with full context
+    """
+    client_ip = get_client_ip(request)
+    user_id = getattr(request.user, 'id', None) if hasattr(request, 'user') else None
+    
+    security_logger.error(
+        f"Security error: {error_type}",
+        extra={
+            'error_type': error_type,
+            'error_message': str(error),
+            'client_ip': client_ip,
+            'user_id': user_id,
+            'path': request.path,
+            'method': request.method,
+            'user_agent': request.META.get('HTTP_USER_AGENT', ''),
+            'referer': request.META.get('HTTP_REFERER', ''),
+            'timestamp': timezone.now().isoformat(),
+            'stack_trace': traceback.format_exc() if settings.DEBUG else None
+        }
+    )
+
+
+def handle_suspicious_operation(request, message="Suspicious operation detected", block_request=True):
+    """
+    Handle suspicious operations with logging and appropriate response
+    """
+    client_ip = get_client_ip(request)
+    user_id = getattr(request.user, 'id', None) if hasattr(request, 'user') else None
+    
+    security_logger.critical(
+        f"SUSPICIOUS ACTIVITY from {client_ip}: {message}",
+        extra={
+            'event_type': 'suspicious_activity',
+            'client_ip': client_ip,
+            'user_id': user_id,
+            'path': request.path,
+            'method': request.method,
+            'message': message,
+            'user_agent': request.META.get('HTTP_USER_AGENT', ''),
+            'post_data': dict(request.POST) if request.method == 'POST' and not any(field in request.POST for field in ['password', 'token']) else 'REDACTED',
+            'get_params': dict(request.GET),
+            'timestamp': timezone.now().isoformat(),
+        }
+    )
+    
+    if block_request:
+        return Response(
+            format_error_response(
+                'security_violation',
+                sanitize_error_message(Exception(message), error_type='security')
+            ),
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    return None
+
+
+class SecurityError(Exception):
+    """Custom exception for security-related errors"""
+    def __init__(self, message, error_type='security', should_block=True):
+        super().__init__(message)
+        self.error_type = error_type
+        self.should_block = should_block
+
+
 def custom_exception_handler(exc, context):
-    """Custom exception handler for the entire application"""
+    """Custom exception handler for the entire application with security logging"""
     
     # Get the request object
     request = context.get('request')
     view = context.get('view')
     
-    # Log the exception with context
-    logger.error(
-        f"Exception in {view.__class__.__name__} for user {getattr(request.user, 'id', 'anonymous')}: {exc}",
-        extra={
-            'exception_type': exc.__class__.__name__,
-            'view': view.__class__.__name__ if view else None,
-            'user_id': getattr(request.user, 'id', None),
-            'path': getattr(request, 'path', None),
-            'method': getattr(request, 'method', None),
-        },
-        exc_info=True
+    # Handle security errors first
+    if isinstance(exc, SecurityError):
+        if request:
+            log_security_error(request, exc, exc.error_type)
+            if exc.should_block:
+                return handle_suspicious_operation(request, str(exc))
+    
+    # Determine if this is a security-related error
+    security_exceptions = [
+        'authentication', 'permission', 'authorization', 'invalid token', 
+        'csrf', 'forbidden', 'unauthorized', 'access denied'
+    ]
+    
+    is_security_error = any(
+        keyword in str(exc).lower() 
+        for keyword in security_exceptions
     )
+    
+    # Log the exception with context
+    if is_security_error:
+        if request:
+            log_security_error(request, exc, 'authentication' if 'auth' in str(exc).lower() else 'authorization')
+        logger.warning(
+            f"Security exception in {view.__class__.__name__ if view else 'unknown'} for user {getattr(request.user, 'id', 'anonymous') if request else 'unknown'}: {exc}",
+            extra={
+                'exception_type': exc.__class__.__name__,
+                'view': view.__class__.__name__ if view else None,
+                'user_id': getattr(request.user, 'id', None) if request else None,
+                'path': getattr(request, 'path', None) if request else None,
+                'method': getattr(request, 'method', None) if request else None,
+                'client_ip': get_client_ip(request) if request else None,
+                'is_security_error': True,
+            },
+            exc_info=settings.DEBUG  # Only include stack trace in debug mode
+        )
+    else:
+        logger.error(
+            f"Exception in {view.__class__.__name__ if view else 'unknown'} for user {getattr(request.user, 'id', 'anonymous') if request else 'unknown'}: {exc}",
+            extra={
+                'exception_type': exc.__class__.__name__,
+                'view': view.__class__.__name__ if view else None,
+                'user_id': getattr(request.user, 'id', None) if request else None,
+                'path': getattr(request, 'path', None) if request else None,
+                'method': getattr(request, 'method', None) if request else None,
+                'is_security_error': False,
+            },
+            exc_info=True
+        )
     
     # Handle specific Open Banking errors
     if isinstance(exc, OpenBankingError):

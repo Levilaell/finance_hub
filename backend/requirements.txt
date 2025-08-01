@@ -58,6 +58,7 @@ python-crontab==3.2.0
 python-dateutil==2.9.0.post0
 python-decouple==3.8
 python-dotenv==1.0.0
+python-json-logger==2.0.7
 pytz==2025.2
 PyYAML==6.0.2
 qrcode==7.4.2
@@ -82,7 +83,7 @@ whitenoise==6.6.0
 reportlab==4.0.4
 xlsxwriter==3.1.2
 stripe==7.10.0
-mercadopago==2.2.1
+# mercadopago==2.2.1  # Removed - Stripe-only integration
 numpy==1.26.4
 pandas==2.2.0
 scikit-learn==1.4.0

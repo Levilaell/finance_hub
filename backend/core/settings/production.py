@@ -100,12 +100,46 @@ SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Importante para Railway!
 
-# CORS
-CORS_ALLOWED_ORIGINS = [origin.strip() for origin in config('CORS_ALLOWED_ORIGINS', default='').split(',') if origin.strip()]
+# CORS - Production Security Configuration
+cors_origins = config('CORS_ALLOWED_ORIGINS', default='')
+if cors_origins:
+    # Only allow HTTPS origins in production
+    allowed_origins = []
+    for origin in cors_origins.split(','):
+        origin = origin.strip()
+        if origin and origin.startswith('https://'):
+            allowed_origins.append(origin)
+        elif origin and not origin.startswith('http'):
+            # Allow domain without protocol, assume HTTPS
+            allowed_origins.append(f'https://{origin}')
+    
+    CORS_ALLOWED_ORIGINS = allowed_origins
+else:
+    CORS_ALLOWED_ORIGINS = []
+
+# Never allow all origins in production
+CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 
-# CSRF - Adicione os domínios do Railway
-CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in config('CORS_ALLOWED_ORIGINS', default='').split(',') if origin.strip()]
+# Additional CORS security for production
+CORS_REPLACE_HTTPS_REFERER = True
+CORS_ORIGIN_ALLOW_ALL = False
+
+# CSRF - Secure configuration for production
+csrf_origins = config('CORS_ALLOWED_ORIGINS', default='')
+if csrf_origins:
+    # Only allow HTTPS origins for CSRF
+    trusted_origins = []
+    for origin in csrf_origins.split(','):
+        origin = origin.strip()
+        if origin and origin.startswith('https://'):
+            trusted_origins.append(origin)
+        elif origin and not origin.startswith('http'):
+            trusted_origins.append(f'https://{origin}')
+    
+    CSRF_TRUSTED_ORIGINS = trusted_origins
+else:
+    CSRF_TRUSTED_ORIGINS = []
 
 # Email settings
 EMAIL_HOST = config('EMAIL_HOST', default='')
@@ -226,9 +260,9 @@ STRIPE_PUBLIC_KEY = config('STRIPE_PUBLIC_KEY', default='')
 STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
 STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
 
-# MercadoPago Configuration
-MERCADOPAGO_ACCESS_TOKEN = config('MERCADOPAGO_ACCESS_TOKEN', default='')
-MERCADOPAGO_PUBLIC_KEY = config('MERCADOPAGO_PUBLIC_KEY', default='')
+# Payment Gateway - Stripe Only (MercadoPago removed for PCI DSS compliance)
+# MERCADOPAGO_ACCESS_TOKEN = config('MERCADOPAGO_ACCESS_TOKEN', default='')
+# MERCADOPAGO_PUBLIC_KEY = config('MERCADOPAGO_PUBLIC_KEY', default='')
 
 # Trial Period Settings
 DEFAULT_TRIAL_DAYS = config('TRIAL_PERIOD_DAYS', default=14, cast=int)

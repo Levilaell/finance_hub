@@ -49,6 +49,8 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'core.security.SecurityHeadersMiddleware',  # Enhanced security headers
+    'core.security.RequestIDMiddleware',  # Request tracking
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -56,11 +58,14 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'apps.authentication.middleware.SecurityMiddleware',
     'apps.authentication.cookie_middleware.JWTCookieMiddleware',
-    'apps.companies.middleware.TrialExpirationMiddleware',  # Add subscription/trial enforcement
+    'core.security.RateLimitMiddleware',  # Enhanced rate limiting
+    'core.security.AuditLogMiddleware',  # Audit logging
+    'apps.companies.middleware.TrialExpirationMiddleware',
     'apps.payments.middleware.PaymentErrorHandlerMiddleware',
     'apps.payments.middleware.PaymentSecurityMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.error_handlers.SecurityErrorMiddleware',  # Security error handling
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -146,9 +151,13 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/hour',
         'user': '1000/hour',
-        'login': '5/minute',
-        'register': '3/minute', 
-        'password_reset': '5/hour',
+        'login': '3/minute',  # Reduced from 5 for security
+        'register': '2/minute',  # Reduced from 3 for security 
+        'password_reset': '3/hour',  # Reduced from 5 for security
+        'token_refresh': '30/minute',  # New rate limit for token refresh
+        '2fa_attempt': '5/minute',  # New rate limit for 2FA attempts
+        'email_verification': '3/hour',  # New rate limit for email verification
+        'account_deletion': '1/hour',  # New rate limit for account deletion
         'report_generation': '10/hour',
         'ai_requests': '10/minute',
         'bank_sync': '20/hour',
@@ -197,6 +206,41 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'Strict'
 CSRF_USE_SESSIONS = True
+# CSRF_COOKIE_SECURE will be set in environment-specific settings
+CSRF_TRUSTED_ORIGINS = []  # Will be set in environment-specific settings
+
+# CORS Configuration - Restrictive by default
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = []  # Will be set in environment-specific settings
+CORS_ALLOWED_ORIGIN_REGEXES = []  # For dynamic subdomains in production
+CORS_ALLOW_ALL_ORIGINS = False  # Never allow all origins
+CORS_ALLOWED_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'x-request-id',
+]
+CORS_ALLOWED_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+CORS_EXPOSE_HEADERS = [
+    'x-request-id',
+    'x-rate-limit-remaining',
+    'x-rate-limit-limit',
+]
+CORS_MAX_AGE = 86400  # 24 hours
+CORS_PREFLIGHT_MAX_AGE = 86400
 
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
