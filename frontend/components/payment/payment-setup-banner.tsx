@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ExclamationTriangleIcon, XMarkIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/store/auth-store';
-import { subscriptionService, SubscriptionStatus } from '@/services/subscription.service';
+import { subscriptionService, SubscriptionStatus } from '@/services/unified-subscription.service';
 
 export function PaymentSetupBanner() {
   const router = useRouter();

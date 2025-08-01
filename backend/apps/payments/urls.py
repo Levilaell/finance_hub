@@ -10,6 +10,11 @@ from .views import (
     CancelSubscriptionView,
     StripeWebhookView,
 )
+from .health_checks import (
+    PaymentHealthCheckView,
+    PaymentMetricsView,
+    PaymentAlertsView,
+)
 from .views_subscription import (
     SubscriptionChangePlanView,
     SubscriptionProrationView,
@@ -42,4 +47,9 @@ urlpatterns = [
     
     # Webhooks
     path('webhooks/stripe/', StripeWebhookView.as_view(), name='stripe-webhook'),
+    
+    # Health checks and monitoring
+    path('health/', PaymentHealthCheckView.as_view(), name='health-check'),
+    path('metrics/', PaymentMetricsView.as_view(), name='metrics'),
+    path('alerts/', PaymentAlertsView.as_view(), name='alerts'),
 ]

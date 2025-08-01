@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 class SubscriptionPlanListView(generics.ListAPIView):
     """List available subscription plans"""
-    queryset = SubscriptionPlan.objects.filter(is_active=True)
+    queryset = SubscriptionPlan.objects.filter(is_active=True).order_by('display_order', 'price_monthly')
     serializer_class = SubscriptionPlanSerializer
     permission_classes = [AllowAny]
 
@@ -220,7 +220,7 @@ class PaymentMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         return PaymentMethod.objects.filter(
             company=self.request.user.current_company
-        )
+        ).select_related('company').order_by('-is_default', '-created_at')
     
     def perform_update(self, serializer):
         # Only allow updating is_default
@@ -246,7 +246,7 @@ class PaymentHistoryView(generics.ListAPIView):
         return Payment.objects.filter(
             company=self.request.user.current_company,
             status='succeeded'
-        ).select_related('payment_method')
+        ).select_related('payment_method', 'subscription', 'company').order_by('-created_at')
 
 
 class CancelSubscriptionView(APIView):
