@@ -15,6 +15,7 @@ from .serializers import (
     UsageLimitsSerializer,
     SubscriptionStatusSerializer
 )
+from .mixins import CompanyValidationMixin
 
 logger = logging.getLogger(__name__)
 
@@ -39,35 +40,27 @@ class SubscriptionPlansView(APIView):
         return Response(serializer.data)
 
 
-class CompanyDetailView(APIView):
+class CompanyDetailView(CompanyValidationMixin, APIView):
     """Get company details"""
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        try:
-            company = request.user.company
-        except Company.DoesNotExist:
-            return Response(
-                {'error': 'Company not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        company, error_response = self.get_user_company(request)
+        if error_response:
+            return error_response
         
         serializer = CompanySerializer(company)
         return Response(serializer.data)
 
 
-class UsageLimitsView(APIView):
+class UsageLimitsView(CompanyValidationMixin, APIView):
     """Get current usage and limits"""
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        try:
-            company = request.user.company
-        except Company.DoesNotExist:
-            return Response(
-                {'error': 'Company not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        company, error_response = self.get_user_company(request)
+        if error_response:
+            return error_response
         
         # Get current usage
         from apps.banking.models import BankAccount
@@ -132,18 +125,14 @@ class UsageLimitsView(APIView):
         return Response(limits)
 
 
-class SubscriptionStatusView(APIView):
+class SubscriptionStatusView(CompanyValidationMixin, APIView):
     """Get subscription status"""
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        try:
-            company = request.user.company
-        except Company.DoesNotExist:
-            return Response(
-                {'error': 'Company not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        company, error_response = self.get_user_company(request)
+        if error_response:
+            return error_response
         
         # Check payment method (simplified - just check if subscription_id exists)
         has_payment_method = bool(company.subscription_id)

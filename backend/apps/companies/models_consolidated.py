@@ -1,5 +1,5 @@
 """
-Simplified Company models - Essential functionality only
+Consolidated Company models - Using payment app for subscription data
 """
 from datetime import timedelta
 from django.contrib.auth import get_user_model
@@ -11,86 +11,21 @@ from django.utils.translation import gettext_lazy as _
 User = get_user_model()
 
 
-class SubscriptionPlan(models.Model):
-    """
-    Simple subscription plan model with essential fields only
-    """
-    # Core identifiers
-    name = models.CharField(_('name'), max_length=50)
-    slug = models.SlugField(_('slug'), unique=True)
-    
-    # Pricing
-    price_monthly = models.DecimalField(_('monthly price'), max_digits=8, decimal_places=2)
-    price_yearly = models.DecimalField(_('yearly price'), max_digits=8, decimal_places=2)
-    
-    # Essential limits
-    max_transactions = models.IntegerField(_('max transactions'), default=500)
-    max_bank_accounts = models.IntegerField(_('max bank accounts'), default=1)
-    max_ai_requests = models.IntegerField(_('max AI requests'), default=100)
-    
-    # Feature flags
-    has_ai_insights = models.BooleanField(_('AI insights'), default=False)
-    has_advanced_reports = models.BooleanField(_('advanced reports'), default=False)
-    
-    # Payment gateway IDs
-    stripe_price_id_monthly = models.CharField(max_length=255, blank=True)
-    stripe_price_id_yearly = models.CharField(max_length=255, blank=True)
-    
-    # Metadata
-    is_active = models.BooleanField(default=True)
-    display_order = models.IntegerField(default=0)
-    
-    class Meta:
-        db_table = 'subscription_plans'
-        ordering = ['display_order', 'price_monthly']
-    
-    def __str__(self):
-        return f"{self.name} - ${self.price_monthly}/mo"
-
-
 class Company(models.Model):
     """
-    Simplified company model - Essential fields only
+    Simplified company model - Subscription data moved to payments.Subscription
     """
     # Owner
     owner = models.OneToOneField(User, on_delete=models.CASCADE, related_name='company')
     name = models.CharField(_('company name'), max_length=200)
     
-    # Subscription
-    subscription_plan = models.ForeignKey(
-        SubscriptionPlan, 
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True
-    )
-    subscription_status = models.CharField(
-        _('status'),
-        max_length=20,
-        choices=[
-            ('trial', 'Trial'),
-            ('active', 'Active'),
-            ('cancelled', 'Cancelled'),
-            ('expired', 'Expired'),
-        ],
-        default='trial'
-    )
-    
-    # Billing
-    billing_cycle = models.CharField(
-        max_length=20,
-        choices=[('monthly', 'Monthly'), ('yearly', 'Yearly')],
-        default='monthly'
-    )
-    trial_ends_at = models.DateTimeField(null=True, blank=True)
-    subscription_id = models.CharField(max_length=255, blank=True)  # Stripe subscription ID
-    
-    # Usage tracking
-    current_month_transactions = models.IntegerField(default=0)
-    current_month_ai_requests = models.IntegerField(default=0)
-    
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
+    
+    # Usage tracking - Keep these for quick access and atomic operations
+    current_month_transactions = models.IntegerField(default=0)
+    current_month_ai_requests = models.IntegerField(default=0)
     
     class Meta:
         db_table = 'companies'
@@ -100,38 +35,79 @@ class Company(models.Model):
         return self.name
     
     def save(self, *args, **kwargs):
-        # Set trial on creation
-        if not self.pk and not self.trial_ends_at:
-            self.trial_ends_at = timezone.now() + timedelta(days=14)
-            self.subscription_status = 'trial'
+        # Create company first
+        is_new = not self.pk
         super().save(*args, **kwargs)
+        
+        # Create default subscription on company creation
+        if is_new:
+            from apps.payments.models import Subscription
+            Subscription.objects.create(
+                company=self,
+                status='trial',
+                trial_ends_at=timezone.now() + timedelta(days=14)
+            )
+    
+    # Proxy properties to subscription
+    @property
+    def subscription(self):
+        """Get related subscription from payments app"""
+        return getattr(self, 'subscription', None)
+    
+    @property
+    def subscription_plan(self):
+        """Get subscription plan through subscription"""
+        if self.subscription:
+            return self.subscription.plan
+        return None
+    
+    @property
+    def subscription_status(self):
+        """Get subscription status"""
+        if self.subscription:
+            return self.subscription.status
+        return 'trial'
+    
+    @property
+    def billing_cycle(self):
+        """Get billing cycle"""
+        if self.subscription:
+            return self.subscription.billing_period
+        return 'monthly'
+    
+    @property
+    def trial_ends_at(self):
+        """Get trial end date"""
+        if self.subscription:
+            return self.subscription.trial_ends_at
+        return None
+    
+    @property
+    def subscription_id(self):
+        """Get payment gateway subscription ID"""
+        if self.subscription:
+            return self.subscription.stripe_subscription_id
+        return None
     
     @property
     def is_trial_active(self):
         """Check if trial is still active"""
-        if self.subscription_status != 'trial':
-            return False
-        return self.trial_ends_at and timezone.now() < self.trial_ends_at
+        if self.subscription:
+            return self.subscription.is_trial and self.subscription.trial_days_remaining > 0
+        return False
     
     @property
     def days_until_trial_ends(self):
         """Calculate days remaining in trial"""
-        if not self.is_trial_active:
-            return 0
-        delta = self.trial_ends_at - timezone.now()
-        return max(0, delta.days)
+        if self.subscription:
+            return self.subscription.trial_days_remaining
+        return 0
     
     def can_use_feature(self, feature):
         """Simple feature access check"""
-        if not self.subscription_plan:
-            return False
-        
-        feature_map = {
-            'ai_insights': self.subscription_plan.has_ai_insights,
-            'advanced_reports': self.subscription_plan.has_advanced_reports,
-        }
-        
-        return feature_map.get(feature, False)
+        if self.subscription:
+            return self.subscription.can_use_feature(feature)
+        return False
     
     def check_limit(self, limit_type):
         """Check if limit is reached"""
