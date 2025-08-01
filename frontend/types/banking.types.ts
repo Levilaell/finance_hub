@@ -439,18 +439,6 @@ export interface PluggyCategory {
   internal_category?: string;
 }
 
-// Pluggy Connect Types
-export interface ConnectTokenRequest {
-  item_id?: string;
-  client_user_id?: string;
-  webhook_url?: string;
-  update_mode?: 'add' | 'replace';
-  include_accounts?: string[];
-  options?: {
-    update_mode?: 'add' | 'replace';
-    webhook_url?: string;
-  };
-}
 
 
 export interface PluggyConnectOptions {
@@ -488,6 +476,3 @@ export interface PluggyConnectError {
   message: string;
 }
 
-interface OAuthConnector extends PluggyConnector {
-  oauth_url?: string;
-}

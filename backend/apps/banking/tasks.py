@@ -683,7 +683,23 @@ def _handle_item_error(data: Dict):
         logger.error(f"Item {item.pluggy_item_id} error: {item.error_code} - {item.error_message}")
         
         # Notify user about the error
-        # TODO: Implement user notification
+        try:
+            from apps.notifications.services import NotificationService
+            NotificationService.create_notification(
+                event_type='sync_error',
+                event_data={
+                    'id': str(item.id),
+                    'connector_name': item.connector.name if hasattr(item, 'connector') else 'Financial Institution',
+                    'status': item.status,
+                    'error_message': item.error_message or 'Connection error',
+                    'action_url': f'/accounts/reconnect/{item.id}',
+                },
+                company=item.company,
+                user=None,
+                broadcast=True
+            )
+        except Exception as e:
+            logger.error(f"Failed to send error notification: {e}")
         
     except PluggyItem.DoesNotExist:
         logger.warning(f"Item {data['id']} not found for error event")
@@ -714,7 +730,22 @@ def _handle_item_waiting_input(data: Dict):
         item.status = 'WAITING_USER_INPUT'
         item.save()
         
-        # TODO: Send notification to user
+        # Send notification to user
+        try:
+            from apps.notifications.services import NotificationService
+            NotificationService.create_notification(
+                event_type='mfa_required',
+                event_data={
+                    'id': str(item.id),
+                    'connector_name': item.connector.name if hasattr(item, 'connector') else 'Financial Institution',
+                    'action_url': f'/accounts/mfa/{item.id}',
+                },
+                company=item.company,
+                user=None,
+                broadcast=True
+            )
+        except Exception as e:
+            logger.error(f"Failed to send MFA notification: {e}")
         
     except PluggyItem.DoesNotExist:
         logger.warning(f"Item {data['id']} not found for waiting input event")

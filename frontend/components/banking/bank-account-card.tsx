@@ -192,10 +192,6 @@ export function BankAccountCard({
   const typeInfo = getAccountTypeInfo(account.type);
   const statusInfo = getStatusInfo(account.item_status);
   const syncProgress = getSyncProgress();
-  
-  // Debug log para verificar o status
-  console.log(`Account ${account.display_name} - Status: ${account.item_status}`);
-
   return (
     <Card className="hover:shadow-lg transition-all duration-300 overflow-hidden">
       {/* Status Bar */}

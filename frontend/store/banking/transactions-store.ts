@@ -141,8 +141,8 @@ export const useTransactionsStore = create<TransactionsState>()(
           
           set({ categories, isLoadingCategories: false });
         } catch (error) {
-          console.error('Failed to fetch categories:', error);
           set({ isLoadingCategories: false });
+          throw error;
         }
       },
 
@@ -215,7 +215,6 @@ export const useTransactionsStore = create<TransactionsState>()(
             BankingCache.clear();
           }
         } catch (error) {
-          console.error('Failed to bulk categorize:', error);
           throw error;
         }
       },

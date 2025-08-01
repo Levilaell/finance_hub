@@ -138,7 +138,6 @@ export const useBankingStore = create<BankingStore>()(
             get().fetchAccounts(),
           ]);
         } catch (error: any) {
-          console.error('Failed to sync item:', error);
           throw error;
         }
       },
@@ -150,11 +149,10 @@ export const useBankingStore = create<BankingStore>()(
           set((state) => ({
             items: state.items.filter((item) => item.id !== itemId),
             accounts: state.accounts.filter(
-              (account) => !state.items.find((item) => item.id === itemId)
+              (account) => account.item.id !== itemId
             ),
           }));
         } catch (error: any) {
-          console.error('Failed to disconnect item:', error);
           throw error;
         }
       },

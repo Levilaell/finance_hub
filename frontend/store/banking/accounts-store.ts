@@ -100,7 +100,7 @@ export const useAccountsStore = create<AccountsState>()(
           
           set({ summary });
         } catch (error) {
-          console.error('Failed to fetch accounts summary:', error);
+          // Error is handled silently - summary remains unchanged
         }
       },
 

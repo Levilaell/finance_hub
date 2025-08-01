@@ -173,8 +173,8 @@ export function BankConnectionCard({
           <AlertDialogHeader>
             <AlertDialogTitle>Remover conexão bancária</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja remover a conexão com {connection.connector.name}? 
-              Esta ação não pode ser desfeita e todos os dados sincronizados serão mantidos.
+              Are you sure you want to remove the connection with {connection.connector.name}? 
+              This action cannot be undone. All synced data will be retained.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
