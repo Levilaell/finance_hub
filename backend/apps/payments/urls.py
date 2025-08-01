@@ -1,20 +1,45 @@
-"""
-Payment URLs
-"""
 from django.urls import path
-from . import views
+from .views import (
+    SubscriptionPlanListView,
+    SubscriptionStatusView,
+    CreateCheckoutSessionView,
+    ValidatePaymentView,
+    PaymentMethodListCreateView,
+    PaymentMethodDetailView,
+    PaymentHistoryView,
+    CancelSubscriptionView,
+    StripeWebhookView,
+)
+from .views_subscription import (
+    SubscriptionChangePlanView,
+    SubscriptionProrationView,
+    SubscriptionUsageLimitsView,
+)
 
 app_name = 'payments'
 
 urlpatterns = [
-    # Checkout endpoints
-    path('checkout/create/', views.CreateCheckoutSessionView.as_view(), name='create-checkout'),
-    path('checkout/validate/', views.ValidatePaymentView.as_view(), name='validate-payment'),
+    # Subscription plans
+    path('plans/', SubscriptionPlanListView.as_view(), name='plan-list'),
     
-    # Subscription status
-    path('subscription-status/', views.CheckSubscriptionStatusView.as_view(), name='subscription-status'),
+    # Subscription management
+    path('subscription/status/', SubscriptionStatusView.as_view(), name='subscription-status'),
+    path('subscription/cancel/', CancelSubscriptionView.as_view(), name='cancel-subscription'),
+    path('subscription/change-plan/', SubscriptionChangePlanView.as_view(), name='change-plan'),
+    path('subscription/calculate-proration/', SubscriptionProrationView.as_view(), name='calculate-proration'),
+    path('subscription/usage-limits/', SubscriptionUsageLimitsView.as_view(), name='usage-limits'),
     
-    # Webhook endpoints
-    path('webhooks/stripe/', views.stripe_webhook, name='stripe-webhook'),
-    path('webhooks/mercadopago/', views.mercadopago_webhook, name='mercadopago-webhook'),
+    # Checkout flow
+    path('checkout/create/', CreateCheckoutSessionView.as_view(), name='create-checkout'),
+    path('checkout/validate/', ValidatePaymentView.as_view(), name='validate-payment'),
+    
+    # Payment methods
+    path('payment-methods/', PaymentMethodListCreateView.as_view(), name='payment-method-list'),
+    path('payment-methods/<int:pk>/', PaymentMethodDetailView.as_view(), name='payment-method-detail'),
+    
+    # Payment history
+    path('payments/', PaymentHistoryView.as_view(), name='payment-history'),
+    
+    # Webhooks
+    path('webhooks/stripe/', StripeWebhookView.as_view(), name='stripe-webhook'),
 ]

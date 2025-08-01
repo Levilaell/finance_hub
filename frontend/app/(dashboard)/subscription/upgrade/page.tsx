@@ -1,260 +1,171 @@
 'use client';
 
-import { useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { toast } from 'sonner';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { subscriptionService } from '@/services/subscription.service';
-import { paymentService } from '@/services/payment.service';
-import { formatCurrency } from '@/utils/billing.utils';
-import { SubscriptionPlan } from '@/types';
-import { CheckIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowLeft, AlertCircle, Check } from 'lucide-react';
+import { useSubscription } from '@/hooks/useSubscription';
+import { subscriptionService, SubscriptionPlan } from '@/services/unified-subscription.service';
+import { PlanSelector } from '@/components/payment/PlanSelector';
 
 export default function UpgradePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const preselectedPlan = searchParams.get('plan');
-  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const { subscription, createCheckoutSession } = useSubscription();
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+
+  // Get preselected plan from URL params
+  useEffect(() => {
+    const plan = searchParams.get('plan');
+    if (plan) {
+      setSelectedPlan(plan);
+    }
+  }, [searchParams]);
 
   // Fetch available plans
-  const { data: plans, isLoading: plansLoading } = useQuery({
-    queryKey: ['available-plans'],
-    queryFn: () => subscriptionService.getAvailablePlans(),
+  const { data: plans, isLoading } = useQuery({
+    queryKey: ['subscription-plans'],
+    queryFn: subscriptionService.getSubscriptionPlans,
   });
 
-  // Set preselected plan when plans are loaded
-  useQuery({
-    queryKey: ['preselect-plan', preselectedPlan, plans],
-    queryFn: () => {
-      if (preselectedPlan && plans && plans.length > 0) {
-        const plan = plans.find((p: SubscriptionPlan) => 
-          p.name.toLowerCase() === preselectedPlan.toLowerCase()
-        );
-        if (plan) {
-          setSelectedPlan(plan);
-        }
-      }
-      return null;
-    },
-    enabled: !!preselectedPlan && !!plans && plans.length > 0,
-  });
+  const handleSelectPlan = (plan: SubscriptionPlan, billingPeriod: 'monthly' | 'yearly') => {
+    const successUrl = `${window.location.origin}/subscription/success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${window.location.origin}/subscription/upgrade`;
 
-  // Create checkout session mutation
-  const createCheckoutMutation = useMutation({
-    mutationFn: (data: { plan_slug: string; billing_cycle: 'monthly' | 'yearly' }) =>
-      paymentService.createCheckoutSession(data),
-    onSuccess: (data) => {
-      if (data.checkout_url) {
-        window.location.href = data.checkout_url;
-      } else {
-        toast.error('Erro ao criar sessão de pagamento');
-      }
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Erro ao processar pagamento');
-    },
-  });
-
-  const handleSubscribe = () => {
-    if (!selectedPlan) {
-      toast.error('Selecione um plano');
-      return;
-    }
-
-    createCheckoutMutation.mutate({
-      plan_slug: selectedPlan.slug,
-      billing_cycle: billingCycle as 'monthly' | 'yearly',
+    createCheckoutSession.mutate({
+      plan_id: plan.id,
+      billing_period: billingPeriod,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
     });
   };
 
-  const getPrice = (plan: SubscriptionPlan) => {
-    return billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly;
-  };
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="animate-pulse space-y-8">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="grid gap-6 md:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-96 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  const getDiscount = (plan: SubscriptionPlan) => {
-    const monthlyTotal = Number(plan.price_monthly) * 12;
-    const yearlyPrice = Number(plan.price_yearly);
-    return Math.round(((monthlyTotal - yearlyPrice) / monthlyTotal) * 100);
-  };
+  const currentPlanId = subscription?.plan?.id;
+  const isTrialActive = subscription?.subscription_status === 'trial';
+  const trialDaysRemaining = subscription?.trial_days_left || 0;
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="mb-8">
+    <div className="container mx-auto py-8 space-y-8">
+      <div className="flex items-center space-x-4">
         <Button
           variant="ghost"
-          onClick={() => router.push('/dashboard')}
-          className="mb-4"
+          size="icon"
+          onClick={() => router.back()}
         >
-          <ArrowLeftIcon className="h-4 w-4 mr-2" />
-          Voltar ao Dashboard
+          <ArrowLeft className="h-4 w-4" />
         </Button>
-        
-        <h1 className="text-3xl font-bold">Escolha seu Plano</h1>
-        <p className="text-gray-600 mt-2">
-          Selecione o plano ideal para suas necessidades e comece a gerenciar suas finanças de forma inteligente.
-        </p>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Choose Your Plan</h1>
+          <p className="text-muted-foreground">
+            Select the plan that best fits your needs
+          </p>
+        </div>
       </div>
 
-      {plansLoading ? (
-        <div className="flex justify-center py-12">
-          <LoadingSpinner />
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {/* Billing Cycle Toggle */}
-          <div className="flex items-center justify-center space-x-4">
-            <Button
-              variant={billingCycle === 'monthly' ? 'default' : 'outline'}
-              onClick={() => setBillingCycle('monthly')}
-              size="sm"
-            >
-              Mensal
-            </Button>
-            <Button
-              variant={billingCycle === 'yearly' ? 'default' : 'outline'}
-              onClick={() => setBillingCycle('yearly')}
-              size="sm"
-            >
-              Anual
-              <Badge variant="secondary" className="ml-2">
-                Economize até 20%
-              </Badge>
-            </Button>
-          </div>
+      {isTrialActive && trialDaysRemaining <= 7 && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Your trial ends in {trialDaysRemaining} days. Choose a plan to continue using Finance Hub.
+          </AlertDescription>
+        </Alert>
+      )}
 
-          {/* Plans Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {plans?.map((plan: SubscriptionPlan) => {
-              const isSelected = selectedPlan?.id === plan.id;
-              const discount = billingCycle === 'yearly' ? getDiscount(plan) : 0;
+      {plans && (
+        <PlanSelector
+          plans={plans}
+          currentPlanId={currentPlanId}
+          onSelectPlan={handleSelectPlan}
+          loading={createCheckoutSession.isPending}
+        />
+      )}
 
-              return (
-                <Card
-                  key={plan.id}
-                  className={`relative cursor-pointer transition-all ${
-                    isSelected
-                      ? 'ring-2 ring-blue-500 shadow-lg'
-                      : 'hover:shadow-md'
-                  }`}
-                  onClick={() => setSelectedPlan(plan)}
-                >
-                  {plan.name === 'Professional' && (
-                    <Badge className="absolute -top-2 -right-2 bg-blue-500">
-                      Mais Popular
-                    </Badge>
-                  )}
-                  
-                  <CardContent className="p-6">
-                    <div className="text-center space-y-4">
-                      <h3 className="text-xl font-semibold">{plan.name}</h3>
-                      
-                      <div>
-                        <div className="text-3xl font-bold text-blue-600">
-                          {formatCurrency(Number(getPrice(plan)))}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          por {billingCycle === 'yearly' ? 'ano' : 'mês'}
-                        </div>
-                        {billingCycle === 'yearly' && discount > 0 && (
-                          <div className="text-sm text-green-600 font-medium">
-                            {discount}% de desconto
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-3 text-left">
-                        <div className="flex items-center text-sm">
-                          <CheckIcon className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                          <span>{plan.max_transactions === -1 ? 'Transações ilimitadas' : `${plan.max_transactions} transações/mês`}</span>
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <CheckIcon className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                          <span>{plan.max_bank_accounts === -1 ? 'Contas bancárias ilimitadas' : `${plan.max_bank_accounts} contas bancárias`}</span>
-                        </div>
-                        
-                        {plan.has_ai_categorization && (
-                          <div className="flex items-center text-sm">
-                            <CheckIcon className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                            <span>Categorização com IA</span>
-                          </div>
-                        )}
-                        
-                        {plan.has_advanced_reports && (
-                          <div className="flex items-center text-sm">
-                            <CheckIcon className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                            <span>Relatórios avançados</span>
-                          </div>
-                        )}
-                        
-                        {plan.has_api_access && (
-                          <div className="flex items-center text-sm">
-                            <CheckIcon className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                            <span>Acesso à API</span>
-                          </div>
-                        )}
-                        
-                        {plan.has_accountant_access && (
-                          <div className="flex items-center text-sm">
-                            <CheckIcon className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                            <span>Acesso para contador</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <Button
-                        className="w-full"
-                        variant={isSelected ? 'default' : 'outline'}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedPlan(plan);
-                        }}
-                      >
-                        {isSelected ? 'Selecionado' : 'Selecionar'}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          {/* Selected Plan Summary */}
-          {selectedPlan && (
-            <div className="bg-blue-50 border border-blue-200 p-6 rounded-lg">
-              <h4 className="font-medium text-blue-900 mb-3 text-lg">Resumo da Assinatura</h4>
-              <div className="text-sm text-blue-800 space-y-2">
-                <p>Plano selecionado: <strong>{selectedPlan.name}</strong></p>
-                <p>Valor: <strong>{formatCurrency(Number(getPrice(selectedPlan)))}/{billingCycle === 'yearly' ? 'ano' : 'mês'}</strong></p>
-                {billingCycle === 'yearly' && (
-                  <p className="text-green-700">
-                    Você economizará <strong>{formatCurrency(Number(selectedPlan.price_monthly) * 12 - Number(selectedPlan.price_yearly))}</strong> por ano!
-                  </p>
-                )}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>All Plans Include</CardTitle>
+          <CardDescription>
+            Everything you need to manage your finances
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="flex items-start space-x-3">
+              <div className="rounded-full bg-primary/10 p-1">
+                <Check className="h-4 w-4 text-primary" />
               </div>
-              
-              <div className="mt-6 flex justify-center">
-                <Button
-                  size="lg"
-                  onClick={handleSubscribe}
-                  disabled={createCheckoutMutation.isPending}
-                  className="min-w-[200px]"
-                >
-                  {createCheckoutMutation.isPending ? (
-                    <LoadingSpinner />
-                  ) : (
-                    'Assinar Agora'
-                  )}
-                </Button>
+              <div>
+                <p className="font-medium">Bank Account Sync</p>
+                <p className="text-sm text-muted-foreground">
+                  Connect and sync your bank accounts automatically
+                </p>
               </div>
             </div>
-          )}
-        </div>
-      )}
+            <div className="flex items-start space-x-3">
+              <div className="rounded-full bg-primary/10 p-1">
+                <Check className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">Transaction Categorization</p>
+                <p className="text-sm text-muted-foreground">
+                  Automatic and manual transaction categorization
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <div className="rounded-full bg-primary/10 p-1">
+                <Check className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">Financial Reports</p>
+                <p className="text-sm text-muted-foreground">
+                  Detailed insights into your spending and income
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <div className="rounded-full bg-primary/10 p-1">
+                <Check className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">AI-Powered Insights</p>
+                <p className="text-sm text-muted-foreground">
+                  Get intelligent recommendations and analysis
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="text-center space-y-4">
+        <p className="text-sm text-muted-foreground">
+          All plans come with a 14-day free trial. No credit card required to start.
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Questions? Contact us at{' '}
+          <a href="mailto:support@financehub.com" className="text-primary hover:underline">
+            support@financehub.com
+          </a>
+        </p>
+      </div>
     </div>
   );
 }

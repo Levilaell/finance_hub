@@ -2,147 +2,139 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { CheckCircleIcon, XCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
-import { paymentService } from '@/services/payment.service';
-import { toast } from 'sonner';
-import { useAuthStore } from '@/store/auth-store';
+import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { useSubscription } from '@/hooks/useSubscription';
+import { useCheckoutWebSocket } from '@/hooks/usePaymentWebSocket';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function PaymentSuccessPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { fetchUser } = useAuthStore();
-  const [paymentStatus, setPaymentStatus] = useState<'checking' | 'success' | 'pending' | 'failed'>('checking');
+  const { validatePayment } = useSubscription();
+  const [status, setStatus] = useState<'checking' | 'success' | 'error' | 'pending'>('checking');
+  const sessionId = searchParams.get('session_id');
   
-  const validatePaymentMutation = useMutation({
-    mutationFn: async () => {
-      const sessionId = searchParams.get('session_id');
-      const paymentId = searchParams.get('payment_id');
-      
-      if (!sessionId && !paymentId) {
-        throw new Error('No payment information found');
-      }
-      
-      return paymentService.validatePayment({
-        session_id: sessionId || undefined,
-        payment_id: paymentId || undefined,
-      });
-    },
-    onSuccess: async (data) => {
-      setPaymentStatus(data.status);
-      
-      if (data.status === 'success') {
-        toast.success('Pagamento confirmado! Sua assinatura está ativa.');
-        
-        // Clear all caches and force refresh user data
-        try {
-          // Clear localStorage and sessionStorage
-          localStorage.clear();
-          sessionStorage.clear();
-          
-          // Clear React Query cache
-          queryClient.clear();
-          
-          // Force fetch fresh user data
-          await fetchUser();
-          
-          // Dispatch event to notify all components
-          window.dispatchEvent(new CustomEvent('subscription-updated'));
-          
-          // Force reload to ensure all components are refreshed
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 2000);
-        } catch (error) {
-          console.error('Error refreshing data:', error);
-          // Still redirect even if refresh fails
-          window.location.href = '/dashboard';
-        }
-      } else if (data.status === 'pending') {
-        toast.info('Pagamento pendente. Você receberá uma confirmação por email.');
-      } else {
-        toast.error('Falha no pagamento. Tente novamente.');
-      }
-    },
-    onError: (error: any) => {
-      setPaymentStatus('failed');
-      toast.error('Erro ao verificar pagamento');
-    },
-  });
-  
+  // Use WebSocket for real-time checkout status
+  const { status: wsStatus } = useCheckoutWebSocket(sessionId);
+
   useEffect(() => {
-    validatePaymentMutation.mutate();
-  }, [validatePaymentMutation]);
-  
-  const getStatusContent = () => {
-    switch (paymentStatus) {
+    if (!sessionId) {
+      setStatus('error');
+      return;
+    }
+    
+    // Update status based on WebSocket events
+    if (wsStatus === 'success') {
+      setStatus('success');
+      // Invalidate all relevant queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['user'] });
+      queryClient.invalidateQueries({ queryKey: ['subscription-status'] });
+      queryClient.invalidateQueries({ queryKey: ['company'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-methods'] });
+    } else if (wsStatus === 'failed') {
+      setStatus('error');
+    }
+  }, [wsStatus, sessionId, queryClient]);
+
+  // Fallback: validate payment if WebSocket doesn't update within 5 seconds
+  useEffect(() => {
+    if (!sessionId || wsStatus) return;
+
+    const timeout = setTimeout(async () => {
+      try {
+        const result = await validatePayment.mutateAsync(sessionId);
+        
+        if (result.status === 'success') {
+          setStatus('success');
+          queryClient.invalidateQueries({ queryKey: ['user'] });
+          queryClient.invalidateQueries({ queryKey: ['subscription-status'] });
+          queryClient.invalidateQueries({ queryKey: ['company'] });
+        } else {
+          setStatus('pending');
+        }
+      } catch (error) {
+        setStatus('error');
+      }
+    }, 5000);
+
+    return () => clearTimeout(timeout);
+  }, [sessionId, wsStatus, validatePayment, queryClient]);
+
+  const getContent = () => {
+    switch (status) {
       case 'checking':
         return {
-          icon: <LoadingSpinner className="h-16 w-16" />,
-          title: 'Verificando pagamento...',
-          description: 'Por favor, aguarde enquanto confirmamos seu pagamento.',
+          icon: <Loader2 className="h-16 w-16 text-primary animate-spin" />,
+          title: 'Processing Your Payment',
+          description: 'Please wait while we confirm your subscription...',
           showButton: false,
         };
       case 'success':
         return {
-          icon: <CheckCircleIcon className="h-16 w-16 text-green-500" />,
-          title: 'Pagamento confirmado!',
-          description: 'Sua assinatura está ativa. Você será redirecionado em instantes...',
+          icon: <CheckCircle className="h-16 w-16 text-green-500" />,
+          title: 'Payment Successful!',
+          description: 'Your subscription has been activated. Welcome to Finance Hub!',
           showButton: true,
         };
       case 'pending':
         return {
-          icon: <ClockIcon className="h-16 w-16 text-yellow-500" />,
-          title: 'Pagamento pendente',
-          description: 'Seu pagamento está sendo processado. Você receberá uma confirmação por email assim que for aprovado.',
-          showButton: true,
+          icon: <Loader2 className="h-16 w-16 text-yellow-500 animate-spin" />,
+          title: 'Payment Processing',
+          description: 'Your payment is still being processed. This may take a few moments...',
+          showButton: false,
         };
-      case 'failed':
+      case 'error':
         return {
-          icon: <XCircleIcon className="h-16 w-16 text-red-500" />,
-          title: 'Pagamento não processado',
-          description: 'Não conseguimos processar seu pagamento. Por favor, tente novamente.',
+          icon: <XCircle className="h-16 w-16 text-red-500" />,
+          title: 'Payment Failed',
+          description: sessionId 
+            ? 'We couldn\'t verify your payment. Please contact support if you were charged.'
+            : 'Invalid payment session. Please try again.',
           showButton: true,
         };
     }
   };
-  
-  const content = getStatusContent();
-  
+
+  const content = getContent();
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="max-w-md w-full">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            {content.icon}
+    <div className="container mx-auto flex items-center justify-center min-h-[600px]">
+      <Card className="w-full max-w-md text-center">
+        <CardHeader className="space-y-6">
+          <div className="flex justify-center">{content.icon}</div>
+          <div className="space-y-2">
+            <CardTitle className="text-2xl">{content.title}</CardTitle>
+            <CardDescription>{content.description}</CardDescription>
           </div>
-          <CardTitle className="text-2xl">{content.title}</CardTitle>
-          <CardDescription className="mt-2">
-            {content.description}
-          </CardDescription>
         </CardHeader>
-        
         {content.showButton && (
-          <CardContent className="text-center">
-            <Button
-              onClick={() => router.push('/dashboard')}
-              className="w-full sm:w-auto"
-            >
-              Ir para o Dashboard
-            </Button>
-            
-            {paymentStatus === 'failed' && (
-              <Button
-                variant="outline"
-                onClick={() => router.push('/dashboard/subscription/upgrade')}
-                className="w-full sm:w-auto mt-2"
+          <CardContent>
+            {status === 'success' ? (
+              <Button 
+                className="w-full" 
+                onClick={() => router.push('/dashboard')}
               >
-                Tentar Novamente
+                Go to Dashboard
               </Button>
+            ) : (
+              <div className="space-y-3">
+                <Button 
+                  className="w-full" 
+                  onClick={() => router.push('/subscription/upgrade')}
+                >
+                  Try Again
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={() => router.push('/dashboard')}
+                >
+                  Go to Dashboard
+                </Button>
+              </div>
             )}
           </CardContent>
         )}

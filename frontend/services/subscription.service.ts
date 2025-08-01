@@ -1,5 +1,10 @@
 /**
- * Simplified Subscription Service - Essential functionality only
+ * DEPRECATED - Use unified-subscription.service.ts instead
+ * 
+ * This service is deprecated and will be removed in a future version.
+ * Please migrate to the unified subscription service.
+ * 
+ * Migration: import { subscriptionService } from '@/services/unified-subscription.service'
  */
 import { apiClient } from '@/lib/api-client';
 
