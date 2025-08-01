@@ -18,7 +18,7 @@ export interface User {
   two_factor_secret?: string;
   backup_codes: string[];
   payment_customer_id?: string;
-  payment_gateway?: 'stripe' | 'mercadopago';
+  payment_gateway?: 'stripe'; // MercadoPago removed - Stripe only
   created_at: string;
   updated_at: string;
   
@@ -144,7 +144,7 @@ export interface SubscriptionPlan {
   trial_days: number;
   stripe_price_id_monthly?: string;
   stripe_price_id_yearly?: string;
-  mercadopago_plan_id?: string;
+  // mercadopago_plan_id?: string; - Removed with MercadoPago integration
   price_monthly: number;
   price_yearly: number;
   max_transactions: number;
@@ -392,7 +392,7 @@ export interface PaymentMethod {
   exp_year?: number;
   cardholder_name?: string;
   stripe_payment_method_id?: string;
-  mercadopago_card_id?: string;
+  // mercadopago_card_id?: string; - Removed with MercadoPago integration
   is_default: boolean;
   is_active: boolean;
   created_at: string;
@@ -412,7 +412,7 @@ export interface PaymentHistory {
   description: string;
   stripe_payment_intent_id?: string;
   stripe_invoice_id?: string;
-  mercadopago_payment_id?: string;
+  // mercadopago_payment_id?: string; - Removed with MercadoPago integration
   invoice_number?: string;
   invoice_url?: string;
   invoice_pdf_path?: string;

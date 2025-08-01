@@ -2,7 +2,7 @@
  * Simplified Usage Indicators Component
  */
 import { useQuery } from '@tanstack/react-query';
-import { subscriptionService } from '@/services/subscription.service';
+import { subscriptionService } from '@/services/unified-subscription.service';
 import { Progress } from '@/components/ui/progress';
 import { 
   ChartBarIcon,

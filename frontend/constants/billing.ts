@@ -74,8 +74,8 @@ export const BILLING_CYCLES = {
 } as const;
 
 export const PAYMENT_PROVIDERS = {
-  STRIPE: 'stripe',
-  MERCADO_PAGO: 'mercadopago'
+  STRIPE: 'stripe'
+  // MERCADO_PAGO: 'mercadopago' - Removed in favor of Stripe-only integration
 } as const;
 
 export const TRIAL_DAYS = 14;

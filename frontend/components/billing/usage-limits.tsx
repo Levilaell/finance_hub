@@ -13,7 +13,7 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { UsageLimits } from '@/types';
-import { subscriptionService } from '@/services/subscription.service';
+import { subscriptionService } from '@/services/unified-subscription.service';
 import { useAuthStore } from '@/store/auth-store';
 import { UpgradePlanDialog } from './upgrade-plan-dialog';
 

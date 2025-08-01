@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { subscriptionService } from '@/services/subscription.service';
+import { subscriptionService } from '@/services/unified-subscription.service';
 import { paymentService } from '@/services/payment.service';
 import { formatCurrency } from '@/utils/billing.utils';
 import { SubscriptionPlan } from '@/types';

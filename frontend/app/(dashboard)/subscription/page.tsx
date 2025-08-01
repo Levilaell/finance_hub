@@ -10,65 +10,95 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useUsageLimits } from '@/hooks/useUsageLimits';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { subscriptionService } from '@/services/unified-subscription.service';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { subscriptionService, CreatePaymentMethodRequest } from '@/services/unified-subscription.service';
 import { SubscriptionCard } from '@/components/payment/SubscriptionCard';
 import { StripePaymentForm } from '@/components/payment/StripePaymentForm';
 import { UsageIndicator } from '@/components/payment/UsageIndicator';
+import PaymentErrorBoundary, { usePaymentErrorHandler } from '@/components/error-boundaries/PaymentErrorBoundary';
 import { CreditCard, Receipt, AlertCircle, Plus, Trash2, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/components/ui/use-toast';
 
 export default function SubscriptionPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { subscription, cancelSubscription, isActive, isTrial } = useSubscription();
   const { usageLimits } = useUsageLimits();
+  const { handleError } = usePaymentErrorHandler();
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
 
-  // Payment methods - Temporarily disabled (payment endpoints not implemented)
-  const { data: paymentMethods, refetch: refetchPaymentMethods } = useQuery({
+  // Payment methods - Now enabled with proper error handling
+  const { data: paymentMethods, refetch: refetchPaymentMethods, isLoading: loadingPaymentMethods, error: paymentMethodsError } = useQuery({
     queryKey: ['payment-methods'],
     queryFn: subscriptionService.getPaymentMethods,
-    enabled: false, // Disable until payment endpoints are ready
+    retry: 2,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  // Payment history - Temporarily disabled
-  const { data: payments } = useQuery({
+  // Payment history - Now enabled with proper error handling
+  const { data: payments, isLoading: loadingPayments, error: paymentsError } = useQuery({
     queryKey: ['payment-history'],
     queryFn: subscriptionService.getPaymentHistory,
-    enabled: false, // Disable until payment endpoints are ready
+    retry: 2,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  // Payment method mutations - Temporarily disabled
+  // Payment method mutations - Now functional
   const addPaymentMethod = useMutation({
-    mutationFn: () => Promise.reject(new Error('Payment endpoints not yet implemented')),
-    onError: () => {
+    mutationFn: (data: CreatePaymentMethodRequest) => subscriptionService.createPaymentMethod(data),
+    onSuccess: () => {
       toast({ 
-        title: 'Payment methods not available', 
-        description: 'Payment functionality is coming soon.',
+        title: 'Payment method added', 
+        description: 'Your payment method has been successfully added.',
+      });
+      refetchPaymentMethods();
+      setShowAddPaymentMethod(false);
+    },
+    onError: (error: Error) => {
+      const message = handleError(error, 'add payment method');
+      toast({ 
+        title: 'Failed to add payment method', 
+        description: message,
         variant: 'destructive' 
       });
     },
   });
 
   const updatePaymentMethod = useMutation({
-    mutationFn: () => Promise.reject(new Error('Payment endpoints not yet implemented')),
-    onError: () => {
+    mutationFn: ({ id, data }: { id: number; data: any }) => subscriptionService.updatePaymentMethod(id, data),
+    onSuccess: () => {
       toast({ 
-        title: 'Payment methods not available', 
-        description: 'Payment functionality is coming soon.',
+        title: 'Payment method updated', 
+        description: 'Your payment method has been successfully updated.',
+      });
+      refetchPaymentMethods();
+    },
+    onError: (error: Error) => {
+      const message = handleError(error, 'update payment method');
+      toast({ 
+        title: 'Failed to update payment method', 
+        description: message,
         variant: 'destructive' 
       });
     },
   });
 
   const deletePaymentMethod = useMutation({
-    mutationFn: () => Promise.reject(new Error('Payment endpoints not yet implemented')),
-    onError: () => {
+    mutationFn: (id: number) => subscriptionService.deletePaymentMethod(id),
+    onSuccess: () => {
       toast({ 
-        title: 'Payment methods not available', 
-        description: 'Payment functionality is coming soon.',
+        title: 'Payment method removed', 
+        description: 'Your payment method has been successfully removed.',
+      });
+      refetchPaymentMethods();
+    },
+    onError: (error: Error) => {
+      const message = handleError(error, 'delete payment method');
+      toast({ 
+        title: 'Failed to remove payment method', 
+        description: message,
         variant: 'destructive' 
       });
     },
@@ -80,7 +110,8 @@ export default function SubscriptionPage() {
   };
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
+    <PaymentErrorBoundary>
+      <div className="container mx-auto py-8 space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Subscription & Billing</h1>
         <p className="text-muted-foreground">
@@ -149,7 +180,22 @@ export default function SubscriptionPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {paymentMethods && paymentMethods.length > 0 ? (
+                  {loadingPaymentMethods ? (
+                    <div className="text-center py-8">
+                      <div className="animate-pulse space-y-4">
+                        <div className="h-16 bg-gray-200 rounded"></div>
+                        <div className="h-16 bg-gray-200 rounded"></div>
+                      </div>
+                    </div>
+                  ) : paymentMethodsError ? (
+                    <div className="text-center py-8">
+                      <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                      <p className="text-red-600 mb-4">Failed to load payment methods</p>
+                      <Button variant="outline" onClick={() => refetchPaymentMethods()}>
+                        Try Again
+                      </Button>
+                    </div>
+                  ) : paymentMethods && paymentMethods.length > 0 ? (
                     <div className="space-y-3">
                       {paymentMethods.map((method) => (
                         <div
@@ -175,17 +221,19 @@ export default function SubscriptionPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                disabled={updatePaymentMethod.isPending}
                                 onClick={() => updatePaymentMethod.mutate({
                                   id: method.id,
                                   data: { is_default: true }
                                 })}
                               >
-                                Set as Default
+                                {updatePaymentMethod.isPending ? 'Setting...' : 'Set as Default'}
                               </Button>
                             )}
                             <Button
                               variant="ghost"
                               size="icon"
+                              disabled={deletePaymentMethod.isPending}
                               onClick={() => deletePaymentMethod.mutate(method.id)}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -220,7 +268,23 @@ export default function SubscriptionPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {payments && payments.length > 0 ? (
+                  {loadingPayments ? (
+                    <div className="text-center py-8">
+                      <div className="animate-pulse space-y-4">
+                        <div className="h-16 bg-gray-200 rounded"></div>
+                        <div className="h-16 bg-gray-200 rounded"></div>
+                        <div className="h-16 bg-gray-200 rounded"></div>
+                      </div>
+                    </div>
+                  ) : paymentsError ? (
+                    <div className="text-center py-8">
+                      <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                      <p className="text-red-600 mb-4">Failed to load payment history</p>
+                      <Button variant="outline" onClick={() => window.location.reload()}>
+                        Try Again
+                      </Button>
+                    </div>
+                  ) : payments && payments.length > 0 ? (
                     <div className="space-y-3">
                       {payments.map((payment) => (
                         <div
@@ -326,6 +390,7 @@ export default function SubscriptionPage() {
           />
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </PaymentErrorBoundary>
   );
 }

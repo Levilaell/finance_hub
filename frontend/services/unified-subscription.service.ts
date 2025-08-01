@@ -110,6 +110,16 @@ export interface CheckoutSessionResponse {
   checkout_url: string;
 }
 
+export interface CreatePaymentMethodRequest {
+  type: 'card' | 'bank_account' | 'pix';
+  token: string;
+  is_default?: boolean;
+  brand?: string;
+  last4?: string;
+  exp_month?: number;
+  exp_year?: number;
+}
+
 // ============================================================================
 // UNIFIED SUBSCRIPTION SERVICE
 // ============================================================================
@@ -149,48 +159,65 @@ class UnifiedSubscriptionService {
   }
 
   // -------------------------------------------------------------------------
-  // PAYMENT MANAGEMENT (Future Payments API - placeholder implementations)
+  // PAYMENT MANAGEMENT (Payments API)
   // -------------------------------------------------------------------------
   
   /**
    * Create checkout session for subscription upgrade
-   * TODO: Implement when payments app endpoints are ready
    */
   async createCheckoutSession(data: CheckoutSessionRequest): Promise<CheckoutSessionResponse> {
-    // For now, return mock data or throw not implemented
-    throw new Error('Payment endpoints not yet implemented. Use companies API for subscription management.');
+    return await apiClient.post<CheckoutSessionResponse>('/api/payments/checkout/create/', data);
   }
 
   /**
    * Validate payment after checkout
-   * TODO: Implement when payments app endpoints are ready
    */
-  async validatePayment(sessionId: string): Promise<{ status: string; message?: string }> {
-    throw new Error('Payment endpoints not yet implemented. Use companies API for subscription management.');
+  async validatePayment(sessionId: string): Promise<{ status: string; message?: string; subscription?: any }> {
+    return await apiClient.post<{ status: string; message?: string; subscription?: any }>('/api/payments/checkout/validate/', {
+      session_id: sessionId
+    });
   }
 
   /**
    * Cancel subscription
-   * TODO: Implement when payments app endpoints are ready
    */
   async cancelSubscription(): Promise<{ status: string; message: string }> {
-    throw new Error('Payment endpoints not yet implemented. Use companies API for subscription management.');
+    return await apiClient.post<{ status: string; message: string }>('/api/payments/subscription/cancel/', {});
   }
 
   /**
    * Get payment methods
-   * TODO: Implement when payments app endpoints are ready
    */
   async getPaymentMethods(): Promise<PaymentMethod[]> {
-    return [];
+    return await apiClient.get<PaymentMethod[]>('/api/payments/payment-methods/');
   }
 
   /**
    * Get payment history
-   * TODO: Implement when payments app endpoints are ready
    */
   async getPaymentHistory(): Promise<Payment[]> {
-    return [];
+    return await apiClient.get<Payment[]>('/api/payments/payments/');
+  }
+
+  /**
+   * Create new payment method
+   */
+  async createPaymentMethod(data: CreatePaymentMethodRequest): Promise<PaymentMethod> {
+    return await apiClient.post<PaymentMethod>('/api/payments/payment-methods/', data);
+  }
+
+  /**
+   * Delete payment method
+   */
+  async deletePaymentMethod(paymentMethodId: number): Promise<{ success: boolean; message: string }> {
+    return await apiClient.delete<{ success: boolean; message: string }>(`/api/payments/payment-methods/${paymentMethodId}/`);
+  }
+
+  /**
+   * Update payment method (set as default, etc.)
+   */
+  async updatePaymentMethod(paymentMethodId: number, data: Partial<PaymentMethod>): Promise<PaymentMethod> {
+    return await apiClient.patch<PaymentMethod>(`/api/payments/payment-methods/${paymentMethodId}/`, data);
   }
 
   // -------------------------------------------------------------------------
@@ -243,7 +270,7 @@ export default subscriptionService;
  * MIGRATION FROM OLD SERVICES:
  * 
  * 1. Replace imports:
- *    - import { subscriptionService } from '@/services/subscription.service'
+ *    - import { subscriptionService } from '@/services/unified-subscription.service'
  *    - import paymentService from '@/services/payment.service' 
  *    + import { subscriptionService } from '@/services/unified-subscription.service'
  * 
@@ -251,9 +278,9 @@ export default subscriptionService;
  *    - paymentService.getSubscriptionPlans() → subscriptionService.getSubscriptionPlans()
  *    - paymentService.getSubscriptionStatus() → subscriptionService.getSubscriptionStatus()
  * 
- * 3. Payment methods temporarily unavailable:
- *    - createCheckoutSession, validatePayment, cancelSubscription will throw errors
- *    - Implement these when payments app endpoints are ready
+ * 3. Payment methods now available:
+ *    - createCheckoutSession, validatePayment, cancelSubscription are fully functional
+ *    - All payment endpoints are integrated with backend API
  * 
  * 4. Interface changes:
  *    - SubscriptionPlan.id is now number (was string)

@@ -50,7 +50,7 @@ import { BillingHistoryDialog } from '@/components/billing/billing-history-dialo
 import { PaymentMethodsDialog } from '@/components/billing/payment-methods-dialog';
 import { UsageLimitsCard } from '@/components/billing/usage-limits';
 import { useSubscriptionCheck } from '@/hooks/use-subscription-check';
-import { subscriptionService } from '@/services/subscription.service';
+import { subscriptionService } from '@/services/unified-subscription.service';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { 

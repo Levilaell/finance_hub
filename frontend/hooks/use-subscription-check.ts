@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/auth-store';
-import { subscriptionService, SubscriptionStatus } from '@/services/subscription.service';
+import { subscriptionService, SubscriptionStatus } from '@/services/unified-subscription.service';
 
 export function useSubscriptionCheck() {
   const router = useRouter();

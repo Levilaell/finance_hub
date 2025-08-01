@@ -1,5 +1,18 @@
 """
-Simplified Company models - Essential functionality only
+Company Models - PRIMARY MODEL FILE
+
+This is the ACTIVE and PRIMARY model file for the companies app.
+DO NOT use models_consolidated.py or legacy/models.py - they are deprecated.
+
+Contains:
+- Company: Multi-tenant company management with subscription tracking
+- SubscriptionPlan: Subscription plan definitions with limits and features  
+- ResourceUsage: Historical usage tracking for billing and analytics
+
+Architecture decisions:
+- Subscription logic kept in companies app for simplicity
+- Atomic usage tracking with F expressions to prevent race conditions
+- Company-scoped data isolation for security
 """
 from datetime import timedelta
 from django.contrib.auth import get_user_model
