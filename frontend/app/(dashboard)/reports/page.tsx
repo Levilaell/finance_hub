@@ -12,7 +12,7 @@ import { ErrorMessage } from '@/components/ui/error-message';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { reportsService } from '@/services/reports.service';
-import { Report, ReportParameters, Account, Category, AIInsights, BankAccount } from '@/types';
+import { Report, ReportParameters, Category, BankAccount } from '@/types';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { 
   DocumentChartBarIcon,
@@ -60,35 +60,7 @@ const QUICK_PERIODS = [
 ];
 
 
-// Types
-interface ReportData {
-  id: string;
-  title: string;
-  report_type: string;
-  period_start: string;
-  period_end: string;
-  file_format: string;
-  is_generated: boolean;
-  created_at: string;
-  created_by_name?: string;
-  file?: string;
-  file_size?: number;
-  generation_time?: number;
-  error_message?: string;
-}
-
-interface AIInsight {
-  type: 'success' | 'warning' | 'info' | 'danger';
-  title: string;
-  description: string;
-  value?: string;
-  trend?: 'up' | 'down' | 'stable';
-  priority?: 'high' | 'medium' | 'low';
-  actionable?: boolean;
-  category?: string;
-}
-
-// Components - AI components removidos (usar página /ai-insights)
+// Components
 
 
 
@@ -159,7 +131,7 @@ function ReportsPageContent() {
   const downloadReportMutation = useMutation({
     mutationFn: (reportId: string) => reportsService.downloadReport(reportId),
     onSuccess: (data, reportId) => {
-      const report = reports?.results?.find((r: ReportData) => r.id === reportId);
+      const report = reports?.results?.find((r: Report) => r.id === reportId);
       if (typeof window !== 'undefined') {
         const url = window.URL.createObjectURL(new Blob([data]));
         const link = document.createElement('a');
@@ -455,7 +427,7 @@ function ReportsPageContent() {
             <CardContent>
               {reports?.results && reports.results.length > 0 ? (
                 <div className="space-y-4">
-                  {reports.results.map((report: ReportData) => (
+                  {reports.results.map((report: Report) => (
                     <div
                       key={report.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
