@@ -17,6 +17,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import EmailVerification, PasswordReset
+from .cookie_middleware import set_jwt_cookies, clear_jwt_cookies, get_client_ip
+from .security_logging import log_security_event, SecurityEvent, LoginAttemptTracker, SessionManager
 from .serializers import (
     ChangePasswordSerializer,
     DeleteAccountSerializer,
@@ -40,15 +42,36 @@ from .utils import (
 User = get_user_model()
 
 
-# Custom throttle classes  
+# Enhanced throttle classes with IP + User tracking
 class LoginRateThrottle(AnonRateThrottle):
     scope = 'login'
+    
+    def get_cache_key(self, request, view):
+        # Combine IP and email for more precise rate limiting
+        ident = self.get_ident(request)
+        email = request.data.get('email', 'unknown')
+        return self.cache_format % {
+            'scope': self.scope,
+            'ident': f"{ident}:{email}"
+        }
 
 class RegisterRateThrottle(AnonRateThrottle):
     scope = 'register'
 
 class PasswordResetRateThrottle(AnonRateThrottle):
     scope = 'password_reset'
+
+class TokenRefreshRateThrottle(AnonRateThrottle):
+    scope = 'token_refresh'
+
+class TwoFactorRateThrottle(AnonRateThrottle):
+    scope = '2fa_attempt'
+
+class EmailVerificationRateThrottle(AnonRateThrottle):
+    scope = 'email_verification'
+
+class AccountDeletionRateThrottle(AnonRateThrottle):
+    scope = 'account_deletion'
 
 
 @method_decorator(ratelimit(key='ip', rate='5/m', method='POST'), name='dispatch')
@@ -94,7 +117,14 @@ class RegisterView(generics.CreateAPIView):
         verification_url = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
         send_verification_email_task.delay(user.id, verification_url)
         
-        return Response({
+        # Log account creation
+        log_security_event(
+            SecurityEvent.ACCOUNT_CREATED,
+            user=user,
+            request=request
+        )
+        
+        response = Response({
             'user': UserSerializer(user).data,
             'tokens': {
                 'refresh': str(refresh),
@@ -102,6 +132,14 @@ class RegisterView(generics.CreateAPIView):
             },
             'message': 'Cadastro realizado com sucesso. Por favor, verifique seu e-mail para confirmar sua conta.'
         }, status=status.HTTP_201_CREATED)
+        
+        # Set httpOnly cookies
+        set_jwt_cookies(response, {
+            'access': str(refresh.access_token),
+            'refresh': str(refresh)
+        }, request)
+        
+        return response
 
 
 @method_decorator(ratelimit(key='ip', rate='10/m', method='POST'), name='dispatch')
@@ -112,13 +150,43 @@ class LoginView(APIView):
     throttle_classes = [LoginRateThrottle]
     
     def post(self, request):
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
+        email = request.data.get('email', '')
+        client_ip = get_client_ip(request)
+        
+        # Check if account is locked
+        if LoginAttemptTracker.is_locked(email):
+            log_security_event(
+                SecurityEvent.ACCOUNT_LOCKED,
+                request=request,
+                extra_data={'email': email}
+            )
+            return Response({
+                'error': 'Conta bloqueada temporariamente. Tente novamente em 1 hora.'
+            }, status=status.HTTP_423_LOCKED)
+        
+        try:
+            serializer = self.serializer_class(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            user = serializer.validated_data['user']
+        except Exception as e:
+            # Track failed attempt
+            should_lock, attempts = LoginAttemptTracker.track_failed_attempt(email, client_ip)
+            log_security_event(
+                SecurityEvent.LOGIN_FAILED,
+                request=request,
+                extra_data={'email': email, 'attempts': attempts, 'reason': str(e)}
+            )
+            
+            if should_lock:
+                return Response({
+                    'error': 'Muitas tentativas de login falhadas. Conta bloqueada temporariamente.'
+                }, status=status.HTTP_423_LOCKED)
+            
+            raise
         
         # Update last login
         user.last_login = timezone.now()
-        user.last_login_ip = request.META.get('REMOTE_ADDR')
+        user.last_login_ip = client_ip
         user.save(update_fields=['last_login', 'last_login_ip'])
         
         # Check if 2FA is enabled
@@ -135,20 +203,45 @@ class LoginView(APIView):
             if not verify_totp_token(user.two_factor_secret, two_fa_code):
                 # Try backup code
                 if not verify_backup_code(user, two_fa_code):
+                    log_security_event(
+                        SecurityEvent.TWO_FA_FAILED,
+                        user=user,
+                        request=request
+                    )
                     return Response({
                         'error': 'Código de autenticação inválido'
                     }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Reset login attempts on successful login
+        LoginAttemptTracker.reset_attempts(email, client_ip)
+        
         # Generate tokens
         refresh = RefreshToken.for_user(user)
         
-        return Response({
+        # Log successful login
+        log_security_event(
+            SecurityEvent.LOGIN_SUCCESS,
+            user=user,
+            request=request,
+            extra_data={'session_count': SessionManager.get_active_session_count(user)}
+        )
+        
+        # Create response with user data
+        response = Response({
             'user': UserSerializer(user).data,
             'tokens': {
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             }
         })
+        
+        # Set httpOnly cookies
+        set_jwt_cookies(response, {
+            'access': str(refresh.access_token),
+            'refresh': str(refresh)
+        }, request)
+        
+        return response
 
 
 class LogoutView(APIView):
@@ -172,7 +265,19 @@ class LogoutView(APIView):
                     # If token processing fails, still return success
                     # (frontend should remove token anyway)
                     pass
-            return Response({'message': 'Logout realizado com sucesso'}, status=status.HTTP_200_OK)
+            # Log logout event
+            log_security_event(
+                SecurityEvent.LOGOUT,
+                user=request.user,
+                request=request
+            )
+            
+            response = Response({'message': 'Logout realizado com sucesso'}, status=status.HTTP_200_OK)
+            
+            # Clear httpOnly cookies
+            clear_jwt_cookies(response)
+            
+            return response
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -210,7 +315,34 @@ class ChangePasswordView(generics.UpdateAPIView):
         user.set_password(serializer.validated_data['new_password'])
         user.save()
         
-        return Response({'message': 'Senha alterada com sucesso'})
+        # Invalidate all sessions for this user (security measure)
+        SessionManager.invalidate_all_sessions(user)
+        
+        # Log password change
+        log_security_event(
+            SecurityEvent.PASSWORD_CHANGED,
+            user=user,
+            request=request
+        )
+        
+        # Generate new tokens for current session
+        refresh = RefreshToken.for_user(user)
+        
+        response = Response({
+            'message': 'Senha alterada com sucesso',
+            'tokens': {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            }
+        })
+        
+        # Set new tokens as cookies
+        set_jwt_cookies(response, {
+            'access': str(refresh.access_token),
+            'refresh': str(refresh)
+        }, request)
+        
+        return response
 
 
 @method_decorator(ratelimit(key='ip', rate='3/h', method='POST'), name='dispatch')
@@ -218,6 +350,7 @@ class PasswordResetRequestView(APIView):
     """Request password reset"""
     permission_classes = (AllowAny,)
     serializer_class = PasswordResetRequestSerializer
+    throttle_classes = [PasswordResetRateThrottle]
     
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
@@ -286,6 +419,7 @@ class EmailVerificationView(APIView):
     """Verify email address"""
     permission_classes = (AllowAny,)
     serializer_class = EmailVerificationSerializer
+    throttle_classes = [EmailVerificationRateThrottle]
     
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
@@ -352,11 +486,20 @@ class ResendVerificationView(APIView):
 class CustomTokenRefreshView(APIView):
     """Custom token refresh view"""
     permission_classes = (AllowAny,)
+    throttle_classes = [TokenRefreshRateThrottle]
     
     def post(self, request):
-        refresh_token = request.data.get('refresh')
+        # Try to get refresh token from cookie first, then from body
+        refresh_token = request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
+        if not refresh_token:
+            refresh_token = request.data.get('refresh')
         
         if not refresh_token:
+            log_security_event(
+                SecurityEvent.TOKEN_REFRESH_FAILED,
+                request=request,
+                extra_data={'reason': 'No refresh token provided'}
+            )
             return Response(
                 {'error': 'Token de atualização é obrigatório'}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -366,16 +509,49 @@ class CustomTokenRefreshView(APIView):
             # Validate and refresh the token
             refresh = RefreshToken(refresh_token)
             
+            # Check if token rotation is enabled
+            if settings.SIMPLE_JWT.get('ROTATE_REFRESH_TOKENS', False):
+                # Get new refresh token
+                refresh.set_jti()
+                refresh.set_exp()
+                
+                # Blacklist the old token if enabled
+                if settings.SIMPLE_JWT.get('BLACKLIST_AFTER_ROTATION', False) and hasattr(refresh, 'blacklist'):
+                    refresh.blacklist()
+            
             # Generate new access token
             access_token = refresh.access_token
             
-            # Return both tokens
-            return Response({
+            # Get user for logging
+            user = refresh.access_token.payload.get('user_id')
+            
+            # Log successful refresh
+            log_security_event(
+                SecurityEvent.TOKEN_REFRESHED,
+                user=user,
+                request=request
+            )
+            
+            # Create response
+            response = Response({
                 'access': str(access_token),
                 'refresh': str(refresh),
             })
             
+            # Set cookies
+            set_jwt_cookies(response, {
+                'access': str(access_token),
+                'refresh': str(refresh)
+            }, request)
+            
+            return response
+            
         except Exception as e:
+            log_security_event(
+                SecurityEvent.TOKEN_REFRESH_FAILED,
+                request=request,
+                extra_data={'reason': str(e)}
+            )
             return Response(
                 {'error': 'Token de atualização inválido'}, 
                 status=status.HTTP_401_UNAUTHORIZED
@@ -410,6 +586,7 @@ class Setup2FAView(APIView):
 class Enable2FAView(APIView):
     """Enable 2FA after verification"""
     permission_classes = [IsAuthenticated]
+    throttle_classes = [TwoFactorRateThrottle]
     
     def post(self, request):
         user = request.user
@@ -479,6 +656,7 @@ class DeleteAccountView(APIView):
     """Delete user account with password verification"""
     permission_classes = [IsAuthenticated]
     serializer_class = DeleteAccountSerializer
+    throttle_classes = [AccountDeletionRateThrottle]
     
     def post(self, request):
         serializer = self.serializer_class(data=request.data, context={'request': request})
@@ -493,7 +671,12 @@ class DeleteAccountView(APIView):
             }, status=status.HTTP_403_FORBIDDEN)
         
         # Log the account deletion for audit purposes
-        print(f"Deleting account for user: {user.email} (ID: {user.id})")
+        log_security_event(
+            SecurityEvent.ACCOUNT_DELETED,
+            user=user,
+            request=request,
+            extra_data={'reason': 'user_requested'}
+        )
         
         try:
             # Delete user and all related data (CASCADE should handle this)
@@ -504,7 +687,12 @@ class DeleteAccountView(APIView):
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            print(f"Error deleting user account {user.id}: {str(e)}")
+            log_security_event(
+                SecurityEvent.ACCOUNT_DELETED,
+                user=user,
+                request=request,
+                extra_data={'reason': 'deletion_failed', 'error': str(e)}
+            )
             return Response({
                 'error': 'Erro interno do servidor. Tente novamente mais tarde.'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

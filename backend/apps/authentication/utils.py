@@ -2,7 +2,6 @@
 Authentication utilities
 """
 import base64
-import hashlib
 import io
 import secrets
 

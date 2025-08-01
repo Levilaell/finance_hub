@@ -38,10 +38,8 @@ class UserSerializer(serializers.ModelSerializer):
             if hasattr(obj, 'company'):
                 return CompanySerializer(obj.company).data
             
-            # If user is not owner, check if they're a team member
-            company_user = CompanyUser.objects.filter(user=obj, is_active=True).first()
-            if company_user:
-                return CompanySerializer(company_user.company).data
+            # Team member functionality has been simplified
+            # Only company owners are supported in current architecture
                 
         except (AttributeError, Company.DoesNotExist):
             pass

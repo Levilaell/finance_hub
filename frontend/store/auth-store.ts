@@ -72,8 +72,13 @@ export const useAuthStore = create<AuthState>()(
         try {
           await apiClient.logout();
         } finally {
-          // Clear cookies
+          // httpOnly cookies are cleared by the backend
+          // Clear any legacy localStorage tokens
           if (typeof window !== "undefined") {
+            localStorage.removeItem("access_token");
+            localStorage.removeItem("refresh_token");
+            
+            // Clear any non-httpOnly cookies we may have set before
             document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
             document.cookie = "refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
           }
@@ -136,15 +141,15 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setAuth: (user, tokens) => {
-        // Save tokens to localStorage and cookies
+        // Tokens are now handled as httpOnly cookies by the backend
+        // Clear any legacy localStorage tokens
         if (typeof window !== "undefined") {
-          localStorage.setItem("access_token", tokens.access);
-          localStorage.setItem("refresh_token", tokens.refresh);
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
           
-          // Also set cookies for SSR middleware
-          document.cookie = `access_token=${tokens.access}; path=/; max-age=3600; SameSite=Lax`;
-          document.cookie = `refresh_token=${tokens.refresh}; path=/; max-age=604800; SameSite=Lax`;
-          
+          // Clear any non-httpOnly cookies we may have set before
+          document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          document.cookie = "refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         }
         
         set({

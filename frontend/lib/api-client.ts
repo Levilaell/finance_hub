@@ -1,12 +1,12 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { toast } from "sonner";
 import { RegisterData } from "@/types";
+import { tokenManager } from "./token-manager";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 class ApiClient {
   private client: AxiosInstance;
-  private refreshPromise: Promise<any> | null = null;
 
   constructor() {
     console.log("API Client - NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL);
@@ -26,31 +26,63 @@ class ApiClient {
   }
 
   private setupInterceptors() {
-    // Request interceptor
+    // Request interceptor with enhanced security
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        const token = this.getAccessToken();
-        const isAuthEndpoint = config.url?.includes('/auth/login') || 
-                              config.url?.includes('/auth/register') ||
-                              config.url?.includes('/auth/refresh');
+        // httpOnly cookies are automatically sent by the browser
+        // No need to manually add Authorization header
         
+        // Ensure credentials are included
+        config.withCredentials = true;
         
-        // Only add auth header if it's NOT an auth endpoint and we have a token
-        if (token && config.headers && !isAuthEndpoint) {
-          config.headers.Authorization = `Bearer ${token}`;
+        // Add security headers
+        config.headers = {
+          ...config.headers,
+          'X-Requested-With': 'XMLHttpRequest', // CSRF protection
+          'Cache-Control': 'no-cache', // Prevent caching of sensitive requests
+        };
+        
+        // Validate URL to prevent SSRF attacks
+        if (config.url && !this.isValidUrl(config.url)) {
+          console.error('Invalid URL detected:', config.url);
+          return Promise.reject(new Error('Invalid request URL'));
         }
+        
+        // Add request timestamp for timeout detection
+        config.metadata = { startTime: Date.now() };
         
         return config;
       },
       (error) => {
+        console.error('Request interceptor error:', error);
         return Promise.reject(error);
       }
     );
 
-    // Response interceptor
+    // Response interceptor with enhanced security validation
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        // Log successful response for security monitoring
+        this.logSecurityEvent('api_success', {
+          url: response.config.url,
+          status: response.status,
+          method: response.config.method,
+        });
+        
+        // Validate response headers for security
+        this.validateResponseHeaders(response);
+        
+        return response;
+      },
       async (error: AxiosError) => {
+        // Log security event for failed requests
+        this.logSecurityEvent('api_error', {
+          url: error.config?.url,
+          status: error.response?.status,
+          method: error.config?.method,
+          error: error.message,
+        });
+        
         const originalRequest = error.config as InternalAxiosRequestConfig & {
           _retry?: boolean;
         };
@@ -61,25 +93,25 @@ class ApiClient {
                                 originalRequest.url?.includes('/auth/register') ||
                                 originalRequest.url?.includes('/auth/refresh');
           
-          if (!isAuthEndpoint && this.getRefreshToken()) {
+          if (!isAuthEndpoint && !tokenManager.isSessionExpiredFlag()) {
             originalRequest._retry = true;
 
             try {
-              if (!this.refreshPromise) {
-                this.refreshPromise = this.refreshToken();
-              }
-              await this.refreshPromise;
-              this.refreshPromise = null;
+              // Use token manager for coordinated refresh
+              await tokenManager.refreshToken();
 
-              const token = this.getAccessToken();
-              if (token && originalRequest.headers) {
-                originalRequest.headers.Authorization = `Bearer ${token}`;
-              }
+              // Retry the original request with credentials
+              originalRequest.withCredentials = true;
               return this.client(originalRequest);
             } catch (refreshError) {
+              console.error('Token refresh failed during retry:', refreshError);
               this.handleAuthError();
               return Promise.reject(refreshError);
             }
+          } else if (tokenManager.isSessionExpiredFlag()) {
+            // Session is expired, don't attempt refresh
+            this.handleAuthError();
+            return Promise.reject(new Error('Session expired'));
           }
         }
 
@@ -138,32 +170,30 @@ class ApiClient {
   }
 
   private getAccessToken(): string | null {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("access_token");
-    }
+    // Access token is now in httpOnly cookie, handled by backend
+    // This method is kept for backward compatibility but returns null
     return null;
   }
 
   private setAccessToken(token: string) {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("access_token", token);
-    }
+    // Access token is now in httpOnly cookie, handled by backend
+    // This method is kept for backward compatibility but does nothing
   }
 
   private getRefreshToken(): string | null {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("refresh_token");
-    }
+    // Refresh token is now in httpOnly cookie, handled by backend
+    // This method is kept for backward compatibility but returns null
     return null;
   }
 
   private setRefreshToken(token: string) {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("refresh_token", token);
-    }
+    // Refresh token is now in httpOnly cookie, handled by backend
+    // This method is kept for backward compatibility but does nothing
   }
 
   private clearTokens() {
+    // Tokens are now in httpOnly cookies, cleared by backend
+    // Clear any legacy localStorage tokens
     if (typeof window !== "undefined") {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
@@ -171,26 +201,8 @@ class ApiClient {
   }
 
   private async refreshToken() {
-    const refreshToken = this.getRefreshToken();
-    if (!refreshToken) {
-      throw new Error("No refresh token available");
-    }
-
-    try {
-      const response = await axios.post(`${API_BASE_URL}/api/auth/refresh/`, {
-        refresh: refreshToken,
-      });
-
-      const { access, refresh } = response.data;
-      this.setAccessToken(access);
-      if (refresh) {
-        this.setRefreshToken(refresh);
-      }
-      return response.data;
-    } catch (error) {
-      this.clearTokens();
-      throw error;
-    }
+    // Delegate to token manager for coordinated refresh
+    return tokenManager.refreshToken();
   }
 
   private handleAuthError() {
@@ -215,18 +227,16 @@ class ApiClient {
     }
     
     const response = await this.client.post("/api/auth/login/", loginData);
-    const { tokens } = response.data;
-    if (tokens) {
-      this.setAccessToken(tokens.access);
-      this.setRefreshToken(tokens.refresh);
-    }
+    // Tokens are now set as httpOnly cookies by the backend
+    // Clear any legacy localStorage tokens
+    this.clearTokens();
     return response.data;
   }
 
   async logout() {
-    const refreshToken = this.getRefreshToken();
     try {
-      await this.client.post("/api/auth/logout/", { refresh: refreshToken });
+      // No need to send refresh token, it's in the cookie
+      await this.client.post("/api/auth/logout/", {});
     } finally {
       this.clearTokens();
     }
@@ -263,14 +273,162 @@ class ApiClient {
     return response.data;
   }
 
-  // File upload
+  // File upload with security validation
   async upload<T>(url: string, formData: FormData): Promise<T> {
+    // Validate file upload for security
+    this.validateFileUpload(formData);
+    
     const response = await this.client.post<T>(url, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
     });
     return response.data;
+  }
+  
+  // Security validation methods
+  
+  /**
+   * Validate URL to prevent SSRF attacks
+   */
+  private isValidUrl(url: string): boolean {
+    if (!url) return false;
+    
+    // Allow relative URLs (starting with /)
+    if (url.startsWith('/')) return true;
+    
+    try {
+      const urlObj = new URL(url, API_BASE_URL);
+      const baseUrl = new URL(API_BASE_URL);
+      
+      // Only allow requests to the same origin
+      return urlObj.origin === baseUrl.origin;
+    } catch {
+      return false;
+    }
+  }
+  
+  /**
+   * Validate response headers for security
+   */
+  private validateResponseHeaders(response: any) {
+    const headers = response.headers;
+    
+    // Check for security headers
+    if (!headers['x-content-type-options']) {
+      console.warn('Missing X-Content-Type-Options header');
+    }
+    
+    if (!headers['x-frame-options'] && !headers['content-security-policy']) {
+      console.warn('Missing X-Frame-Options or CSP header');
+    }
+    
+    // Validate content type for JSON responses
+    const contentType = headers['content-type'];
+    if (contentType && !contentType.includes('application/json') && response.config.url?.includes('/api/')) {
+      console.warn('Unexpected content type for API response:', contentType);
+    }
+  }
+  
+  /**
+   * Validate file upload for security
+   */
+  private validateFileUpload(formData: FormData) {
+    const allowedTypes = [
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'application/pdf', 'text/csv', 'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    
+    const maxFileSize = 10 * 1024 * 1024; // 10MB
+    
+    for (const [key, value] of formData.entries()) {
+      if (value instanceof File) {
+        // Check file type
+        if (!allowedTypes.includes(value.type)) {
+          throw new Error(`Invalid file type: ${value.type}`);
+        }
+        
+        // Check file size
+        if (value.size > maxFileSize) {
+          throw new Error(`File too large: ${value.size} bytes`);
+        }
+        
+        // Check file name for suspicious patterns
+        if (this.hasSuspiciousFileName(value.name)) {
+          throw new Error(`Suspicious file name: ${value.name}`);
+        }
+      }
+    }
+  }
+  
+  /**
+   * Check for suspicious file names
+   */
+  private hasSuspiciousFileName(fileName: string): boolean {
+    const suspiciousPatterns = [
+      /\.(exe|bat|cmd|scr|pif|com|vbs|js|jar|app|deb|rpm)$/i,
+      /\.(php|asp|jsp|py|rb|pl)$/i,
+      /\.\./,
+      /[<>:"|?*]/,
+      /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
+    ];
+    
+    return suspiciousPatterns.some(pattern => pattern.test(fileName));
+  }
+  
+  /**
+   * Log security events for monitoring
+   */
+  private logSecurityEvent(eventType: string, data: any) {
+    // In development, just log to console
+    if (process.env.NODE_ENV === 'development') {
+      console.debug(`Security Event [${eventType}]:`, data);
+      return;
+    }
+    
+    // In production, you could send to monitoring service
+    // Example: send to Sentry, DataDog, or custom monitoring endpoint
+    try {
+      // Implement your monitoring logic here
+      console.info(`Security Event [${eventType}]:`, data);
+    } catch (error) {
+      console.error('Failed to log security event:', error);
+    }
+  }
+  
+  /**
+   * Enhanced auth error handling with security logging
+   */
+  private handleAuthError() {
+    this.logSecurityEvent('auth_error', {
+      timestamp: Date.now(),
+      path: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+    });
+    
+    this.clearTokens();
+    tokenManager.resetSessionExpiry();
+    
+    if (typeof window !== "undefined") {
+      const currentPath = window.location.pathname;
+      const isAuthPage = currentPath.includes('/login') || 
+                        currentPath.includes('/register') || 
+                        currentPath.includes('/forgot-password');
+      
+      if (!isAuthPage) {
+        // Notify user before redirect
+        const event = new CustomEvent('auth-error', {
+          detail: { message: 'Your session has expired. Please log in again.' }
+        });
+        window.dispatchEvent(event);
+        
+        // Small delay to allow notification to be seen
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1000);
+      }
+    }
   }
 }
 

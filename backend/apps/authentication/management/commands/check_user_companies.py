@@ -4,8 +4,7 @@ Check user-company relationships
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from apps.companies.models import Company
-# CompanyUser model removed in simplified version
-# from apps.companies.models import CompanyUser
+# Note: CompanyUser model removed in simplified architecture
 
 User = get_user_model()
 
@@ -55,11 +54,5 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.WARNING('  ✗ Does not own a company'))
         
-        # Check if user is member of any companies
-        memberships = CompanyUser.objects.filter(user=user, is_active=True).select_related('company')
-        if memberships.exists():
-            self.stdout.write(f'  Member of {memberships.count()} companies:')
-            for membership in memberships:
-                self.stdout.write(f'    - {membership.company.name} (Role: {membership.role})')
-        else:
-            self.stdout.write('  Not a member of any company')
+        # Note: Company membership functionality removed in simplified architecture
+        # Users can only own companies, not be members of multiple companies
