@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number, currency: string = "BRL"): string;
+export function formatCurrency(amount: number, currency?: string): string;
 export function formatCurrency(amount: number, format: 'compact'): string;
 export function formatCurrency(amount: number, currencyOrFormat: string = "BRL"): string {
   if (currencyOrFormat === 'compact') {
