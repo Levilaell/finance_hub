@@ -5,6 +5,10 @@ Financial reporting and analytics
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.core.validators import MinValueValidator, FileExtensionValidator
+from django.core.exceptions import ValidationError
+from django.utils import timezone
+import datetime
 
 User = get_user_model()
 
@@ -82,11 +86,61 @@ class Report(models.Model):
     def __str__(self):
         return f"{self.title} - {self.company.name}"
     
+    def clean(self):
+        """Validate report data"""
+        if self.period_start and self.period_end:
+            if self.period_start > self.period_end:
+                raise ValidationError({
+                    'period_end': _('End date must be after start date.')
+                })
+            
+            if self.period_end > timezone.now().date():
+                raise ValidationError({
+                    'period_end': _('End date cannot be in the future.')
+                })
+            
+            # Validate period is not too long (1 year max)
+            delta = self.period_end - self.period_start
+            if delta.days > 365:
+                raise ValidationError({
+                    'period_end': _('Report period cannot exceed 1 year.')
+                })
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+    
     def get_file_url(self):
         """Get the file URL if available"""
         if self.file:
             return self.file.url
         return None
+    
+    @property
+    def duration_days(self):
+        """Get report period duration in days"""
+        if self.period_start and self.period_end:
+            return (self.period_end - self.period_start).days + 1
+        return 0
+    
+    @property
+    def is_monthly(self):
+        """Check if report covers exactly one month"""
+        if not self.period_start or not self.period_end:
+            return False
+        
+        # Check if start is first day of month and end is last day
+        if self.period_start.day != 1:
+            return False
+        
+        # Get last day of the month
+        if self.period_end.month == 12:
+            next_month = self.period_end.replace(year=self.period_end.year + 1, month=1, day=1)
+        else:
+            next_month = self.period_end.replace(month=self.period_end.month + 1, day=1)
+        
+        last_day = next_month - datetime.timedelta(days=1)
+        return self.period_end == last_day.date()
 
 
 class ReportTemplate(models.Model):
@@ -99,7 +153,7 @@ class ReportTemplate(models.Model):
         related_name='report_templates'
     )
     
-    name = models.CharField(_('template name'), max_length=200)
+    name = models.CharField(_('template name'), max_length=200, db_index=True)
     description = models.TextField(_('description'), blank=True)
     
     # Template configuration
@@ -138,13 +192,17 @@ class ReportTemplate(models.Model):
     
     def __str__(self):
         return self.name
+    
+    def clean(self):
+        """Validate template data"""
+        if not self.template_config:
+            self.template_config = {}
+        
+        if not self.charts:
+            self.charts = []
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
-class AIAnalysis(models.Model):
-    """AI Analysis model - to be implemented"""
-    pass
-
-
-class AIAnalysisTemplate(models.Model):
-    """AI Analysis Template model - to be implemented"""
-    pass

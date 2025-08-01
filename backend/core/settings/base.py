@@ -47,7 +47,6 @@ LOCAL_APPS = [
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
-    'apps.authentication.middleware.SecurityHeadersMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -145,6 +144,7 @@ REST_FRAMEWORK = {
         'login': '5/minute',
         'register': '3/minute', 
         'password_reset': '5/hour',
+        'report_generation': '10/hour',
         'ai_requests': '10/minute',
         'bank_sync': '20/hour',
         'payment_operations': '30/hour',

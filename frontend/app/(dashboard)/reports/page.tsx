@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { useReportData } from '@/hooks/useReportData';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -39,24 +41,7 @@ import {
 } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  Legend,
-  AreaChart,
-  Area,
-  ComposedChart
-} from 'recharts';
+import { CashFlowChart, CategoryPieChart, IncomeExpenseChart } from '@/components/charts';
 import { bankingService } from '@/services/banking.service';
 import { categoriesService } from '@/services/categories.service';
 
@@ -74,7 +59,6 @@ const QUICK_PERIODS = [
   { id: 'year_to_date', label: 'Ano Atual', icon: TrendingUpIcon },
 ];
 
-const CHART_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
 
 // Types
 interface ReportData {
@@ -111,86 +95,48 @@ interface AIInsight {
 
 
 
-export default function ReportsPage() {
+function ReportsPageContent() {
   const queryClient = useQueryClient();
   
-  // State
-  const [selectedPeriod, setSelectedPeriod] = useState<{
-    start_date: Date | null;
-    end_date: Date | null;
-  }>({
-    start_date: null,
-    end_date: null,
-  });
+  // Use custom hook for report data
+  const {
+    selectedPeriod,
+    setSelectedPeriod,
+    handleQuickPeriod,
+    refreshData,
+    cashFlow,
+    categorySpending,
+    incomeVsExpenses,
+    analytics,
+  } = useReportData();
   
+  // State
   const [reportType, setReportType] = useState<string>('profit_loss');
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [exportFormat, setExportFormat] = useState<'pdf' | 'xlsx'>('pdf');
 
-  // Set dates on client-side after hydration
-  useEffect(() => {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    setSelectedPeriod({
-      start_date: startOfMonth,
-      end_date: now,
-    });
-  }, []);
-
   // Queries
   const { data: reports, isLoading, error, refetch: refetchReports } = useQuery({
     queryKey: ['reports'],
     queryFn: () => reportsService.getReports(),
+    staleTime: 5 * 60 * 1000,
+    cacheTime: 10 * 60 * 1000,
   });
 
   const { data: accounts } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => bankingService.getAccounts(),
+    staleTime: 10 * 60 * 1000,
+    cacheTime: 15 * 60 * 1000,
   });
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
     queryFn: () => categoriesService.getCategories(),
+    staleTime: 10 * 60 * 1000,
+    cacheTime: 15 * 60 * 1000,
   });
-
-  const { data: cashFlowData } = useQuery({
-    queryKey: ['cash-flow', selectedPeriod],
-    queryFn: () => {
-      if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
-      return reportsService.getCashFlowData({
-        start_date: selectedPeriod.start_date,
-        end_date: selectedPeriod.end_date
-      });
-    },
-    enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
-  });
-
-  const { data: categorySpending } = useQuery({
-    queryKey: ['category-spending', selectedPeriod],
-    queryFn: () => {
-      if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
-      return reportsService.getCategorySpending({
-        start_date: selectedPeriod.start_date,
-        end_date: selectedPeriod.end_date
-      });
-    },
-    enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
-  });
-
-  const { data: incomeVsExpenses } = useQuery({
-    queryKey: ['income-vs-expenses', selectedPeriod],
-    queryFn: () => {
-      if (!selectedPeriod.start_date || !selectedPeriod.end_date) return null;
-      return reportsService.getIncomeVsExpenses({
-        start_date: selectedPeriod.start_date,
-        end_date: selectedPeriod.end_date
-      });
-    },
-    enabled: !!selectedPeriod.start_date && !!selectedPeriod.end_date,
-  });
-
-  // AI insights query removida - usar página separada /ai-insights
 
   // Mutations
   const generateReportMutation = useMutation({
@@ -232,32 +178,6 @@ export default function ReportsPage() {
   });
 
   // Handlers
-  const handleQuickPeriod = useCallback((periodId: string) => {
-    const now = new Date();
-    let start: Date;
-    let end: Date = now;
-    
-    switch (periodId) {
-      case 'current_month':
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
-      case 'last_month':
-        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        end = new Date(now.getFullYear(), now.getMonth(), 0);
-        break;
-      case 'quarterly':
-        const quarter = Math.floor(now.getMonth() / 3);
-        start = new Date(now.getFullYear(), quarter * 3, 1);
-        break;
-      case 'year_to_date':
-        start = new Date(now.getFullYear(), 0, 1);
-        break;
-      default:
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
-    
-    setSelectedPeriod({ start_date: start, end_date: end });
-  }, []);
 
   const handleGenerateReport = useCallback(() => {
     if (!selectedPeriod.start_date || !selectedPeriod.end_date) {
@@ -354,52 +274,11 @@ export default function ReportsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-80">
-                  {cashFlowData && (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={cashFlowData}>
-                        <defs>
-                          <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
-                            <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                          </linearGradient>
-                          <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
-                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                        <Legend />
-                        <Area
-                          type="monotone"
-                          dataKey="income"
-                          stroke="#22c55e"
-                          fillOpacity={1}
-                          fill="url(#colorIncome)"
-                          name="Receitas"
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="expenses"
-                          stroke="#ef4444"
-                          fillOpacity={1}
-                          fill="url(#colorExpenses)"
-                          name="Despesas"
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="balance"
-                          stroke="#3b82f6"
-                          strokeWidth={3}
-                          name="Saldo"
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
+                <CashFlowChart 
+                  data={cashFlow.data} 
+                  isLoading={cashFlow.isLoading}
+                  height={320} 
+                />
               </CardContent>
             </Card>
 
@@ -412,32 +291,12 @@ export default function ReportsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-80">
-                  {categorySpending && (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={categorySpending}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ category, percentage }) => `${category.name} (${percentage}%)`}
-                          outerRadius={100}
-                          fill="#8884d8"
-                          dataKey="amount"
-                        >
-                          {categorySpending.map((entry: any, index: number) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={CHART_COLORS[index % CHART_COLORS.length]}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
+                <CategoryPieChart 
+                  data={categorySpending.data} 
+                  isLoading={categorySpending.isLoading}
+                  height={320}
+                  showLegend={true}
+                />
               </CardContent>
             </Card>
 
@@ -450,28 +309,11 @@ export default function ReportsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-80">
-                  {incomeVsExpenses && (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={incomeVsExpenses}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                        <Legend />
-                        <Bar dataKey="income" fill="#22c55e" name="Receitas" />
-                        <Bar dataKey="expenses" fill="#ef4444" name="Despesas" />
-                        <Line 
-                          type="monotone" 
-                          dataKey="profit" 
-                          stroke="#3b82f6" 
-                          strokeWidth={3}
-                          name="Lucro/Prejuízo"
-                        />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
+                <IncomeExpenseChart 
+                  data={incomeVsExpenses.data} 
+                  isLoading={incomeVsExpenses.isLoading}
+                  height={320}
+                />
               </CardContent>
             </Card>
           </div>
@@ -690,5 +532,13 @@ export default function ReportsPage() {
         
       </Tabs>
     </div>
+  );
+}
+
+export default function ReportsPage() {
+  return (
+    <ErrorBoundary>
+      <ReportsPageContent />
+    </ErrorBoundary>
   );
 }

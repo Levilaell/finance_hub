@@ -6,7 +6,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.companies.models import Company, SubscriptionPlan, CompanyUser
+from apps.companies.models import Company, SubscriptionPlan
 from apps.companies.validators import validate_cnpj, validate_phone, format_cnpj, format_phone
 
 User = get_user_model()

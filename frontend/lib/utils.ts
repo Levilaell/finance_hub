@@ -5,10 +5,28 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number, currency: string = "BRL"): string {
+export function formatCurrency(amount: number, currency: string = "BRL"): string;
+export function formatCurrency(amount: number, format: 'compact'): string;
+export function formatCurrency(amount: number, currencyOrFormat: string = "BRL"): string {
+  if (currencyOrFormat === 'compact') {
+    const absAmount = Math.abs(amount);
+    const isNegative = amount < 0;
+    
+    let compactValue: string;
+    if (absAmount >= 1_000_000) {
+      compactValue = `R$ ${(absAmount / 1_000_000).toFixed(1)}M`;
+    } else if (absAmount >= 1_000) {
+      compactValue = `R$ ${(absAmount / 1_000).toFixed(1)}k`;
+    } else {
+      compactValue = `R$ ${absAmount.toFixed(0)}`;
+    }
+    
+    return isNegative ? `-${compactValue}` : compactValue;
+  }
+  
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
-    currency: currency,
+    currency: currencyOrFormat,
   }).format(amount);
 }
 

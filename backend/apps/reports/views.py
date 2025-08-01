@@ -4,80 +4,51 @@ Financial reporting and analytics
 """
 import logging
 from decimal import Decimal
-import math
-from typing import Dict, Any, List
 from datetime import datetime, timedelta
-
-from apps.companies.decorators import requires_plan_feature
-from collections import defaultdict
-from django.conf import settings
-from django.core.cache import cache
-from django.db.models import Count, Q, Sum, Avg, Max, Min
-from django.http import FileResponse, Http404
-from django.utils import timezone
-
-from rest_framework import generics, permissions, status, viewsets, filters
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from django_filters.rest_framework import DjangoFilterBackend
-from django.utils import timezone as django_timezone
-
-from apps.banking.models import BankAccount, Transaction, TransactionCategory
-from .models import Report, ReportTemplate, AIAnalysis, AIAnalysisTemplate
-from .serializers import (
-    ReportSerializer,
-    ReportTemplateSerializer,
-    AIAnalysisSerializer,
-    AIAnalysisListSerializer,
-    AIAnalysisTemplateSerializer,
-)
-# from .ai_service import enhanced_ai_service  # To be implemented
-from django.utils import timezone as django_timezone
-logger = logging.getLogger(__name__)
-
-
-# Adicionar estas correções ao backend/apps/reports/views.py
-
-# backend/apps/reports/views.py
-
-import logging
-from decimal import Decimal
-import math
 from typing import Dict, Any, List
-from datetime import datetime, timedelta
 
+from django.core.files.base import ContentFile
+from django.db.models import Count, Q, Sum, Avg
 from django.http import HttpResponse
-from rest_framework import generics, permissions, status, viewsets
+from django.utils import timezone
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.banking.models import BankAccount, Transaction
 from .models import Report, ReportTemplate
-from .serializers import (
-    ReportSerializer,
-    ReportTemplateSerializer,
-)
+from .serializers import ReportSerializer, ReportTemplateSerializer
 from .report_generator import ReportGenerator
+from django.views.decorators.cache import cache_page
+from django.core.cache import cache
+from rest_framework.throttling import UserRateThrottle
+from django.utils.decorators import method_decorator
 
 logger = logging.getLogger(__name__)
 
 
+class ReportGenerationThrottle(UserRateThrottle):
+    """Rate limiting for report generation"""
+    scope = 'report_generation'
+    rate = '10/hour'
+
+
 class ReportViewSet(viewsets.ModelViewSet):
     """
-    Report management viewset - SEM CELERY
+    Report management viewset
     """
     serializer_class = ReportSerializer
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ReportGenerationThrottle]
     
     def get_queryset(self):
         return Report.objects.filter(
             company=self.request.user.company
-        ).order_by('-created_at')
+        ).select_related('created_by', 'company').order_by('-created_at')
     
     def create(self, request, *args, **kwargs):
-        """Generate a new report SINCRONAMENTE"""
+        """Generate a new report synchronously"""
         logger.info(f"Report creation request data: {request.data}")
         
         report_type = request.data.get('report_type')
@@ -133,12 +104,11 @@ class ReportViewSet(viewsets.ModelViewSet):
                 created_by=request.user
             )
             
-            # Gerar relatório SINCRONAMENTE
+            # Generate report synchronously
             try:
-                from django.core.files.base import ContentFile
                 generator = ReportGenerator(report.company)
                 
-                # Gerar relatório baseado no tipo
+                # Generate report based on type
                 buffer = generator.generate_report(
                     report_type=report.report_type,
                     start_date=report.period_start,
@@ -149,10 +119,10 @@ class ReportViewSet(viewsets.ModelViewSet):
                 
                 filename = f"{report.report_type}_{report.period_start}_{report.period_end}.{report.file_format or 'pdf'}"
                 
-                # Salvar arquivo
+                # Save file
                 report.file.save(filename, ContentFile(buffer.getvalue()))
                 report.is_generated = True
-                report.generation_time = 1  # Geração síncrona é rápida
+                report.generation_time = 1
                 report.file_size = buffer.tell()
                 report.save()
                 
@@ -254,8 +224,9 @@ class ReportViewSet(viewsets.ModelViewSet):
 
 
 class QuickReportsView(APIView):
-    """Quick report generation for common reports - SEM CELERY"""
+    """Quick report generation for common reports"""
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ReportGenerationThrottle]
     
     def get(self, request):
         """Get quick report options"""
@@ -295,9 +266,7 @@ class QuickReportsView(APIView):
         })
     
     def post(self, request):
-        """Generate quick report SINCRONAMENTE"""
-        from django.utils import timezone
-        from django.core.files.base import ContentFile
+        """Generate quick report synchronously"""
         
         report_id = request.data.get('report_id')
         company = request.user.company
@@ -384,17 +353,14 @@ class QuickReportsView(APIView):
 
 
 
-# Manter outras views (AnalyticsView, DashboardStatsView, etc.) como estão
-
 class ReportTemplateViewSet(viewsets.ModelViewSet):
     """
-    Report template management - CORRIGIDO
+    Report template management
     """
     serializer_class = ReportTemplateSerializer
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
-        # Remover referência ao campo is_system inexistente
         return ReportTemplate.objects.filter(
             Q(company=self.request.user.company) | Q(is_public=True),
             is_active=True
@@ -423,8 +389,8 @@ class AnalyticsView(APIView):
         start_datetime = datetime.combine(start_date, datetime.min.time())
         end_datetime = datetime.combine(end_date, datetime.max.time())
         
-        # Get all company accounts
-        accounts = BankAccount.objects.filter(company=company, is_active=True)
+        # Get all company accounts with optimized query
+        accounts = BankAccount.objects.filter(company=company, is_active=True).select_related('company')
         
         # Get transactions for period
         transactions = Transaction.objects.filter(
@@ -441,6 +407,12 @@ class AnalyticsView(APIView):
         expenses = transactions.filter(
             type='DEBIT'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        
+        # Check cache first
+        cache_key = f'analytics_{company.id}_{period_days}_{start_date}_{end_date}'
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
         
         # Top income sources
         top_income_sources = transactions.filter(
@@ -496,7 +468,7 @@ class AnalyticsView(APIView):
                 'net': week_income - abs(week_expenses)
             })
         
-        return Response({
+        response_data = {
             'period': {
                 'start_date': start_date,
                 'end_date': end_date,
@@ -514,7 +486,12 @@ class AnalyticsView(APIView):
             'top_expense_categories': list(top_expense_categories),
             'weekly_trend': weekly_trend,
             'insights': self._generate_insights(income, expenses, transactions, period_days)
-        })
+        }
+        
+        # Cache the response for 1 hour
+        cache.set(cache_key, response_data, 60 * 60)
+        
+        return Response(response_data)
     
     def _generate_insights(self, income, expenses, transactions, period_days):
         """Generate financial insights"""
@@ -563,6 +540,7 @@ class DashboardStatsView(APIView):
     """Dashboard statistics endpoint"""
     permission_classes = [permissions.IsAuthenticated]
     
+    @method_decorator(cache_page(60 * 5))  # Cache for 5 minutes
     def get(self, request):
         company = request.user.company
         accounts = BankAccount.objects.filter(company=company, is_active=True)
