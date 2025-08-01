@@ -1,73 +1,51 @@
 """
-Create default subscription plans
+Simplified command to create subscription plans
 """
 from decimal import Decimal
-
 from django.core.management.base import BaseCommand
-
 from apps.companies.models import SubscriptionPlan
 
 
 class Command(BaseCommand):
-    help = 'Create default subscription plans'
+    help = 'Create or update subscription plans'
 
     def handle(self, *args, **options):
         plans = [
             {
-                'name': 'Grátis',
-                'slug': 'free',
-                'plan_type': 'free',  # Using starter as plan_type since free is not in choices
-                'price_monthly': Decimal('0.00'),
-                'price_yearly': Decimal('0.00'),
-                'max_transactions': 100,
-                'max_bank_accounts': 1,
-                'max_users': 1,
-                'has_ai_categorization': False,
-                'has_advanced_reports': False,
-                'has_api_access': False,
-                'has_accountant_access': False,
-            },
-            {
                 'name': 'Starter',
                 'slug': 'starter',
-                'plan_type': 'starter',
-                'price_monthly': Decimal('49.00'),
-                'price_yearly': Decimal('490.00'),
+                'price_monthly': Decimal('29.90'),
+                'price_yearly': Decimal('299.00'),
                 'max_transactions': 500,
                 'max_bank_accounts': 2,
-                'max_users': 3,
-                'has_ai_categorization': False,
-                'has_advanced_reports': True,
-                'has_api_access': False,
-                'has_accountant_access': False,
+                'max_ai_requests': 50,
+                'has_ai_insights': False,
+                'has_advanced_reports': False,
+                'display_order': 1,
             },
             {
-                'name': 'Profissional',
+                'name': 'Professional',
                 'slug': 'professional',
-                'plan_type': 'professional',
-                'price_monthly': Decimal('149.00'),
-                'price_yearly': Decimal('1490.00'),
+                'price_monthly': Decimal('59.90'),
+                'price_yearly': Decimal('599.00'),
                 'max_transactions': 2000,
                 'max_bank_accounts': 5,
-                'max_users': 10,
-                'has_ai_categorization': True,
+                'max_ai_requests': 200,
+                'has_ai_insights': True,
                 'has_advanced_reports': True,
-                'has_api_access': False,
-                'has_accountant_access': True,
+                'display_order': 2,
             },
             {
-                'name': 'Empresarial',
+                'name': 'Enterprise',
                 'slug': 'enterprise',
-                'plan_type': 'enterprise',
-                'price_monthly': Decimal('449.00'),
-                'price_yearly': Decimal('4490.00'),
-                'max_transactions': 999999,  # Using large number instead of -1
-                'max_bank_accounts': 999,
-                'max_users': 999,
-                'has_ai_categorization': True,
+                'price_monthly': Decimal('199.90'),
+                'price_yearly': Decimal('1999.00'),
+                'max_transactions': 99999,  # Effectively unlimited
+                'max_bank_accounts': 99999,  # Effectively unlimited
+                'max_ai_requests': 99999,  # Effectively unlimited
+                'has_ai_insights': True,
                 'has_advanced_reports': True,
-                'has_api_access': True,
-                'has_accountant_access': True,
+                'display_order': 3,
             },
         ]
 
@@ -76,6 +54,7 @@ class Command(BaseCommand):
                 slug=plan_data['slug'],
                 defaults=plan_data
             )
+            
             if created:
                 self.stdout.write(
                     self.style.SUCCESS(f'Created plan: {plan.name}')
@@ -86,5 +65,5 @@ class Command(BaseCommand):
                 )
 
         self.stdout.write(
-            self.style.SUCCESS('Successfully created/updated subscription plans')
+            self.style.SUCCESS('Successfully created/updated all plans')
         )

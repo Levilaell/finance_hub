@@ -15,7 +15,9 @@ class ImprovedWebhookHandlers:
     @staticmethod
     def handle_invoice_payment_succeeded(data: Dict[str, Any]):
         """Handle successful renewal payments"""
-        from apps.companies.models import Company, PaymentHistory
+        from apps.companies.models import Company
+        # PaymentHistory should be moved to payments app
+        # from apps.companies.models import PaymentHistory
         
         invoice = data['object']
         subscription_id = invoice.get('subscription')
@@ -131,7 +133,9 @@ class ImprovedWebhookHandlers:
     @staticmethod
     def handle_charge_failed(data: Dict[str, Any]):
         """Handle failed payment attempts"""
-        from apps.companies.models import Company, PaymentHistory
+        from apps.companies.models import Company
+        # PaymentHistory should be moved to payments app
+        # from apps.companies.models import PaymentHistory
         
         charge = data['object']
         customer_id = charge.get('customer')

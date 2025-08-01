@@ -9,7 +9,9 @@ from django.db.models import Sum
 from django.utils import timezone
 from datetime import timedelta
 
-from apps.companies.models import Company, PaymentMethod
+from apps.companies.models import Company
+# PaymentMethod should be moved to payments app
+# from apps.companies.models import PaymentMethod
 from apps.payments.services import StripeService
 from ..models import AICredit, AICreditTransaction
 
@@ -341,7 +343,7 @@ class CreditService:
     def _process_payment(
         cls,
         company: Company,
-        payment_method: PaymentMethod,
+        payment_method: Any,  # PaymentMethod moved to payments app
         amount: Decimal,
         description: str
     ) -> Dict[str, Any]:

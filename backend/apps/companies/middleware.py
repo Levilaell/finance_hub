@@ -64,14 +64,8 @@ class TrialExpirationMiddleware:
         try:
             company = request.user.company
         except:
-            # User might be a team member, try to get company through CompanyUser
-            try:
-                from apps.companies.models import CompanyUser
-                company_user = CompanyUser.objects.get(user=request.user, is_active=True)
-                company = company_user.company
-            except:
-                # No company found, allow request
-                return self.get_response(request)
+            # No company found, allow request (multi-user support removed)
+            return self.get_response(request)
         
         # Check trial expiration (don't update status here, let Celery task handle it)
         if company.subscription_status == 'trial' and company.trial_ends_at:
@@ -149,14 +143,14 @@ class TrialExpirationMiddleware:
                 cache.set(rate_limit_key, rate_limit_count + 1, 60)
                 
                 # Check monthly limit
-                if company.subscription_plan.max_ai_requests_per_month > 0:
-                    if company.current_month_ai_requests >= company.subscription_plan.max_ai_requests_per_month:
+                if company.subscription_plan.max_ai_requests > 0:
+                    if company.current_month_ai_requests >= company.subscription_plan.max_ai_requests:
                         return JsonResponse({
                             'error': 'limit_reached',
-                            'message': f'Você atingiu o limite de {company.subscription_plan.max_ai_requests_per_month} requisições de IA mensais.',
+                            'message': f'Você atingiu o limite de {company.subscription_plan.max_ai_requests} requisições de IA mensais.',
                             'limit_type': 'ai_requests',
                             'current': company.current_month_ai_requests,
-                            'limit': company.subscription_plan.max_ai_requests_per_month,
+                            'limit': company.subscription_plan.max_ai_requests,
                             'redirect': '/dashboard/subscription/upgrade'
                         }, status=status.HTTP_402_PAYMENT_REQUIRED)
         
@@ -183,9 +177,9 @@ class PlanLimitsMiddleware:
             # Add plan limits to request
             request.plan_limits = {
                 'subscription_status': company.subscription_status,
-                'plan_type': company.subscription_plan.plan_type if company.subscription_plan else None,
-                'can_use_ai': company.subscription_plan.enable_ai_insights if company.subscription_plan else False,
-                'remaining_transactions': company.get_remaining_transactions() if hasattr(company, 'get_remaining_transactions') else 0,
+                'plan_type': company.subscription_plan.slug if company.subscription_plan else None,
+                'can_use_ai': company.subscription_plan.has_ai_insights if company.subscription_plan else False,
+                'remaining_transactions': (company.subscription_plan.max_transactions - company.current_month_transactions) if company.subscription_plan else 0,
                 'can_add_bank_account': company.can_add_bank_account(),
                 'can_generate_reports': company.subscription_plan.has_advanced_reports if company.subscription_plan else False,
                 'usage_summary': company.get_usage_summary(),
@@ -201,11 +195,7 @@ class PlanLimitsMiddleware:
     
     def _should_reset_monthly_usage(self, company):
         """Check if monthly usage should be reset"""
-        if not company.last_usage_reset:
-            return True
+        # Check if it's a new month
+        # Simplified - reset happens via management command
         
-        now = timezone.now()
-        last_reset = company.last_usage_reset
-        
-        # Reset on the first day of each month
-        return (now.month != last_reset.month or now.year != last_reset.year)
+        return False

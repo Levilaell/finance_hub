@@ -3,7 +3,9 @@ Check user-company relationships
 """
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
-from apps.companies.models import Company, CompanyUser
+from apps.companies.models import Company
+# CompanyUser model removed in simplified version
+# from apps.companies.models import CompanyUser
 
 User = get_user_model()
 

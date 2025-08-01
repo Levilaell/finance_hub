@@ -1,56 +1,88 @@
-import apiClient from '@/lib/api-client';
-import { SubscriptionPlan, UsageLimits } from '@/types';
+/**
+ * Simplified Subscription Service - Essential functionality only
+ */
+import { apiClient } from '@/lib/api-client';
 
-export interface UpgradeSubscriptionData {
-  plan_id: string;
-  billing_cycle: string;
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  slug: string;
+  price_monthly: number;
+  price_yearly: number;
+  yearly_discount: number;
+  max_transactions: number;
+  max_bank_accounts: number;
+  max_ai_requests: number;
+  has_ai_insights: boolean;
+  has_advanced_reports: boolean;
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  owner_email: string;
+  subscription_plan: SubscriptionPlan | null;
+  subscription_status: 'trial' | 'active' | 'cancelled' | 'expired';
+  billing_cycle: 'monthly' | 'yearly';
+  trial_ends_at: string | null;
+  is_trial_active: boolean;
+  days_until_trial_ends: number;
+  current_month_transactions: number;
+  current_month_ai_requests: number;
+  created_at: string;
+}
+
+export interface UsageLimits {
+  transactions: {
+    used: number;
+    limit: number;
+    percentage: number;
+  };
+  bank_accounts: {
+    used: number;
+    limit: number;
+    percentage: number;
+  };
+  ai_requests: {
+    used: number;
+    limit: number;
+    percentage: number;
+  };
 }
 
 export interface SubscriptionStatus {
   subscription_status: string;
-  has_payment_method: boolean;
-  trial_days_left: number;
   plan: SubscriptionPlan | null;
-  requires_payment_setup: boolean;
+  trial_days_left: number;
   trial_ends_at: string | null;
-  next_billing_date: string | null;
+  requires_payment_setup: boolean;
+  has_payment_method: boolean;
 }
 
 export const subscriptionService = {
-  // Get all public subscription plans
-  async getPublicPlans(): Promise<SubscriptionPlan[]> {
-    const response = await apiClient.get<SubscriptionPlan[]>('/api/companies/public/plans/');
-    return response;
+  // Get available plans
+  async getPlans(): Promise<SubscriptionPlan[]> {
+    return await apiClient.get<SubscriptionPlan[]>('/api/companies/plans/');
   },
 
-  // Get current user's available plans
-  async getAvailablePlans(): Promise<SubscriptionPlan[]> {
-    const response = await apiClient.get<SubscriptionPlan[]>('/api/companies/subscription/plans/');
-    return response;
-  },
-
-  // Upgrade subscription
-  async upgradeSubscription(data: UpgradeSubscriptionData) {
-    const response = await apiClient.post('/api/companies/subscription/upgrade/', data);
-    return response;
-  },
-
-  // Cancel subscription
-  async cancelSubscription() {
-    const response = await apiClient.post('/api/companies/subscription/cancel/');
-    return response;
-  },
-
-  // Get subscription status
-  async getSubscriptionStatus(): Promise<SubscriptionStatus> {
-    const response = await apiClient.get<SubscriptionStatus>('/api/payments/subscription-status/');
-    return response;
+  // Get company details
+  async getCompanyDetails(): Promise<Company> {
+    return await apiClient.get<Company>('/api/companies/detail/');
   },
 
   // Get usage limits
   async getUsageLimits(): Promise<UsageLimits> {
-    // This might be part of the company profile or a separate endpoint
-    const response = await apiClient.get<UsageLimits>('/api/companies/usage-limits/');
-    return response;
+    return await apiClient.get<UsageLimits>('/api/companies/usage-limits/');
   },
+
+  // Get subscription status
+  async getSubscriptionStatus(): Promise<SubscriptionStatus> {
+    return await apiClient.get<SubscriptionStatus>('/api/companies/subscription-status/');
+  },
+
+  // Note: Payment-related methods moved to payment.service.ts
+  // - upgradeSubscription
+  // - cancelSubscription
+  // - addPaymentMethod
+  // - etc.
 };

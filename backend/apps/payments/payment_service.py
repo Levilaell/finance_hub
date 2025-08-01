@@ -7,7 +7,8 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
-from ..companies.models import PaymentHistory
+# PaymentHistory model should be moved to payments app
+# from ..companies.models import PaymentHistory
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
