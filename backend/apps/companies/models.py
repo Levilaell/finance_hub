@@ -31,6 +31,8 @@ class SubscriptionPlan(models.Model):
     # Core identifiers
     name = models.CharField(_('name'), max_length=50)
     slug = models.SlugField(_('slug'), unique=True)
+    plan_type = models.CharField(_('plan type'), max_length=20, default='standard')
+    trial_days = models.IntegerField(_('trial days'), default=14)
     
     # Pricing
     price_monthly = models.DecimalField(_('monthly price'), max_digits=8, decimal_places=2)
@@ -39,19 +41,29 @@ class SubscriptionPlan(models.Model):
     # Essential limits
     max_transactions = models.IntegerField(_('max transactions'), default=500)
     max_bank_accounts = models.IntegerField(_('max bank accounts'), default=1)
-    max_ai_requests = models.IntegerField(_('max AI requests'), default=100)
+    max_ai_requests_per_month = models.IntegerField(_('max AI requests per month'), default=100)
     
     # Feature flags
-    has_ai_insights = models.BooleanField(_('AI insights'), default=False)
+    has_ai_categorization = models.BooleanField(_('AI categorization'), default=False)
+    enable_ai_insights = models.BooleanField(_('AI insights'), default=False)
+    enable_ai_reports = models.BooleanField(_('AI reports'), default=False)
     has_advanced_reports = models.BooleanField(_('advanced reports'), default=False)
+    has_api_access = models.BooleanField(_('API access'), default=False)
+    has_accountant_access = models.BooleanField(_('accountant access'), default=False)
+    has_priority_support = models.BooleanField(_('priority support'), default=False)
     
     # Payment gateway IDs
     stripe_price_id_monthly = models.CharField(max_length=255, blank=True)
     stripe_price_id_yearly = models.CharField(max_length=255, blank=True)
+    mercadopago_plan_id = models.CharField(max_length=255, blank=True)
+    
+    # Display and status
+    display_order = models.IntegerField(_('display order'), default=0)
+    is_active = models.BooleanField(_('is active'), default=True)
     
     # Metadata
-    is_active = models.BooleanField(default=True)
-    display_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
     
     class Meta:
         db_table = 'subscription_plans'
@@ -63,11 +75,35 @@ class SubscriptionPlan(models.Model):
 
 class Company(models.Model):
     """
-    Simplified company model - Essential fields only
+    Complete company model matching database schema
     """
     # Owner
     owner = models.OneToOneField(User, on_delete=models.CASCADE, related_name='company')
+    
+    # Company Information
     name = models.CharField(_('company name'), max_length=200)
+    trade_name = models.CharField(_('trade name'), max_length=200)
+    cnpj = models.CharField(_('CNPJ'), max_length=18, blank=True, unique=True, null=True)
+    company_type = models.CharField(_('company type'), max_length=20, default='LTDA')
+    business_sector = models.CharField(_('business sector'), max_length=50, default='Technology')
+    
+    # Contact Information
+    email = models.EmailField(_('email'), max_length=254, default='')
+    phone = models.CharField(_('phone'), max_length=20, default='')
+    website = models.URLField(_('website'), max_length=200, blank=True, default='')
+    
+    # Address
+    address_street = models.CharField(_('street'), max_length=200, default='')
+    address_number = models.CharField(_('number'), max_length=20, default='')
+    address_complement = models.CharField(_('complement'), max_length=100, blank=True, default='')
+    address_neighborhood = models.CharField(_('neighborhood'), max_length=100, default='')
+    address_city = models.CharField(_('city'), max_length=100, default='')
+    address_state = models.CharField(_('state'), max_length=2, default='')
+    address_zipcode = models.CharField(_('zipcode'), max_length=10, default='')
+    
+    # Business Data
+    monthly_revenue = models.DecimalField(_('monthly revenue'), max_digits=12, decimal_places=2, null=True, blank=True)
+    employee_count = models.IntegerField(_('employee count'), default=1)
     
     # Subscription
     subscription_plan = models.ForeignKey(
@@ -95,14 +131,37 @@ class Company(models.Model):
         default='monthly'
     )
     trial_ends_at = models.DateTimeField(null=True, blank=True)
+    next_billing_date = models.DateField(null=True, blank=True)
     subscription_id = models.CharField(max_length=255, blank=True)  # Stripe subscription ID
+    subscription_start_date = models.DateTimeField(null=True, blank=True)
+    subscription_end_date = models.DateTimeField(null=True, blank=True)
     
     # Usage tracking
     current_month_transactions = models.IntegerField(default=0)
     current_month_ai_requests = models.IntegerField(default=0)
+    last_usage_reset = models.DateTimeField(auto_now_add=True)
+    
+    # Notification flags
+    notified_80_percent = models.BooleanField(default=False)
+    notified_90_percent = models.BooleanField(default=False)
+    
+    # Branding
+    logo = models.ImageField(_('logo'), upload_to='company_logos/', blank=True, null=True)
+    primary_color = models.CharField(_('primary color'), max_length=7, default='#007bff')
+    
+    # Localization
+    currency = models.CharField(_('currency'), max_length=3, default='BRL')
+    fiscal_year_start = models.CharField(_('fiscal year start'), max_length=2, default='01')
+    
+    # Feature flags
+    enable_ai_categorization = models.BooleanField(_('enable AI categorization'), default=True)
+    auto_categorize_threshold = models.FloatField(_('auto categorize threshold'), default=0.8)
+    enable_notifications = models.BooleanField(_('enable notifications'), default=True)
+    enable_email_reports = models.BooleanField(_('enable email reports'), default=True)
     
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
     
     class Meta:
@@ -140,7 +199,7 @@ class Company(models.Model):
             return False
         
         feature_map = {
-            'ai_insights': self.subscription_plan.has_ai_insights,
+            'ai_insights': self.subscription_plan.enable_ai_insights,
             'advanced_reports': self.subscription_plan.has_advanced_reports,
         }
         
@@ -162,7 +221,7 @@ class Company(models.Model):
             ),
             'ai_requests': (
                 self.current_month_ai_requests,
-                self.subscription_plan.max_ai_requests
+                self.subscription_plan.max_ai_requests_per_month
             ),
         }
         

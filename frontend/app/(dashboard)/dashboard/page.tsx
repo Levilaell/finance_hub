@@ -318,7 +318,7 @@ export default function DashboardPage() {
       {user?.company && (
         <div className="mb-6">
           <h2 className="text-lg font-semibold mb-4">Uso do Plano</h2>
-          <UsageIndicators company={user.company} />
+          <UsageIndicators />
         </div>
       )}
 

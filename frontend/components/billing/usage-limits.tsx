@@ -175,7 +175,7 @@ export function UsageLimitsCard() {
       <UpgradePlanDialog
         open={showUpgradeDialog}
         onOpenChange={setShowUpgradeDialog}
-        currentPlan={user?.company?.subscription_plan}
+        currentPlan={undefined}
       />
     </Card>
   );

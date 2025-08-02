@@ -5,6 +5,7 @@ import secrets
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.throttling import AnonRateThrottle

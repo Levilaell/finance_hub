@@ -6,6 +6,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.db.models import Sum
+from core.admin import BaseModelAdmin, ExportMixin, StatusColorMixin
 
 from .models import (
     AICredit,
@@ -17,7 +18,7 @@ from .models import (
 
 
 @admin.register(AICredit)
-class AICreditAdmin(admin.ModelAdmin):
+class AICreditAdmin(BaseModelAdmin):
     """Admin para créditos AI"""
     list_display = [
         'company', 'balance', 'monthly_allowance', 'bonus_credits',
@@ -49,7 +50,8 @@ class AICreditAdmin(admin.ModelAdmin):
 
 
 @admin.register(AICreditTransaction)
-class AICreditTransactionAdmin(admin.ModelAdmin):
+class AICreditTransactionAdmin(BaseModelAdmin, ExportMixin):
+    export_fields = ['company', 'type', 'amount', 'balance_after', 'user', 'created_at', 'description']
     """Admin para transações de créditos"""
     list_display = [
         'company', 'type', 'amount_formatted', 'balance_after',
@@ -106,7 +108,7 @@ class AICreditTransactionAdmin(admin.ModelAdmin):
 
 
 @admin.register(AIConversation)
-class AIConversationAdmin(admin.ModelAdmin):
+class AIConversationAdmin(BaseModelAdmin):
     """Admin para conversas"""
     list_display = [
         'title', 'company', 'user', 'status', 'message_count',
@@ -160,7 +162,7 @@ class AIMessageInline(admin.TabularInline):
 
 
 @admin.register(AIMessage)
-class AIMessageAdmin(admin.ModelAdmin):
+class AIMessageAdmin(BaseModelAdmin):
     """Admin para mensagens"""
     list_display = [
         'conversation', 'role', 'type', 'content_preview',
@@ -212,7 +214,7 @@ class AIMessageAdmin(admin.ModelAdmin):
 
 
 @admin.register(AIInsight)
-class AIInsightAdmin(admin.ModelAdmin):
+class AIInsightAdmin(BaseModelAdmin, ExportMixin, StatusColorMixin):
     """Admin para insights"""
     list_display = [
         'title', 'company', 'type', 'priority_badge',

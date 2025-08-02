@@ -15,10 +15,9 @@ import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { subscriptionService } from '@/services/unified-subscription.service';
-import { paymentService } from '@/services/payment.service';
+import { subscriptionService, SubscriptionPlan } from '@/services/unified-subscription.service';
+import paymentService from '@/services/payment.service';
 import { formatCurrency } from '@/utils/billing.utils';
-import { SubscriptionPlan } from '@/types';
 import { CheckIcon } from '@heroicons/react/24/outline';
 
 interface UpgradePlanDialogProps {
@@ -38,14 +37,19 @@ export function UpgradePlanDialog({
   // Fetch available plans
   const { data: plans, isLoading: plansLoading } = useQuery({
     queryKey: ['available-plans'],
-    queryFn: () => subscriptionService.getAvailablePlans(),
+    queryFn: () => subscriptionService.getSubscriptionPlans(),
     enabled: open,
   });
 
   // Create checkout session mutation
   const checkoutMutation = useMutation({
     mutationFn: (data: { plan_slug: string; billing_cycle: 'monthly' | 'yearly' }) =>
-      paymentService.createCheckoutSession(data),
+      subscriptionService.createCheckoutSession({
+        plan_id: plans?.find(p => p.name === data.plan_slug)?.id || 0,
+        billing_period: data.billing_cycle,
+        success_url: `${window.location.origin}/subscription/success`,
+        cancel_url: `${window.location.origin}/subscription`
+      }),
     onSuccess: (response) => {
       // Redirect to Stripe checkout
       if (response.checkout_url) {
@@ -79,17 +83,15 @@ export function UpgradePlanDialog({
   };
 
   const getDiscount = (plan: SubscriptionPlan) => {
-    const monthly = typeof plan.price_monthly === 'string' ? parseFloat(plan.price_monthly) : plan.price_monthly;
-    const yearly = typeof plan.price_yearly === 'string' ? parseFloat(plan.price_yearly) : plan.price_yearly;
+    const monthly = plan.price_monthly;
+    const yearly = plan.price_yearly;
     const monthlyTotal = monthly * 12;
     return Math.round(((monthlyTotal - yearly) / monthlyTotal) * 100);
   };
 
   const isPlanUpgrade = (plan: SubscriptionPlan) => {
     if (!currentPlan) return true;
-    const planMonthly = typeof plan.price_monthly === 'string' ? parseFloat(plan.price_monthly) : plan.price_monthly;
-    const currentMonthly = typeof currentPlan.price_monthly === 'string' ? parseFloat(currentPlan.price_monthly) : currentPlan.price_monthly;
-    return planMonthly > currentMonthly;
+    return plan.price_monthly > currentPlan.price_monthly;
   };
 
   return (
@@ -139,7 +141,7 @@ export function UpgradePlanDialog({
 
             {/* Plans Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {plans?.map((plan: SubscriptionPlan) => {
+              {plans?.map((plan) => {
                 const isCurrentPlan = currentPlan?.id === plan.id;
                 const isUpgrade = isPlanUpgrade(plan);
                 const isSelected = selectedPlan?.id === plan.id;
@@ -172,9 +174,9 @@ export function UpgradePlanDialog({
                         
                         {/* Descrição do plano */}
                         <p className="text-sm text-gray-600">
-                          {plan.plan_type === 'starter' && 'Ideal para empresas em crescimento que precisam de controle financeiro'}
-                          {plan.plan_type === 'professional' && 'Solução completa com IA para automação e insights'}
-                          {plan.plan_type === 'enterprise' && 'Para grandes empresas com necessidades complexas'}
+                          {plan.name === 'starter' && 'Ideal para empresas em crescimento que precisam de controle financeiro'}
+                          {plan.name === 'professional' && 'Solução completa com IA para automação e insights'}
+                          {plan.name === 'enterprise' && 'Para grandes empresas com necessidades complexas'}
                         </p>
                         
                         <div>
@@ -193,7 +195,7 @@ export function UpgradePlanDialog({
 
                         <div className="space-y-2 text-left">
                           {/* Recursos principais baseados no plano */}
-                          {plan.plan_type === 'starter' && (
+                          {plan.name === 'starter' && (
                             <>
                               <div className="flex items-center text-sm">
                                 <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
@@ -230,7 +232,7 @@ export function UpgradePlanDialog({
                             </>
                           )}
                           
-                          {plan.plan_type === 'professional' && (
+                          {plan.name === 'professional' && (
                             <>
                               <div className="flex items-center text-sm">
                                 <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
@@ -271,7 +273,7 @@ export function UpgradePlanDialog({
                             </>
                           )}
                           
-                          {plan.plan_type === 'enterprise' && (
+                          {plan.name === 'enterprise' && (
                             <>
                               <div className="flex items-center text-sm">
                                 <CheckIcon className="h-4 w-4 text-green-500 mr-2" />

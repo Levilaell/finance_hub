@@ -1,0 +1,79 @@
+/* Custom Admin Styles for Finance Hub */
+
+/* Modern color scheme */
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #3498db;
+    --success-color: #27ae60;
+    --danger-color: #e74c3c;
+    --warning-color: #f39c12;
+    --info-color: #3498db;
+}
+
+/* Enhanced readability */
+.module h2, .inline-group h2 {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* Better status indicators */
+.status-indicator {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.status-active { background-color: var(--success-color); color: white; }
+.status-inactive { background-color: var(--danger-color); color: white; }
+.status-pending { background-color: var(--warning-color); color: white; }
+.status-trial { background-color: var(--info-color); color: white; }
+
+/* Improved form layout */
+.aligned label {
+    width: 200px;
+}
+
+/* Better table styling */
+#changelist table tbody tr:hover {
+    background-color: #f5f5f5;
+}
+
+/* Highlight required fields */
+.required label:after {
+    content: " *";
+    color: var(--danger-color);
+}
+
+/* Improved pagination */
+.paginator {
+    font-size: 14px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+/* Security warning for sensitive fields */
+.sensitive-field {
+    background-color: #fff3cd;
+    border: 1px solid #ffeeba;
+    padding: 5px;
+    border-radius: 3px;
+}
+
+.sensitive-field::before {
+    content: "🔒 ";
+}
+
+/* Performance indicator */
+.query-count {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    background: var(--primary-color);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+}

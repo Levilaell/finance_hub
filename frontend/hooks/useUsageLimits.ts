@@ -5,7 +5,7 @@
  * Usage data comes from /api/companies/usage-limits/ endpoint.
  */
 import { useQuery } from '@tanstack/react-query';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore } from '@/store/auth-store';
 import { subscriptionService, UsageLimits } from '@/services/unified-subscription.service';
 
 export function useUsageLimits() {

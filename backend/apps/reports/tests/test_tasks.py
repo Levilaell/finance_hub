@@ -14,10 +14,10 @@ from django.utils import timezone
 from celery.result import AsyncResult
 from celery.exceptions import Retry, Ignore
 
-from apps.companies.models import Company, Subscription
+from apps.companies.models import Company, SubscriptionPlan
 from apps.banking.models import BankAccount, Transaction
-from apps.categories.models import Category
-from apps.reports.models import Report, ScheduledReport
+from apps.banking.models import TransactionCategory
+from apps.reports.models import Report
 from apps.reports.tasks import (
     generate_report_async,
     process_scheduled_reports,
@@ -39,10 +39,7 @@ class CeleryTaskTestCase(TransactionTestCase):
     """Base test case for Celery task testing"""
     
     def setUp(self):
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.user = User.objects.create_user(
             email="test@example.com",
             password="testpass123"
@@ -51,11 +48,17 @@ class CeleryTaskTestCase(TransactionTestCase):
         self.user.save()
         
         # Create subscription
-        self.subscription = Subscription.objects.create(
-            company=self.company,
-            plan="premium",
-            status="active"
+        # Create subscription plan and assign to company
+        from apps.companies.tests.factories import SubscriptionPlanFactory
+        self.subscription_plan = SubscriptionPlanFactory(
+            name="premium".title(),
+            slug="premium",
+            has_advanced_reports=True,
+            enable_ai_reports=True
         )
+        self.company.subscription_plan = self.subscription_plan
+        self.company.subscription_status = "active"
+        self.company.save()
         
         # Create test data
         self.account = BankAccount.objects.create(
@@ -67,7 +70,7 @@ class CeleryTaskTestCase(TransactionTestCase):
             currency_code="BRL"
         )
         
-        self.category = Category.objects.create(
+        self.transaction_category = TransactionCategory.objects.create(
             name="Food & Dining",
             icon="utensils",
             type="expense"
@@ -84,7 +87,7 @@ class CeleryTaskTestCase(TransactionTestCase):
                 description=f"Transaction {i + 1}",
                 date=date(2024, 1, i + 1),
                 currency_code="BRL",
-                category=self.category if i % 2 == 0 else None
+                category=self.transaction_category if i % 2 == 0 else None
             )
 
 

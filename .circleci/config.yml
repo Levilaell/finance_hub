@@ -1,0 +1,196 @@
+version: 2.1
+
+orbs:
+  python: circleci/python@2.1.1
+  node: circleci/node@5.1.0
+  browser-tools: circleci/browser-tools@1.4.6
+
+executors:
+  python-executor:
+    docker:
+      - image: cimg/python:3.11
+      - image: cimg/postgres:15.0
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_finance_hub
+      - image: cimg/redis:7.0
+    environment:
+      DJANGO_SETTINGS_MODULE: core.settings.test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_finance_hub
+      REDIS_URL: redis://localhost:6379/0
+      SECRET_KEY: test-secret-key-for-ci
+      DEBUG: False
+
+  node-executor:
+    docker:
+      - image: cimg/node:20.0
+    environment:
+      NODE_ENV: test
+
+  e2e-executor:
+    docker:
+      - image: mcr.microsoft.com/playwright:v1.40.0-focal
+      - image: cimg/postgres:15.0
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_finance_hub
+      - image: cimg/redis:7.0
+    environment:
+      DJANGO_SETTINGS_MODULE: core.settings.test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_finance_hub
+      REDIS_URL: redis://localhost:6379/0
+      SECRET_KEY: test-secret-key-for-ci
+      BASE_URL: http://localhost:3000
+      API_URL: http://localhost:8000
+
+jobs:
+  backend-tests:
+    executor: python-executor
+    steps:
+      - checkout
+      - python/install-packages:
+          pkg-manager: pip
+          pip-dependency-file: backend/requirements.txt
+          app-dir: backend
+      - run:
+          name: Install dev dependencies
+          command: |
+            cd backend
+            pip install -r requirements-dev.txt
+      - run:
+          name: Wait for PostgreSQL
+          command: dockerize -wait tcp://localhost:5432 -timeout 1m
+      - run:
+          name: Run migrations
+          command: |
+            cd backend
+            python manage.py migrate --noinput
+      - run:
+          name: Run backend tests with coverage
+          command: |
+            cd backend
+            coverage run --source='.' manage.py test apps.banking.tests -v 2
+            coverage xml
+            coverage report
+      - store_test_results:
+          path: backend/test-results
+      - store_artifacts:
+          path: backend/coverage.xml
+      - persist_to_workspace:
+          root: .
+          paths:
+            - backend/coverage.xml
+
+  frontend-tests:
+    executor: node-executor
+    steps:
+      - checkout
+      - node/install-packages:
+          pkg-manager: npm
+          app-dir: frontend
+      - run:
+          name: Run linting
+          command: |
+            cd frontend
+            npm run lint
+      - run:
+          name: Run type checking
+          command: |
+            cd frontend
+            npm run typecheck
+      - run:
+          name: Run frontend tests with coverage
+          command: |
+            cd frontend
+            npm run test:ci
+      - store_test_results:
+          path: frontend/test-results
+      - store_artifacts:
+          path: frontend/coverage
+      - persist_to_workspace:
+          root: .
+          paths:
+            - frontend/coverage
+
+  e2e-tests:
+    executor: e2e-executor
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            apt-get update -qq
+            apt-get install -y python3 python3-pip nodejs npm postgresql-client
+            pip3 install --upgrade pip
+      - run:
+          name: Setup backend
+          command: |
+            cd backend
+            pip3 install -r requirements.txt
+            python3 manage.py migrate --noinput
+            python3 manage.py shell -c "
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            if not User.objects.filter(email='test@example.com').exists():
+                User.objects.create_user(email='test@example.com', password='Test123!@#')
+            "
+      - run:
+          name: Setup frontend
+          command: |
+            cd frontend
+            npm ci
+            npm run build
+      - run:
+          name: Start services
+          background: true
+          command: |
+            cd backend && python3 manage.py runserver 0.0.0.0:8000 &
+            cd frontend && npm start &
+      - run:
+          name: Wait for services
+          command: |
+            sleep 15
+            curl -f http://localhost:8000/api/health/ || exit 1
+            curl -f http://localhost:3000 || exit 1
+      - run:
+          name: Run E2E tests
+          command: npx playwright test
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: playwright-report
+      - store_artifacts:
+          path: test-results
+
+  coverage-report:
+    executor: python-executor
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Install coverage tools
+          command: |
+            pip install codecov coverage
+      - run:
+          name: Upload coverage reports
+          command: |
+            codecov -f backend/coverage.xml -F backend
+            codecov -f frontend/coverage/lcov.info -F frontend
+
+workflows:
+  version: 2
+  test-and-deploy:
+    jobs:
+      - backend-tests
+      - frontend-tests
+      - e2e-tests:
+          requires:
+            - backend-tests
+            - frontend-tests
+      - coverage-report:
+          requires:
+            - backend-tests
+            - frontend-tests

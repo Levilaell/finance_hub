@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore } from '@/store/auth-store';
 import { subscriptionService, SubscriptionStatus, CheckoutSessionRequest } from '@/services/unified-subscription.service';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 
 export function useSubscription() {
   const queryClient = useQueryClient();
@@ -27,11 +27,7 @@ export function useSubscription() {
       }
     },
     onError: () => {
-      toast({
-        title: 'Error',
-        description: 'Failed to create checkout session. Please try again.',
-        variant: 'destructive',
-      });
+      toast.error('Failed to create checkout session. Please try again.');
     },
   });
 
@@ -44,19 +40,10 @@ export function useSubscription() {
         queryClient.invalidateQueries({ queryKey: ['subscription-status'] });
         queryClient.invalidateQueries({ queryKey: ['user'] });
         
-        // Update user data if subscription is active
-        if (data.subscription && user) {
-          updateUser({
-            ...user,
-            subscription_status: data.subscription.status,
-            subscription_plan: data.subscription.plan.name,
-          });
-        }
+        // Subscription data is already cached in the query
+        // No need to update user data
         
-        toast({
-          title: 'Success',
-          description: 'Your subscription has been activated!',
-        });
+        toast.success('Your subscription has been activated!');
       }
     },
   });
@@ -67,17 +54,10 @@ export function useSubscription() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['subscription-status'] });
       
-      toast({
-        title: 'Subscription Cancelled',
-        description: data.message,
-      });
+      toast.success(data.message || 'Subscription cancelled successfully.');
     },
     onError: () => {
-      toast({
-        title: 'Error',
-        description: 'Failed to cancel subscription. Please try again.',
-        variant: 'destructive',
-      });
+      toast.error('Failed to cancel subscription. Please try again.');
     },
   });
 

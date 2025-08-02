@@ -1,3 +1,14 @@
+export interface DateRange {
+  start_date: string;
+  end_date: string;
+}
+
+export interface ReportData {
+  reports: Report[];
+  accounts: any[];
+  categories: any[];
+}
+
 export interface Report {
   id: string;
   title: string;

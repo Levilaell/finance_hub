@@ -21,15 +21,15 @@ class TestAIInsight(TestCase):
     
     def setUp(self):
         """Set up test data"""
-        self.company = Company.objects.create(
-            name='Test Company',
-            business_sector='Retail',
-            employee_count=25,
-            monthly_revenue=Decimal('150000.00')
-        )
         self.user = User.objects.create_user(
+            username='testuser_insight',
             email='test@example.com',
             password='testpass123'
+        )
+        self.company = Company.objects.create(
+            owner=self.user,
+            name='Test Company',
+            trade_name='Test Company Ltd'
         )
         self.conversation = AIConversation.objects.create(
             company=self.company,
@@ -459,9 +459,15 @@ class TestInsightBusinessLogic(TestCase):
     
     def setUp(self):
         """Set up test data"""
+        self.user = User.objects.create_user(
+            username='testuser_biz_insight',
+            email='bizinsight@example.com',
+            password='testpass123'
+        )
         self.company = Company.objects.create(
+            owner=self.user,
             name='Business Logic Test Company',
-            business_sector='Manufacturing'
+            trade_name='Business Logic Test Company Ltd'
         )
     
     def test_critical_insights_require_immediate_action(self):

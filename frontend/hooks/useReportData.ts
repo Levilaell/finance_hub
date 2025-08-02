@@ -10,7 +10,7 @@ interface UseReportDataOptions {
   initialPeriod?: DateRange;
   retryAttempts?: number;
   staleTime?: number;
-  cacheTime?: number;
+  gcTime?: number;
   onError?: (error: any) => void;
 }
 
@@ -30,7 +30,7 @@ interface UseReportDataReturn {
 
 const DEFAULT_RETRY_ATTEMPTS = 3;
 const DEFAULT_STALE_TIME = 5 * 60 * 1000; // 5 minutes
-const DEFAULT_CACHE_TIME = 10 * 60 * 1000; // 10 minutes
+const DEFAULT_GC_TIME = 10 * 60 * 1000; // 10 minutes
 
 /**
  * Custom hook for fetching and managing report data with enhanced error handling
@@ -40,7 +40,7 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
     initialPeriod,
     retryAttempts = DEFAULT_RETRY_ATTEMPTS,
     staleTime = DEFAULT_STALE_TIME,
-    cacheTime = DEFAULT_CACHE_TIME,
+    gcTime = DEFAULT_GC_TIME,
     onError
   } = options;
 
@@ -51,7 +51,7 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
   // Common query options with retry logic
   const commonQueryOptions: Partial<UseQueryOptions> = {
     staleTime,
-    cacheTime,
+    gcTime,
     retry: (failureCount, error) => {
       if (failureCount < retryAttempts) {
         setRetryCount(failureCount);
@@ -62,27 +62,7 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
       }
       return false;
     },
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
-    onError: (error: any) => {
-      console.error('Query error:', error);
-      
-      // Handle specific error types
-      if (error.response?.status === 401) {
-        toast.error('Sessão expirada. Por favor, faça login novamente.');
-        // Redirect to login or refresh token
-      } else if (error.response?.status === 429) {
-        toast.error('Muitas requisições. Por favor, aguarde um momento.');
-      } else if (error.response?.status >= 500) {
-        toast.error('Erro no servidor. Tentando novamente...');
-      } else {
-        toast.error('Erro ao carregar dados. Por favor, tente novamente.');
-      }
-      
-      // Call custom error handler if provided
-      if (onError) {
-        onError(error);
-      }
-    }
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000)
   };
 
   // Fetch reports with error recovery
@@ -96,7 +76,7 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
     queryKey: ['reports', selectedPeriod],
     queryFn: async () => {
       try {
-        const data = await reportsService.getReports(selectedPeriod);
+        const data = await reportsService.getReports();
         setRetryCount(0); // Reset retry count on success
         return data;
       } catch (error) {
@@ -147,10 +127,11 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
       });
 
       // Prefetch analytics data if reports are loaded
-      if (reports && reports.length > 0) {
+      const reportsData = reports as { results: Report[] } | undefined;
+      if (reportsData && reportsData.results && reportsData.results.length > 0) {
         await queryClient.prefetchQuery({
           queryKey: ['analytics', selectedPeriod],
-          queryFn: () => reportsService.getAnalytics(selectedPeriod),
+          queryFn: () => reportsService.getAnalytics(30),
           staleTime: 15 * 60 * 1000 // 15 minutes
         });
       }
@@ -165,8 +146,8 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
       setRetryCount(0);
       await Promise.all([
         refetchReports(),
-        queryClient.invalidateQueries(['accounts']),
-        queryClient.invalidateQueries(['categories'])
+        queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+        queryClient.invalidateQueries({ queryKey: ['categories'] })
       ]);
       toast.success('Dados atualizados com sucesso!');
     } catch (error) {
@@ -196,9 +177,9 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
   }, [isError, refetchAll]);
 
   return {
-    reports,
-    accounts,
-    categories,
+    reports: (reports as { results: Report[] } | undefined)?.results || [],
+    accounts: (accounts as any[]) || [],
+    categories: (categories as any[]) || [],
     isLoading,
     isError,
     error,
@@ -223,7 +204,11 @@ export function useReportGeneration() {
     try {
       setGeneratingReports(prev => new Set(prev).add(reportId));
       
-      const report = await reportsService.generateReport(params);
+      const report = await reportsService.generateReport(
+        params.report_type, 
+        params, 
+        params.format || 'pdf'
+      );
       
       // Poll for completion
       const checkStatus = async () => {
@@ -231,7 +216,7 @@ export function useReportGeneration() {
         
         if (status.is_generated) {
           toast.success('Relatório gerado com sucesso!');
-          queryClient.invalidateQueries(['reports']);
+          queryClient.invalidateQueries({ queryKey: ['reports'] });
           setGeneratingReports(prev => {
             const next = new Set(prev);
             next.delete(reportId);

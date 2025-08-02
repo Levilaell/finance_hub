@@ -14,8 +14,8 @@ class SubscriptionPlanSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'slug',
             'price_monthly', 'price_yearly', 'yearly_discount',
-            'max_transactions', 'max_bank_accounts', 'max_ai_requests',
-            'has_ai_insights', 'has_advanced_reports'
+            'max_transactions', 'max_bank_accounts', 'max_ai_requests_per_month',
+            'enable_ai_insights', 'has_advanced_reports'
         ]
     
     def get_yearly_discount(self, obj):

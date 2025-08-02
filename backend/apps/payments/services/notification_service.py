@@ -16,6 +16,7 @@ class PaymentNotificationService:
     
     def notify_payment_success(self, company_id: int, payment_data: Dict[str, Any]):
         """Notify about successful payment"""
+        # Send WebSocket notification
         self._send_to_company_group(company_id, {
             'type': 'payment_success',
             'payment_id': payment_data.get('payment_id'),
@@ -24,9 +25,30 @@ class PaymentNotificationService:
             'currency': payment_data.get('currency', 'BRL'),
             'timestamp': timezone.now().isoformat()
         })
+        
+        # Create notification in database
+        try:
+            from apps.companies.models import Company
+            from apps.notifications.services import NotificationService
+            
+            company = Company.objects.get(id=company_id)
+            amount = payment_data.get('amount', 0)
+            currency = payment_data.get('currency', 'BRL')
+            
+            NotificationService.create_notification(
+                event_name='payment_success',
+                company=company,
+                broadcast=True,
+                title="Payment Successful",
+                message=f"Payment of {currency} {amount} processed successfully",
+                metadata=payment_data
+            )
+        except Exception as e:
+            logger.error(f"Failed to create payment success notification: {e}")
     
     def notify_payment_failed(self, company_id: int, payment_data: Dict[str, Any]):
         """Notify about failed payment"""
+        # Send WebSocket notification
         self._send_to_company_group(company_id, {
             'type': 'payment_failed',
             'payment_id': payment_data.get('payment_id'),
@@ -34,6 +56,23 @@ class PaymentNotificationService:
             'retry_available': payment_data.get('retry_available', True),
             'timestamp': timezone.now().isoformat()
         })
+        
+        # Create critical notification in database
+        try:
+            from apps.companies.models import Company
+            from apps.notifications.services import handle_payment_failed
+            
+            company = Company.objects.get(id=company_id)
+            reason = payment_data.get('reason', 'Payment processing failed')
+            
+            # Notify all company users about payment failure
+            handle_payment_failed(
+                company=company,
+                user=None,  # Broadcast to all
+                error_message=reason
+            )
+        except Exception as e:
+            logger.error(f"Failed to create payment failed notification: {e}")
     
     def notify_subscription_updated(self, company_id: int, subscription_data: Dict[str, Any]):
         """Notify about subscription updates"""

@@ -8,6 +8,7 @@ from django.utils.html import format_html
 from django.urls import reverse
 from .models import User, EmailVerification, PasswordReset
 from django.contrib.admin import SimpleListFilter
+from core.admin import SecureModelAdmin
 
 
 class SubscriptionPlanFilter(SimpleListFilter):
@@ -130,8 +131,9 @@ class UserAdmin(BaseUserAdmin):
             'fields': ('preferred_language', 'timezone'),
         }),
         (_('Two Factor Authentication'), {
-            'fields': ('is_two_factor_enabled', 'two_factor_secret', 'backup_codes'),
+            'fields': ('is_two_factor_enabled',),
             'classes': ('collapse',),
+            'description': 'Two-factor authentication status. Secret keys are not displayed for security.',
         }),
         (_('Important dates'), {
             'fields': ('last_login', 'created_at', 'updated_at'),
@@ -414,12 +416,25 @@ class UserAdmin(BaseUserAdmin):
         if obj.payment_customer_id:
             info_html.append('<h4>Informações de Pagamento</h4>')
             info_html.append(f'<p><strong>Gateway:</strong> {obj.payment_gateway or "Não configurado"}</p>')
-            info_html.append(f'<p><strong>Customer ID:</strong> {obj.payment_customer_id}</p>')
+            # Customer ID hidden for security - only show payment gateway
+            info_html.append(f'<p><strong>Payment Configured:</strong> ✓ {obj.payment_gateway or "Not configured"}</p>')
         
         info_html.append('</div>')
         
         return format_html(''.join(info_html))
     get_subscription_info.short_description = 'Detalhes da Assinatura'
+    
+    def get_queryset(self, request):
+        """Optimize queries to prevent N+1 issues"""
+        qs = super().get_queryset(request)
+        # Prefetch related company and subscription data
+        return qs.select_related(
+            'company',
+            'company__subscription_plan'
+        ).prefetch_related(
+            'company_memberships',
+            'company_memberships__company'
+        )
 
 
 @admin.register(EmailVerification)

@@ -34,8 +34,8 @@ class SubscriptionPlanSerializerTest(TestCase):
             price_yearly=Decimal('199.99'),
             max_transactions=2000,
             max_bank_accounts=5,
-            max_ai_requests=200,
-            has_ai_insights=True,
+            max_ai_requests_per_month=200,
+            enable_ai_insights=True,
             has_advanced_reports=True
         )
         
@@ -45,8 +45,8 @@ class SubscriptionPlanSerializerTest(TestCase):
         # Check all required fields are present
         expected_fields = [
             'id', 'name', 'slug', 'price_monthly', 'price_yearly', 'yearly_discount',
-            'max_transactions', 'max_bank_accounts', 'max_ai_requests',
-            'has_ai_insights', 'has_advanced_reports'
+            'max_transactions', 'max_bank_accounts', 'max_ai_requests_per_month',
+            'enable_ai_insights', 'has_advanced_reports'
         ]
         
         for field in expected_fields:
@@ -59,8 +59,8 @@ class SubscriptionPlanSerializerTest(TestCase):
         self.assertEqual(Decimal(data['price_yearly']), Decimal('199.99'))
         self.assertEqual(data['max_transactions'], 2000)
         self.assertEqual(data['max_bank_accounts'], 5)
-        self.assertEqual(data['max_ai_requests'], 200)
-        self.assertTrue(data['has_ai_insights'])
+        self.assertEqual(data['max_ai_requests_per_month'], 200)
+        self.assertTrue(data['enable_ai_insights'])
         self.assertTrue(data['has_advanced_reports'])
     
     def test_yearly_discount_calculation(self):
@@ -358,7 +358,7 @@ class SerializerIntegrationTest(CompaniesUnitTestCase):
         plan = SubscriptionPlanFactory(
             name='Enterprise',
             price_monthly=Decimal('49.99'),
-            has_ai_insights=True,
+            enable_ai_insights=True,
             has_advanced_reports=True
         )
         user = UserFactory(email='test@example.com')
@@ -375,7 +375,7 @@ class SerializerIntegrationTest(CompaniesUnitTestCase):
         plan_data = data['subscription_plan']
         self.assertEqual(plan_data['name'], 'Enterprise')
         self.assertEqual(Decimal(plan_data['price_monthly']), Decimal('49.99'))
-        self.assertTrue(plan_data['has_ai_insights'])
+        self.assertTrue(plan_data['enable_ai_insights'])
         self.assertTrue(plan_data['has_advanced_reports'])
         
         # Check that yearly discount is calculated

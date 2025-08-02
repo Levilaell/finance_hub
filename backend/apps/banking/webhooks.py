@@ -8,6 +8,7 @@ from django.http import JsonResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
+from django.db import IntegrityError
 # timezone imported if needed for future use
 
 from .models import BankAccount, ItemWebhook, PluggyItem
@@ -55,25 +56,45 @@ def pluggy_webhook(request):
             
             if not client.validate_webhook(signature, payload):
                 logger.warning(f"Invalid webhook signature from {request.META.get('REMOTE_ADDR')}")
-                return HttpResponseBadRequest("Invalid signature")
+                return JsonResponse({"error": "Invalid signature"}, status=401)
         
         # Extract event data
         event_type = data.get('event')
-        event_id = data.get('eventId')
-        item_id = data.get('itemId') or data.get('id')  # Some events use 'id' field
+        event_id = data.get('eventId') or data.get('id')  # Some events use 'id' field
+        
+        # Extract item ID from different possible locations
+        item_id = None
+        if 'data' in data and 'item' in data['data']:
+            item_id = data['data']['item'].get('id')
+        else:
+            item_id = data.get('itemId')
+            
         client_id = data.get('clientId')
         triggered_by = data.get('triggeredBy')  # USER, CLIENT, SYNC, INTERNAL
         
         logger.info(f"Webhook event: {event_type}, eventId: {event_id}, itemId: {item_id}, triggeredBy: {triggered_by}")
         
+        # Find the PluggyItem instance
+        try:
+            item = PluggyItem.objects.get(pluggy_item_id=item_id) if item_id else None
+        except PluggyItem.DoesNotExist:
+            logger.warning(f"PluggyItem not found for item_id: {item_id}")
+            return JsonResponse({"error": "Item not found"}, status=404)
+        
         # Store webhook for audit trail
-        ItemWebhook.objects.create(
-            item_id=item_id or '',
-            event_type=event_type,
-            event_id=event_id or '',
-            payload=data,
-            triggered_by=triggered_by
-        )
+        webhook_created = False
+        if item:
+            webhook, webhook_created = ItemWebhook.objects.get_or_create(
+                event_id=event_id or '',
+                defaults={
+                    'item': item,
+                    'event_type': event_type or '',
+                    'payload': data,
+                    'triggered_by': triggered_by or 'CLIENT'  # Default to CLIENT if not specified
+                }
+            )
+            if not webhook_created:
+                logger.info(f"Duplicate webhook event {event_id} - using existing")
         
         # Process event asynchronously following best practices
         # The task will fetch latest data from Pluggy API instead of relying on webhook payload

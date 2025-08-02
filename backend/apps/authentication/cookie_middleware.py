@@ -30,7 +30,8 @@ class JWTCookieMiddleware:
     def _add_security_headers(self, response):
         """Add security headers to response"""
         # Prevent caching of sensitive data
-        if hasattr(response, 'data') and 'tokens' in getattr(response, 'data', {}):
+        response_data = getattr(response, 'data', {}) or {}
+        if hasattr(response, 'data') and 'tokens' in response_data:
             response['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
             response['Pragma'] = 'no-cache'
             response['Expires'] = '0'

@@ -4,10 +4,11 @@ Simplified Companies admin - Essential functionality only
 from django.contrib import admin
 from django.utils.html import format_html
 from .models import Company, SubscriptionPlan, ResourceUsage
+from core.admin import BaseModelAdmin
 
 
 @admin.register(SubscriptionPlan)
-class SubscriptionPlanAdmin(admin.ModelAdmin):
+class SubscriptionPlanAdmin(BaseModelAdmin):
     list_display = ['name', 'price_monthly', 'price_yearly', 'max_transactions', 'max_bank_accounts', 'is_active']
     list_filter = ['is_active']
     ordering = ['display_order', 'price_monthly']
@@ -33,7 +34,7 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
 
 
 @admin.register(Company)
-class CompanyAdmin(admin.ModelAdmin):
+class CompanyAdmin(BaseModelAdmin):
     list_display = ['name', 'owner_email', 'subscription_plan', 'subscription_status', 'trial_days', 'created_at']
     list_filter = ['subscription_status', 'subscription_plan', 'created_at']
     search_fields = ['name', 'owner__email']
@@ -79,10 +80,15 @@ class CompanyAdmin(admin.ModelAdmin):
         html += '</table>'
         return format_html(html)
     usage_summary.short_description = 'Current Month Usage'
+    
+    def get_queryset(self, request):
+        """Optimize queries"""
+        qs = super().get_queryset(request)
+        return qs.select_related('owner', 'subscription_plan')
 
 
 @admin.register(ResourceUsage)
-class ResourceUsageAdmin(admin.ModelAdmin):
+class ResourceUsageAdmin(BaseModelAdmin):
     list_display = ['company', 'month', 'transactions_count', 'ai_requests_count', 'created_at']
     list_filter = ['month', 'created_at']
     search_fields = ['company__name']

@@ -77,7 +77,6 @@ class Subscription(models.Model):
     # Payment gateway references
     stripe_subscription_id = models.CharField(max_length=255, blank=True, null=True)
     stripe_customer_id = models.CharField(max_length=255, blank=True, null=True)
-    # mercadopago_subscription_id = models.CharField(max_length=255, blank=True, null=True)  # Removed - Stripe only
     
     # Dates
     trial_ends_at = models.DateTimeField(null=True, blank=True)

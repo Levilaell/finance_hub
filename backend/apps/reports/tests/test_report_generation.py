@@ -13,9 +13,9 @@ from django.core.files.base import ContentFile
 from rest_framework.test import APITestCase
 from rest_framework import status
 
-from apps.companies.models import Company, Subscription
+from apps.companies.models import Company, SubscriptionPlan
 from apps.banking.models import BankAccount, Transaction
-from apps.categories.models import Category
+from apps.banking.models import TransactionCategory
 from apps.reports.models import Report, ReportTemplate
 from apps.reports.services.validation_service import ReportValidationService
 from apps.reports.services.cache_service import ReportCacheService
@@ -32,10 +32,7 @@ class ReportValidationServiceTest(TestCase):
     """Test report validation service"""
     
     def setUp(self):
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
     
     def test_validate_date_range_valid(self):
         """Test valid date range validation"""
@@ -130,19 +127,22 @@ class ReportGenerationAPITest(APITestCase):
             email="test@example.com",
             password="testpass123"
         )
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.user.company = self.company
         self.user.save()
         
         # Create subscription
-        self.subscription = Subscription.objects.create(
-            company=self.company,
-            plan="premium",
-            status="active"
+        # Create subscription plan and assign to company
+        from apps.companies.tests.factories import SubscriptionPlanFactory
+        self.subscription_plan = SubscriptionPlanFactory(
+            name="premium".title(),
+            slug="premium",
+            has_advanced_reports=True,
+            enable_ai_reports=True
         )
+        self.company.subscription_plan = self.subscription_plan
+        self.company.subscription_status = "active"
+        self.company.save()
         
         # Create bank account
         self.account = BankAccount.objects.create(
@@ -153,7 +153,7 @@ class ReportGenerationAPITest(APITestCase):
         )
         
         # Create category
-        self.category = Category.objects.create(
+        self.transaction_category = TransactionCategory.objects.create(
             name="Food",
             icon="utensils"
         )
@@ -166,7 +166,7 @@ class ReportGenerationAPITest(APITestCase):
                 amount=Decimal(f"{(i + 1) * 10}.00"),
                 description=f"Transaction {i + 1}",
                 transaction_date=timezone.now().date() - timedelta(days=i),
-                category=self.category if i % 2 == 0 else None
+                category=self.transaction_category if i % 2 == 0 else None
             )
         
         self.client.force_authenticate(user=self.user)
@@ -350,10 +350,7 @@ class AsyncTaskTest(TransactionTestCase):
             email="test@example.com",
             password="testpass123"
         )
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.report = Report.objects.create(
             company=self.company,
             report_type='monthly_summary',

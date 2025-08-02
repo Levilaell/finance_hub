@@ -11,17 +11,14 @@ from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from rest_framework.test import APIRequestFactory
 
-from apps.companies.models import Company, Subscription
+from apps.companies.models import Company, SubscriptionPlan
+from apps.companies.tests.factories import CompanyFactory, SubscriptionPlanFactory, PremiumPlanFactory
 from apps.banking.models import BankAccount, Transaction
-from apps.categories.models import Category
-from apps.reports.models import Report, ScheduledReport, ReportTemplate
+from apps.banking.models import TransactionCategory
+from apps.reports.models import Report, ReportTemplate
 from apps.reports.serializers import (
     ReportSerializer,
-    ReportCreateSerializer,
-    ReportListSerializer,
-    ScheduledReportSerializer,
-    ReportTemplateSerializer,
-    ReportSummarySerializer
+    ReportTemplateSerializer
 )
 
 User = get_user_model()
@@ -32,10 +29,7 @@ class ReportSerializerTest(TestCase):
     
     def setUp(self):
         self.factory = APIRequestFactory()
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.user = User.objects.create_user(
             email="test@example.com",
             password="testpass123"
@@ -117,10 +111,7 @@ class ReportCreateSerializerTest(TestCase):
     
     def setUp(self):
         self.factory = APIRequestFactory()
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.user = User.objects.create_user(
             email="test@example.com",
             password="testpass123"
@@ -284,10 +275,7 @@ class ReportListSerializerTest(TestCase):
     """Test ReportListSerializer (optimized for list views)"""
     
     def setUp(self):
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.user = User.objects.create_user(
             email="test@example.com",
             password="testpass123"
@@ -340,10 +328,7 @@ class ScheduledReportSerializerTest(TestCase):
     
     def setUp(self):
         self.factory = APIRequestFactory()
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.user = User.objects.create_user(
             email="test@example.com",
             password="testpass123"
@@ -449,10 +434,7 @@ class ReportTemplateSerializerTest(TestCase):
     
     def setUp(self):
         self.factory = APIRequestFactory()
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.user = User.objects.create_user(
             email="test@example.com",
             password="testpass123"
@@ -560,10 +542,7 @@ class ReportSummarySerializerTest(TestCase):
     """Test ReportSummarySerializer for dashboard stats"""
     
     def setUp(self):
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.user = User.objects.create_user(
             email="test@example.com",
             password="testpass123"
@@ -614,10 +593,7 @@ class SerializerValidationTest(TestCase):
     
     def setUp(self):
         self.factory = APIRequestFactory()
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.user = User.objects.create_user(
             email="test@example.com",
             password="testpass123"

@@ -114,7 +114,7 @@ export const reportsService = {
       const report = await this.getReportStatus(reportId);
       
       if (onProgress) {
-        onProgress(report.status || 'processing');
+        onProgress(report.is_generated ? 'completed' : 'processing');
       }
       
       if (report.is_generated) {

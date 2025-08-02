@@ -12,17 +12,17 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 
-from apps.ai_insights.consumers import AIChatConsumer
+from apps.ai_insights.consumers import ChatConsumer
 from apps.ai_insights.websocket_security import SecureWebSocketAuthMiddleware
 
 User = get_user_model()
 
 
-class TestAIChatConsumer(TestCase):
-    """Test AIChatConsumer functionality"""
+class TestChatConsumer(TestCase):
+    """Test ChatConsumer functionality"""
     
     def setUp(self):
-        self.consumer = AIChatConsumer()
+        self.consumer = ChatConsumer()
         self.consumer.scope = {
             'type': 'websocket',
             'user': Mock(id=123, is_authenticated=True),
@@ -33,7 +33,7 @@ class TestAIChatConsumer(TestCase):
     
     def test_consumer_initialization(self):
         """Test consumer initialization"""
-        self.assertIsInstance(self.consumer, AIChatConsumer)
+        self.assertIsInstance(self.consumer, ChatConsumer)
         self.assertTrue(hasattr(self.consumer, 'security_checks'))
         self.assertTrue(hasattr(self.consumer, 'track_connection'))
     
@@ -243,8 +243,8 @@ class TestAIChatConsumer(TestCase):
 
 
 @pytest.mark.asyncio
-class TestAIChatConsumerIntegration:
-    """Integration tests for AIChatConsumer"""
+class TestChatConsumerIntegration:
+    """Integration tests for ChatConsumer"""
     
     async def test_full_chat_flow(self):
         """Test complete chat flow from connection to message"""
@@ -255,7 +255,7 @@ class TestAIChatConsumerIntegration:
         )
         
         # Create communicator
-        application = SecureWebSocketAuthMiddleware(AIChatConsumer.as_asgi())
+        application = SecureWebSocketAuthMiddleware(ChatConsumer.as_asgi())
         communicator = WebsocketCommunicator(application, "/ws/ai-chat/")
         communicator.scope['user'] = user
         
@@ -304,7 +304,7 @@ class TestAIChatConsumerIntegration:
         
         # Create communicators
         communicators = []
-        application = SecureWebSocketAuthMiddleware(AIChatConsumer.as_asgi())
+        application = SecureWebSocketAuthMiddleware(ChatConsumer.as_asgi())
         
         for user in users:
             communicator = WebsocketCommunicator(application, "/ws/ai-chat/")
@@ -366,7 +366,7 @@ class TestAIChatConsumerIntegration:
         )
         
         # Connect to specific conversation
-        application = SecureWebSocketAuthMiddleware(AIChatConsumer.as_asgi())
+        application = SecureWebSocketAuthMiddleware(ChatConsumer.as_asgi())
         communicator = WebsocketCommunicator(
             application, 
             f"/ws/ai-chat/{conversation.id}/"
@@ -420,7 +420,7 @@ class TestAIChatConsumerIntegration:
         )
         
         # Create communicator
-        application = SecureWebSocketAuthMiddleware(AIChatConsumer.as_asgi())
+        application = SecureWebSocketAuthMiddleware(ChatConsumer.as_asgi())
         communicator = WebsocketCommunicator(application, "/ws/ai-chat/")
         communicator.scope['user'] = user
         
@@ -451,7 +451,7 @@ class TestAIChatConsumerIntegration:
         )
         
         # Create communicator
-        application = SecureWebSocketAuthMiddleware(AIChatConsumer.as_asgi())
+        application = SecureWebSocketAuthMiddleware(ChatConsumer.as_asgi())
         communicator = WebsocketCommunicator(application, "/ws/ai-chat/")
         communicator.scope['user'] = user
         
@@ -475,7 +475,7 @@ class TestWebSocketErrorHandling(TestCase):
     """Test WebSocket error handling scenarios"""
     
     def setUp(self):
-        self.consumer = AIChatConsumer()
+        self.consumer = ChatConsumer()
         self.consumer.scope = {
             'type': 'websocket',
             'user': Mock(id=123, is_authenticated=True)
@@ -593,7 +593,7 @@ class TestConsumerPerformance:
         )
         
         # Create communicator
-        application = SecureWebSocketAuthMiddleware(AIChatConsumer.as_asgi())
+        application = SecureWebSocketAuthMiddleware(ChatConsumer.as_asgi())
         communicator = WebsocketCommunicator(application, "/ws/ai-chat/")
         communicator.scope['user'] = user
         
@@ -640,7 +640,7 @@ class TestConsumerPerformance:
         )
         
         # Create communicator
-        application = SecureWebSocketAuthMiddleware(AIChatConsumer.as_asgi())
+        application = SecureWebSocketAuthMiddleware(ChatConsumer.as_asgi())
         communicator = WebsocketCommunicator(application, "/ws/ai-chat/")
         communicator.scope['user'] = user
         

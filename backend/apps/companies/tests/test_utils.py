@@ -40,7 +40,7 @@ class CompaniesTestMixin:
             price_monthly=Decimal('9.99'),
             max_transactions=500,
             max_bank_accounts=2,
-            max_ai_requests=50
+            max_ai_requests_per_month=50
         )
         self.premium_plan = SubscriptionPlanFactory(
             name='Premium',
@@ -48,8 +48,8 @@ class CompaniesTestMixin:
             price_monthly=Decimal('19.99'),
             max_transactions=2000,
             max_bank_accounts=5,
-            max_ai_requests=200,
-            has_ai_insights=True
+            max_ai_requests_per_month=200,
+            enable_ai_insights=True
         )
         
         # Create test companies
@@ -216,7 +216,7 @@ def create_test_subscription_plans():
         price_yearly=Decimal('99.99'),
         max_transactions=500,
         max_bank_accounts=2,
-        max_ai_requests=50,
+        max_ai_requests_per_month=50,
         has_ai_insights=False,
         has_advanced_reports=False
     )
@@ -230,7 +230,7 @@ def create_test_subscription_plans():
         price_yearly=Decimal('199.99'),
         max_transactions=2000,
         max_bank_accounts=5,
-        max_ai_requests=200,
+        max_ai_requests_per_month=200,
         has_ai_insights=True,
         has_advanced_reports=True
     )

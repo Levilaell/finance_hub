@@ -416,6 +416,86 @@ def custom_exception_handler(exc, context):
     return None
 
 
+class SecurityErrorMiddleware:
+    """Middleware specifically for handling security-related errors and threats"""
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        try:
+            response = self.get_response(request)
+            return response
+        except SecurityError as exc:
+            # Handle security errors with specialized logging and blocking
+            log_security_error(request, exc, exc.error_type)
+            if exc.should_block:
+                return handle_suspicious_operation(request, str(exc))
+            else:
+                # Log but don't block
+                return Response(
+                    format_error_response(
+                        'security_warning',
+                        sanitize_error_message(exc, error_type='security')
+                    ),
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except Exception as exc:
+            # Check if this is a security-related exception
+            security_keywords = [
+                'csrf', 'xss', 'injection', 'unauthorized', 'forbidden',
+                'authentication', 'permission', 'token', 'session'
+            ]
+            
+            is_security_related = any(
+                keyword in str(exc).lower() 
+                for keyword in security_keywords
+            )
+            
+            if is_security_related:
+                log_security_error(request, exc, 'security')
+                return Response(
+                    format_error_response(
+                        'security_error',
+                        sanitize_error_message(exc, error_type='security')
+                    ),
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Not a security error, let other middleware handle it
+            return self.get_response(request)
+    
+    def process_exception(self, request, exception):
+        """Process security exceptions that occur during view processing"""
+        if isinstance(exception, SecurityError):
+            log_security_error(request, exception, exception.error_type)
+            return handle_suspicious_operation(request, str(exception))
+        
+        # Check for security-related exceptions
+        security_exceptions = [
+            'authentication', 'permission', 'authorization', 'csrf',
+            'xss', 'injection', 'suspicious', 'rate limit'
+        ]
+        
+        is_security_exception = any(
+            keyword in str(exception).lower() 
+            for keyword in security_exceptions
+        )
+        
+        if is_security_exception:
+            log_security_error(request, exception, 'security')
+            return Response(
+                format_error_response(
+                    'security_exception',
+                    sanitize_error_message(exception, error_type='security')
+                ),
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Return None to let other middleware handle non-security exceptions
+        return None
+
+
 class ErrorHandlingMiddleware:
     """Middleware to catch and handle errors not caught by DRF"""
     

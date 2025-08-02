@@ -11,6 +11,7 @@ describe('Token Manager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.clearAllTimers();
+    jest.useFakeTimers();
     
     // Reset token manager state
     tokenManager.clearScheduledRefresh();
@@ -18,6 +19,7 @@ describe('Token Manager', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     tokenManager.cleanup();
   });
 
@@ -153,7 +155,12 @@ describe('Token Manager', () => {
         headers: new Headers(),
       });
 
-      await expect(tokenManager.refreshToken()).rejects.toThrow(
+      const refreshPromise = tokenManager.refreshToken();
+      
+      // Fast-forward any timers that might be set (like throttling or fetch timeout)
+      jest.runAllTimers();
+      
+      await expect(refreshPromise).rejects.toThrow(
         'Authentication failed - session expired'
       );
 
@@ -249,11 +256,18 @@ describe('Token Manager', () => {
         headers: new Headers({ 'content-type': 'application/json' }),
       });
 
-      // Make two rapid refresh attempts
+      // Make first refresh attempt
       const promise1 = tokenManager.refreshToken();
+      jest.runAllTimers(); // Process any timers from first call
       await promise1;
       
+      // Make second rapid refresh attempt (should be throttled)
       const promise2 = tokenManager.refreshToken();
+      
+      // Advance timers to handle throttling delay
+      jest.advanceTimersByTime(10000); // 10 seconds for MIN_REFRESH_INTERVAL
+      
+      await promise2;
       
       expect(consoleSpy).toHaveBeenCalledWith(
         'Token refresh too frequent, throttling'
@@ -263,8 +277,6 @@ describe('Token Manager', () => {
     });
 
     it('should handle network timeouts', async () => {
-      jest.useFakeTimers();
-      
       (fetch as jest.Mock).mockImplementation(() => 
         new Promise((resolve) => {
           // Never resolve to simulate timeout
@@ -277,8 +289,6 @@ describe('Token Manager', () => {
       jest.advanceTimersByTime(10000);
       
       await expect(refreshPromise).rejects.toThrow();
-      
-      jest.useRealTimers();
     });
 
     it('should retry on failure up to max attempts', async () => {

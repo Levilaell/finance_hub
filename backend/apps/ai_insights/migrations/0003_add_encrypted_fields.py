@@ -7,7 +7,7 @@ from apps.ai_insights.models_encrypted import EncryptedJSONField
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ai_insights', '0002_auto_20240101_0000'),  # Update this to your last migration
+        ('ai_insights', '0002_auto_20240101_0000'),
     ]
 
     operations = [

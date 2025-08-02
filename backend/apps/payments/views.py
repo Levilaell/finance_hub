@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 class SubscriptionPlanListView(generics.ListAPIView):
     """List available subscription plans"""
-    queryset = SubscriptionPlan.objects.filter(is_active=True).order_by('display_order', 'price_monthly')
+    queryset = SubscriptionPlan.objects.filter(is_active=True).order_by('price_monthly')
     serializer_class = SubscriptionPlanSerializer
     permission_classes = [AllowAny]
 

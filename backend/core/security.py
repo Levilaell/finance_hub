@@ -254,6 +254,7 @@ class RateLimitMiddleware(MiddlewareMixin):
     
     def __init__(self, get_response):
         self.get_response = get_response
+        self.async_mode = False  # Required for Django middleware
         # Configure rate limits
         self.rate_limits = {
             'default': (100, 60),  # 100 requests per minute

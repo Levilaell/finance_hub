@@ -99,8 +99,8 @@ class SubscriptionPlansViewTest(CompaniesBaseTestCase):
         plan_data = response.data[0]
         expected_fields = [
             'id', 'name', 'slug', 'price_monthly', 'price_yearly',
-            'max_transactions', 'max_bank_accounts', 'max_ai_requests',
-            'has_ai_insights', 'has_advanced_reports', 'yearly_discount'
+            'max_transactions', 'max_bank_accounts', 'max_ai_requests_per_month',
+            'enable_ai_insights', 'has_advanced_reports', 'yearly_discount'
         ]
         
         for field in expected_fields:
@@ -220,7 +220,7 @@ class UsageLimitsViewTest(CompaniesBaseTestCase):
         self.assertEqual(response.data['bank_accounts']['limit'], self.basic_plan.max_bank_accounts)
         
         self.assertEqual(response.data['ai_requests']['used'], 25)
-        self.assertEqual(response.data['ai_requests']['limit'], self.basic_plan.max_ai_requests)
+        self.assertEqual(response.data['ai_requests']['limit'], self.basic_plan.max_ai_requests_per_month)
     
     def test_usage_limits_with_no_plan(self):
         """Test usage limits for company with no subscription plan"""
@@ -258,7 +258,7 @@ class UsageLimitsViewTest(CompaniesBaseTestCase):
         self.simulate_usage(
             self.company1,
             transactions=plan.max_transactions // 2,
-            ai_requests=plan.max_ai_requests // 2
+            ai_requests=plan.max_ai_requests_per_month // 2
         )
         
         self.authenticate_user(self.user1)

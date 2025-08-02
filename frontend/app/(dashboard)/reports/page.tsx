@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { reportsService } from '@/services/reports.service';
 import { Report, ReportParameters, Category, BankAccount } from '@/types';
+import { DateRange } from '@/types/reports';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { 
   DocumentChartBarIcon,
@@ -74,13 +75,55 @@ function ReportsPageContent() {
   const {
     selectedPeriod,
     setSelectedPeriod,
-    handleQuickPeriod,
-    refreshData,
-    cashFlow,
-    categorySpending,
-    incomeVsExpenses,
-    analytics,
+    refetch: refreshData,
+    reports: reportDataReports,
+    accounts: reportDataAccounts,
+    categories: reportDataCategories,
+    isLoading: reportDataLoading,
+    isError: reportDataError,
+    error: reportDataErrorMessage,
   } = useReportData();
+  
+  // Temporary data structures until backend integration is complete
+  const cashFlow = { data: [], isLoading: false };
+  const categorySpending = { data: [], isLoading: false };
+  const incomeVsExpenses = { data: [], isLoading: false };
+  const analytics = { data: null, isLoading: false };
+  
+  const handleQuickPeriod = (periodId: string) => {
+    // Implementation for quick period selection
+    const today = new Date();
+    let startDate = new Date();
+    let endDate = new Date();
+    
+    switch (periodId) {
+      case 'thisMonth':
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        break;
+      case 'lastMonth':
+        startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+        break;
+      case 'last3Months':
+        startDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        break;
+      case 'last6Months':
+        startDate = new Date(today.getFullYear(), today.getMonth() - 5, 1);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        break;
+      case 'thisYear':
+        startDate = new Date(today.getFullYear(), 0, 1);
+        endDate = new Date(today.getFullYear(), 11, 31);
+        break;
+    }
+    
+    setSelectedPeriod({
+      start_date: startDate.toISOString().split('T')[0],
+      end_date: endDate.toISOString().split('T')[0]
+    });
+  };
   
   // State
   const [reportType, setReportType] = useState<string>('profit_loss');
@@ -93,21 +136,21 @@ function ReportsPageContent() {
     queryKey: ['reports'],
     queryFn: () => reportsService.getReports(),
     staleTime: 5 * 60 * 1000,
-    cacheTime: 10 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   const { data: accounts } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => bankingService.getAccounts(),
     staleTime: 10 * 60 * 1000,
-    cacheTime: 15 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
     queryFn: () => categoriesService.getCategories(),
     staleTime: 10 * 60 * 1000,
-    cacheTime: 15 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   // Mutations
@@ -152,14 +195,14 @@ function ReportsPageContent() {
   // Handlers
 
   const handleGenerateReport = useCallback(() => {
-    if (!selectedPeriod.start_date || !selectedPeriod.end_date) {
+    if (!selectedPeriod || !selectedPeriod.start_date || !selectedPeriod.end_date) {
       toast.error('Por favor, selecione um período');
       return;
     }
     
     const parameters: ReportParameters = {
-      start_date: selectedPeriod.start_date.toISOString().split('T')[0],
-      end_date: selectedPeriod.end_date.toISOString().split('T')[0],
+      start_date: selectedPeriod.start_date,
+      end_date: selectedPeriod.end_date,
       account_ids: selectedAccounts.length > 0 ? selectedAccounts : undefined,
       category_ids: selectedCategories.length > 0 ? selectedCategories : undefined,
       title: `${REPORT_TYPES.find(t => t.value === reportType)?.label} - ${formatDate(selectedPeriod.start_date)} a ${formatDate(selectedPeriod.end_date)}`,
@@ -327,18 +370,24 @@ function ReportsPageContent() {
                   <div>
                     <Label>Período Inicial</Label>
                     <DatePicker
-                      date={selectedPeriod.start_date || undefined}
+                      date={selectedPeriod?.start_date ? new Date(selectedPeriod.start_date) : undefined}
                       onDateChange={(date) =>
-                        setSelectedPeriod({ ...selectedPeriod, start_date: date || new Date() })
+                        setSelectedPeriod({ 
+                          start_date: date?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+                          end_date: selectedPeriod?.end_date || new Date().toISOString().split('T')[0]
+                        })
                       }
                     />
                   </div>
                   <div>
                     <Label>Período Final</Label>
                     <DatePicker
-                      date={selectedPeriod.end_date || undefined}
+                      date={selectedPeriod?.end_date ? new Date(selectedPeriod.end_date) : undefined}
                       onDateChange={(date) =>
-                        setSelectedPeriod({ ...selectedPeriod, end_date: date || new Date() })
+                        setSelectedPeriod({ 
+                          start_date: selectedPeriod?.start_date || new Date().toISOString().split('T')[0],
+                          end_date: date?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
+                        })
                       }
                     />
                   </div>

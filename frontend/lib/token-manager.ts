@@ -327,7 +327,7 @@ class TokenManager {
     }
     
     // Listen for session timeout events
-    window.addEventListener('session-timeout', this.handleSessionTimeoutEvent.bind(this));
+    window.addEventListener('session-timeout' as any, this.handleSessionTimeoutEvent.bind(this) as EventListener);
     
     // Listen for visibility change to handle tab switching
     document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
@@ -412,7 +412,7 @@ class TokenManager {
     this.clearScheduledRefresh();
     
     if (typeof window !== 'undefined') {
-      window.removeEventListener('session-timeout', this.handleSessionTimeoutEvent.bind(this));
+      window.removeEventListener('session-timeout' as any, this.handleSessionTimeoutEvent.bind(this) as EventListener);
       document.removeEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
       window.removeEventListener('online', this.handleOnline.bind(this));
       window.removeEventListener('offline', this.handleOffline.bind(this));

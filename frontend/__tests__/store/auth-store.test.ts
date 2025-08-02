@@ -42,6 +42,9 @@ describe('Auth Store', () => {
     useAuthStore.getState().isLoading = false;
     useAuthStore.getState().error = null;
     useAuthStore.getState()._hasHydrated = false;
+    
+    // Clear all mocks
+    jest.clearAllMocks();
   });
 
   describe('Initial State', () => {
@@ -185,10 +188,10 @@ describe('Auth Store', () => {
       });
 
       expect(mockApiClient.register).toHaveBeenCalledWith(registerData);
-      expect(mockApiClient.login).toHaveBeenCalledWith({
-        email: registerData.email,
-        password: registerData.password,
-      });
+      expect(mockApiClient.login).toHaveBeenCalledWith(
+        registerData.email,
+        registerData.password
+      );
       expect(result.current.isAuthenticated).toBe(true);
     });
 
@@ -266,7 +269,11 @@ describe('Auth Store', () => {
       const { result } = renderHook(() => useAuthStore());
 
       await act(async () => {
-        await result.current.logout();
+        try {
+          await result.current.logout();
+        } catch (error) {
+          // Expected to fail, but state should still be cleared
+        }
       });
 
       expect(result.current.user).toBeNull();
@@ -525,15 +532,31 @@ describe('Auth Store', () => {
     });
 
     it('should clear legacy cookies in setAuth', () => {
+      // Mock document.cookie setter to track cookie operations
+      const originalCookie = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie');
+      let cookieValue = '';
+      
+      Object.defineProperty(document, 'cookie', {
+        get: () => cookieValue,
+        set: (value) => {
+          cookieValue += value + ';';
+        },
+        configurable: true,
+      });
+      
       const { result } = renderHook(() => useAuthStore());
 
       act(() => {
         result.current.setAuth(mockUser, mockTokens);
       });
 
-      // Verify that cookies are cleared by checking document.cookie manipulation
-      // Note: In a real test environment, you might need to mock document.cookie setter
-      expect(document.cookie).toContain('expires=Thu, 01 Jan 1970 00:00:00 GMT');
+      // Verify that cookies are cleared by checking for expiration date
+      expect(cookieValue).toContain('expires=Thu, 01 Jan 1970 00:00:00 GMT');
+      
+      // Restore original descriptor
+      if (originalCookie) {
+        Object.defineProperty(Document.prototype, 'cookie', originalCookie);
+      }
     });
   });
 

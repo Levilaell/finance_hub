@@ -7,8 +7,16 @@ import { api } from '@/lib/api';
 import type { ReportParameters } from '@/types';
 
 // Mock the api client
-jest.mock('@/lib/api');
-const mockApi = api as jest.Mocked<typeof api>;
+jest.mock('@/lib/api', () => ({
+  api: {
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+    patch: jest.fn(),
+    delete: jest.fn(),
+  }
+}));
+const mockApi = require('@/lib/api').api as jest.Mocked<typeof import('@/lib/api').api>;
 
 // Mock console.error to avoid noise in tests
 const originalConsoleError = console.error;

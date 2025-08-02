@@ -117,8 +117,8 @@ class UsageLimitsView(CompanyValidationMixin, APIView):
                 },
                 'ai_requests': {
                     'used': usage.ai_requests_count,
-                    'limit': plan.max_ai_requests,
-                    'percentage': min(100, (usage.ai_requests_count / plan.max_ai_requests) * 100) if plan.max_ai_requests > 0 else 0
+                    'limit': plan.max_ai_requests_per_month,
+                    'percentage': min(100, (usage.ai_requests_count / plan.max_ai_requests_per_month) * 100) if plan.max_ai_requests_per_month > 0 else 0
                 }
             }
         

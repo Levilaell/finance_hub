@@ -18,7 +18,7 @@ import { UsageIndicator } from '@/components/payment/UsageIndicator';
 import PaymentErrorBoundary, { usePaymentErrorHandler } from '@/components/error-boundaries/PaymentErrorBoundary';
 import { CreditCard, Receipt, AlertCircle, Plus, Trash2, Check } from 'lucide-react';
 import { format } from 'date-fns';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 
 export default function SubscriptionPage() {
   const router = useRouter();
@@ -49,58 +49,37 @@ export default function SubscriptionPage() {
   const addPaymentMethod = useMutation({
     mutationFn: (data: CreatePaymentMethodRequest) => subscriptionService.createPaymentMethod(data),
     onSuccess: () => {
-      toast({ 
-        title: 'Payment method added', 
-        description: 'Your payment method has been successfully added.',
-      });
+      toast.success('Payment method has been successfully added.');
       refetchPaymentMethods();
       setShowAddPaymentMethod(false);
     },
     onError: (error: Error) => {
       const message = handleError(error, 'add payment method');
-      toast({ 
-        title: 'Failed to add payment method', 
-        description: message,
-        variant: 'destructive' 
-      });
+      toast.error(message || 'Failed to add payment method');
     },
   });
 
   const updatePaymentMethod = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => subscriptionService.updatePaymentMethod(id, data),
     onSuccess: () => {
-      toast({ 
-        title: 'Payment method updated', 
-        description: 'Your payment method has been successfully updated.',
-      });
+      toast.success('Payment method has been successfully updated.');
       refetchPaymentMethods();
     },
     onError: (error: Error) => {
       const message = handleError(error, 'update payment method');
-      toast({ 
-        title: 'Failed to update payment method', 
-        description: message,
-        variant: 'destructive' 
-      });
+      toast.error(message || 'Failed to update payment method');
     },
   });
 
   const deletePaymentMethod = useMutation({
     mutationFn: (id: number) => subscriptionService.deletePaymentMethod(id),
     onSuccess: () => {
-      toast({ 
-        title: 'Payment method removed', 
-        description: 'Your payment method has been successfully removed.',
-      });
+      toast.success('Payment method has been successfully removed.');
       refetchPaymentMethods();
     },
     onError: (error: Error) => {
       const message = handleError(error, 'delete payment method');
-      toast({ 
-        title: 'Failed to remove payment method', 
-        description: message,
-        variant: 'destructive' 
-      });
+      toast.error(message || 'Failed to remove payment method');
     },
   });
 
@@ -322,7 +301,7 @@ export default function SubscriptionPage() {
         </div>
 
         <div className="space-y-4">
-          {subscription?.subscription?.status === 'active' && (
+          {subscription?.subscription_status === 'active' && (
             <Card>
               <CardHeader>
                 <CardTitle>Manage Plan</CardTitle>
@@ -360,7 +339,7 @@ export default function SubscriptionPage() {
           <DialogHeader>
             <DialogTitle>Cancel Subscription</DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel your subscription? You'll continue to have access
+              Are you sure you want to cancel your subscription? You&apos;ll continue to have access
               until the end of your current billing period.
             </DialogDescription>
           </DialogHeader>

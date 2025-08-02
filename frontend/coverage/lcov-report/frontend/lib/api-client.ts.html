@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">9.72% </span>
+                <span class="strong">10.07% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>14/144</span>
+                <span class='fraction'>14/139</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">2.56% </span>
+                <span class="strong">2.73% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>2/78</span>
+                <span class='fraction'>2/73</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">6.25% </span>
+                <span class="strong">6.45% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/32</span>
+                <span class='fraction'>2/31</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">8.63% </span>
+                <span class="strong">8.95% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>12/139</span>
+                <span class='fraction'>12/134</span>
             </div>
         
             
@@ -483,23 +483,7 @@
 <a name='L418'></a><a href='#L418'>418</a>
 <a name='L419'></a><a href='#L419'>419</a>
 <a name='L420'></a><a href='#L420'>420</a>
-<a name='L421'></a><a href='#L421'>421</a>
-<a name='L422'></a><a href='#L422'>422</a>
-<a name='L423'></a><a href='#L423'>423</a>
-<a name='L424'></a><a href='#L424'>424</a>
-<a name='L425'></a><a href='#L425'>425</a>
-<a name='L426'></a><a href='#L426'>426</a>
-<a name='L427'></a><a href='#L427'>427</a>
-<a name='L428'></a><a href='#L428'>428</a>
-<a name='L429'></a><a href='#L429'>429</a>
-<a name='L430'></a><a href='#L430'>430</a>
-<a name='L431'></a><a href='#L431'>431</a>
-<a name='L432'></a><a href='#L432'>432</a>
-<a name='L433'></a><a href='#L433'>433</a>
-<a name='L434'></a><a href='#L434'>434</a>
-<a name='L435'></a><a href='#L435'>435</a>
-<a name='L436'></a><a href='#L436'>436</a>
-<a name='L437'></a><a href='#L437'>437</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">4x</span>
+<a name='L421'></a><a href='#L421'>421</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
@@ -538,10 +522,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -704,19 +685,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -973,11 +941,8 @@ class ApiClient {
 <span class="cstat-no" title="statement not covered" >        config.withCredentials = true;</span>
         
         // Add security headers
-<span class="cstat-no" title="statement not covered" >        config.headers = {</span>
-          ...config.headers,
-          'X-Requested-With': 'XMLHttpRequest', // CSRF protection
-          'Cache-Control': 'no-cache', // Prevent caching of sensitive requests
-        };
+<span class="cstat-no" title="statement not covered" >        config.headers['X-Requested-With'] = 'XMLHttpRequest'; /</span>/ CSRF protection
+<span class="cstat-no" title="statement not covered" >        config.headers['Cache-Control'] = 'no-cache'; /</span>/ Prevent caching of sensitive requests
         
         // Validate URL to prevent SSRF attacks
 <span class="cstat-no" title="statement not covered" >        <span class="missing-if-branch" title="if path not taken" >I</span>if (config.url &amp;&amp; !this.isValidUrl(config.url)) {</span>
@@ -986,7 +951,7 @@ class ApiClient {
         }
         
         // Add request timestamp for timeout detection
-<span class="cstat-no" title="statement not covered" >        config.metadata = { startTime: Date.now() };</span>
+        (<span class="cstat-no" title="statement not covered" >config as any).metadata = { startTime: Date.now() };</span>
         
 <span class="cstat-no" title="statement not covered" >        return config;</span>
       },
@@ -1142,19 +1107,6 @@ class ApiClient {
 <span class="cstat-no" title="statement not covered" >    return tokenManager.refreshToken();</span>
   }
 &nbsp;
-  private <span class="fstat-no" title="function not covered" >handleAuthError() {</span>
-<span class="cstat-no" title="statement not covered" >    this.clearTokens();</span>
-<span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (typeof window !== "undefined") {</span>
-      const currentPath = <span class="cstat-no" title="statement not covered" >window.location.pathname;</span>
-      const isAuthPage = <span class="cstat-no" title="statement not covered" >currentPath.includes('/login') || </span>
-                        currentPath.includes('/register') || 
-                        currentPath.includes('/forgot-password');
-      
-<span class="cstat-no" title="statement not covered" >      <span class="missing-if-branch" title="if path not taken" >I</span>if (!isAuthPage) {</span>
-<span class="cstat-no" title="statement not covered" >        window.location.href = "/login";</span>
-      }
-    }
-  }
 &nbsp;
   // Authentication methods
 <span class="fstat-no" title="function not covered" >  async l</span>ogin(email: string, password: string, two_fa_code?: string) {
@@ -1378,7 +1330,7 @@ export default apiClient;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-01T04:33:35.535Z
+                at 2025-08-02T04:31:00.449Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

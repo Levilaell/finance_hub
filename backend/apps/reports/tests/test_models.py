@@ -13,10 +13,11 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.utils import timezone
 
-from apps.companies.models import Company, Subscription
+from apps.companies.models import Company, SubscriptionPlan
+from apps.companies.tests.factories import CompanyFactory, SubscriptionPlanFactory, PremiumPlanFactory
 from apps.banking.models import BankAccount, Transaction
-from apps.categories.models import Category
-from apps.reports.models import Report, ScheduledReport, ReportTemplate
+from apps.banking.models import TransactionCategory
+from apps.reports.models import Report, ReportTemplate
 from apps.reports.exceptions import (
     InvalidReportPeriodError,
     ReportDataInsufficientError
@@ -29,10 +30,7 @@ class ReportModelTest(TestCase):
     """Test Report model"""
     
     def setUp(self):
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.user = User.objects.create_user(
             email="test@example.com",
             password="testpass123"
@@ -196,10 +194,7 @@ class ScheduledReportModelTest(TestCase):
     """Test ScheduledReport model"""
     
     def setUp(self):
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.user = User.objects.create_user(
             email="test@example.com",
             password="testpass123"
@@ -322,10 +317,7 @@ class ReportTemplateModelTest(TestCase):
     """Test ReportTemplate model"""
     
     def setUp(self):
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.user = User.objects.create_user(
             email="test@example.com",
             password="testpass123"

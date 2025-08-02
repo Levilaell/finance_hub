@@ -755,14 +755,7 @@ export default function SettingsPage() {
                         )}
                       </p>
                     </div>
-                    {subscriptionStatus.next_billing_date && (
-                      <div className="text-right">
-                        <p className="text-sm text-gray-600">Próxima cobrança</p>
-                        <p className="text-sm font-medium">
-                          {new Date(subscriptionStatus.next_billing_date).toLocaleDateString('pt-BR')}
-                        </p>
-                      </div>
-                    )}
+                    {/* Next billing date not available in current API */}
                   </div>
 
                   {/* Action Buttons */}
@@ -1354,7 +1347,7 @@ export default function SettingsPage() {
       <UpgradePlanDialog
         open={upgradePlanDialogOpen}
         onOpenChange={setUpgradePlanDialogOpen}
-        currentPlan={user?.company?.subscription_plan}
+        currentPlan={undefined}
       />
 
       <BillingHistoryDialog

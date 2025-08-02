@@ -36,11 +36,8 @@ class ApiClient {
         config.withCredentials = true;
         
         // Add security headers
-        config.headers = {
-          ...config.headers,
-          'X-Requested-With': 'XMLHttpRequest', // CSRF protection
-          'Cache-Control': 'no-cache', // Prevent caching of sensitive requests
-        };
+        config.headers['X-Requested-With'] = 'XMLHttpRequest'; // CSRF protection
+        config.headers['Cache-Control'] = 'no-cache'; // Prevent caching of sensitive requests
         
         // Validate URL to prevent SSRF attacks
         if (config.url && !this.isValidUrl(config.url)) {
@@ -49,7 +46,7 @@ class ApiClient {
         }
         
         // Add request timestamp for timeout detection
-        config.metadata = { startTime: Date.now() };
+        (config as any).metadata = { startTime: Date.now() };
         
         return config;
       },
@@ -205,19 +202,6 @@ class ApiClient {
     return tokenManager.refreshToken();
   }
 
-  private handleAuthError() {
-    this.clearTokens();
-    if (typeof window !== "undefined") {
-      const currentPath = window.location.pathname;
-      const isAuthPage = currentPath.includes('/login') || 
-                        currentPath.includes('/register') || 
-                        currentPath.includes('/forgot-password');
-      
-      if (!isAuthPage) {
-        window.location.href = "/login";
-      }
-    }
-  }
 
   // Authentication methods
   async login(email: string, password: string, two_fa_code?: string) {

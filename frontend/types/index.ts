@@ -481,24 +481,17 @@ export interface NotificationPreference {
 // Notifications
 export interface Notification {
   id: string;
-  user: string; // User ID
-  company?: string; // Company ID
-  notification_type: 'low_balance' | 'large_transaction' | 'recurring_payment' | 'sync_error' | 'report_ready' | 'subscription_expiring' | 'user_invited' | 'budget_exceeded' | 'ai_insight' | 'custom';
+  event: 'account_sync_failed' | 'payment_failed' | 'low_balance' | 'security_alert' | 'account_connected' | 'large_transaction' | 'report_ready' | 'payment_success' | 'sync_completed';
+  event_display?: string;
+  is_critical: boolean;
   title: string;
   message: string;
-  data?: Record<string, any>;
+  metadata?: Record<string, any>;
   action_url?: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
   is_read: boolean;
   read_at?: string;
-  email_sent: boolean;
-  email_sent_at?: string;
-  push_sent: boolean;
-  push_sent_at?: string;
-  sms_sent: boolean;
-  sms_sent_at?: string;
+  delivery_status?: 'pending' | 'delivered' | 'failed';
   created_at: string;
-  expires_at?: string;
 }
 
 // Dashboard

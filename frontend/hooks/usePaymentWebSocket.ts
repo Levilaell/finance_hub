@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { useAuthStore } from '@/store/authStore';
-import { toast } from '@/components/ui/use-toast';
+import { useAuthStore } from '@/store/auth-store';
+import { toast } from 'sonner';
 
 export type PaymentEventType = 
   | 'payment_success'
@@ -85,60 +85,35 @@ export function usePaymentWebSocket(options: UsePaymentWebSocketOptions = {}) {
           // Handle different event types
           switch (data.type) {
             case 'payment_success':
-              toast({
-                title: 'Payment Successful',
-                description: `Payment of ${data.currency} ${data.amount} was processed successfully.`,
-              });
+              toast.success(`Payment of ${data.currency} ${data.amount} was processed successfully.`);
               onPaymentSuccess?.(data);
               break;
 
             case 'payment_failed':
-              toast({
-                title: 'Payment Failed',
-                description: data.reason || 'Payment could not be processed.',
-                variant: 'destructive',
-              });
+              toast.error(data.reason || 'Payment could not be processed.');
               onPaymentFailed?.(data);
               break;
 
             case 'subscription_updated':
-              toast({
-                title: 'Subscription Updated',
-                description: `Your subscription status is now: ${data.status}`,
-              });
+              toast.success(`Your subscription status is now: ${data.status}`);
               onSubscriptionUpdated?.(data);
               break;
 
             case 'payment_method_updated':
               const action = data.action === 'added' ? 'added' : 
                            data.action === 'removed' ? 'removed' : 'updated';
-              toast({
-                title: 'Payment Method Updated',
-                description: `Payment method was ${action}.`,
-              });
+              toast.success(`Payment method was ${action}.`);
               onPaymentMethodUpdated?.(data);
               break;
 
             case 'trial_ending':
-              toast({
-                title: 'Trial Ending Soon',
-                description: `Your trial ends in ${data.days_remaining} days.`,
-                variant: 'destructive',
-              });
+              toast.error(`Your trial ends in ${data.days_remaining} days.`);
               onTrialEnding?.(data);
               break;
 
             case 'usage_limit_warning':
-              toast({
-                title: 'Usage Limit Warning',
-                description: `${data.usage_type} usage at ${data.percentage}% of limit.`,
-                variant: 'destructive',
-              });
+              toast.error(`${data.usage_type} usage at ${data.percentage}% of limit.`);
               onUsageLimitWarning?.(data);
-              break;
-
-            case 'pong':
-              // Ignore pong responses
               break;
 
             default:

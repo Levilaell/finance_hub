@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Check, X } from 'lucide-react';
-import { SubscriptionPlan } from '@/services/payment.service';
+import { SubscriptionPlan } from '@/services/unified-subscription.service';
 import { cn } from '@/lib/utils';
 
 interface PlanSelectorProps {
@@ -77,8 +77,8 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading }: Pl
       <div className="grid gap-6 md:grid-cols-3">
         {plans.map((plan) => {
           const features = planFeatures[plan.name as keyof typeof planFeatures] || [];
-          const price = billingPeriod === 'yearly' ? plan.yearly_price : plan.monthly_price;
-          const monthlyEquivalent = billingPeriod === 'yearly' ? plan.yearly_price / 12 : plan.monthly_price;
+          const price = billingPeriod === 'yearly' ? plan.price_yearly : plan.price_monthly;
+          const monthlyEquivalent = billingPeriod === 'yearly' ? plan.price_yearly / 12 : plan.price_monthly;
           const isCurrentPlan = plan.id === currentPlanId;
           const isRecommended = plan.name === recommendedPlan;
 
@@ -97,7 +97,7 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading }: Pl
               )}
               
               <CardHeader>
-                <CardTitle>{plan.display_name}</CardTitle>
+                <CardTitle>{plan.name.charAt(0).toUpperCase() + plan.name.slice(1)}</CardTitle>
                 <CardDescription>
                   {plan.name === 'starter' && 'Perfect for individuals'}
                   {plan.name === 'professional' && 'Great for growing businesses'}
@@ -116,9 +116,9 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading }: Pl
                       R$ {price.toFixed(2)} billed annually
                     </p>
                   )}
-                  {billingPeriod === 'yearly' && plan.yearly_savings > 0 && (
+                  {billingPeriod === 'yearly' && plan.yearly_discount && plan.yearly_discount > 0 && (
                     <Badge variant="secondary" className="mt-1">
-                      Save R$ {plan.yearly_savings.toFixed(2)}
+                      Save {plan.yearly_discount}% annually
                     </Badge>
                   )}
                 </div>

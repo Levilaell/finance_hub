@@ -7,5 +7,4 @@ from . import consumers
 
 websocket_urlpatterns = [
     path('ws/notifications/', consumers.NotificationConsumer.as_asgi()),
-    path('ws/transactions/', consumers.TransactionConsumer.as_asgi()),
 ]

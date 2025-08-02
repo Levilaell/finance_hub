@@ -206,7 +206,6 @@ class OpenAIWrapper:
         
         return wrapper
     
-    @with_retry
     def create_completion(
         self,
         messages: List[Dict[str, str]],

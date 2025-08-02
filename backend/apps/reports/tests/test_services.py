@@ -13,10 +13,10 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from apps.companies.models import Company, Subscription
+from apps.companies.models import Company, SubscriptionPlan
 from apps.banking.models import BankAccount, Transaction
-from apps.categories.models import Category
-from apps.reports.models import Report, ScheduledReport
+from apps.banking.models import TransactionCategory
+from apps.reports.models import Report
 from apps.reports.services.validation_service import ReportValidationService
 from apps.reports.services.cache_service import ReportCacheService
 from apps.reports.exceptions import (
@@ -32,10 +32,7 @@ class ReportValidationServiceTest(TestCase):
     """Test ReportValidationService with comprehensive validation scenarios"""
     
     def setUp(self):
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.user = User.objects.create_user(
             email="test@example.com",
             password="testpass123"
@@ -53,7 +50,7 @@ class ReportValidationServiceTest(TestCase):
             currency_code="BRL"
         )
         
-        self.category = Category.objects.create(
+        self.transaction_category = TransactionCategory.objects.create(
             name="Food & Dining",
             icon="utensils",
             type="expense"
@@ -227,11 +224,16 @@ class ReportValidationServiceTest(TestCase):
     def test_validate_subscription_limits(self):
         """Test subscription-based validation"""
         # Create subscription
-        subscription = Subscription.objects.create(
-            company=self.company,
-            plan="starter",
-            status="active"
+        # Create subscription plan and assign to company
+        from apps.companies.tests.factories import SubscriptionPlanFactory
+        subscription_plan = SubscriptionPlanFactory(
+            name="starter".title(),
+            slug="starter",
+            has_advanced_reports=True
         )
+        self.company.subscription_plan = subscription_plan
+        self.company.subscription_status = "active"
+        self.company.save()
         
         # Mock plan limits
         with patch.object(subscription, 'plan_data', {
@@ -649,10 +651,7 @@ class ReportGenerationServiceTest(TestCase):
     """Test report generation service with mocked external dependencies"""
     
     def setUp(self):
-        self.company = Company.objects.create(
-            name="Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Test Company")
         self.user = User.objects.create_user(
             email="test@example.com",
             password="testpass123"
@@ -670,7 +669,7 @@ class ReportGenerationServiceTest(TestCase):
             currency_code="BRL"
         )
         
-        self.category = Category.objects.create(
+        self.transaction_category = TransactionCategory.objects.create(
             name="Food & Dining",
             icon="utensils",
             type="expense"
@@ -687,7 +686,7 @@ class ReportGenerationServiceTest(TestCase):
                 description=f"Transaction {i + 1}",
                 date=date(2024, 1, i + 1),
                 currency_code="BRL",
-                category=self.category if i % 2 == 0 else None
+                category=self.transaction_category if i % 2 == 0 else None
             )
     
     @patch('apps.reports.report_generator.ReportGenerator.generate_report')

@@ -20,10 +20,10 @@ from rest_framework import status
 from channels.testing import WebsocketCommunicator
 from channels.db import database_sync_to_async
 
-from apps.companies.models import Company, Subscription
+from apps.companies.models import Company, SubscriptionPlan
 from apps.banking.models import BankAccount, Transaction
-from apps.categories.models import Category
-from apps.reports.models import Report, ScheduledReport
+from apps.banking.models import TransactionCategory
+from apps.reports.models import Report
 from apps.reports.tasks import generate_report_async
 from apps.reports import consumers
 
@@ -37,10 +37,7 @@ class ReportsAPIIntegrationTest(TestCase):
         self.client = APIClient()
         
         # Create test company and user
-        self.company = Company.objects.create(
-            name="Integration Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Integration Test Company")
         
         self.user = User.objects.create_user(
             email="integration@test.com",
@@ -51,11 +48,17 @@ class ReportsAPIIntegrationTest(TestCase):
         self.user.save()
         
         # Create subscription
-        self.subscription = Subscription.objects.create(
-            company=self.company,
-            plan="premium",
-            status="active"
+        # Create subscription plan and assign to company
+        from apps.companies.tests.factories import SubscriptionPlanFactory
+        self.subscription_plan = SubscriptionPlanFactory(
+            name="premium".title(),
+            slug="premium",
+            has_advanced_reports=True,
+            enable_ai_reports=True
         )
+        self.company.subscription_plan = self.subscription_plan
+        self.company.subscription_status = "active"
+        self.company.save()
         
         # Authenticate client
         self.client.force_authenticate(user=self.user)
@@ -70,7 +73,7 @@ class ReportsAPIIntegrationTest(TestCase):
             currency_code="BRL"
         )
         
-        self.category = Category.objects.create(
+        self.transaction_category = TransactionCategory.objects.create(
             name="Food & Dining",
             icon="utensils",
             type="expense"
@@ -88,7 +91,7 @@ class ReportsAPIIntegrationTest(TestCase):
                 description=f"Integration Transaction {i + 1}",
                 date=date(2024, 1, (i % 28) + 1),
                 currency_code="BRL",
-                category=self.category if i % 3 == 0 else None
+                category=self.transaction_category if i % 3 == 0 else None
             )
             self.transactions.append(transaction)
     
@@ -106,7 +109,7 @@ class ReportsAPIIntegrationTest(TestCase):
                 'include_charts': True,
                 'detailed_breakdown': True,
                 'account_ids': [self.account.id],
-                'category_ids': [self.category.id]
+                'category_ids': [self.transaction_category.id]
             }
         }
         
@@ -450,10 +453,7 @@ class ScheduledReportsIntegrationTest(TestCase):
         self.client = APIClient()
         
         # Create test company and user
-        self.company = Company.objects.create(
-            name="Scheduled Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Scheduled Test Company")
         
         self.user = User.objects.create_user(
             email="scheduled@test.com",
@@ -693,10 +693,7 @@ class AIInsightsIntegrationTest(TestCase):
         self.client = APIClient()
         
         # Create test company and user
-        self.company = Company.objects.create(
-            name="AI Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="AI Test Company")
         
         self.user = User.objects.create_user(
             email="ai@test.com",
@@ -707,11 +704,17 @@ class AIInsightsIntegrationTest(TestCase):
         self.user.save()
         
         # Create subscription with AI features
-        self.subscription = Subscription.objects.create(
-            company=self.company,
-            plan="premium",
-            status="active"
+        # Create subscription plan and assign to company
+        from apps.companies.tests.factories import SubscriptionPlanFactory
+        self.subscription_plan = SubscriptionPlanFactory(
+            name="premium".title(),
+            slug="premium",
+            has_advanced_reports=True,
+            enable_ai_reports=True
         )
+        self.company.subscription_plan = self.subscription_plan
+        self.company.subscription_status = "active"
+        self.company.save()
         
         # Authenticate client
         self.client.force_authenticate(user=self.user)
@@ -867,10 +870,7 @@ class FileHandlingIntegrationTest(TestCase):
         self.client = APIClient()
         
         # Create test company and user
-        self.company = Company.objects.create(
-            name="File Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="File Test Company")
         
         self.user = User.objects.create_user(
             email="file@test.com",
@@ -979,10 +979,7 @@ class PerformanceIntegrationTest(TestCase):
         self.client = APIClient()
         
         # Create test company and user
-        self.company = Company.objects.create(
-            name="Performance Test Company",
-            cnpj="12345678000123"
-        )
+        self.company = CompanyFactory(name="Performance Test Company")
         
         self.user = User.objects.create_user(
             email="performance@test.com",
@@ -1007,7 +1004,7 @@ class PerformanceIntegrationTest(TestCase):
         
         categories = []
         for i in range(10):
-            category = Category.objects.create(
+            category = TransactionCategory.objects.create(
                 name=f"Category {i + 1}",
                 icon="icon",
                 type="expense" if i % 2 == 0 else "income"
