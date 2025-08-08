@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice {{ invoice.number }}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .invoice-container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e5e5e5;
+        }
+        .company-info h1 {
+            margin: 0;
+            color: #2563eb;
+            font-size: 28px;
+        }
+        .invoice-details {
+            text-align: right;
+        }
+        .invoice-details h2 {
+            margin: 0 0 10px 0;
+            color: #666;
+            font-size: 24px;
+            font-weight: normal;
+        }
+        .invoice-number {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-top: 8px;
+        }
+        .status-paid {
+            background-color: #10b981;
+            color: white;
+        }
+        .status-pending {
+            background-color: #f59e0b;
+            color: white;
+        }
+        .status-overdue {
+            background-color: #ef4444;
+            color: white;
+        }
+        .billing-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+        .billing-section h3 {
+            margin: 0 0 10px 0;
+            color: #666;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .billing-section p {
+            margin: 4px 0;
+        }
+        .invoice-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 40px;
+        }
+        .invoice-table th {
+            background-color: #f9fafb;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 2px solid #e5e5e5;
+        }
+        .invoice-table td {
+            padding: 16px 12px;
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .invoice-table .amount {
+            text-align: right;
+        }
+        .invoice-summary {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 40px;
+        }
+        .summary-content {
+            width: 300px;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+        .summary-row.subtotal {
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .summary-row.total {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2563eb;
+            padding-top: 16px;
+        }
+        .invoice-footer {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e5e5;
+        }
+        .payment-info {
+            background-color: #f9fafb;
+            padding: 20px;
+            border-radius: 6px;
+            margin-bottom: 40px;
+        }
+        .payment-info h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        @media print {
+            body {
+                background-color: white;
+            }
+            .invoice-container {
+                box-shadow: none;
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-container">
+        <!-- Header -->
+        <div class="invoice-header">
+            <div class="company-info">
+                <h1>Finance Hub</h1>
+                <p>Your Financial Management Platform</p>
+            </div>
+            <div class="invoice-details">
+                <h2>INVOICE</h2>
+                <div class="invoice-number">#{{ invoice.number|default:invoice.id }}</div>
+                <div>{{ invoice.created|date:"F j, Y" }}</div>
+                <div class="status-badge status-{{ invoice.status }}">
+                    {{ invoice.status|upper }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Billing Information -->
+        <div class="billing-info">
+            <div class="billing-section">
+                <h3>Bill To</h3>
+                <p><strong>{{ company.name }}</strong></p>
+                <p>{{ company.email }}</p>
+                {% if company.address.street %}
+                <p>{{ company.address.street }}</p>
+                <p>{{ company.address.city }}, {{ company.address.state }} {{ company.address.zip }}</p>
+                <p>{{ company.address.country }}</p>
+                {% endif %}
+            </div>
+            <div class="billing-section">
+                <h3>Invoice Details</h3>
+                <p><strong>Invoice Date:</strong> {{ invoice.created|date:"F j, Y" }}</p>
+                {% if invoice.due_date %}
+                <p><strong>Due Date:</strong> {{ invoice.due_date|date:"F j, Y" }}</p>
+                {% endif %}
+                <p><strong>Billing Period:</strong> {{ invoice.period_start|date:"M j" }} - {{ invoice.period_end|date:"M j, Y" }}</p>
+                {% if invoice.paid_at %}
+                <p><strong>Paid On:</strong> {{ invoice.paid_at|date:"F j, Y" }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Payment Information (if paid) -->
+        {% if invoice.status == 'paid' and invoice.payment_method %}
+        <div class="payment-info">
+            <h3>Payment Information</h3>
+            <p>Paid with {{ invoice.payment_method.brand|title }} ending in {{ invoice.payment_method.last4 }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Line Items -->
+        <table class="invoice-table">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th style="text-align: center;">Quantity</th>
+                    <th style="text-align: right;">Unit Price</th>
+                    <th style="text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in invoice.line_items %}
+                <tr>
+                    <td>
+                        {{ item.description }}
+                        {% if item.period %}
+                        <br><small style="color: #666;">
+                            {{ item.period.start|date:"M j" }} - {{ item.period.end|date:"M j, Y" }}
+                        </small>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: center;">{{ item.quantity }}</td>
+                    <td style="text-align: right;">
+                        {% if item.unit_amount %}
+                        {{ invoice.currency }} {{ item.unit_amount|floatformat:2 }}
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right;">{{ invoice.currency }} {{ item.amount|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Summary -->
+        <div class="invoice-summary">
+            <div class="summary-content">
+                <div class="summary-row subtotal">
+                    <span>Subtotal</span>
+                    <span>{{ invoice.currency }} {{ invoice.subtotal|floatformat:2 }}</span>
+                </div>
+                {% if invoice.tax > 0 %}
+                <div class="summary-row">
+                    <span>Tax</span>
+                    <span>{{ invoice.currency }} {{ invoice.tax|floatformat:2 }}</span>
+                </div>
+                {% endif %}
+                <div class="summary-row total">
+                    <span>Total</span>
+                    <span>{{ invoice.currency }} {{ invoice.total|floatformat:2 }}</span>
+                </div>
+                {% if invoice.amount_paid > 0 and invoice.amount_remaining > 0 %}
+                <div class="summary-row">
+                    <span>Amount Paid</span>
+                    <span>{{ invoice.currency }} {{ invoice.amount_paid|floatformat:2 }}</span>
+                </div>
+                <div class="summary-row">
+                    <span>Amount Due</span>
+                    <span>{{ invoice.currency }} {{ invoice.amount_remaining|floatformat:2 }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="invoice-footer">
+            <p>Thank you for your business!</p>
+            <p>Questions? Contact us at support@financehub.com</p>
+            <p style="margin-top: 20px; font-size: 12px; color: #999;">
+                Generated on {{ generated_at|date:"F j, Y \a\t g:i A" }}<br>
+                Invoice ID: {{ invoice.id }}
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Seu Relatório está Pronto{% endblock %}
+
+{% block content %}
+<h2>Olá {{ user.first_name|default:user.email }},</h2>
+
+<p>Ótimas notícias! Seu relatório {{ report.report_type|title }} está pronto para download.</p>
+
+<div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin: 20px 0;">
+    <h3 style="margin-top: 0;">Detalhes do Relatório</h3>
+    <p><strong>Relatório:</strong> {{ report.title }}</p>
+    <p><strong>Período:</strong> {{ report.period_start|date:"d/m/Y" }} - {{ report.period_end|date:"d/m/Y" }}</p>
+    <p><strong>Gerado em:</strong> {{ report.completed_at|date:"d/m/Y H:i" }}</p>
+    {% if report.file_size %}
+    <p><strong>Tamanho:</strong> {{ report.file_size|filesizeformat }}</p>
+    {% endif %}
+</div>
+
+<div style="text-align: center;">
+    <a href="{{ download_url }}" class="button">Baixar Relatório</a>
+</div>
+
+<div class="warning">
+    <strong>Atenção:</strong> Os relatórios ficam disponíveis para download por 90 dias. Após esse período, você precisará gerar um novo relatório.
+</div>
+
+<p>Obrigado por usar o {{ site_name }} para suas necessidades de gestão financeira!</p>
+
+<p>Atenciosamente,<br>Equipe {{ site_name }}</p>
+{% endblock %}

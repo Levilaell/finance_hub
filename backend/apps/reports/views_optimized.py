@@ -1,0 +1,872 @@
+"""
+Reports app views - Optimized version
+Financial reporting and analytics with performance improvements
+"""
+import logging
+from decimal import Decimal
+from datetime import datetime, timedelta
+from typing import Dict, Any, List
+import mimetypes
+import hashlib
+
+from django.core.files.base import ContentFile
+from django.db.models import Count, Q, Sum, Avg, F, Prefetch
+from django.http import HttpResponse, Http404
+from django.utils import timezone
+from django.core.signing import TimestampSigner, BadSignature
+from django.shortcuts import get_object_or_404
+from django.db import transaction as db_transaction
+from django.views.decorators.cache import cache_page
+from django.core.cache import cache
+from django.utils.decorators import method_decorator
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.throttling import UserRateThrottle
+
+from apps.banking.models import BankAccount, Transaction
+from .models import Report, ReportTemplate
+from .serializers import ReportSerializer, ReportTemplateSerializer
+from .report_generator import ReportGenerator
+from .tasks import generate_report_async
+from .exceptions import (
+    InvalidReportPeriodError,
+    ReportGenerationInProgressError,
+    ReportPermissionDeniedError
+)
+
+logger = logging.getLogger(__name__)
+
+
+class ReportGenerationThrottle(UserRateThrottle):
+    """Rate limiting for report generation"""
+    scope = 'report_generation'
+    rate = '10/hour'
+
+
+class ReportViewSet(viewsets.ModelViewSet):
+    """
+    Report management viewset with optimizations
+    """
+    serializer_class = ReportSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ReportGenerationThrottle]
+    
+    def get_queryset(self):
+        """Optimized queryset with proper select_related and prefetch_related"""
+        return Report.objects.filter(
+            company=self.request.user.company
+        ).select_related(
+            'created_by',
+            'company',
+            'company__subscription'
+        ).order_by('-created_at')
+    
+    def create(self, request, *args, **kwargs):
+        """Create report with async generation and validation"""
+        logger.info(f"Report creation request from user {request.user.id}")
+        
+        # Extract and validate data
+        report_type = request.data.get('report_type')
+        period_start = request.data.get('period_start')
+        period_end = request.data.get('period_end')
+        file_format = request.data.get('file_format', 'pdf')
+        
+        # Basic validation
+        if not all([report_type, period_start, period_end]):
+            return Response({
+                'error': 'report_type, period_start, and period_end are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Date validation
+        try:
+            start_date = datetime.strptime(period_start, '%Y-%m-%d').date()
+            end_date = datetime.strptime(period_end, '%Y-%m-%d').date()
+        except ValueError as e:
+            raise InvalidReportPeriodError(f'Invalid date format: {str(e)}')
+        
+        if start_date > end_date:
+            raise InvalidReportPeriodError('Start date must be before end date')
+        
+        if (end_date - start_date).days > 365:
+            raise InvalidReportPeriodError('Report period cannot exceed 365 days')
+        
+        if end_date > timezone.now().date():
+            raise InvalidReportPeriodError('End date cannot be in the future')
+        
+        # Check for duplicate in-progress reports
+        with db_transaction.atomic():
+            existing = Report.objects.select_for_update().filter(
+                company=request.user.company,
+                report_type=report_type,
+                period_start=start_date,
+                period_end=end_date,
+                is_generated=False,
+                error_message=''
+            ).exists()
+            
+            if existing:
+                raise ReportGenerationInProgressError()
+            
+            # Create report
+            report = Report.objects.create(
+                company=request.user.company,
+                report_type=report_type,
+                title=request.data.get('title', f'{report_type} Report - {period_start} to {period_end}'),
+                description=request.data.get('description', ''),
+                period_start=start_date,
+                period_end=end_date,
+                file_format=file_format,
+                parameters=request.data.get('parameters', {}),
+                filters=request.data.get('filters', {}),
+                created_by=request.user
+            )
+            
+            # Generate asynchronously
+            generate_report_async.delay(report.id)
+            
+            logger.info(f"Report {report.id} created and queued for generation")
+        
+        serializer = self.get_serializer(report)
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED
+        )
+    
+    @action(detail=True, methods=['get'])
+    def download(self, request, pk=None):
+        """Download report with signed URL validation"""
+        report = self.get_object()
+        
+        if not report.is_generated:
+            return Response({
+                'error': 'Report is not ready for download'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not report.file:
+            return Response({
+                'error': 'Report file not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Generate signed download URL
+        signer = TimestampSigner()
+        signed_id = signer.sign(str(report.id))
+        
+        # Return signed URL for secure download
+        return Response({
+            'download_url': f'/api/reports/secure-download/{signed_id}/',
+            'expires_in': 3600  # 1 hour
+        })
+    
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """Get reports summary with caching"""
+        company = request.user.company
+        cache_key = f'report_summary_{company.id}'
+        
+        # Check cache
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
+        
+        reports = self.get_queryset()
+        last_30_days = timezone.now() - timedelta(days=30)
+        
+        summary_data = {
+            'total_reports': reports.count(),
+            'reports_generated': reports.filter(is_generated=True).count(),
+            'reports_pending': reports.filter(is_generated=False, error_message='').count(),
+            'reports_failed': reports.filter(is_generated=False).exclude(error_message='').count(),
+            'reports_by_type': list(reports.values('report_type').annotate(
+                count=Count('id')
+            )),
+            'recent_reports': ReportSerializer(
+                reports.select_related('created_by')[:10], 
+                many=True
+            ).data,
+            'reports_last_30_days': reports.filter(created_at__gte=last_30_days).count(),
+        }
+        
+        # Cache for 5 minutes
+        cache.set(cache_key, summary_data, 300)
+        
+        return Response(summary_data)
+    
+    @action(detail=True, methods=['post'])
+    def regenerate(self, request, pk=None):
+        """Regenerate a failed or completed report"""
+        report = self.get_object()
+        
+        # Reset report status
+        report.is_generated = False
+        report.error_message = ''
+        report.save(update_fields=['is_generated', 'error_message'])
+        
+        # Queue for regeneration
+        generate_report_async.delay(report.id, regenerate=True)
+        
+        return Response({
+            'message': 'Report queued for regeneration',
+            'report_id': report.id
+        })
+
+
+class SecureReportDownloadView(APIView):
+    """Secure download endpoint with signed URLs"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request, signed_id):
+        """Download report with signature validation"""
+        signer = TimestampSigner()
+        
+        try:
+            # Validate signature (1 hour expiry)
+            report_id = signer.unsign(signed_id, max_age=3600)
+        except BadSignature:
+            raise Http404("Invalid or expired download link")
+        
+        # Get report and verify permissions
+        report = get_object_or_404(Report, id=report_id)
+        
+        if report.company != request.user.company:
+            raise ReportPermissionDeniedError()
+        
+        if not report.file:
+            raise Http404("Report file not found")
+        
+        # Stream file response
+        try:
+            file_handle = report.file.open('rb')
+            response = HttpResponse(
+                file_handle,
+                content_type=mimetypes.guess_type(report.file.name)[0] or 'application/octet-stream'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{report.title}_{report.id}.{report.file_format}"'
+            response['Content-Length'] = report.file.size
+            
+            # Log download
+            logger.info(f"Report {report.id} downloaded by user {request.user.id}")
+            
+            return response
+        except Exception as e:
+            logger.error(f"Error downloading report {report_id}: {str(e)}")
+            raise Http404("Error downloading file")
+
+
+class ReportTemplateViewSet(viewsets.ModelViewSet):
+    """Report template management with optimizations"""
+    serializer_class = ReportTemplateSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        """Get templates with proper filtering"""
+        return ReportTemplate.objects.filter(
+            Q(company=self.request.user.company) | Q(is_public=True),
+            is_active=True
+        ).select_related(
+            'company',
+            'created_by'
+        ).order_by('name')
+
+
+class AnalyticsView(APIView):
+    """Optimized analytics endpoint with caching"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
+    def get(self, request):
+        """Get analytics data with heavy caching"""
+        company = request.user.company
+        period_days = int(request.query_params.get('days', 30))
+        
+        # Create cache key from parameters
+        cache_key = hashlib.md5(
+            f"analytics_{company.id}_{period_days}".encode()
+        ).hexdigest()
+        
+        # Check cache
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logger.info(f"Analytics cache hit for company {company.id}")
+            return Response(cached_data)
+        
+        # Calculate date range
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=period_days)
+        
+        # Optimized queries with select_related
+        accounts = BankAccount.objects.filter(
+            company=company,
+            is_active=True
+        ).select_related('bank_provider')
+        
+        transactions = Transaction.objects.filter(
+            bank_account__company=company,
+            transaction_date__range=[start_date, end_date]
+        ).select_related(
+            'category',
+            'bank_account',
+            'bank_account__bank_provider'
+        )
+        
+        # Aggregate data
+        total_income = transactions.filter(
+            transaction_type__in=['credit', 'transfer_in', 'pix_in']
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        
+        total_expenses = transactions.filter(
+            transaction_type__in=['debit', 'transfer_out', 'pix_out']
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        
+        # Top income sources
+        top_income_sources = transactions.filter(
+            transaction_type='credit',
+            counterpart_name__isnull=False
+        ).values('counterpart_name').annotate(
+            total=Sum('amount'),
+            count=Count('id')
+        ).order_by('-total')[:10]
+        
+        # Top expense categories
+        top_expense_categories = transactions.filter(
+            transaction_type='debit',
+            category__isnull=False
+        ).values(
+            'category__name',
+            'category__icon'
+        ).annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+            avg=Avg('amount')
+        ).order_by('-total')[:10]
+        
+        # Weekly trend with optimized query
+        weekly_trend = []
+        current_date = start_date
+        
+        while current_date <= end_date:
+            week_end = min(current_date + timedelta(days=6), end_date)
+            
+            week_data = transactions.filter(
+                transaction_date__range=[current_date, week_end]
+            ).aggregate(
+                income=Sum('amount', filter=Q(transaction_type='credit')),
+                expenses=Sum('amount', filter=Q(transaction_type='debit'))
+            )
+            
+            weekly_trend.append({
+                'week_start': current_date.isoformat(),
+                'week_end': week_end.isoformat(),
+                'income': week_data['income'] or Decimal('0'),
+                'expenses': abs(week_data['expenses'] or Decimal('0')),
+                'net': (week_data['income'] or Decimal('0')) + (week_data['expenses'] or Decimal('0'))
+            })
+            
+            current_date += timedelta(days=7)
+        
+        # Build response
+        response_data = {
+            'period': {
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'days': period_days
+            },
+            'summary': {
+                'total_income': float(total_income),
+                'total_expenses': float(abs(total_expenses)),
+                'net_result': float(total_income + total_expenses),
+                'transaction_count': transactions.count(),
+                'daily_avg_income': float(total_income / period_days),
+                'daily_avg_expense': float(abs(total_expenses) / period_days)
+            },
+            'top_income_sources': list(top_income_sources),
+            'top_expense_categories': list(top_expense_categories),
+            'weekly_trend': weekly_trend,
+            'accounts_count': accounts.count(),
+            'active_categories': transactions.values('category').distinct().count()
+        }
+        
+        # Cache for 1 hour
+        cache.set(cache_key, response_data, 3600)
+        
+        logger.info(f"Analytics generated for company {company.id}")
+        return Response(response_data)
+
+
+class CashFlowView(APIView):
+    """Optimized cash flow endpoint"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """Get cash flow data with caching"""
+        company = request.user.company
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+        
+        if not all([start_date, end_date]):
+            return Response({
+                'error': 'start_date and end_date are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Parse dates
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({
+                'error': 'Invalid date format. Use YYYY-MM-DD'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create cache key
+        cache_key = f"cashflow_{company.id}_{start_date}_{end_date}"
+        cached_data = cache.get(cache_key)
+        
+        if cached_data:
+            return Response(cached_data)
+        
+        # Get transactions with optimized query
+        transactions = Transaction.objects.filter(
+            bank_account__company=company,
+            transaction_date__range=[start_date, end_date]
+        ).select_related(
+            'category',
+            'bank_account'
+        ).order_by('transaction_date')
+        
+        # Build daily cash flow
+        daily_flow = []
+        current_date = start_date
+        running_balance = Decimal('0')
+        
+        while current_date <= end_date:
+            day_transactions = transactions.filter(transaction_date=current_date)
+            
+            daily_data = day_transactions.aggregate(
+                income=Sum('amount', filter=Q(transaction_type='credit')),
+                expenses=Sum('amount', filter=Q(transaction_type='debit'))
+            )
+            
+            income = daily_data['income'] or Decimal('0')
+            expenses = abs(daily_data['expenses'] or Decimal('0'))
+            balance = income - expenses
+            running_balance += balance
+            
+            daily_flow.append({
+                'date': current_date.isoformat(),
+                'income': float(income),
+                'expenses': float(expenses),
+                'balance': float(running_balance)
+            })
+            
+            current_date += timedelta(days=1)
+        
+        # Cache for 30 minutes
+        cache.set(cache_key, daily_flow, 1800)
+        
+        return Response(daily_flow)
+
+
+class QuickReportsView(APIView):
+    """Quick report generation with async processing"""
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ReportGenerationThrottle]
+    
+    def get(self, request):
+        """Get quick report options"""
+        return Response({
+            'quick_reports': [
+                {
+                    'id': 'current_month',
+                    'name': 'Resumo do Mês Atual',
+                    'description': 'Relatório completo do mês em andamento',
+                    'icon': 'calendar'
+                },
+                {
+                    'id': 'last_month',
+                    'name': 'Resumo do Mês Anterior',
+                    'description': 'Relatório completo do mês passado',
+                    'icon': 'calendar-check'
+                },
+                {
+                    'id': 'quarterly',
+                    'name': 'Relatório Trimestral',
+                    'description': 'Análise dos últimos 3 meses',
+                    'icon': 'chart-line'
+                },
+                {
+                    'id': 'year_to_date',
+                    'name': 'Acumulado do Ano',
+                    'description': 'Resultados desde o início do ano',
+                    'icon': 'chart-bar'
+                },
+                {
+                    'id': 'cash_flow_30',
+                    'name': 'Fluxo de Caixa 30 dias',
+                    'description': 'Projeção de fluxo de caixa para os próximos 30 dias',
+                    'icon': 'money-bill-wave'
+                }
+            ]
+        })
+    
+    def post(self, request):
+        """Generate quick report asynchronously"""
+        
+        report_id = request.data.get('report_id')
+        company = request.user.company
+        
+        # Define date ranges for quick reports
+        now = timezone.now()
+        today = now.date()
+        
+        if report_id == 'current_month':
+            period_start = today.replace(day=1)
+            period_end = today
+            report_type = 'monthly_summary'
+            title = f'Resumo de {now.strftime("%B %Y")}'
+            
+        elif report_id == 'last_month':
+            last_month = (today.replace(day=1) - timedelta(days=1))
+            period_start = last_month.replace(day=1)
+            period_end = last_month
+            report_type = 'monthly_summary'
+            title = f'Resumo de {last_month.strftime("%B %Y")}'
+            
+        elif report_id == 'quarterly':
+            period_end = today
+            period_start = today - timedelta(days=90)
+            report_type = 'quarterly_report'
+            title = f'Relatório Trimestral - {period_start.strftime("%b")} a {period_end.strftime("%b %Y")}'
+            
+        elif report_id == 'year_to_date':
+            period_start = today.replace(month=1, day=1)
+            period_end = today
+            report_type = 'annual_report'
+            title = f'Acumulado {today.year}'
+            
+        elif report_id == 'cash_flow_30':
+            period_start = today
+            period_end = today + timedelta(days=30)
+            report_type = 'cash_flow'
+            title = 'Projeção de Fluxo de Caixa - 30 dias'
+            
+        else:
+            return Response({
+                'error': 'Invalid report_id'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create report
+        with db_transaction.atomic():
+            report = Report.objects.create(
+                company=company,
+                report_type=report_type,
+                title=title,
+                period_start=period_start,
+                period_end=period_end,
+                created_by=request.user,
+                file_format='pdf'
+            )
+            
+            # Generate asynchronously
+            generate_report_async.delay(report.id)
+        
+        logger.info(f"Quick report {report_id} queued for user {request.user.id}")
+        
+        return Response({
+            'status': 'processing',
+            'report': ReportSerializer(report).data,
+            'message': 'Relatório sendo gerado. Você será notificado quando estiver pronto.'
+        })
+
+
+class DashboardStatsView(APIView):
+    """Dashboard statistics with caching and optimized queries"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @method_decorator(cache_page(60 * 5))  # Cache for 5 minutes
+    def get(self, request):
+        company = request.user.company
+        
+        # Create cache key
+        cache_key = f"dashboard_stats_{company.id}"
+        cached_data = cache.get(cache_key)
+        
+        if cached_data:
+            logger.debug(f"Dashboard stats cache hit for company {company.id}")
+            return Response(cached_data)
+        
+        # Optimized query with select_related
+        accounts = BankAccount.objects.filter(
+            company=company, 
+            is_active=True
+        ).select_related('bank_provider')
+        
+        # Current month stats
+        now = timezone.now()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        # Single query for transactions with optimizations
+        transactions = Transaction.objects.filter(
+            bank_account__company=company,
+            transaction_date__gte=month_start
+        ).select_related('bank_account', 'category')
+        
+        # Aggregate in database
+        stats = transactions.aggregate(
+            income=Sum('amount', filter=Q(transaction_type__in=['credit', 'transfer_in', 'pix_in'])),
+            expenses=Sum('amount', filter=Q(transaction_type__in=['debit', 'transfer_out', 'pix_out'])),
+            transaction_count=Count('id')
+        )
+        
+        total_balance = accounts.aggregate(total=Sum('balance'))['total'] or Decimal('0')
+        income = stats['income'] or Decimal('0')
+        expenses = abs(stats['expenses'] or Decimal('0'))
+        
+        response_data = {
+            'total_balance': float(total_balance),
+            'income_this_month': float(income),
+            'expenses_this_month': float(expenses),
+            'net_income': float(income - expenses),
+            'transaction_count': stats['transaction_count'],
+            'accounts_count': accounts.count(),
+        }
+        
+        # Cache for 5 minutes
+        cache.set(cache_key, response_data, 300)
+        
+        logger.info(f"Dashboard stats generated for company {company.id}")
+        return Response(response_data)
+
+
+class CashFlowDataView(APIView):
+    """Cash flow data with query optimizations"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        company = request.user.company
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+        
+        if not start_date or not end_date:
+            return Response({'error': 'start_date and end_date are required'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create cache key
+        cache_key = f"cashflow_data_{company.id}_{start_date}_{end_date}"
+        cached_data = cache.get(cache_key)
+        
+        if cached_data:
+            return Response(cached_data)
+        
+        # Optimized query - get all transactions at once
+        transactions = Transaction.objects.filter(
+            bank_account__company=company,
+            transaction_date__range=[start_date, end_date]
+        ).select_related(
+            'bank_account',
+            'category'
+        ).values(
+            'transaction_date',
+            'transaction_type',
+            'amount'
+        ).order_by('transaction_date')
+        
+        # Process in Python for better performance
+        daily_data = {}
+        current_date = start_date
+        
+        # Initialize all dates
+        while current_date <= end_date:
+            daily_data[current_date] = {'income': Decimal('0'), 'expenses': Decimal('0')}
+            current_date += timedelta(days=1)
+        
+        # Aggregate transactions
+        for trans in transactions:
+            date = trans['transaction_date']
+            amount = trans['amount']
+            trans_type = trans['transaction_type']
+            
+            if trans_type in ['credit', 'transfer_in', 'pix_in']:
+                daily_data[date]['income'] += amount
+            elif trans_type in ['debit', 'transfer_out', 'pix_out']:
+                daily_data[date]['expenses'] += abs(amount)
+        
+        # Build response with running balance
+        cash_flow_data = []
+        running_balance = Decimal('0')
+        
+        for date in sorted(daily_data.keys()):
+            data = daily_data[date]
+            running_balance += data['income'] - data['expenses']
+            
+            cash_flow_data.append({
+                'date': date.strftime('%Y-%m-%d'),
+                'income': float(data['income']),
+                'expenses': float(data['expenses']),
+                'balance': float(running_balance)
+            })
+        
+        # Cache for 30 minutes
+        cache.set(cache_key, cash_flow_data, 1800)
+        
+        return Response(cash_flow_data)
+
+
+class CategorySpendingView(APIView):
+    """Category spending with optimized aggregation"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        company = request.user.company
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+        category_type = request.GET.get('type', 'expense')
+        
+        if not start_date or not end_date:
+            return Response({'error': 'start_date and end_date are required'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        # Cache key
+        cache_key = f"category_spending_{company.id}_{start_date}_{end_date}_{category_type}"
+        cached_data = cache.get(cache_key)
+        
+        if cached_data:
+            return Response(cached_data)
+        
+        # Map transaction types
+        if category_type == 'expense':
+            transaction_types = ['debit', 'transfer_out', 'pix_out', 'fee']
+        else:
+            transaction_types = ['credit', 'transfer_in', 'pix_in', 'interest']
+        
+        # Optimized query with proper joins
+        category_data = Transaction.objects.filter(
+            bank_account__company=company,
+            transaction_date__range=[start_date, end_date],
+            transaction_type__in=transaction_types,
+            category__isnull=False
+        ).select_related(
+            'category'
+        ).values(
+            'category__name', 
+            'category__icon'
+        ).annotate(
+            total_amount=Sum('amount'),
+            transaction_count=Count('id')
+        ).order_by(
+            '-total_amount' if category_type == 'income' else 'total_amount'
+        )
+        
+        # Calculate percentages
+        total_amount = sum(abs(item['total_amount']) for item in category_data)
+        
+        result = []
+        for item in category_data:
+            amount = abs(item['total_amount'])
+            percentage = (amount / total_amount * 100) if total_amount else 0
+            
+            result.append({
+                'category': {
+                    'name': item['category__name'],
+                    'icon': item['category__icon']
+                },
+                'amount': float(amount),
+                'percentage': round(percentage, 1),
+                'transaction_count': item['transaction_count']
+            })
+        
+        # Cache for 1 hour
+        cache.set(cache_key, result, 3600)
+        
+        return Response(result)
+
+
+class IncomeVsExpensesView(APIView):
+    """Income vs expenses with optimized monthly aggregation"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        company = request.user.company
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+        
+        if not start_date or not end_date:
+            return Response({'error': 'start_date and end_date are required'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        # Cache key
+        cache_key = f"income_vs_expenses_{company.id}_{start_date}_{end_date}"
+        cached_data = cache.get(cache_key)
+        
+        if cached_data:
+            return Response(cached_data)
+        
+        # Get all transactions in date range with optimized query
+        transactions = Transaction.objects.filter(
+            bank_account__company=company,
+            transaction_date__range=[start_date, end_date]
+        ).select_related(
+            'bank_account'
+        ).values(
+            'transaction_date__year',
+            'transaction_date__month',
+            'transaction_type',
+            'amount'
+        )
+        
+        # Aggregate by month
+        monthly_data = {}
+        
+        for trans in transactions:
+            year = trans['transaction_date__year']
+            month = trans['transaction_date__month']
+            month_key = f"{year}-{month:02d}"
+            
+            if month_key not in monthly_data:
+                monthly_data[month_key] = {'income': Decimal('0'), 'expenses': Decimal('0')}
+            
+            amount = trans['amount']
+            trans_type = trans['transaction_type']
+            
+            if trans_type in ['credit', 'transfer_in', 'pix_in', 'interest']:
+                monthly_data[month_key]['income'] += amount
+            elif trans_type in ['debit', 'transfer_out', 'pix_out', 'fee']:
+                monthly_data[month_key]['expenses'] += abs(amount)
+        
+        # Build response
+        result = []
+        for month_key in sorted(monthly_data.keys()):
+            data = monthly_data[month_key]
+            
+            result.append({
+                'month': month_key,
+                'income': float(data['income']),
+                'expenses': float(data['expenses']),
+                'net': float(data['income'] - data['expenses'])
+            })
+        
+        # Cache for 1 hour
+        cache.set(cache_key, result, 3600)
+        
+        return Response(result)

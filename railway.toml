@@ -1,0 +1,9 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "./backend/Dockerfile"
+buildContext = "./backend"
+
+[deploy]
+# Remove startCommand - let Docker handle it
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
