@@ -54,5 +54,5 @@ urlpatterns = [
     path('health/celery/', CeleryHealthCheckView.as_view(), name='celery-health'),
     
     # Legacy endpoints for compatibility
-    path('pluggy/banks/',o PluggyConnectorViewSet.as_view({'get': 'list'}), name='pluggy-banks'),
+    path('pluggy/banks/', PluggyConnectorViewSet.as_view({'get': 'list'}), name='pluggy-banks'),
 ]
