@@ -24,6 +24,22 @@ def health_check(request):
     checks["environment"] = os.environ.get("DJANGO_SETTINGS_MODULE", "unknown")
     checks["debug_mode"] = settings.DEBUG
     
+    # Check for critical environment variables
+    env_warnings = []
+    if 'INSECURE-TEMPORARY-KEY' in getattr(settings, 'SECRET_KEY', ''):
+        env_warnings.append("DJANGO_SECRET_KEY not set - using temporary key")
+        warnings.append("DJANGO_SECRET_KEY environment variable must be set in Railway")
+    
+    if not os.environ.get('DATABASE_URL'):
+        env_warnings.append("DATABASE_URL not configured")
+        warnings.append("DATABASE_URL environment variable must be set in Railway")
+    
+    if env_warnings:
+        checks["configuration"] = "incomplete"
+        checks["missing_env_vars"] = env_warnings
+    else:
+        checks["configuration"] = "complete"
+    
     # Database check with better error handling
     try:
         with connection.cursor() as cursor:

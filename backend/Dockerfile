@@ -33,7 +33,8 @@ RUN mkdir -p /app/staticfiles /app/media /app/logs /keys
 RUN chown -R 1000:1000 /keys && chmod 755 /keys
 
 # Run collectstatic with dummy environment variables
-RUN DJANGO_SECRET_KEY="dummy-key-for-collectstatic" \
+RUN DJANGO_COLLECT_STATIC=1 \
+    DJANGO_SECRET_KEY="dummy-key-for-collectstatic" \
     DJANGO_SETTINGS_MODULE=core.settings.production \
     DATABASE_URL="postgres://dummy:dummy@dummy:5432/dummy" \
     python manage.py collectstatic --noinput || true

@@ -4,7 +4,24 @@ set -e
 # Use PORT environment variable, default to 8000 if not set
 export PORT=${PORT:-8000}
 
+# Ensure we're using production settings
+export DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-core.settings.production}
+
 echo "Starting Django server on port $PORT"
+echo "Using settings: $DJANGO_SETTINGS_MODULE"
+
+# Check for critical environment variables
+if [ -z "$DJANGO_SECRET_KEY" ]; then
+    echo "WARNING: DJANGO_SECRET_KEY is not set!"
+    echo "Please set it in Railway dashboard > Variables"
+    echo "The app will start with a temporary key but this is INSECURE!"
+fi
+
+if [ -z "$DATABASE_URL" ]; then
+    echo "WARNING: DATABASE_URL is not set!"
+    echo "Railway should provide this automatically."
+    echo "Check your database service configuration."
+fi
 
 # Run migrations in correct order to handle dependencies
 echo "Running migrations..."

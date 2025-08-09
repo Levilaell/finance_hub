@@ -16,19 +16,36 @@ except ImportError:
     SENTRY_AVAILABLE = False
 
 # Security
-SECRET_KEY = config('DJANGO_SECRET_KEY')
+# Check if we have a SECRET_KEY, provide helpful error if not
+SECRET_KEY = config('DJANGO_SECRET_KEY', default=None)
+if not SECRET_KEY:
+    # Generate a temporary key for collectstatic and health checks
+    if os.environ.get('DJANGO_COLLECT_STATIC') == '1':
+        SECRET_KEY = 'temporary-key-for-collectstatic-only'
+    else:
+        import sys
+        print("ERROR: DJANGO_SECRET_KEY environment variable is required in production!")
+        print("Please set it in Railway dashboard under Variables section.")
+        print("You can generate one with: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'")
+        # Use a temporary key to allow health checks to work
+        SECRET_KEY = 'INSECURE-TEMPORARY-KEY-PLEASE-SET-DJANGO_SECRET_KEY'
+        
 DEBUG = config('DEBUG', default=False, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')  # Allow all hosts temporarily
 
 # Database - Correção principal aqui!
 import dj_database_url
 
 DATABASE_URL = config('DATABASE_URL', default=None)
 if not DATABASE_URL:
-    raise ValueError(
-        "DATABASE_URL environment variable is required in production. "
-        "Please set it to your PostgreSQL connection string."
-    )
+    # Check if this is during collectstatic
+    if os.environ.get('DJANGO_COLLECT_STATIC') == '1':
+        DATABASE_URL = 'postgres://dummy:dummy@dummy:5432/dummy'
+    else:
+        print("WARNING: DATABASE_URL environment variable is not set!")
+        print("Using a dummy database URL - database operations will fail.")
+        print("Please set DATABASE_URL in Railway dashboard.")
+        DATABASE_URL = 'postgres://dummy:dummy@localhost:5432/dummy'
 
 DATABASES = {
     'default': dj_database_url.config(
