@@ -10,6 +10,44 @@ from django.core.management import call_command
 class Command(BaseCommand):
     help = 'Ensure database tables are created and migrations are applied'
 
+    def fix_inconsistent_migrations(self, cursor):
+        """Fix inconsistent migration history in reports app"""
+        try:
+            # Check if the problem exists
+            cursor.execute("""
+                SELECT COUNT(*) FROM django_migrations 
+                WHERE app = 'reports' 
+                AND name IN ('0002_alter_aianalysis_options_and_more', '0003_aianalysistemplate_aianalysis')
+            """)
+            count = cursor.fetchone()[0]
+            
+            if count == 1:
+                # One is applied but not the other - fix it
+                self.stdout.write('🔧 Fixing inconsistent reports migrations...')
+                
+                # Check which one is applied
+                cursor.execute("""
+                    SELECT name FROM django_migrations 
+                    WHERE app = 'reports' 
+                    AND name IN ('0002_alter_aianalysis_options_and_more', '0003_aianalysistemplate_aianalysis')
+                """)
+                result = cursor.fetchone()
+                if result:
+                    applied = result[0]
+                    
+                    if applied == '0003_aianalysistemplate_aianalysis':
+                        # 0003 is applied but not 0002 - fake apply 0002
+                        self.stdout.write('  📝 Marking reports.0002 as applied (fake)...')
+                        cursor.execute("""
+                            INSERT INTO django_migrations (app, name, applied) 
+                            VALUES ('reports', '0002_alter_aianalysis_options_and_more', NOW())
+                            ON CONFLICT DO NOTHING
+                        """)
+                        self.stdout.write(self.style.SUCCESS('  ✅ Fixed migration order'))
+                        
+        except Exception as e:
+            self.stdout.write(f'  ⚠️ Could not fix migration inconsistency: {e}')
+
     def handle(self, *args, **options):
         self.stdout.write('🔍 Checking database state...')
         
@@ -37,6 +75,9 @@ class Command(BaseCommand):
                     raise
             else:
                 self.stdout.write(self.style.SUCCESS('✅ django_migrations table exists'))
+                
+                # Fix any migration inconsistencies first
+                self.fix_inconsistent_migrations(cursor)
                 
                 # Check specific critical tables
                 critical_tables = {

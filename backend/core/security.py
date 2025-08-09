@@ -24,9 +24,24 @@ logger = logging.getLogger(__name__)
 def get_jwt_keys_path() -> Tuple[Path, Path]:
     """Get paths for JWT private and public keys"""
     # Use BASE_DIR directly from __file__ to avoid settings import issues
-    base_dir = Path(__file__).resolve().parent.parent.parent
-    keys_dir = base_dir / 'keys'
-    keys_dir.mkdir(exist_ok=True, mode=0o700)  # Secure permissions
+    base_dir = Path(__file__).resolve().parent.parent  # This is backend/
+    
+    # Try to create keys directory in a writable location
+    # In production (Railway), we'll use the app directory
+    # Check if we're in a container/production environment
+    if os.environ.get('RAILWAY_ENVIRONMENT') or not os.access('/tmp', os.W_OK):
+        # Use app directory for keys (writable in Railway)
+        keys_dir = base_dir / 'core' / 'keys'
+    else:
+        # Use /tmp for local development (always writable)
+        keys_dir = Path('/tmp') / 'finance_hub_keys'
+    
+    try:
+        keys_dir.mkdir(exist_ok=True, mode=0o700, parents=True)  # Secure permissions
+    except PermissionError:
+        # Fallback to app directory if /tmp is not writable
+        keys_dir = base_dir / 'core' / 'keys'
+        keys_dir.mkdir(exist_ok=True, mode=0o700, parents=True)
     
     private_key_path = keys_dir / 'jwt_private.pem'
     public_key_path = keys_dir / 'jwt_public.pem'
@@ -90,18 +105,28 @@ def load_jwt_keys() -> Tuple[str, str]:
         return private_key_env, public_key_env
     
     # Try loading from files
-    private_key_path, public_key_path = get_jwt_keys_path()
-    
-    if private_key_path.exists() and public_key_path.exists():
-        logger.info("Using JWT keys from file system")
-        private_key = private_key_path.read_text()
-        public_key = public_key_path.read_text()
-        return private_key, public_key
+    try:
+        private_key_path, public_key_path = get_jwt_keys_path()
+        
+        if private_key_path.exists() and public_key_path.exists():
+            logger.info(f"Using JWT keys from file system: {private_key_path.parent}")
+            private_key = private_key_path.read_text()
+            public_key = public_key_path.read_text()
+            return private_key, public_key
+    except Exception as e:
+        logger.warning(f"Could not access JWT key files: {e}")
     
     # Generate new keys if none exist
     logger.warning("No JWT keys found, generating new keypair")
     private_key, public_key = generate_jwt_keypair()
-    save_jwt_keys(private_key, public_key)
+    
+    # Try to save the keys, but don't fail if we can't
+    try:
+        save_jwt_keys(private_key, public_key)
+    except Exception as e:
+        logger.warning(f"Could not save JWT keys to disk (using in-memory only): {e}")
+        # In production, you should set JWT_PRIVATE_KEY and JWT_PUBLIC_KEY env vars
+        logger.warning("IMPORTANT: Set JWT_PRIVATE_KEY and JWT_PUBLIC_KEY environment variables for production!")
     
     return private_key, public_key
 
@@ -113,6 +138,11 @@ def get_jwt_private_key() -> str:
         return private_key
     except Exception as e:
         logger.error(f"Failed to load JWT private key: {e}")
+        # In development/testing, generate a temporary key
+        if settings.DEBUG or os.environ.get('DJANGO_SETTINGS_MODULE', '').endswith('.development'):
+            logger.warning("Generating temporary JWT key for development")
+            private_key, _ = generate_jwt_keypair()
+            return private_key
         raise ValueError("JWT private key configuration is invalid")
 
 
@@ -123,6 +153,11 @@ def get_jwt_public_key() -> str:
         return public_key
     except Exception as e:
         logger.error(f"Failed to load JWT public key: {e}")
+        # In development/testing, generate a temporary key
+        if settings.DEBUG or os.environ.get('DJANGO_SETTINGS_MODULE', '').endswith('.development'):
+            logger.warning("Generating temporary JWT key for development")
+            _, public_key = generate_jwt_keypair()
+            return public_key
         raise ValueError("JWT public key configuration is invalid")
 
 
