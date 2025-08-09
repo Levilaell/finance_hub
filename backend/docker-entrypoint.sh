@@ -27,7 +27,13 @@ fi
 # Run migrations in correct order to handle dependencies
 echo "Running migrations..."
 
-# Try to fix any migration inconsistencies first
+# First, try the emergency fix script if it exists
+if [ -f "/app/fix_database.py" ]; then
+    echo "🔧 Running emergency database fix..."
+    python /app/fix_database.py || echo "⚠️ Fix script had issues but continuing..."
+fi
+
+# Try to fix any migration inconsistencies first (if command exists)
 python manage.py fix_migrations 2>/dev/null || true
 
 # Try normal migration process
@@ -44,11 +50,17 @@ python manage.py migrate --noinput 2>&1 | tee /tmp/migrate.log || {
         # Try migrate again
         python manage.py migrate --noinput || {
             echo "⚠️ Still failing, ensuring critical tables exist..."
-            python manage.py ensure_critical_tables || true
+            python manage.py ensure_critical_tables 2>/dev/null || {
+                # If the command doesn't exist, run fix_database.py again
+                [ -f "/app/fix_database.py" ] && python /app/fix_database.py || true
+            }
         }
     else
         echo "⚠️ Other migration error, ensuring critical tables exist..."
-        python manage.py ensure_critical_tables || true
+        python manage.py ensure_critical_tables 2>/dev/null || {
+            # If the command doesn't exist, run fix_database.py
+            [ -f "/app/fix_database.py" ] && python /app/fix_database.py || true
+        }
     fi
 }
 

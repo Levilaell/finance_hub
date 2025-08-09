@@ -26,6 +26,9 @@ RUN pip install -r requirements.txt
 # Copy project
 COPY . /app/
 
+# Make scripts executable
+RUN chmod +x /app/startup.sh /app/fix_database.py 2>/dev/null || true
+
 # Create necessary directories
 RUN mkdir -p /app/staticfiles /app/media /app/logs /keys
 
