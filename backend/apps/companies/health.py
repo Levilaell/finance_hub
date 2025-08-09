@@ -30,9 +30,14 @@ def health_check(request):
         env_warnings.append("DJANGO_SECRET_KEY not set - using temporary key")
         warnings.append("DJANGO_SECRET_KEY environment variable must be set in Railway")
     
-    if not os.environ.get('DATABASE_URL'):
+    db_url = os.environ.get('DATABASE_URL', '')
+    if not db_url:
         env_warnings.append("DATABASE_URL not configured")
         warnings.append("DATABASE_URL environment variable must be set in Railway")
+    elif '{{' in db_url:
+        env_warnings.append("DATABASE_URL contains unresolved Railway template variables")
+        warnings.append(f"DATABASE_URL has unresolved template: {db_url[:50]}...")
+        warnings.append("Fix: In Railway dashboard, use the reference button to link to your database service")
     
     if env_warnings:
         checks["configuration"] = "incomplete"

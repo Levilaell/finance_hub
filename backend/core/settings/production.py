@@ -38,14 +38,24 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 import dj_database_url
 
 DATABASE_URL = os.environ.get('DATABASE_URL', None)
+
+# Check if DATABASE_URL contains unresolved Railway template variables
+if DATABASE_URL and '{{' in DATABASE_URL:
+    print("ERROR: DATABASE_URL contains unresolved Railway template variables!")
+    print(f"Current value: {DATABASE_URL}")
+    print("This usually means the reference variable isn't configured correctly.")
+    print("Please check Railway dashboard and ensure the database service reference is set properly.")
+    DATABASE_URL = None
+
 if not DATABASE_URL:
     # Check if this is during collectstatic
     if os.environ.get('DJANGO_COLLECT_STATIC') == '1':
         DATABASE_URL = 'postgres://dummy:dummy@dummy:5432/dummy'
     else:
-        print("WARNING: DATABASE_URL environment variable is not set!")
+        print("WARNING: DATABASE_URL environment variable is not set or invalid!")
         print("Using a dummy database URL - database operations will fail.")
         print("Please set DATABASE_URL in Railway dashboard.")
+        print("Use the reference button to link to your database service.")
         DATABASE_URL = 'postgres://dummy:dummy@localhost:5432/dummy'
 
 DATABASES = {
