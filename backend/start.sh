@@ -1,5 +1,5 @@
 #!/bin/bash
-# Startup script for production deployment with better error handling
+# Startup script for production deployment with comprehensive fixes
 
 echo "🚀 Starting Finance Hub Backend..."
 
@@ -30,6 +30,12 @@ for i in {1..30}; do
     fi
     sleep 1
 done
+
+# CRITICAL: Apply authentication migrations first to create users table
+echo "🔧 Ensuring users table exists..."
+python manage.py migrate contenttypes --no-input 2>/dev/null || true
+python manage.py migrate auth --no-input 2>/dev/null || true
+python manage.py migrate authentication --no-input 2>/dev/null || true
 
 # Handle inconsistent migration history (for reports and companies apps)
 echo "🔧 Checking for migration inconsistencies..."
@@ -123,6 +129,17 @@ MIGRATION_OUTPUT=$(python manage.py migrate --no-input 2>&1) || {
             echo "⚠️  Still couldn't run migrations, but continuing..."
             echo "⚠️  The application may not work properly!"
         }
+    elif echo "$MIGRATION_OUTPUT" | grep -q "relation \"users\" does not exist"; then
+        echo "🔧 Users table missing, trying to create it..."
+        
+        # Force creation of auth tables
+        python manage.py migrate contenttypes --no-input --run-syncdb 2>/dev/null || true
+        python manage.py migrate auth --no-input --run-syncdb 2>/dev/null || true
+        python manage.py migrate authentication --no-input --run-syncdb 2>/dev/null || true
+        
+        # Retry migrations
+        echo "🔄 Retrying migrations after creating users table..."
+        python manage.py migrate --no-input || echo "⚠️  Still having issues, but continuing..."
     else
         echo "⚠️  Could not run migrations, but continuing..."
     fi
