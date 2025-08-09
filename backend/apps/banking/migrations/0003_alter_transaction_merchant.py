@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('banking', '0002_bankaccount_balance_in_account_currency_and_more'),
+        ('banking', '0002_add_consent_model'),
     ]
 
     operations = [

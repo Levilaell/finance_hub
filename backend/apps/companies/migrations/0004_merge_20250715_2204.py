@@ -6,8 +6,8 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('companies', '0002_subscriptionplan_trial_days_and_more'),
-        ('companies', '0003_remove_free_plan'),
+        ('companies', '0002_auto_simplify'),
+        ('companies', '0003_consolidate_subscriptions'),
     ]
 
     operations = [

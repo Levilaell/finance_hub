@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('companies', '0006_remove_max_users_field'),
-        ('reports', '0002_delete_reportschedule'),
+        ('reports', '0002_alter_aianalysis_options_and_more'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

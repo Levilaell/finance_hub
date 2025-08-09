@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('companies', '0004_simplify_company_model'),
+        ('companies', '0005_resourceusage'),
         ('companies', '0008_company_companies_subscri_f72d81_idx_and_more'),
     ]
 

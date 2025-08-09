@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('companies', '0010_add_ai_credits_balance'),
+        ('companies', '0011_merge_fixup'),
     ]
 
     operations = [
