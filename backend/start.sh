@@ -31,11 +31,14 @@ for i in {1..30}; do
     sleep 1
 done
 
-# CRITICAL: Apply authentication migrations first to create users table
+# CRITICAL: Force creation of users table if it doesn't exist
 echo "🔧 Ensuring users table exists..."
-python manage.py migrate contenttypes --no-input 2>/dev/null || true
-python manage.py migrate auth --no-input 2>/dev/null || true
-python manage.py migrate authentication --no-input 2>/dev/null || true
+python create_users_table.py || {
+    echo "⚠️  Could not create users table with script, trying migrations..."
+    python manage.py migrate contenttypes --no-input 2>/dev/null || true
+    python manage.py migrate auth --no-input 2>/dev/null || true
+    python manage.py migrate authentication --no-input 2>/dev/null || true
+}
 
 # Handle inconsistent migration history (for reports and companies apps)
 echo "🔧 Checking for migration inconsistencies..."
@@ -132,10 +135,24 @@ MIGRATION_OUTPUT=$(python manage.py migrate --no-input 2>&1) || {
     elif echo "$MIGRATION_OUTPUT" | grep -q "relation \"users\" does not exist"; then
         echo "🔧 Users table missing, trying to create it..."
         
-        # Force creation of auth tables
-        python manage.py migrate contenttypes --no-input --run-syncdb 2>/dev/null || true
-        python manage.py migrate auth --no-input --run-syncdb 2>/dev/null || true
-        python manage.py migrate authentication --no-input --run-syncdb 2>/dev/null || true
+        # Try to create with our script
+        python create_users_table.py || {
+            # If that fails, try with Django
+            python manage.py migrate contenttypes --no-input --run-syncdb 2>/dev/null || true
+            python manage.py migrate auth --no-input --run-syncdb 2>/dev/null || true
+            python manage.py migrate authentication --no-input --run-syncdb 2>/dev/null || true
+        }
+        
+        # Reset ai_insights migration if it's the problem
+        echo "🔧 Resetting ai_insights migration to retry..."
+        python -c "
+import django
+django.setup()
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute(\"DELETE FROM django_migrations WHERE app = 'ai_insights' AND name = '0001_initial'\")
+    print('Removed ai_insights 0001_initial from migration history')
+" 2>/dev/null || true
         
         # Retry migrations
         echo "🔄 Retrying migrations after creating users table..."
