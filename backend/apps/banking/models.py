@@ -3,6 +3,7 @@ Banking and financial transaction models - Pluggy Integration
 Following Pluggy's official documentation structure
 """
 import uuid
+import logging
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -13,6 +14,7 @@ from django.utils.translation import gettext_lazy as _
 from .managers import ActiveTransactionManager
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class PluggyConnector(models.Model):
@@ -122,7 +124,8 @@ class PluggyItem(models.Model):
     products = models.JSONField(_('products'), default=list, blank=True)  # ['ACCOUNTS', 'TRANSACTIONS', etc]
     
     # MFA parameter for waiting user input
-    parameter = models.JSONField(_('parameter'), default=dict, blank=True)  # For MFA responses
+    parameter = models.JSONField(_('parameter'), default=dict, blank=True)  # For MFA responses - DEPRECATED, use encrypted_parameter
+    encrypted_parameter = models.TextField(_('encrypted parameter'), blank=True, default='')  # Encrypted MFA parameters
     
     # Status tracking
     status = models.CharField(
@@ -174,6 +177,69 @@ class PluggyItem(models.Model):
     
     def __str__(self):
         return f"{self.connector.name} - {self.pluggy_item_id}"
+    
+    def get_mfa_parameter(self):
+        """
+        Get decrypted MFA parameter
+        Returns the decrypted parameter or falls back to unencrypted if needed
+        """
+        from apps.banking.utils.encryption import banking_encryption
+        
+        # First try encrypted parameter
+        if self.encrypted_parameter:
+            try:
+                return banking_encryption.decrypt_mfa_parameter(self.encrypted_parameter)
+            except Exception as e:
+                logger.error(f"Failed to decrypt parameter for item {self.pluggy_item_id}: {e}")
+        
+        # Fall back to unencrypted parameter for backward compatibility
+        if self.parameter:
+            return self.parameter
+        
+        return {}
+    
+    def set_mfa_parameter(self, parameter_data):
+        """
+        Set and encrypt MFA parameter
+        
+        Args:
+            parameter_data: Dictionary with MFA parameter information
+        """
+        from apps.banking.utils.encryption import banking_encryption
+        
+        if not parameter_data:
+            self.encrypted_parameter = ''
+            self.parameter = {}
+            return
+        
+        try:
+            # Encrypt the parameter
+            self.encrypted_parameter = banking_encryption.encrypt_mfa_parameter(parameter_data)
+            # Clear the unencrypted field for security
+            self.parameter = {}
+        except Exception as e:
+            logger.error(f"Failed to encrypt parameter for item {self.pluggy_item_id}: {e}")
+            # Fallback to unencrypted (not recommended but prevents breaking)
+            self.parameter = parameter_data
+            self.encrypted_parameter = ''
+    
+    def clear_mfa_parameter(self):
+        """Clear both encrypted and unencrypted MFA parameters"""
+        self.encrypted_parameter = ''
+        self.parameter = {}
+    
+    def save(self, *args, **kwargs):
+        """Override save to handle parameter migration"""
+        # Migrate unencrypted parameters to encrypted on save
+        if self.parameter and not self.encrypted_parameter:
+            from apps.banking.utils.encryption import banking_encryption
+            try:
+                self.encrypted_parameter = banking_encryption.encrypt_mfa_parameter(self.parameter)
+                self.parameter = {}  # Clear unencrypted after successful encryption
+            except Exception as e:
+                logger.warning(f"Could not migrate parameter to encrypted format: {e}")
+        
+        super().save(*args, **kwargs)
 
 
 class BankAccount(models.Model):

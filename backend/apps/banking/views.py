@@ -210,8 +210,8 @@ class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
                 'message': 'Item does not require MFA input'
             })
         
-        # Get parameter details from item
-        parameter_info = item.parameter if item.parameter else {}
+        # Get parameter details from item (decrypted)
+        parameter_info = item.get_mfa_parameter()
         
         return Response({
             'requires_mfa': True,
@@ -253,10 +253,11 @@ class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Get parameter name from item
+        # Get parameter name from item (decrypted)
         parameter_name = 'token'  # default
-        if item.parameter and 'name' in item.parameter:
-            parameter_name = item.parameter['name']
+        parameter_info = item.get_mfa_parameter()
+        if parameter_info and 'name' in parameter_info:
+            parameter_name = parameter_info['name']
         
         try:
             with PluggyClient() as client:
@@ -280,7 +281,7 @@ class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
                     
                     # Clear parameter if MFA was accepted
                     if item.status != 'WAITING_USER_INPUT':
-                        item.parameter = {}
+                        item.clear_mfa_parameter()
                     
                     item.save()
                     
@@ -379,34 +380,88 @@ class BankAccountViewSet(CompanyAccessMixin, viewsets.ReadOnlyModelViewSet):
         account = self.get_object()
         
         try:
-            # Check item status
-            if account.item.status in ['LOGIN_ERROR', 'INVALID_CREDENTIALS']:
+            # First, get the latest item status from Pluggy API
+            # This is crucial for local development where webhooks don't arrive
+            with PluggyClient() as client:
+                try:
+                    logger.info(f"Fetching latest status for item {account.item.pluggy_item_id}")
+                    item_data = client.get_item(account.item.pluggy_item_id)
+                    
+                    # Update local item with latest status from Pluggy
+                    old_status = account.item.status
+                    old_execution = account.item.execution_status
+                    
+                    account.item.status = item_data.get('status', account.item.status)
+                    account.item.execution_status = item_data.get('executionStatus', '')
+                    account.item.error_code = item_data.get('error', {}).get('code', '')
+                    account.item.error_message = item_data.get('error', {}).get('message', '')
+                    account.item.pluggy_updated_at = item_data.get('updatedAt', account.item.pluggy_updated_at)
+                    account.item.save()
+                    
+                    logger.info(f"Item status updated: {old_status}/{old_execution} -> {account.item.status}/{account.item.execution_status}")
+                    
+                    # Check for USER_INPUT_TIMEOUT in executionStatus or error code
+                    if account.item.execution_status == 'USER_INPUT_TIMEOUT' or account.item.error_code == 'USER_INPUT_TIMEOUT':
+                        logger.warning(f"Item {account.item.pluggy_item_id} has USER_INPUT_TIMEOUT - reconnection required")
+                        return Response({
+                            'success': False,
+                            'error_code': 'AUTHENTICATION_TIMEOUT',
+                            'message': 'Timeout de autenticação. O banco solicitou verificação adicional mas o tempo expirou.',
+                            'reconnection_required': True,
+                            'details': 'Por favor, reconecte sua conta e insira o código de verificação em até 60 segundos.',
+                            'item_status': account.item.status,
+                            'execution_status': account.item.execution_status
+                        }, status=status.HTTP_400_BAD_REQUEST)
+                    
+                except PluggyError as e:
+                    logger.warning(f"Could not fetch latest item status: {e}")
+                    # Continue with cached status if API call fails
+            
+            # Check item status after update
+            if account.item.status in ['LOGIN_ERROR', 'INVALID_CREDENTIALS', 'ERROR']:
+                error_msg = account.item.error_message or 'Invalid credentials or connection error.'
                 return Response({
                     'success': False,
                     'error_code': 'LOGIN_ERROR',
-                    'message': 'Invalid credentials. Please reconnect the account.',
-                    'reconnection_required': True
+                    'message': f'{error_msg} Please reconnect the account.',
+                    'reconnection_required': True,
+                    'item_status': account.item.status,
+                    'error_details': account.item.error_code
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             if account.item.status == 'WAITING_USER_INPUT':
                 return Response({
                     'success': False,
                     'error_code': 'MFA_REQUIRED',
-                    'message': 'Additional authentication required.',
-                    'reconnection_required': True
+                    'message': 'Autenticação adicional necessária. Reconecte para inserir o código de verificação.',
+                    'reconnection_required': True,
+                    'item_status': account.item.status
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # First, trigger an update via Pluggy API for manual sync
+            if account.item.status == 'OUTDATED':
+                # OUTDATED usually means there was an error, check executionStatus
+                return Response({
+                    'success': False,
+                    'error_code': 'OUTDATED_CONNECTION',
+                    'message': 'Conexão desatualizada. Por favor, reconecte sua conta bancária.',
+                    'reconnection_required': True,
+                    'item_status': account.item.status,
+                    'execution_status': account.item.execution_status
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Now trigger an update via Pluggy API for manual sync
             with PluggyClient() as client:
                 try:
                     logger.info(f"Triggering manual update for item {account.item.pluggy_item_id}")
                     update_response = client.update_item(account.item.pluggy_item_id, {})
                     
-                    # Update item status
+                    # Update item status again after triggering update
                     account.item.status = update_response.get('status', account.item.status)
                     account.item.execution_status = update_response.get('executionStatus', '')
                     account.item.pluggy_updated_at = update_response.get('updatedAt', account.item.pluggy_updated_at)
                     account.item.save()
+                    
+                    logger.info(f"Update triggered, new status: {account.item.status}/{account.item.execution_status}")
                     
                 except PluggyError as e:
                     logger.warning(f"Failed to trigger Pluggy update: {e}")

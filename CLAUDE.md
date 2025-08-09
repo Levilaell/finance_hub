@@ -310,6 +310,102 @@ python manage.py migrate notifications 0003_cleanup_old_fields
 - `backend/apps/notifications/migrations/0002_add_event_key.py` - Adiciona campos novos
 - `backend/apps/notifications/migrations/0003_cleanup_old_fields.py` - Remove campos antigos
 
+### 10. Erro de Sincronização - USER_INPUT_TIMEOUT em Ambiente Local
+
+#### Problema
+- **Sintoma**: Transações não sincronizam após MFA timeout do banco
+- **Erro**: Item entra em `USER_INPUT_TIMEOUT` após 60 segundos esperando código de verificação
+- **Causa Raiz**: Webhooks configurados para produção não chegam em localhost
+- **Dashboard Pluggy**: Múltiplos eventos `item/waiting_user_action` seguidos de `item/error` com USER_INPUT_TIMEOUT
+
+#### Análise Detalhada
+1. **Ambiente Local sem Webhooks**:
+   - Webhooks configurados: `https://seu-backend.railway.app/api/banking/webhooks/pluggy/`
+   - Servidor local não recebe notificações de mudança de status
+   - Sistema não detecta que item entrou em timeout
+
+2. **Fluxo do Problema**:
+   - Banco solicita autenticação adicional (MFA)
+   - Pluggy envia webhook `item/waiting_user_action` (não recebido localmente)
+   - Após 60 segundos sem resposta: `USER_INPUT_TIMEOUT`
+   - Sistema local tenta sincronizar sem saber do timeout
+   - API retorna apenas transações antigas, não as novas
+
+#### Solução Aplicada
+- **Arquivo**: `backend/apps/banking/views.py` - método `sync()`
+- **Alteração**: Buscar status real do item antes de sincronizar
+- **Verificações adicionadas**:
+  - Fetch item status da API Pluggy antes de sincronizar
+  - Detecta `USER_INPUT_TIMEOUT` no executionStatus
+  - Retorna erro claro solicitando reconexão
+  
+- **Arquivo**: `backend/apps/banking/tasks.py` - método `_sync_account()`
+- **Alteração**: Verificação de status antes de sincronizar transações
+
+#### Soluções para Desenvolvimento Local
+
+**Opção 1: Usar ngrok (Recomendado)**
+```bash
+# Instalar ngrok
+brew install ngrok  # macOS
+# ou baixar de https://ngrok.com
+
+# Expor servidor local
+ngrok http 8000
+
+# Usar URL gerada no Pluggy Dashboard
+# Ex: https://abc123.ngrok.io/api/banking/webhooks/pluggy/
+```
+
+**Opção 2: Polling Manual**
+- Sistema agora verifica status real do item antes de cada sync
+- Detecta timeouts mesmo sem receber webhooks
+
+**Opção 3: Ambiente de Staging**
+- Deploy em ambiente de desenvolvimento com URL pública
+- Configurar webhooks para esse ambiente
+
+#### Comandos de Teste
+```bash
+# Testar sincronização
+curl -X POST http://localhost:8000/api/banking/accounts/{account-id}/sync/
+
+# Resposta esperada para timeout:
+{
+  "success": false,
+  "error_code": "AUTHENTICATION_TIMEOUT",
+  "message": "Timeout de autenticação. O banco solicitou verificação adicional mas o tempo expirou.",
+  "reconnection_required": true,
+  "details": "Por favor, reconecte sua conta e insira o código de verificação em até 60 segundos."
+}
+```
+
+#### Arquivos Modificados
+- `backend/apps/banking/views.py` - Verificação de status antes de sync
+- `backend/apps/banking/tasks.py` - Verificação em _sync_account()
+
+### 10. Correções de Alta Prioridade Pluggy (Bugs Críticos e Segurança)
+
+#### Bugs Críticos Corrigidos
+1. **Bug de Paginação** - Faltava `page += 1` no loop de sincronização de transações (linha 416 em tasks.py)
+2. **Idempotência de Webhooks** - Implementado sistema de event_id para prevenir duplicação (linhas 613-661 em tasks.py)
+3. **Timeout Configurável** - API timeout agora configurável via settings (linha 33 em client.py)
+
+#### Segurança - Criptografia de Parâmetros MFA
+- **Problema**: Códigos MFA (2FA) eram armazenados em texto plano no campo `parameter`
+- **Solução**: Implementado sistema de criptografia completo
+  - Novo campo `encrypted_parameter` no modelo PluggyItem
+  - Utiliza criptografia Fernet com chave derivada do SECRET_KEY
+  - Métodos `get_mfa_parameter()` e `set_mfa_parameter()` para transparência
+  - Migração automática de dados existentes
+  - Compatibilidade retroativa mantida
+- **Arquivos Modificados**:
+  - `apps/banking/models.py` - Adicionado campo encrypted_parameter e métodos
+  - `apps/banking/views.py` - Atualizado para usar métodos criptografados
+  - `apps/banking/tasks.py` - Atualizado para usar métodos criptografados
+  - `apps/banking/utils/encryption.py` - Criado serviço de criptografia
+  - `apps/banking/migrations/0010_add_encrypted_parameter.py` - Migração aplicada
+
 ### Próximos Passos
 
 - ✅ Módulo de Relatórios corrigido
@@ -322,9 +418,12 @@ python manage.py migrate notifications 0003_cleanup_old_fields
 - ✅ Sincronização de transações sem Celery/Redis (fallback síncrono implementado)
 - ✅ **Erro de sincronização de transações DEFINITIVAMENTE RESOLVIDO** (migrações aplicadas, tabela limpa)
 - ✅ **Banco de dados consistente** (campos obsoletos removidos, modelo atualizado)
+- ✅ **USER_INPUT_TIMEOUT em ambiente local** (verificação de status implementada)
+- ✅ **Segurança MFA** - Parâmetros MFA agora criptografados no banco de dados
+- **Para desenvolvimento local**: Considerar usar ngrok para receber webhooks
 - **Importante**: Servidor backend reiniciado e funcionando
 - **Opcional mas recomendado**: Iniciar Redis para melhor performance (`redis-server`)
 - **Opcional**: Iniciar Celery worker para processamento assíncrono (`celery -A core worker -l info`)
-- Testar sincronização novamente para verificar se transações são salvas corretamente
-- Executar testes de integração para garantir estabilidade
+- Reconectar conta bancária e inserir código MFA em até 60 segundos
+- Testar sincronização após reconexão bem-sucedida
 - Considerar script para popular connectors do Pluggy no banco

@@ -221,6 +221,43 @@ def _sync_account(client: PluggyClient, account: BankAccount) -> Dict:
     try:
         logger.info(f"Syncing account {account.pluggy_account_id}")
         
+        # First check if item is in a syncable state
+        try:
+            item_data = client.get_item(account.item.pluggy_item_id)
+            item_status = item_data.get('status')
+            execution_status = item_data.get('executionStatus', '')
+            error_code = item_data.get('error', {}).get('code', '')
+            
+            # Update item status
+            account.item.status = item_status
+            account.item.execution_status = execution_status
+            account.item.error_code = error_code
+            account.item.save()
+            
+            # Check for timeout or errors that prevent sync
+            if execution_status == 'USER_INPUT_TIMEOUT' or error_code == 'USER_INPUT_TIMEOUT':
+                logger.warning(f"Cannot sync account {account.pluggy_account_id} - item has USER_INPUT_TIMEOUT")
+                return {
+                    'success': False,
+                    'account_id': str(account.id),
+                    'error': 'Authentication timeout - reconnection required',
+                    'error_code': 'USER_INPUT_TIMEOUT',
+                    'reconnection_required': True
+                }
+            
+            if item_status in ['LOGIN_ERROR', 'INVALID_CREDENTIALS', 'ERROR', 'OUTDATED']:
+                logger.warning(f"Cannot sync account {account.pluggy_account_id} - item status: {item_status}")
+                return {
+                    'success': False,
+                    'account_id': str(account.id),
+                    'error': f'Item in error state: {item_status}',
+                    'reconnection_required': True
+                }
+                
+        except Exception as e:
+            logger.warning(f"Could not check item status: {e}")
+            # Continue with sync attempt
+        
         # Update account info
         account_data = client.get_account(account.pluggy_account_id)
         
@@ -374,7 +411,8 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
             # Check if more pages
             if page >= result.get('totalPages', 1):
                 break
-                
+            
+            # Move to next page
             page += 1
             
         except Exception as e:
@@ -574,6 +612,28 @@ def process_webhook_event(event_type: str, event_data: Dict):
     """
     try:
         logger.info(f"Processing webhook event: {event_type}")
+        
+        # Extract event ID for idempotency
+        event_id = event_data.get('eventId', '')
+        if not event_id:
+            # Generate a deterministic event_id from the payload for webhooks without eventId
+            import hashlib
+            import json
+            payload_str = json.dumps(event_data, sort_keys=True)
+            event_id = hashlib.sha256(f"{event_type}:{payload_str}".encode()).hexdigest()[:32]
+            logger.warning(f"No eventId in webhook, generated: {event_id}")
+        
+        # Check for idempotency - if already processed, skip
+        existing_webhook = ItemWebhook.objects.filter(
+            event_id=event_id,
+            event_type=event_type,
+            processed=True
+        ).first()
+        
+        if existing_webhook:
+            logger.info(f"Webhook {event_id} already processed at {existing_webhook.processed_at}, skipping")
+            return {'status': 'already_processed', 'event_id': event_id}
+        
         logger.info(f"Event data: {event_data}")
         
         # Get item ID based on event type
@@ -585,11 +645,20 @@ def process_webhook_event(event_type: str, event_data: Dict):
             logger.error(f"No item ID in webhook data for event {event_type}: {event_data}")
             return
         
-        # Webhook already saved in the view, just update processing status
-        webhook = ItemWebhook.objects.filter(
-            event_id=event_data.get('eventId', ''),
-            event_type=event_type
-        ).first()
+        # Get or create webhook record for processing
+        webhook, created = ItemWebhook.objects.get_or_create(
+            event_id=event_id,
+            event_type=event_type,
+            defaults={
+                'item_id': item_id if item_id else None,
+                'payload': event_data,
+                'processed': False
+            }
+        )
+        
+        if not created and webhook.processed:
+            logger.info(f"Webhook {event_id} already processed, skipping duplicate")
+            return {'status': 'already_processed', 'event_id': event_id}
         
         try:
             # Process based on event type - according to Pluggy documentation
@@ -660,7 +729,7 @@ def _handle_item_updated(data: Dict):
                 
                 # Update additional fields if available
                 if 'parameter' in item_data:
-                    item.parameter = item_data['parameter']
+                    item.set_mfa_parameter(item_data['parameter'])
                 if 'webhookUrl' in item_data:
                     item.webhook_url = item_data['webhookUrl']
                     
@@ -769,20 +838,21 @@ def _handle_item_waiting_input(data: Dict):
         
         # Extract parameter information from webhook data
         if 'parameter' in data:
-            item.parameter = data['parameter']
+            item.set_mfa_parameter(data['parameter'])
             logger.info(f"Item {item.pluggy_item_id} requires parameter: {data['parameter'].get('name', 'unknown')}")
         elif 'data' in data and 'parameter' in data['data']:
-            item.parameter = data['data']['parameter']
+            item.set_mfa_parameter(data['data']['parameter'])
             logger.info(f"Item {item.pluggy_item_id} requires parameter: {data['data']['parameter'].get('name', 'unknown')}")
         else:
             # Default parameter for MFA
-            item.parameter = {
+            default_param = {
                 'name': 'token',
                 'type': 'text',
                 'label': 'Código de verificação',
                 'placeholder': 'Digite o código recebido',
                 'assistiveText': 'Verifique seu aplicativo bancário ou SMS'
             }
+            item.set_mfa_parameter(default_param)
             logger.warning(f"No parameter info in webhook, using default token parameter")
         
         item.save()

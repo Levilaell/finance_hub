@@ -29,7 +29,8 @@ class PluggyClient:
         self.base_url = settings.PLUGGY_BASE_URL
         self.use_sandbox = getattr(settings, 'PLUGGY_USE_SANDBOX', True)
         self.api_key = None
-        self.timeout = 30
+        # Configurable timeout with 30s default
+        self.timeout = getattr(settings, 'PLUGGY_API_TIMEOUT', 30)
         
         # Log configuration for debugging
         logger.info(f"Pluggy Client initialized - Base URL: {self.base_url}, Sandbox: {self.use_sandbox}")
