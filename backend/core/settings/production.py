@@ -131,7 +131,9 @@ else:
     MEDIA_URL = '/media/'
 
 # Security - Ajustado para Railway
-SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True').lower() in ('true', '1', 'yes')
+# Disable SSL redirect by default to avoid health check issues
+# Railway handles SSL termination at the edge
+SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() in ('true', '1', 'yes')
 SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'True').lower() in ('true', '1', 'yes')
 CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'True').lower() in ('true', '1', 'yes')
 SECURE_HSTS_SECONDS = 31536000

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Startup script for production deployment
+# Startup script for production deployment with better error handling
 
 echo "🚀 Starting Finance Hub Backend..."
 
@@ -31,15 +31,70 @@ for i in {1..30}; do
     sleep 1
 done
 
-# Ensure database is properly initialized
-echo "📊 Checking database..."
-python manage.py ensure_database || echo "⚠️  Database check had warnings but continuing..."
+# Handle inconsistent migration history (specific to reports app issue)
+echo "🔧 Checking for migration inconsistencies..."
+python -c "
+import django
+django.setup()
+from django.db import connection
 
-# Run migrations
+try:
+    with connection.cursor() as cursor:
+        # Check if we have the inconsistent migration state
+        cursor.execute('''
+            SELECT COUNT(*) FROM django_migrations 
+            WHERE app = 'reports' 
+            AND name = '0003_aianalysistemplate_aianalysis'
+        ''')
+        has_0003 = cursor.fetchone()[0] > 0
+        
+        cursor.execute('''
+            SELECT COUNT(*) FROM django_migrations 
+            WHERE app = 'reports' 
+            AND name = '0002_alter_aianalysis_options_and_more'
+        ''')
+        has_0002 = cursor.fetchone()[0] > 0
+        
+        if has_0003 and not has_0002:
+            print('⚠️  Detected inconsistent migration state in reports app')
+            print('🔧 Fixing by faking missing migration 0002...')
+            cursor.execute('''
+                INSERT INTO django_migrations (app, name, applied)
+                SELECT 'reports', '0002_alter_aianalysis_options_and_more', applied
+                FROM django_migrations
+                WHERE app = 'reports' AND name = '0003_aianalysistemplate_aianalysis'
+                LIMIT 1
+            ''')
+            print('✅ Migration history fixed!')
+except Exception as e:
+    print(f'⚠️  Could not check migration consistency: {e}')
+"
+
+# Run migrations with better error handling
 echo "🔄 Running migrations..."
-python manage.py migrate --no-input || {
-    echo "⚠️  Migration failed, trying to create initial schema..."
-    python manage.py migrate --run-syncdb --no-input || echo "⚠️  Could not run migrations, but continuing..."
+MIGRATION_OUTPUT=$(python manage.py migrate --no-input 2>&1) || {
+    echo "⚠️  Migration failed with error:"
+    echo "$MIGRATION_OUTPUT"
+    
+    # Check if it's the inconsistent history error
+    if echo "$MIGRATION_OUTPUT" | grep -q "InconsistentMigrationHistory"; then
+        echo "🔧 Attempting to fix inconsistent migration history..."
+        
+        # Try to fake the problematic migrations
+        python manage.py migrate reports 0001 --fake 2>/dev/null || true
+        python manage.py migrate reports 0002 --fake 2>/dev/null || true
+        python manage.py migrate reports 0003 --fake 2>/dev/null || true
+        python manage.py migrate reports 0004_merge_20250803_2225 --fake 2>/dev/null || true
+        
+        # Now try to run all migrations again
+        echo "🔄 Retrying migrations after fixes..."
+        python manage.py migrate --no-input || {
+            echo "⚠️  Still couldn't run migrations, but continuing..."
+            echo "⚠️  The application may not work properly!"
+        }
+    else
+        echo "⚠️  Could not run migrations, but continuing..."
+    fi
 }
 
 # Collect static files (don't fail if this errors)
