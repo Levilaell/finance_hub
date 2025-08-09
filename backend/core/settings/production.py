@@ -31,8 +31,20 @@ if not SECRET_KEY:
 # Debug mode - always False in production unless explicitly set
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-# Allowed hosts - default to all for now, but should be restricted
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+# Allowed hosts - Parse from environment and add Railway-specific hosts
+allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '*')
+if allowed_hosts_env == '*':
+    ALLOWED_HOSTS = ['*']
+else:
+    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()]
+
+# Always allow Railway health check host
+ALLOWED_HOSTS.extend([
+    'healthcheck.railway.app',  # Railway health check
+    '.railway.app',  # All Railway subdomains
+    'localhost',  # For local testing
+    '127.0.0.1',  # For local testing
+])
 
 # Database - Correção principal aqui!
 import dj_database_url
