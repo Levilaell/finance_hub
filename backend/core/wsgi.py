@@ -37,11 +37,44 @@ except Exception as e:
     
     # Create a minimal WSGI application that returns error info
     def application(environ, start_response):
-        status = '500 Internal Server Error'
-        response_headers = [('Content-Type', 'text/plain')]
-        start_response(status, response_headers)
-        error_message = f"Django startup failed: {str(e)}\n"
-        error_message += "Please check Railway logs for details.\n"
-        error_message += f"Missing DATABASE_URL: {not bool(os.environ.get('DATABASE_URL'))}\n"
-        error_message += f"Missing DJANGO_SECRET_KEY: {not bool(os.environ.get('DJANGO_SECRET_KEY'))}\n"
-        return [error_message.encode('utf-8')]
+        path = environ.get('PATH_INFO', '')
+        
+        # For health check endpoints, return JSON with error details
+        if path in ['/health/', '/api/health/']:
+            import json
+            status = '500 Internal Server Error'
+            response_data = {
+                "status": "initialization_failed",
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "message": "Django failed to initialize during WSGI startup",
+                "environment": {
+                    "DJANGO_SETTINGS_MODULE": os.environ.get('DJANGO_SETTINGS_MODULE', 'not set'),
+                    "DATABASE_URL": "configured" if os.environ.get('DATABASE_URL') else "missing",
+                    "DJANGO_SECRET_KEY": "configured" if os.environ.get('DJANGO_SECRET_KEY') else "missing",
+                    "OPENAI_API_KEY": "configured" if os.environ.get('OPENAI_API_KEY') else "missing",
+                    "DJANGO_ENV": os.environ.get('DJANGO_ENV', 'not set')
+                },
+                "traceback": traceback.format_exc()[-1500:]  # Last 1500 chars of traceback
+            }
+            
+            response_body = json.dumps(response_data, indent=2).encode('utf-8')
+            response_headers = [
+                ('Content-Type', 'application/json'),
+                ('Content-Length', str(len(response_body)))
+            ]
+            start_response(status, response_headers)
+            return [response_body]
+        else:
+            # For other paths, return HTML error
+            status = '500 Internal Server Error'
+            response_headers = [('Content-Type', 'text/html')]
+            start_response(status, response_headers)
+            error_html = f"""<html>
+<head><title>Internal Server Error</title></head>
+<body>
+<h1><p>Internal Server Error</p></h1>
+<p>Django initialization failed: {str(e)}</p>
+</body>
+</html>"""
+            return [error_html.encode('utf-8')]
