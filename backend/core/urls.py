@@ -84,8 +84,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('seed-plans-temp/', seed_plans_temp),
 
-    # Health check for deployment platforms
-    path('api/health/', health_check, name='health-check'),
+    # Health check for deployment platforms (multiple paths for compatibility)
+    path('health/', health_check, name='health-check'),
+    path('api/health/', health_check, name='api-health-check'),
     
     # API endpoints
     path('api/', api_root, name='api-root-detail'),

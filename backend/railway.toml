@@ -4,12 +4,11 @@ builder = "NIXPACKS"
 [deploy]
 startCommand = "./start.sh"
 healthcheckPath = "/health/"
-healthcheckTimeout = 30
+healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 3
+restartPolicyMaxRetries = 5
 
-[[deploy.preDeploy]]
-command = "python manage.py ensure_database"
+[deploy.environment]
+DJANGO_SETTINGS_MODULE = "core.settings.production"
 
-[[deploy.preDeploy]]
-command = "python manage.py migrate --no-input"
+# Pre-deploy commands are handled in start.sh for better control
