@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { billingService, PaymentMethod } from '@/services/billing.service';
-import paymentService from '@/services/payment.service';
+// import paymentService from '@/services/payment.service'; // DEPRECATED - removed
 import { subscriptionService } from '@/services/unified-subscription.service';
 import {
   Dialog,

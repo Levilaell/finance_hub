@@ -17,7 +17,12 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Lock, AlertCircle } from 'lucide-react';
-import { CreatePaymentMethodRequest } from '@/services/payment.service';
+// Type definition for payment method request
+interface CreatePaymentMethodRequest {
+  token: string;
+  cardholderName: string;
+  isDefault: boolean;
+}
 import { useTheme } from 'next-themes';
 
 // Initialize Stripe - this should come from environment variable

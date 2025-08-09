@@ -16,7 +16,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { subscriptionService, SubscriptionPlan } from '@/services/unified-subscription.service';
-import paymentService from '@/services/payment.service';
+// import paymentService from '@/services/payment.service'; // DEPRECATED - removed
 import { formatCurrency } from '@/utils/billing.utils';
 import { CheckIcon } from '@heroicons/react/24/outline';
 
