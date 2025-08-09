@@ -138,15 +138,17 @@ class OpenAIWrapper:
     
     def __init__(self):
         self.api_key = getattr(settings, 'OPENAI_API_KEY', None)
-        if not self.api_key:
-            raise ValueError("OPENAI_API_KEY not configured")
-        
-        openai.api_key = self.api_key
+        self._initialized = False
         self.circuit_breaker = CircuitBreaker()
         
         # Retry configuration
         self.max_retries = 3
         self.retry_delay = 1  # seconds
+        
+        # Initialize OpenAI if API key is available
+        if self.api_key:
+            openai.api_key = self.api_key
+            self._initialized = True
         self.timeout = 30  # seconds
         
         # Fallback responses
@@ -215,6 +217,11 @@ class OpenAIWrapper:
         request_type: str = 'general'
     ) -> Dict[str, Any]:
         """Create chat completion with error handling"""
+        
+        # Check if properly initialized
+        if not self._initialized:
+            logger.warning("OpenAI API key not configured, using fallback response")
+            return self._get_fallback_response(request_type)
         
         # Log request for monitoring (without sensitive data)
         logger.info(f"OpenAI request: model={model}, type={request_type}, messages={len(messages)}")
@@ -286,6 +293,15 @@ class OpenAIWrapper:
     
     def health_check(self) -> Dict[str, Any]:
         """Check OpenAI service health"""
+        # If not initialized, return unavailable status
+        if not self._initialized:
+            return {
+                'status': 'not_configured',
+                'api_available': False,
+                'message': 'OpenAI API key not configured',
+                'last_check': timezone.now().isoformat()
+            }
+        
         try:
             # Simple test request
             response = self.create_completion(
