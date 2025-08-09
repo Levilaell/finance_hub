@@ -211,7 +211,7 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'Strict'
-CSRF_USE_SESSIONS = True
+CSRF_USE_SESSIONS = False  # Changed to False - not needed with JWT authentication
 # CSRF_COOKIE_SECURE will be set in environment-specific settings
 CSRF_TRUSTED_ORIGINS = []  # Will be set in environment-specific settings
 
