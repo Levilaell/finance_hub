@@ -17,13 +17,8 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Lock, AlertCircle } from 'lucide-react';
-// Type definition for payment method request
-interface CreatePaymentMethodRequest {
-  token: string;
-  cardholderName: string;
-  isDefault: boolean;
-}
 import { useTheme } from 'next-themes';
+import type { CreatePaymentMethodRequest } from '@/services/unified-subscription.service';
 
 // Initialize Stripe - this should come from environment variable
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -131,8 +126,8 @@ function PaymentFormContent({ onSubmit, loading }: StripePaymentFormProps) {
         type: 'card',
         token: paymentMethod.id, // This is the Stripe payment method ID
         is_default: data.isDefault,
-        brand: paymentMethod.card?.brand || '',
-        last4: paymentMethod.card?.last4 || '',
+        brand: paymentMethod.card?.brand,
+        last4: paymentMethod.card?.last4,
         exp_month: paymentMethod.card?.exp_month,
         exp_year: paymentMethod.card?.exp_year,
       });
