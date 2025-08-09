@@ -48,6 +48,7 @@ LOCAL_APPS = [
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
+    'core.health_middleware.HealthCheckSSLBypassMiddleware',  # Must be first to bypass SSL redirect for health checks
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'core.security.SecurityHeadersMiddleware',  # Enhanced security headers

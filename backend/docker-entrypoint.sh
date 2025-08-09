@@ -27,20 +27,32 @@ fi
 # Run migrations in correct order to handle dependencies
 echo "Running migrations..."
 
-# First, migrate the core Django apps
-python manage.py migrate contenttypes --noinput || true
-python manage.py migrate auth --noinput || true
+# Try to fix any migration inconsistencies first
+python manage.py fix_migrations 2>/dev/null || true
 
-# Then our custom user model
-python manage.py migrate authentication --noinput || true
+# Try normal migration process
+python manage.py migrate --noinput 2>&1 | tee /tmp/migrate.log || {
+    echo "⚠️ Migration failed, checking error..."
+    
+    # Check if it's the inconsistent migration history error
+    if grep -q "InconsistentMigrationHistory" /tmp/migrate.log; then
+        echo "⚠️ Detected inconsistent migration history, attempting to fix..."
+        
+        # Try to fake the problematic migration
+        python manage.py migrate reports 0002 --fake --noinput 2>/dev/null || true
+        
+        # Try migrate again
+        python manage.py migrate --noinput || {
+            echo "⚠️ Still failing, ensuring critical tables exist..."
+            python manage.py ensure_critical_tables || true
+        }
+    else
+        echo "⚠️ Other migration error, ensuring critical tables exist..."
+        python manage.py ensure_critical_tables || true
+    fi
+}
 
-# Then companies (depends on authentication)
-python manage.py migrate companies --noinput || true
-
-# Then all other apps
-python manage.py migrate --noinput || true
-
-echo "Migrations completed"
+echo "Migration process completed (with possible warnings)"
 
 # Collect static files
 python manage.py collectstatic --noinput
