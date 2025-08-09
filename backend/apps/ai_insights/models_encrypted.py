@@ -2,9 +2,7 @@
 Encrypted field mixins for AI Insights models
 Provides transparent encryption/decryption for sensitive fields
 """
-import json
 from django.db import models
-from django.core.exceptions import ValidationError
 from .services.encryption_service import encryption_service
 
 

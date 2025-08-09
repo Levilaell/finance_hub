@@ -35,7 +35,6 @@ from .serializers import (
 )
 from .integrations.pluggy.client import PluggyClient, PluggyError
 from .tasks import sync_bank_account, process_webhook_event
-# from apps.companies.decorators import requires_plan_feature  # Not used with APIView
 from apps.companies.mixins import CompanyAccessMixin
 
 logger = logging.getLogger(__name__)
