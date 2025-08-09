@@ -31,7 +31,7 @@ for i in {1..30}; do
     sleep 1
 done
 
-# Handle inconsistent migration history (specific to reports app issue)
+# Handle inconsistent migration history (for reports and companies apps)
 echo "🔧 Checking for migration inconsistencies..."
 python -c "
 import django
@@ -40,22 +40,22 @@ from django.db import connection
 
 try:
     with connection.cursor() as cursor:
-        # Check if we have the inconsistent migration state
+        # Fix reports app issues
         cursor.execute('''
             SELECT COUNT(*) FROM django_migrations 
             WHERE app = 'reports' 
             AND name = '0003_aianalysistemplate_aianalysis'
         ''')
-        has_0003 = cursor.fetchone()[0] > 0
+        reports_has_0003 = cursor.fetchone()[0] > 0
         
         cursor.execute('''
             SELECT COUNT(*) FROM django_migrations 
             WHERE app = 'reports' 
             AND name = '0002_alter_aianalysis_options_and_more'
         ''')
-        has_0002 = cursor.fetchone()[0] > 0
+        reports_has_0002 = cursor.fetchone()[0] > 0
         
-        if has_0003 and not has_0002:
+        if reports_has_0003 and not reports_has_0002:
             print('⚠️  Detected inconsistent migration state in reports app')
             print('🔧 Fixing by faking missing migration 0002...')
             cursor.execute('''
@@ -65,7 +65,35 @@ try:
                 WHERE app = 'reports' AND name = '0003_aianalysistemplate_aianalysis'
                 LIMIT 1
             ''')
-            print('✅ Migration history fixed!')
+            print('✅ Reports migration history fixed!')
+        
+        # Fix companies app issues
+        cursor.execute('''
+            SELECT COUNT(*) FROM django_migrations 
+            WHERE app = 'companies' 
+            AND name = '0012_add_notification_fields'
+        ''')
+        companies_has_0012 = cursor.fetchone()[0] > 0
+        
+        cursor.execute('''
+            SELECT COUNT(*) FROM django_migrations 
+            WHERE app = 'companies' 
+            AND name = '0011_merge_fixup'
+        ''')
+        companies_has_0011 = cursor.fetchone()[0] > 0
+        
+        if companies_has_0012 and not companies_has_0011:
+            print('⚠️  Detected inconsistent migration state in companies app')
+            print('🔧 Fixing by faking missing migration 0011...')
+            cursor.execute('''
+                INSERT INTO django_migrations (app, name, applied)
+                SELECT 'companies', '0011_merge_fixup', applied
+                FROM django_migrations
+                WHERE app = 'companies' AND name = '0012_add_notification_fields'
+                LIMIT 1
+            ''')
+            print('✅ Companies migration history fixed!')
+            
 except Exception as e:
     print(f'⚠️  Could not check migration consistency: {e}')
 "
@@ -80,11 +108,14 @@ MIGRATION_OUTPUT=$(python manage.py migrate --no-input 2>&1) || {
     if echo "$MIGRATION_OUTPUT" | grep -q "InconsistentMigrationHistory"; then
         echo "🔧 Attempting to fix inconsistent migration history..."
         
-        # Try to fake the problematic migrations
+        # Try to fake the problematic migrations for both apps
         python manage.py migrate reports 0001 --fake 2>/dev/null || true
         python manage.py migrate reports 0002 --fake 2>/dev/null || true
         python manage.py migrate reports 0003 --fake 2>/dev/null || true
         python manage.py migrate reports 0004_merge_20250803_2225 --fake 2>/dev/null || true
+        python manage.py migrate companies 0010 --fake 2>/dev/null || true
+        python manage.py migrate companies 0011 --fake 2>/dev/null || true
+        python manage.py migrate companies 0012 --fake 2>/dev/null || true
         
         # Now try to run all migrations again
         echo "🔄 Retrying migrations after fixes..."
