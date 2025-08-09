@@ -5,6 +5,7 @@ set -e
 export PORT=${PORT:-8000}
 
 # Ensure we're using production settings
+export DJANGO_ENV=${DJANGO_ENV:-production}
 export DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-core.settings.production}
 
 echo "Starting Django server on port $PORT"

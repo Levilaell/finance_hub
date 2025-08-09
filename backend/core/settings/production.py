@@ -2,8 +2,7 @@
 Production settings
 """
 import os
-
-from decouple import config
+import sys
 
 from .base import *
 
@@ -17,26 +16,28 @@ except ImportError:
 
 # Security
 # Check if we have a SECRET_KEY, provide helpful error if not
-SECRET_KEY = config('DJANGO_SECRET_KEY', default=None)
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', None)
 if not SECRET_KEY:
     # Generate a temporary key for collectstatic and health checks
     if os.environ.get('DJANGO_COLLECT_STATIC') == '1':
         SECRET_KEY = 'temporary-key-for-collectstatic-only'
     else:
-        import sys
         print("ERROR: DJANGO_SECRET_KEY environment variable is required in production!")
         print("Please set it in Railway dashboard under Variables section.")
         print("You can generate one with: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'")
         # Use a temporary key to allow health checks to work
         SECRET_KEY = 'INSECURE-TEMPORARY-KEY-PLEASE-SET-DJANGO_SECRET_KEY'
-        
-DEBUG = config('DEBUG', default=False, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')  # Allow all hosts temporarily
+
+# Debug mode - always False in production unless explicitly set
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
+
+# Allowed hosts - default to all for now, but should be restricted
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
 # Database - Correção principal aqui!
 import dj_database_url
 
-DATABASE_URL = config('DATABASE_URL', default=None)
+DATABASE_URL = os.environ.get('DATABASE_URL', None)
 if not DATABASE_URL:
     # Check if this is during collectstatic
     if os.environ.get('DJANGO_COLLECT_STATIC') == '1':
@@ -56,7 +57,7 @@ DATABASES = {
 }
 
 # Redis
-REDIS_URL = config('REDIS_URL', default='redis://localhost:6379')
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
 
 # Cache configuration
 if REDIS_URL and REDIS_URL != 'redis://localhost:6379':
@@ -90,12 +91,12 @@ else:
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files - AWS S3 (optional)
-AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID', default='')
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', '')
 if AWS_ACCESS_KEY_ID:
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-    AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME')
-    AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='us-east-1')
+    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', '')
+    AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', '')
+    AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
     AWS_S3_OBJECT_PARAMETERS = {
         'CacheControl': 'max-age=86400',
@@ -108,9 +109,9 @@ else:
     MEDIA_URL = '/media/'
 
 # Security - Ajustado para Railway
-SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
-SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=True, cast=bool)
-CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=True, cast=bool)
+SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True').lower() in ('true', '1', 'yes')
+SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'True').lower() in ('true', '1', 'yes')
+CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'True').lower() in ('true', '1', 'yes')
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
@@ -118,7 +119,7 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Importante para Railway!
 
 # CORS - Production Security Configuration
-cors_origins = config('CORS_ALLOWED_ORIGINS', default='')
+cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
 if cors_origins:
     # Only allow HTTPS origins in production
     allowed_origins = []
@@ -143,7 +144,7 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_ALLOW_ALL = False
 
 # CSRF - Secure configuration for production
-csrf_origins = config('CORS_ALLOWED_ORIGINS', default='')
+csrf_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '')
 if csrf_origins:
     # Only allow HTTPS origins for CSRF
     trusted_origins = []
@@ -159,14 +160,14 @@ else:
     CSRF_TRUSTED_ORIGINS = []
 
 # Email settings
-EMAIL_HOST = config('EMAIL_HOST', default='')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
 if EMAIL_HOST:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
     EMAIL_USE_TLS = True
-    EMAIL_HOST_USER = config('EMAIL_HOST_USER')
-    EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
-    DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@caixahub.com.br')
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@caixahub.com.br')
     SERVER_EMAIL = DEFAULT_FROM_EMAIL
 else:
     # Use console backend for development/testing
@@ -175,30 +176,31 @@ else:
     SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
 # Frontend URL
-FRONTEND_URL = config('FRONTEND_URL', default='https://finance-frontend-production-24be.up.railway.app')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://finance-frontend-production-24be.up.railway.app')
 
 # OpenAI API
-OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 
 # Open Banking API
-OPEN_BANKING_CLIENT_ID = config('OPEN_BANKING_CLIENT_ID', default='')
-OPEN_BANKING_CLIENT_SECRET = config('OPEN_BANKING_CLIENT_SECRET', default='')
+OPEN_BANKING_CLIENT_ID = os.environ.get('OPEN_BANKING_CLIENT_ID', '')
+OPEN_BANKING_CLIENT_SECRET = os.environ.get('OPEN_BANKING_CLIENT_SECRET', '')
 
 # Pluggy API Settings
-PLUGGY_BASE_URL = config('PLUGGY_BASE_URL', default='https://api.pluggy.ai')
-PLUGGY_CLIENT_ID = config('PLUGGY_CLIENT_ID', default='')
-PLUGGY_CLIENT_SECRET = config('PLUGGY_CLIENT_SECRET', default='')
-PLUGGY_USE_SANDBOX = config('PLUGGY_USE_SANDBOX', default=False, cast=bool)
-PLUGGY_CONNECT_URL = config('PLUGGY_CONNECT_URL', default='https://connect.pluggy.ai')
+PLUGGY_BASE_URL = os.environ.get('PLUGGY_BASE_URL', 'https://api.pluggy.ai')
+PLUGGY_CLIENT_ID = os.environ.get('PLUGGY_CLIENT_ID', '')
+PLUGGY_CLIENT_SECRET = os.environ.get('PLUGGY_CLIENT_SECRET', '')
+PLUGGY_USE_SANDBOX = os.environ.get('PLUGGY_USE_SANDBOX', 'False').lower() in ('true', '1', 'yes')
+PLUGGY_CONNECT_URL = os.environ.get('PLUGGY_CONNECT_URL', 'https://connect.pluggy.ai')
 
 # Webhook settings
-PLUGGY_WEBHOOK_SECRET = config('PLUGGY_WEBHOOK_SECRET', default='')
-PLUGGY_WEBHOOK_URL = config('PLUGGY_WEBHOOK_URL', default='')
+PLUGGY_WEBHOOK_SECRET = os.environ.get('PLUGGY_WEBHOOK_SECRET', '')
+PLUGGY_WEBHOOK_URL = os.environ.get('PLUGGY_WEBHOOK_URL', '')
 
 # Sentry
-if SENTRY_AVAILABLE and config('SENTRY_DSN', default=''):
+SENTRY_DSN = os.environ.get('SENTRY_DSN', '')
+if SENTRY_AVAILABLE and SENTRY_DSN:
     sentry_sdk.init(
-        dsn=config('SENTRY_DSN'),
+        dsn=SENTRY_DSN,
         integrations=[
             DjangoIntegration(),
         ],
@@ -270,22 +272,22 @@ CONN_MAX_AGE = 60
 
 # ===== PAYMENT GATEWAY SETTINGS =====
 # Payment Gateway Settings
-DEFAULT_PAYMENT_GATEWAY = config('DEFAULT_PAYMENT_GATEWAY', default='stripe')
+DEFAULT_PAYMENT_GATEWAY = os.environ.get('DEFAULT_PAYMENT_GATEWAY', 'stripe')
 
 # Stripe Configuration
-STRIPE_PUBLIC_KEY = config('STRIPE_PUBLIC_KEY', default='')
-STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
-STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
+STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', '')
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
 # Payment Gateway - Stripe Only (MercadoPago removed for PCI DSS compliance)
-# MERCADOPAGO_ACCESS_TOKEN = config('MERCADOPAGO_ACCESS_TOKEN', default='')
-# MERCADOPAGO_PUBLIC_KEY = config('MERCADOPAGO_PUBLIC_KEY', default='')
+# MERCADOPAGO_ACCESS_TOKEN = os.environ.get('MERCADOPAGO_ACCESS_TOKEN', '')
+# MERCADOPAGO_PUBLIC_KEY = os.environ.get('MERCADOPAGO_PUBLIC_KEY', '')
 
 # Trial Period Settings
-DEFAULT_TRIAL_DAYS = config('TRIAL_PERIOD_DAYS', default=14, cast=int)
+DEFAULT_TRIAL_DAYS = int(os.environ.get('TRIAL_PERIOD_DAYS', '14'))
 
 # Currency Settings
-DEFAULT_CURRENCY = config('DEFAULT_CURRENCY', default='BRL')
+DEFAULT_CURRENCY = os.environ.get('DEFAULT_CURRENCY', 'BRL')
 
 # Railway specific settings
 if os.environ.get('RAILWAY_ENVIRONMENT'):
