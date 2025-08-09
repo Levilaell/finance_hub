@@ -3,11 +3,6 @@ const nextConfig = {
   // Enable standalone output for Docker
   output: 'standalone',
   
-  // Disable type checking during build to avoid hanging
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  
   async rewrites() {
     return [
       {

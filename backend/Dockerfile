@@ -27,7 +27,10 @@ RUN pip install -r requirements.txt
 COPY . /app/
 
 # Create necessary directories
-RUN mkdir -p /app/staticfiles /app/media /app/logs
+RUN mkdir -p /app/staticfiles /app/media /app/logs /keys
+
+# Create keys directory with proper permissions for appuser
+RUN chown -R 1000:1000 /keys && chmod 755 /keys
 
 # Run collectstatic with dummy environment variables
 RUN DJANGO_SECRET_KEY="dummy-key-for-collectstatic" \

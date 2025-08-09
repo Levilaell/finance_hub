@@ -90,7 +90,25 @@ class BankingService {
       message?: string;
     };
   }> {
-    const response = await apiClient.get(`/api/banking/items/${id}/mfa_status/`);
+    const response = await apiClient.get<{
+      requires_mfa: boolean;
+      status: string;
+      parameter?: {
+        name: string;
+        type: string;
+        label: string;
+        placeholder: string;
+        validation?: any;
+        assistiveText?: string;
+        optional?: boolean;
+      };
+      connector?: {
+        id: string;
+        name: string;
+        image_url: string;
+      };
+      message?: string;
+    }>(`/api/banking/items/${id}/mfa_status/`);
     return { data: response };
   }
   
@@ -108,7 +126,13 @@ class BankingService {
       requires_additional_mfa?: boolean;
     };
   }> {
-    const response = await apiClient.post(`/api/banking/items/${id}/send_mfa/`, data);
+    const response = await apiClient.post<{
+      success: boolean;
+      message: string;
+      item_status: string;
+      execution_status?: string;
+      requires_additional_mfa?: boolean;
+    }>(`/api/banking/items/${id}/send_mfa/`, data);
     return { data: response };
   }
   

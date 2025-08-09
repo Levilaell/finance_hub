@@ -122,7 +122,7 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 
 # Additional CORS security for production
-CORS_REPLACE_HTTPS_REFERER = True
+# CORS_REPLACE_HTTPS_REFERER = True  # Removed - deprecated in django-cors-headers
 CORS_ORIGIN_ALLOW_ALL = False
 
 # CSRF - Secure configuration for production
