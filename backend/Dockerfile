@@ -42,9 +42,9 @@ RUN DJANGO_COLLECT_STATIC=1 \
     DATABASE_URL="postgres://dummy:dummy@dummy:5432/dummy" \
     python manage.py collectstatic --noinput || true
 
-# Copy entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Copy entrypoint script to root directory
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Create a non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
@@ -54,4 +54,4 @@ USER appuser
 EXPOSE 8000
 
 # Use entrypoint
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
