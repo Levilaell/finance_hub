@@ -19,12 +19,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY requirements.txt /app/
+COPY backend/requirements.txt /app/
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 # Copy project
-COPY . /app/
+COPY backend/ /app/
 
 # Make scripts executable
 RUN chmod +x /app/startup.sh /app/fix_database.py 2>/dev/null || true
@@ -43,7 +43,7 @@ RUN DJANGO_COLLECT_STATIC=1 \
     python manage.py collectstatic --noinput || true
 
 # Copy entrypoint script to root directory
-COPY docker-entrypoint.sh /docker-entrypoint.sh
+COPY backend/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 # Create a non-root user
