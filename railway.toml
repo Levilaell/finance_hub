@@ -1,9 +1,10 @@
 [build]
-builder = "dockerfile"
-dockerfilePath = "./backend/Dockerfile"
-buildContext = "./backend"
+builder = "DOCKERFILE"
+dockerfilePath = "backend/Dockerfile"
 
 [deploy]
-# Remove startCommand - let Docker handle it
-restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 3
+startCommand = "sh /app/deploy/start-production.sh"
+healthcheckPath = "/api/health/"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

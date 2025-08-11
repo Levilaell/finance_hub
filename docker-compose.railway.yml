@@ -1,0 +1,355 @@
+version: '3.8'
+
+# Docker Compose for Railway-like local development and testing
+# Simulates Railway deployment environment locally
+
+services:
+  # PostgreSQL Database (simulates Railway Postgres)
+  postgres:
+    image: postgres:16-alpine
+    container_name: finance_hub_postgres
+    environment:
+      POSTGRES_DB: railway
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/deploy/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - finance_network
+
+  # Redis (simulates Railway Redis)
+  redis:
+    image: redis:7-alpine
+    container_name: finance_hub_redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - finance_network
+
+  # Django Backend
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: production
+      cache_from:
+        - finance_hub_backend:latest
+    image: finance_hub_backend:latest
+    container_name: finance_hub_backend
+    command: /app/deploy/start-production.sh
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - ./backend/logs:/app/logs
+    ports:
+      - "8000:8000"
+    environment:
+      # Django settings
+      DJANGO_SETTINGS_MODULE: core.settings.production
+      DJANGO_ENV: production
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DEBUG: ${DEBUG:-False}
+      
+      # Database
+      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@postgres:5432/railway
+      
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      
+      # Railway simulation
+      PORT: 8000
+      RAILWAY_ENVIRONMENT: production
+      RAILWAY_PUBLIC_DOMAIN: localhost:8000
+      ALLOWED_HOSTS: localhost,127.0.0.1,backend,*.railway.app
+      
+      # URLs
+      BACKEND_URL: http://localhost:8000
+      FRONTEND_URL: http://localhost:3000
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      
+      # Services
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY}
+      PLUGGY_CLIENT_ID: ${PLUGGY_CLIENT_ID}
+      PLUGGY_CLIENT_SECRET: ${PLUGGY_CLIENT_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      SENTRY_DSN: ${SENTRY_DSN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - finance_network
+    labels:
+      - "com.railway.service=backend"
+
+  # Celery Worker
+  celery_worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: production
+    image: finance_hub_backend:latest
+    container_name: finance_hub_celery_worker
+    command: /app/deploy/start-celery.sh
+    volumes:
+      - ./backend/logs:/app/logs
+      - media_volume:/app/media
+    environment:
+      # Django settings
+      DJANGO_SETTINGS_MODULE: core.settings.production
+      DJANGO_ENV: production
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      
+      # Database
+      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@postgres:5432/railway
+      
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      
+      # Celery settings
+      CELERY_WORKER_CONCURRENCY: 4
+      CELERY_WORKER_PREFETCH: 1
+      CELERY_WORKER_MAX_TASKS: 1000
+      
+      # Services
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      PLUGGY_CLIENT_ID: ${PLUGGY_CLIENT_ID}
+      PLUGGY_CLIENT_SECRET: ${PLUGGY_CLIENT_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A core inspect ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - finance_network
+    labels:
+      - "com.railway.service=celery"
+
+  # Celery Beat Scheduler
+  celery_beat:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: production
+    image: finance_hub_backend:latest
+    container_name: finance_hub_celery_beat
+    command: /app/deploy/start-celery-beat.sh
+    volumes:
+      - ./backend/logs:/app/logs
+    environment:
+      # Django settings
+      DJANGO_SETTINGS_MODULE: core.settings.production
+      DJANGO_ENV: production
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      
+      # Database
+      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@postgres:5432/railway
+      
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      celery_worker:
+        condition: service_started
+    networks:
+      - finance_network
+    labels:
+      - "com.railway.service=celery-beat"
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: production
+      cache_from:
+        - finance_hub_frontend:latest
+    image: finance_hub_frontend:latest
+    container_name: finance_hub_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_NAME: Finance Hub
+      NEXT_PUBLIC_ENABLE_AI_INSIGHTS: true
+      NEXT_PUBLIC_ENABLE_OPEN_BANKING: true
+      NEXT_PUBLIC_STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY}
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - finance_network
+    labels:
+      - "com.railway.service=frontend"
+
+  # Nginx Reverse Proxy (optional for production-like setup)
+  nginx:
+    image: nginx:alpine
+    container_name: finance_hub_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.railway.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - static_volume:/static:ro
+      - media_volume:/media:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - finance_network
+    profiles:
+      - full
+    labels:
+      - "com.railway.service=nginx"
+
+  # Monitoring Stack (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: finance_hub_prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - finance_network
+    profiles:
+      - monitoring
+    labels:
+      - "com.railway.service=prometheus"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: finance_hub_grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: false
+    depends_on:
+      - prometheus
+    networks:
+      - finance_network
+    profiles:
+      - monitoring
+    labels:
+      - "com.railway.service=grafana"
+
+  # Development tools
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: finance_hub_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@finance-hub.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - finance_network
+    profiles:
+      - dev
+    labels:
+      - "com.railway.service=pgadmin"
+
+  # Mail catcher for development
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: finance_hub_mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - finance_network
+    profiles:
+      - dev
+    labels:
+      - "com.railway.service=mailhog"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  static_volume:
+    driver: local
+  media_volume:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  finance_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16

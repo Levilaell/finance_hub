@@ -1,57 +1,95 @@
-FROM python:3.11-slim
+# Stage 1: Builder
+FROM python:3.11-slim AS builder
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Set work directory
-WORKDIR /app
-
-# Install system dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
-    postgresql-client \
     gcc \
     python3-dev \
     musl-dev \
     libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set work directory
+WORKDIR /build
+
+# Install Python dependencies
+COPY backend/requirements.txt .
+RUN pip install --user --no-cache-dir --upgrade pip && \
+    pip install --user --no-cache-dir -r requirements.txt
+
+# Stage 2: Static files builder
+FROM python:3.11-slim AS static-builder
+
+# Install minimal runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy dependencies from builder
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+# Copy Django project
+COPY backend/ /app/
+
+# Collect static files
+RUN DJANGO_SECRET_KEY="build-key" \
+    DJANGO_SETTINGS_MODULE=core.settings.production \
+    DATABASE_URL="sqlite:///tmp/db.sqlite3" \
+    python manage.py collectstatic --noinput
+
+# Stage 3: Final production image
+FROM python:3.11-slim
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    libpq-dev \
     curl \
+    netcat-openbsd \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY backend/requirements.txt /app/
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH=/home/appuser/.local/bin:$PATH \
+    DJANGO_SETTINGS_MODULE=core.settings.production
 
-# Copy project
-COPY backend/ /app/
+# Create non-root user first
+RUN useradd -m -u 1000 appuser
 
-# Make scripts executable
-RUN chmod +x /app/startup.sh /app/fix_database.py 2>/dev/null || true
+# Set work directory
+WORKDIR /app
+
+# Copy Python dependencies from builder
+COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
+
+# Copy application code
+COPY --chown=appuser:appuser backend/ /app/
+
+# Copy static files from static-builder
+COPY --from=static-builder --chown=appuser:appuser /app/staticfiles /app/staticfiles
 
 # Create necessary directories
-RUN mkdir -p /app/staticfiles /app/media /app/logs /keys
+RUN mkdir -p /app/media /app/logs /keys && \
+    chown -R appuser:appuser /app /keys
 
-# Create keys directory with proper permissions for appuser
-RUN chown -R 1000:1000 /keys && chmod 755 /keys
+# Copy and setup deploy scripts
+COPY --chown=appuser:appuser backend/deploy/ /app/deploy/
+RUN chmod +x /app/deploy/*.sh
 
-# Run collectstatic with dummy environment variables
-RUN DJANGO_COLLECT_STATIC=1 \
-    DJANGO_SECRET_KEY="dummy-key-for-collectstatic" \
-    DJANGO_SETTINGS_MODULE=core.settings.production \
-    DATABASE_URL="postgres://dummy:dummy@dummy:5432/dummy" \
-    python manage.py collectstatic --noinput || true
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8000}/api/health/ || exit 1
 
-# Copy entrypoint script to root directory
-COPY backend/docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-
-# Create a non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+# Switch to non-root user
 USER appuser
 
-# Railway sets PORT dynamically
+# Expose port
 EXPOSE 8000
 
-# Use entrypoint
-ENTRYPOINT ["/docker-entrypoint.sh"]
+# Default command (can be overridden by Railway)
+CMD ["/app/deploy/start-production.sh"]

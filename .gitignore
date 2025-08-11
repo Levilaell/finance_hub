@@ -29,6 +29,11 @@ staticfiles/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.railway
+.env.staging
+*.env
+!.env.example
+!.env.railway.example
 
 # Node.js
 node_modules/
@@ -57,11 +62,16 @@ out/
 ehthumbs.db
 Thumbs.db
 
-# Security
+# Security - NEVER commit these!
 *.key
 *.pem
 *.p12
 *.pfx
+*.crt
+secrets.json
+credentials.json
+service-account-key.json
+setup-railway-env.sh
 
 # Temporary files
 *.tmp
@@ -143,3 +153,23 @@ backend/apps/companies/tests
 backend/apps/notifications/tests
 backend/apps/payments/tests
 backend/apps/reports/tests
+
+# Railway deployment files
+railway.json.backup
+deployments.json
+rollback_backup.json
+current_*.txt
+deployment_info.json
+rollback_report_*.md
+deployment-report.md
+trivy-results.sarif
+bandit-report.json
+
+# Docker volumes
+postgres_data/
+redis_data/
+static_volume/
+media_volume/
+prometheus_data/
+grafana_data/
+pgadmin_data/
