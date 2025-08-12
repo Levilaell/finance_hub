@@ -6,27 +6,6 @@ echo "🚀 Starting Finance Hub Backend..."
 # Set default environment variables if not set
 export DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-core.settings.production}
 
-# Check if we need to force reset (use environment variable as flag)
-if [ "$FORCE_DB_RESET" = "true" ]; then
-    echo "⚠️  FORCE_DB_RESET is set. Resetting database..."
-    python force_reset_and_migrate.py || {
-        echo "❌ Force reset failed. Trying alternate method..."
-        # Try dropping tables via Django
-        python manage.py dbshell << EOF
-DO \$\$ 
-DECLARE r RECORD;
-BEGIN
-    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') 
-    LOOP
-        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
-    END LOOP;
-END \$\$;
-EOF
-        python manage.py migrate --noinput --run-syncdb
-    }
-    echo "✅ Database reset complete"
-fi
-
 # If ALLOWED_HOSTS is not set, try to auto-detect from Railway
 if [ -z "$ALLOWED_HOSTS" ]; then
     if [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
@@ -54,38 +33,7 @@ done
 
 # Run migrations
 echo "🔄 Running migrations..."
-python manage.py migrate --no-input 2>&1 | tee /tmp/migrate.log || {
-    # Check if it's the duplicate column error
-    if grep -q "column.*already exists" /tmp/migrate.log; then
-        echo "⚠️  Detected duplicate column error. Attempting to fix..."
-        
-        # Try to reset and recreate from scratch
-        python -c "
-import django
-django.setup()
-from django.db import connection
-with connection.cursor() as cursor:
-    # Drop all tables in public schema
-    cursor.execute('''
-        DO \$\$ 
-        DECLARE r RECORD;
-        BEGIN
-            FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') 
-            LOOP
-                EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
-            END LOOP;
-        END \$\$;
-    ''')
-    print('✅ All tables dropped')
-"
-        
-        # Try migrations again
-        echo "🔄 Retrying migrations after cleanup..."
-        python manage.py migrate --no-input || echo "⚠️  Migrations still having issues"
-    else
-        echo "⚠️  Some migrations failed, but continuing..."
-    fi
-}
+python manage.py migrate --no-input || echo "⚠️  Migration failed, check logs"
 
 # Collect static files
 echo "📦 Collecting static files..."
