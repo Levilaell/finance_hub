@@ -90,5 +90,5 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Default command - Railway will override this with railway.toml startCommand
-CMD ["sh", "/app/start.sh"]
+# Start command
+CMD ["/bin/bash", "/app/start.sh"]
