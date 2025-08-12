@@ -152,5 +152,4 @@ class SubscriptionStatusView(CompanyValidationMixin, APIView):
             'has_payment_method': has_payment_method
         }
         
-        serializer = SubscriptionStatusSerializer(data)
-        return Response(serializer.data)
+        return Response(data)

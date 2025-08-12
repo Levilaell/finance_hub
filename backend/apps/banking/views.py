@@ -137,15 +137,12 @@ class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardPagination
     
-    def get_user_company(self):
-        """Get the user's company from the request"""
-        if hasattr(self.request.user, 'company') and self.request.user.company:
-            return self.request.user.company
-        raise PermissionDenied("You must be associated with a company to access this resource.")
-    
     def get_queryset(self):
         """Get items for user's company"""
-        company = self.get_user_company()
+        company, error_response = self.get_user_company(self.request)
+        if error_response:
+            return PluggyItem.objects.none()
+        
         return PluggyItem.objects.filter(
             company=company
         ).select_related('connector').prefetch_related('accounts')
@@ -359,15 +356,12 @@ class BankAccountViewSet(CompanyAccessMixin, viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = None
     
-    def get_user_company(self):
-        """Get the user's company from the request"""
-        if hasattr(self.request.user, 'company') and self.request.user.company:
-            return self.request.user.company
-        raise PermissionDenied("You must be associated with a company to access this resource.")
-    
     def get_queryset(self):
         """Get accounts for user's company"""
-        company = self.get_user_company()
+        company, error_response = self.get_user_company(self.request)
+        if error_response:
+            return BankAccount.objects.none()
+        
         return BankAccount.objects.filter(
             company=company,
             is_active=True
@@ -556,16 +550,13 @@ class TransactionViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardPagination
     
-    def get_user_company(self):
-        """Get the user's company from the request"""
-        if hasattr(self.request.user, 'company') and self.request.user.company:
-            return self.request.user.company
-        raise PermissionDenied("You must be associated with a company to access this resource.")
-    
     def get_queryset(self):
         """Get transactions with filters"""
         # Use active manager to exclude transactions from deleted or inactive accounts
-        company = self.get_user_company()
+        company, error_response = self.get_user_company(self.request)
+        if error_response:
+            return Transaction.objects.none()
+        
         queryset = Transaction.active.for_company(
             company
         ).select_related(
@@ -747,22 +738,21 @@ class TransactionCategoryViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = None
     
-    def get_user_company(self):
-        """Get the user's company from the request"""
-        if hasattr(self.request.user, 'company') and self.request.user.company:
-            return self.request.user.company
-        raise PermissionDenied("You must be associated with a company to access this resource.")
-    
     def get_queryset(self):
         """Get categories for user's company and system categories"""
-        company = self.get_user_company()
+        company, error_response = self.get_user_company(self.request)
+        if error_response:
+            return TransactionCategory.objects.none()
+        
         return TransactionCategory.objects.filter(
             Q(company=company) | Q(is_system=True)
         ).order_by('type', 'order', 'name')
     
     def perform_create(self, serializer):
         """Set company when creating category"""
-        company = self.get_user_company()
+        company, error_response = self.get_user_company(self.request)
+        if error_response:
+            raise PermissionDenied("You must be associated with a company to access this resource.")
         serializer.save(company=company)
 
 
