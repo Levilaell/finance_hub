@@ -233,6 +233,11 @@ if SENTRY_AVAILABLE and SENTRY_DSN:
         environment='production',
     )
 
+# Session configuration - use database backend in production
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_AGE = 86400 * 7  # 7 days
+SESSION_SAVE_EVERY_REQUEST = True
+
 # Channels
 if REDIS_URL and REDIS_URL != 'redis://localhost:6379':
     CHANNEL_LAYERS = {
