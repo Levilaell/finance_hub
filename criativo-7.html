@@ -207,6 +207,40 @@
             background: linear-gradient(135deg, var(--accent-2), var(--accent-3));
         }
 
+        .lead-list {
+            list-style: none;
+            color: var(--muted);
+            padding: 0 10px;
+            margin: 0 auto;
+            display: grid;
+            gap: .55rem;
+            text-align: left;
+            /* evita o "buraco" do center */
+            width: fit-content;
+        }
+
+
+
+        .lead-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            font-size: clamp(16px, 3.5vw, 18px);
+            line-height: 1.3;
+        }
+
+        .lead-list li::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            margin-top: .45em;
+            flex: 0 0 8px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+            box-shadow: 0 0 10px rgba(255, 45, 155, .5);
+        }
+
+
         @keyframes float {
 
             0%,
@@ -238,15 +272,20 @@
                     🚀 Lançamento em breve • Lista VIP
                 </div>
 
-                <h1 id="titulo">Empresários estão <span class="accent">largando as planilhas</span>
+                <h1 id="titulo">Gestão financeira empresarial no <span class="accent">piloto automático </span>🚀
                 </h1>
 
-                <p class="lead">
-                    O CaixaHub conecta as contas da sua empresa e entrega relatórios prontos, sem esforço.
-                    <br>Grátis para testar.
-                </p>
+                <p class="lead">Seu tempo é valioso. O CaixaHub cuida de tudo:</p>
+                <div style="text-align: left;">
+                    <ul class="lead-list" aria-label="O que o CaixaHub faz">
+                        <li>Conecta</li>
+                        <li>Organiza</li>
+                        <li>Analisa</li>
+                    </ul>
+                </div>
 
-                <a class="cta" href="#lista-vip">Garantir meu acesso</a>
+
+                <a class="cta" href="#lista-vip">Quero entrar na lista VIP</a>
 
                 <div class="bullets">
                     <span><i class="dot"></i> Sem planilhas</span>

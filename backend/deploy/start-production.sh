@@ -45,6 +45,22 @@ if [ -z "$ALLOWED_HOSTS" ]; then
     fi
 fi
 
+# Check if DATABASE_URL is configured
+check_database_url() {
+    if [ -z "$DATABASE_URL" ]; then
+        log_error "DATABASE_URL is not configured!"
+        log_info "Please add PostgreSQL service in Railway Dashboard:"
+        log_info "1. Click 'New' → 'Database' → 'PostgreSQL'"
+        log_info "2. Go to your service Variables"
+        log_info "3. Add reference: DATABASE_URL → \${{Postgres.DATABASE_URL}}"
+        
+        # Start without database for now (will fail health checks)
+        log_warning "Starting without database - service will not be fully functional"
+        return 1
+    fi
+    return 0
+}
+
 # Wait for database with exponential backoff
 wait_for_db() {
     local max_attempts=30
@@ -53,8 +69,25 @@ wait_for_db() {
     
     log_info "Waiting for database connection..."
     
+    # First check if DATABASE_URL exists
+    if ! check_database_url; then
+        return 1
+    fi
+    
     while [ $attempt -le $max_attempts ]; do
         if python -c "
+import os
+import sys
+
+# Check DATABASE_URL
+database_url = os.environ.get('DATABASE_URL')
+if not database_url or database_url == 'dummy':
+    print('WARNING: DATABASE_URL environment variable is not set or invalid!')
+    print('Using a dummy database URL - database operations will fail.')
+    print('Please set DATABASE_URL in Railway dashboard.')
+    print('Use the reference button to link to your database service.')
+    sys.exit(1)
+
 import django
 django.setup()
 from django.db import connection

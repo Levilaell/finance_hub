@@ -63,6 +63,7 @@ ehthumbs.db
 Thumbs.db
 
 # Security - NEVER commit these!
+RAILWAY_ENV_VARS.txt
 *.key
 *.pem
 *.p12
