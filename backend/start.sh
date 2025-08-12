@@ -1,7 +1,9 @@
 #!/bin/bash
 # Startup script for production deployment
+# Last updated: $(date)
 
 echo "🚀 Starting Finance Hub Backend..."
+echo "📅 Deploy timestamp: $(date)"
 
 # Set default environment variables if not set
 export DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-core.settings.production}
