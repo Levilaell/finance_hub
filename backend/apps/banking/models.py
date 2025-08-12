@@ -508,6 +508,73 @@ class Transaction(models.Model):
     def is_expense(self):
         """Check if transaction is expense"""
         return self.type == 'DEBIT'
+    
+    @classmethod
+    def create_safe(cls, company, **transaction_data):
+        """
+        Safely create a transaction with plan limit verification.
+        Prevents race conditions and enforces limits atomically.
+        
+        Args:
+            company: Company instance
+            **transaction_data: Transaction fields
+            
+        Returns:
+            Transaction instance if created successfully
+            
+        Raises:
+            PlanLimitExceeded: If transaction limit is reached
+            ValidationError: If data is invalid
+        """
+        from django.db import transaction as db_transaction
+        from django.core.exceptions import ValidationError
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        with db_transaction.atomic():
+            # Increment usage with safety check
+            success, message = company.increment_usage_safe('transactions')
+            
+            if not success:
+                # Log attempt to exceed limit
+                logger.warning(
+                    f"Transaction creation blocked for company {company.id}: {message}"
+                )
+                
+                # Create a custom exception for plan limits
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied({
+                    'error': 'Transaction limit reached',
+                    'message': message,
+                    'limit_type': 'transactions',
+                    'current_usage': company.current_month_transactions,
+                    'limit': company.subscription_plan.max_transactions if company.subscription_plan else 0,
+                    'upgrade_required': True,
+                    'current_plan': company.subscription_plan.name if company.subscription_plan else 'None'
+                })
+            
+            # Create the transaction
+            try:
+                transaction = cls.objects.create(
+                    company=company,
+                    **transaction_data
+                )
+                
+                logger.info(
+                    f"Transaction created for company {company.id}: "
+                    f"ID={transaction.id}, amount={transaction.amount}"
+                )
+                
+                return transaction
+                
+            except Exception as e:
+                # If transaction creation fails, the increment will be rolled back
+                # due to the atomic block
+                logger.error(
+                    f"Failed to create transaction for company {company.id}: {e}"
+                )
+                raise
 
 
 class TransactionCategory(models.Model):

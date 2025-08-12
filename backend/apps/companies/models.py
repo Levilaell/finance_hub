@@ -277,11 +277,137 @@ class Company(models.Model):
         
         return 0
     
+    def get_usage_summary(self):
+        """Get comprehensive usage summary for the company"""
+        if not self.subscription_plan:
+            return {
+                'transactions': {'used': 0, 'limit': 0, 'percentage': 0},
+                'ai_requests': {'used': 0, 'limit': 0, 'percentage': 0},
+                'bank_accounts': {'used': 0, 'limit': 0, 'percentage': 0}
+            }
+        
+        bank_accounts_count = self.bank_accounts.filter(is_active=True).count()
+        
+        return {
+            'transactions': {
+                'used': self.current_month_transactions,
+                'limit': self.subscription_plan.max_transactions,
+                'percentage': self.get_usage_percentage('transactions')
+            },
+            'ai_requests': {
+                'used': self.current_month_ai_requests,
+                'limit': self.subscription_plan.max_ai_requests_per_month,
+                'percentage': self.get_usage_percentage('ai_requests')
+            },
+            'bank_accounts': {
+                'used': bank_accounts_count,
+                'limit': self.subscription_plan.max_bank_accounts,
+                'percentage': (bank_accounts_count / self.subscription_plan.max_bank_accounts * 100) 
+                             if self.subscription_plan.max_bank_accounts > 0 else 0
+            }
+        }
+    
+    @transaction.atomic
+    def increment_usage_safe(self, usage_type):
+        """
+        Safely increment usage counters with atomic verification.
+        Prevents race conditions and enforces plan limits.
+        Returns tuple (success: bool, message: str)
+        """
+        from django.db import transaction
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        # Lock the company row for update to prevent race conditions
+        company = Company.objects.select_for_update().get(pk=self.pk)
+        
+        if not company.subscription_plan:
+            return False, "No active subscription plan"
+        
+        # Check limits based on usage type
+        if usage_type == 'transactions':
+            current = company.current_month_transactions
+            limit = company.subscription_plan.max_transactions
+            field_name = 'current_month_transactions'
+            resource_field = 'transactions_count'
+        elif usage_type == 'ai_requests':
+            current = company.current_month_ai_requests
+            limit = company.subscription_plan.max_ai_requests_per_month
+            field_name = 'current_month_ai_requests'
+            resource_field = 'ai_requests_count'
+        else:
+            return False, f"Unknown usage type: {usage_type}"
+        
+        # Check if limit would be exceeded
+        if current >= limit:
+            logger.warning(
+                f"Usage limit reached for company {company.id}: "
+                f"{usage_type} = {current}/{limit}"
+            )
+            return False, f"Limit reached: {current}/{limit}"
+        
+        # Safe to increment - do it atomically
+        Company.objects.filter(pk=company.pk).update(
+            **{field_name: F(field_name) + 1}
+        )
+        
+        # Update ResourceUsage
+        self._update_resource_usage(resource_field, 1)
+        
+        # Refresh instance
+        self.refresh_from_db(fields=[field_name])
+        
+        # Log successful increment
+        new_value = getattr(self, field_name)
+        logger.info(
+            f"Usage incremented for company {company.id}: "
+            f"{usage_type} = {new_value}/{limit}"
+        )
+        
+        # Check if we should send usage warnings
+        percentage = (new_value / limit) * 100 if limit > 0 else 0
+        if percentage >= 90 and not company.notified_90_percent:
+            self._send_usage_warning(90, usage_type, new_value, limit)
+            company.notified_90_percent = True
+            company.save(update_fields=['notified_90_percent'])
+        elif percentage >= 80 and not company.notified_80_percent:
+            self._send_usage_warning(80, usage_type, new_value, limit)
+            company.notified_80_percent = True
+            company.save(update_fields=['notified_80_percent'])
+        
+        return True, f"Usage incremented: {new_value}/{limit}"
+    
+    def _send_usage_warning(self, percentage, usage_type, current, limit):
+        """Send usage warning notification"""
+        try:
+            from apps.notifications.models import Notification
+            Notification.objects.create(
+                user=self.owner,
+                company=self,  # Add company field
+                event='usage_warning',
+                event_key=f'usage_{percentage}_{usage_type}',
+                title=f'{percentage}% of {usage_type} limit reached',
+                message=f'You have used {current} of {limit} {usage_type} ({percentage}%)',
+                is_critical=percentage >= 90,
+                metadata={
+                    'usage_type': usage_type,
+                    'percentage': percentage,
+                    'current': current,
+                    'limit': limit
+                }
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create usage warning notification: {e}")
+    
     @transaction.atomic
     def increment_usage(self, usage_type):
         """
         Increment usage counters atomically to prevent race conditions.
         Uses F expressions for atomic database operations.
+        DEPRECATED: Use increment_usage_safe() for limit checking
         """
         if usage_type == 'transactions':
             # Use F expression for atomic increment

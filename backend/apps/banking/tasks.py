@@ -11,6 +11,7 @@ from celery import shared_task
 from django.db import transaction as db_transaction
 from django.db import IntegrityError
 from django.utils import timezone
+from rest_framework.exceptions import PermissionDenied
 
 from .models import (
     PluggyItem, BankAccount, Transaction,
@@ -395,7 +396,11 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
                     
                     try:
                         transaction, created = _process_transaction(account, trans_data)
-                        if created:
+                        if transaction is None:
+                            # Transaction limit reached, stop processing
+                            logger.info(f"Stopping transaction sync - limit reached for company {company.id}")
+                            break
+                        elif created:
                             total_synced += 1
                             logger.info(f"Created new transaction: {trans_data.get('description', 'No description')} - {trans_data.get('amount', 0)} - ID: {trans_data.get('id')}")
                             
@@ -477,33 +482,42 @@ def _process_transaction(account: BankAccount, trans_data: Dict):
                 transaction.save()
                 
             except Transaction.DoesNotExist:
-                # Create new transaction
-                transaction = Transaction.objects.create(
-                    pluggy_transaction_id=trans_data['id'],
-                    account=account,
-                    company=account.company,
-                    type=trans_data['type'],
-                    status=trans_data.get('status', 'POSTED'),
-                    description=trans_data.get('description', '')[:500],
-                    description_raw=trans_data.get('descriptionRaw') or '',
-                    amount=Decimal(str(trans_data.get('amount', 0))),
-                    amount_in_account_currency=Decimal(str(trans_data.get('amountInAccountCurrency', 0))) if trans_data.get('amountInAccountCurrency') else None,
-                    balance=Decimal(str(trans_data.get('balance', 0))) if trans_data.get('balance') else None,
-                    currency_code=trans_data.get('currencyCode', 'BRL'),
-                    date=trans_date,
-                    provider_code=trans_data.get('providerCode') or '',
-                    provider_id=trans_data.get('providerId') or '',
-                    merchant=merchant if merchant else None,
-                    payment_data=trans_data.get('paymentData') or {},
-                    pluggy_category_id=trans_data.get('categoryId') or '',
-                    pluggy_category_description=trans_data.get('category') or '',
-                    category=category,
-                    credit_card_metadata=trans_data.get('creditCardMetadata') or {},
-                    notes='',
-                    tags=[],
-                    pluggy_created_at=trans_data.get('createdAt'),
-                    pluggy_updated_at=trans_data.get('updatedAt')
-                )
+                # Create new transaction using safe method
+                try:
+                    transaction = Transaction.create_safe(
+                        company=account.company,
+                        pluggy_transaction_id=trans_data['id'],
+                        account=account,
+                        type=trans_data['type'],
+                        status=trans_data.get('status', 'POSTED'),
+                        description=trans_data.get('description', '')[:500],
+                        description_raw=trans_data.get('descriptionRaw') or '',
+                        amount=Decimal(str(trans_data.get('amount', 0))),
+                        amount_in_account_currency=Decimal(str(trans_data.get('amountInAccountCurrency', 0))) if trans_data.get('amountInAccountCurrency') else None,
+                        balance=Decimal(str(trans_data.get('balance', 0))) if trans_data.get('balance') else None,
+                        currency_code=trans_data.get('currencyCode', 'BRL'),
+                        date=trans_date,
+                        provider_code=trans_data.get('providerCode') or '',
+                        provider_id=trans_data.get('providerId') or '',
+                        merchant=merchant if merchant else None,
+                        payment_data=trans_data.get('paymentData') or {},
+                        pluggy_category_id=trans_data.get('categoryId') or '',
+                        pluggy_category_description=trans_data.get('category') or '',
+                        category=category,
+                        credit_card_metadata=trans_data.get('creditCardMetadata') or {},
+                        notes='',
+                        tags=[],
+                        pluggy_created_at=trans_data.get('createdAt'),
+                        pluggy_updated_at=trans_data.get('updatedAt')
+                    )
+                except PermissionDenied as e:
+                    # Transaction limit reached - log and skip remaining transactions
+                    logger.warning(
+                        f"Transaction limit reached for company {account.company.id} "
+                        f"during sync. Skipping remaining transactions."
+                    )
+                    # Return None to indicate transaction could not be created
+                    return None, False
                 created = True
         
         return transaction, created

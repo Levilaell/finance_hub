@@ -38,11 +38,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Copy and setup entrypoint
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
-
 # Set environment to production
 ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
@@ -57,6 +52,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 3000) + '/', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); })"
 
-# Set entrypoint and command
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+# Start the application
 CMD ["node", "server.js"] 
