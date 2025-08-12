@@ -1,8 +1,0 @@
-[build]
-builder = "dockerfile"
-dockerfilePath = "./celery/Dockerfile"
-buildContext = "."
-
-[deploy]
-restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 3
