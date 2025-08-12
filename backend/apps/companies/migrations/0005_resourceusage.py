@@ -11,24 +11,52 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='ResourceUsage',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('month', models.DateField(help_text='First day of the month', verbose_name='month')),
-                ('transactions_count', models.IntegerField(default=0, verbose_name='transactions count')),
-                ('ai_requests_count', models.IntegerField(default=0, verbose_name='AI requests count')),
-                ('reports_generated', models.IntegerField(default=0, verbose_name='reports generated')),
-                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='created at')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='updated at')),
-                ('company', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='resource_usage', to='companies.company')),
+        migrations.RunSQL(
+            # Forward SQL - Create table only if it doesn't exist
+            sql="""
+                CREATE TABLE IF NOT EXISTS resource_usage (
+                    id BIGSERIAL PRIMARY KEY,
+                    company_id BIGINT NOT NULL REFERENCES companies_company(id) ON DELETE CASCADE,
+                    month DATE NOT NULL,
+                    transactions_count INTEGER DEFAULT 0 NOT NULL,
+                    ai_requests_count INTEGER DEFAULT 0 NOT NULL,
+                    reports_generated INTEGER DEFAULT 0 NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(company_id, month)
+                );
+                
+                -- Create index for foreign key if not exists
+                CREATE INDEX IF NOT EXISTS resource_usage_company_id_idx 
+                ON resource_usage(company_id);
+                
+                -- Create index for month if not exists
+                CREATE INDEX IF NOT EXISTS resource_usage_month_idx 
+                ON resource_usage(month);
+            """,
+            # Reverse SQL - Drop table
+            reverse_sql="DROP TABLE IF EXISTS resource_usage CASCADE;",
+            state_operations=[
+                migrations.CreateModel(
+                    name='ResourceUsage',
+                    fields=[
+                        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                        ('month', models.DateField(help_text='First day of the month', verbose_name='month')),
+                        ('transactions_count', models.IntegerField(default=0, verbose_name='transactions count')),
+                        ('ai_requests_count', models.IntegerField(default=0, verbose_name='AI requests count')),
+                        ('reports_generated', models.IntegerField(default=0, verbose_name='reports generated')),
+                        ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='created at')),
+                        ('updated_at', models.DateTimeField(auto_now=True, verbose_name='updated at')),
+                        ('company', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='resource_usage', to='companies.company')),
+                    ],
+                    options={
+                        'verbose_name': 'Resource Usage',
+                        'verbose_name_plural': 'Resource Usage',
+                        'db_table': 'resource_usage',
+                        'ordering': ['-month'],
+                        'unique_together': {('company', 'month')},
+                    },
+                ),
             ],
-            options={
-                'verbose_name': 'Resource Usage',
-                'verbose_name_plural': 'Resource Usage',
-                'db_table': 'resource_usage',
-                'ordering': ['-month'],
-                'unique_together': {('company', 'month')},
-            },
         ),
     ]
