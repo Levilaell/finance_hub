@@ -77,9 +77,8 @@ COPY --from=static-builder --chown=appuser:appuser /app/staticfiles /app/staticf
 RUN mkdir -p /app/media /app/logs /keys && \
     chown -R appuser:appuser /app /keys
 
-# Copy and setup deploy scripts
-COPY --chown=appuser:appuser backend/deploy/ /app/deploy/
-RUN chmod +x /app/deploy/*.sh
+# Make start.sh executable
+RUN chmod +x /app/start.sh
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
@@ -91,5 +90,5 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Default command (can be overridden by Railway)
-CMD ["/app/deploy/start-production.sh"]
+# Default command
+CMD ["/app/start.sh"]
