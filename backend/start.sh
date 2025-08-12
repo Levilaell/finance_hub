@@ -6,6 +6,27 @@ echo "🚀 Starting Finance Hub Backend..."
 # Set default environment variables if not set
 export DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-core.settings.production}
 
+# Check if we need to force reset (use environment variable as flag)
+if [ "$FORCE_DB_RESET" = "true" ]; then
+    echo "⚠️  FORCE_DB_RESET is set. Resetting database..."
+    python force_reset_and_migrate.py || {
+        echo "❌ Force reset failed. Trying alternate method..."
+        # Try dropping tables via Django
+        python manage.py dbshell << EOF
+DO \$\$ 
+DECLARE r RECORD;
+BEGIN
+    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') 
+    LOOP
+        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+    END LOOP;
+END \$\$;
+EOF
+        python manage.py migrate --noinput --run-syncdb
+    }
+    echo "✅ Database reset complete"
+fi
+
 # If ALLOWED_HOSTS is not set, try to auto-detect from Railway
 if [ -z "$ALLOWED_HOSTS" ]; then
     if [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
