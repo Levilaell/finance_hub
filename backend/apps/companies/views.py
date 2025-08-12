@@ -47,7 +47,7 @@ class CompanyDetailView(CompanyValidationMixin, APIView):
     def get(self, request):
         company, error_response = self.get_user_company(request)
         if error_response:
-            return error_response
+            return Response(error_response['error'], status=error_response['status'])
         
         serializer = CompanySerializer(company)
         return Response(serializer.data)
@@ -60,7 +60,7 @@ class UsageLimitsView(CompanyValidationMixin, APIView):
     def get(self, request):
         company, error_response = self.get_user_company(request)
         if error_response:
-            return error_response
+            return Response(error_response['error'], status=error_response['status'])
         
         # Get current usage
         from apps.banking.models import BankAccount
@@ -132,7 +132,7 @@ class SubscriptionStatusView(CompanyValidationMixin, APIView):
     def get(self, request):
         company, error_response = self.get_user_company(request)
         if error_response:
-            return error_response
+            return Response(error_response['error'], status=error_response['status'])
         
         # Check payment method (simplified - just check if subscription_id exists)
         has_payment_method = bool(company.subscription_id)
@@ -145,7 +145,7 @@ class SubscriptionStatusView(CompanyValidationMixin, APIView):
         
         data = {
             'subscription_status': company.subscription_status,
-            'plan': company.subscription_plan,
+            'plan': SubscriptionPlanSerializer(company.subscription_plan).data if company.subscription_plan else None,
             'trial_days_left': company.days_until_trial_ends,
             'trial_ends_at': company.trial_ends_at,
             'requires_payment_setup': requires_payment_setup,

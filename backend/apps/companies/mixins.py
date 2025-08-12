@@ -3,7 +3,7 @@ Company-related mixins for safe access
 """
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, NotAuthenticated
 
 
 class CompanyValidationMixin:
@@ -19,10 +19,11 @@ class CompanyValidationMixin:
         user = request.user
         
         if not user.is_authenticated:
-            return None, Response(
-                {"error": {"message": "Authentication required"}},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            # Return None with error data to be handled by view
+            return None, {
+                "error": {"message": "Authentication required"},
+                "status": status.HTTP_401_UNAUTHORIZED
+            }
         
         # Try to get company
         try:
@@ -31,24 +32,12 @@ class CompanyValidationMixin:
         except:
             pass
         
-        # If no company, return error response
-        return None, Response(
-            {"error": {"message": "You must be associated with a company to access this resource. "
-                       "Please contact support if you believe this is an error."}},
-            status=status.HTTP_403_FORBIDDEN
-        )
-    
-    def dispatch(self, request, *args, **kwargs):
-        """
-        Override dispatch to check company access early
-        """
-        if request.user.is_authenticated and request.method != 'OPTIONS':
-            # Check if user has company access
-            company, error_response = self.get_user_company(request)
-            if error_response:
-                return error_response
-        
-        return super().dispatch(request, *args, **kwargs)
+        # If no company, return error data
+        return None, {
+            "error": {"message": "You must be associated with a company to access this resource. "
+                       "Please contact support if you believe this is an error."},
+            "status": status.HTTP_403_FORBIDDEN
+        }
 
 
 # Alias for backward compatibility

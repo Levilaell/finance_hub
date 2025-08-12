@@ -386,8 +386,10 @@ class BankAccountViewSet(CompanyAccessMixin, viewsets.ReadOnlyModelViewSet):
                     
                     account.item.status = item_data.get('status', account.item.status)
                     account.item.execution_status = item_data.get('executionStatus', '')
-                    account.item.error_code = item_data.get('error', {}).get('code', '')
-                    account.item.error_message = item_data.get('error', {}).get('message', '')
+                    # Handle error field safely - it might be None
+                    error_data = item_data.get('error') or {}
+                    account.item.error_code = error_data.get('code', '')
+                    account.item.error_message = error_data.get('message', '')
                     account.item.pluggy_updated_at = item_data.get('updatedAt', account.item.pluggy_updated_at)
                     account.item.save()
                     
@@ -502,13 +504,15 @@ class BankAccountViewSet(CompanyAccessMixin, viewsets.ReadOnlyModelViewSet):
             if sync_result:
                 response_data['sync_result'] = sync_result
                 response_data['message'] = 'Sync completed successfully (synchronous mode)'
-                if sync_result.get('transactions_synced'):
+                if sync_result and isinstance(sync_result, dict) and sync_result.get('transactions_synced'):
                     response_data['message'] += f' - {sync_result["transactions_synced"]} transactions synced'
             
             return Response(response_data)
             
         except Exception as e:
+            import traceback
             logger.error(f"Failed to sync account: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
