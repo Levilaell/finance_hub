@@ -41,6 +41,44 @@ python manage.py migrate --no-input || {
 echo "📦 Collecting static files..."
 python manage.py collectstatic --no-input || echo "⚠️  Static files collection had issues"
 
+# Initialize production data
+echo "📊 Initializing production data..."
+
+# Create subscription plans
+echo "  Creating subscription plans..."
+python manage.py create_subscription_plans 2>/dev/null || echo "  ℹ️  Subscription plans already exist or could not be created"
+
+# Sync Pluggy connectors (banks)
+if [ -n "$PLUGGY_CLIENT_ID" ] && [ -n "$PLUGGY_CLIENT_SECRET" ]; then
+    echo "  Syncing Pluggy connectors..."
+    python manage.py sync_pluggy_connectors 2>/dev/null || echo "  ⚠️  Could not sync Pluggy connectors"
+else
+    echo "  ℹ️  Skipping Pluggy sync (API keys not configured)"
+fi
+
+# Create default transaction categories
+echo "  Creating default categories..."
+python -c "
+import django
+django.setup()
+from apps.banking.models import TransactionCategory
+categories = [
+    {'name': 'Alimentação', 'slug': 'alimentacao', 'icon': '🍴', 'color': '#FF6B6B'},
+    {'name': 'Transporte', 'slug': 'transporte', 'icon': '🚗', 'color': '#4ECDC4'},
+    {'name': 'Moradia', 'slug': 'moradia', 'icon': '🏠', 'color': '#45B7D1'},
+    {'name': 'Saúde', 'slug': 'saude', 'icon': '⚕️', 'color': '#96CEB4'},
+    {'name': 'Educação', 'slug': 'educacao', 'icon': '📚', 'color': '#FECA57'},
+    {'name': 'Lazer', 'slug': 'lazer', 'icon': '🎮', 'color': '#9C88FF'},
+    {'name': 'Compras', 'slug': 'compras', 'icon': '🛍️', 'color': '#FD79A8'},
+    {'name': 'Serviços', 'slug': 'servicos', 'icon': '🔧', 'color': '#A29BFE'},
+    {'name': 'Investimentos', 'slug': 'investimentos', 'icon': '📈', 'color': '#00B894'},
+    {'name': 'Outros', 'slug': 'outros', 'icon': '📌', 'color': '#636E72'},
+]
+for cat in categories:
+    TransactionCategory.objects.get_or_create(slug=cat['slug'], defaults=cat)
+print('  ✅ Default categories created')
+" 2>/dev/null || echo "  ℹ️  Categories already exist or could not be created"
+
 # Create default superuser if it doesn't exist
 echo "👤 Checking for superuser..."
 python -c "
