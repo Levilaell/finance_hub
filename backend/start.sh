@@ -44,9 +44,13 @@ python manage.py collectstatic --no-input || echo "⚠️  Static files collecti
 # Initialize production data
 echo "📊 Initializing production data..."
 
-# Create subscription plans
+# Create and sync subscription plans with Stripe
 echo "  Creating subscription plans..."
 python manage.py create_subscription_plans 2>/dev/null || echo "  ℹ️  Subscription plans already exist or could not be created"
+
+# Sync subscription plans with correct prices and Stripe IDs
+echo "  Syncing subscription plans with Stripe..."
+python manage.py sync_subscription_plans 2>/dev/null || echo "  ⚠️  Could not sync subscription plans"
 
 # Sync Pluggy connectors (banks)
 if [ -n "$PLUGGY_CLIENT_ID" ] && [ -n "$PLUGGY_CLIENT_SECRET" ]; then
