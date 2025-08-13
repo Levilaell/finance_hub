@@ -1,5 +1,6 @@
 """
-Simplified command to create subscription plans
+Command to create or update subscription plans with Stripe integration
+Syncs pricing with Stripe dashboard and frontend
 """
 from decimal import Decimal
 from django.core.management.base import BaseCommand
@@ -7,20 +8,32 @@ from apps.companies.models import SubscriptionPlan
 
 
 class Command(BaseCommand):
-    help = 'Create or update subscription plans'
+    help = 'Create or update subscription plans with correct Stripe pricing'
 
     def handle(self, *args, **options):
+        """
+        Plans synchronized with:
+        - Stripe Dashboard (price IDs from actual products)
+        - Frontend pricing page
+        - Backend models
+        """
         plans = [
             {
                 'name': 'Starter',
                 'slug': 'starter',
                 'plan_type': 'standard',
                 'trial_days': 14,
-                'price_monthly': Decimal('29.90'),
-                'price_yearly': Decimal('299.00'),
+                # Prices synced with Stripe and frontend
+                'price_monthly': Decimal('49.00'),  # R$ 49/mês
+                'price_yearly': Decimal('490.00'),   # R$ 490/ano
+                # Stripe Price IDs from dashboard
+                'stripe_price_id_monthly': 'price_1RkePtPFSVtvOaJKYbiX6TqQ',  # prod_Sg0QBa3Hbj97lf monthly
+                'stripe_price_id_yearly': 'price_1RnPVfPFSVtvOaJKmwzNmUdz',   # prod_Sg0QBa3Hbj97lf yearly
+                # Limits
                 'max_transactions': 500,
-                'max_bank_accounts': 2,
-                'max_ai_requests_per_month': 50,
+                'max_bank_accounts': 1,  # Updated to match frontend
+                'max_ai_requests_per_month': 0,  # Starter doesn't have AI
+                # Features
                 'has_ai_categorization': False,
                 'enable_ai_insights': False,
                 'enable_ai_reports': False,
@@ -36,11 +49,17 @@ class Command(BaseCommand):
                 'slug': 'professional',
                 'plan_type': 'standard',
                 'trial_days': 14,
-                'price_monthly': Decimal('59.90'),
-                'price_yearly': Decimal('599.00'),
-                'max_transactions': 2000,
-                'max_bank_accounts': 5,
-                'max_ai_requests_per_month': 200,
+                # Prices synced with Stripe and frontend
+                'price_monthly': Decimal('149.00'),  # R$ 149/mês
+                'price_yearly': Decimal('1490.00'),  # R$ 1490/ano
+                # Stripe Price IDs from dashboard
+                'stripe_price_id_monthly': 'price_1RkeQgPFSVtvOaJKgPQzW1SD',  # prod_Sg0RnnnAC68Di5R monthly
+                'stripe_price_id_yearly': 'price_1RnPVRPFSVtvOaJKlWxiSHnn',   # prod_Sg0RnnnAC68Di5R yearly
+                # Limits
+                'max_transactions': 2500,  # Updated to match frontend
+                'max_bank_accounts': 3,     # Updated to match frontend
+                'max_ai_requests_per_month': 10,  # 10 AI interactions/month
+                # Features
                 'has_ai_categorization': True,
                 'enable_ai_insights': True,
                 'enable_ai_reports': True,
@@ -56,11 +75,17 @@ class Command(BaseCommand):
                 'slug': 'enterprise',
                 'plan_type': 'enterprise',
                 'trial_days': 30,
-                'price_monthly': Decimal('199.90'),
-                'price_yearly': Decimal('1999.00'),
+                # Prices synced with Stripe and frontend
+                'price_monthly': Decimal('349.00'),  # R$ 349/mês
+                'price_yearly': Decimal('3490.00'),  # R$ 3490/ano
+                # Stripe Price IDs from dashboard
+                'stripe_price_id_monthly': 'price_1RkeMJPFSVtvOaJKuIZxvjPa',  # prod_Sg0WMkmUeqiQUm monthly
+                'stripe_price_id_yearly': 'price_1RnPV8PFSVtvOaJKuIZxvjPa',   # prod_Sg0WMkmUeqiQUm yearly
+                # Limits (unlimited)
                 'max_transactions': 99999,  # Effectively unlimited
                 'max_bank_accounts': 99999,  # Effectively unlimited
-                'max_ai_requests_per_month': 99999,  # Effectively unlimited
+                'max_ai_requests_per_month': 99999,  # Unlimited AI
+                # Features (all enabled)
                 'has_ai_categorization': True,
                 'enable_ai_insights': True,
                 'enable_ai_reports': True,

@@ -29,7 +29,7 @@ class SubscriptionService:
     
     @classmethod
     def can_upgrade_plan(cls, current_plan, new_plan) -> Tuple[bool, str]:
-        """Check if plan upgrade is allowed"""
+        """Check if plan change is allowed with proper validation"""
         from ..models import SubscriptionPlan
         
         # Define plan hierarchy
@@ -39,8 +39,8 @@ class SubscriptionService:
             'enterprise': 3
         }
         
-        current_level = plan_hierarchy.get(current_plan.name, 0)
-        new_level = plan_hierarchy.get(new_plan.name, 0)
+        current_level = plan_hierarchy.get(current_plan.slug.lower(), 0)
+        new_level = plan_hierarchy.get(new_plan.slug.lower(), 0)
         
         if new_level > current_level:
             return True, "upgrade"
@@ -48,6 +48,40 @@ class SubscriptionService:
             return True, "downgrade"
         else:
             return False, "same_plan"
+    
+    @classmethod
+    def validate_downgrade(cls, company, current_plan, new_plan) -> Tuple[bool, str]:
+        """
+        Validate if downgrade is possible based on current usage.
+        Returns (can_downgrade: bool, reason: str)
+        """
+        # Get current usage
+        usage = company.get_usage_summary()
+        
+        # Check transactions
+        if usage['transactions']['used'] > new_plan.max_transactions:
+            return False, f"Current transactions ({usage['transactions']['used']}) exceed new plan limit ({new_plan.max_transactions})"
+        
+        # Check bank accounts
+        if usage['bank_accounts']['used'] > new_plan.max_bank_accounts:
+            return False, f"Current bank accounts ({usage['bank_accounts']['used']}) exceed new plan limit ({new_plan.max_bank_accounts})"
+        
+        # Check AI requests
+        if usage['ai_requests']['used'] > new_plan.max_ai_requests_per_month:
+            return False, f"Current AI requests ({usage['ai_requests']['used']}) exceed new plan limit ({new_plan.max_ai_requests_per_month})"
+        
+        # Check feature compatibility
+        if current_plan.has_ai_categorization and not new_plan.has_ai_categorization:
+            # Check if there are AI-categorized transactions
+            from apps.banking.models import Transaction
+            ai_categorized = Transaction.objects.filter(
+                company=company,
+                categorized_by='ai'
+            ).exists()
+            if ai_categorized:
+                return False, "You have AI-categorized transactions. Please review them before downgrading."
+        
+        return True, "Downgrade allowed"
     
     @classmethod
     def calculate_proration(cls, subscription, new_plan, billing_period='monthly') -> Dict[str, Any]:
@@ -112,6 +146,14 @@ class SubscriptionService:
         if not can_change:
             raise ValueError("Cannot change to the same plan")
         
+        # For downgrades, validate current usage
+        if change_type == "downgrade":
+            can_downgrade, reason = cls.validate_downgrade(
+                subscription.company, subscription.plan, new_plan
+            )
+            if not can_downgrade:
+                raise ValueError(f"Downgrade not allowed: {reason}")
+        
         # Use current billing period if not specified
         if not billing_period:
             billing_period = subscription.billing_period
@@ -141,25 +183,42 @@ class SubscriptionService:
             try:
                 stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
                 
+                # Get the appropriate price ID
+                price_id = new_plan.stripe_price_id_yearly if billing_period == 'yearly' else new_plan.stripe_price_id_monthly
+                
                 # Update subscription with new price
-                updated_sub = stripe.Subscription.modify(
-                    subscription.stripe_subscription_id,
-                    items=[{
-                        'id': stripe_sub['items']['data'][0]['id'],
-                        'price_data': {
-                            'currency': 'brl',
-                            'product_data': {
-                                'name': new_plan.display_name,
-                            },
-                            'unit_amount': int(new_plan.get_price(billing_period) * 100),
-                            'recurring': {
-                                'interval': 'year' if billing_period == 'yearly' else 'month',
-                                'interval_count': 1
+                if price_id:
+                    # Use pre-configured price ID (preferred)
+                    updated_sub = stripe.Subscription.modify(
+                        subscription.stripe_subscription_id,
+                        items=[{
+                            'id': stripe_sub['items']['data'][0]['id'],
+                            'price': price_id,
+                            'quantity': 1
+                        }],
+                        proration_behavior='create_prorations' if immediate else 'none'
+                    )
+                else:
+                    # Fallback to dynamic pricing if no price ID
+                    logger.warning(f"No Stripe price ID for plan {new_plan.name}, using dynamic pricing")
+                    updated_sub = stripe.Subscription.modify(
+                        subscription.stripe_subscription_id,
+                        items=[{
+                            'id': stripe_sub['items']['data'][0]['id'],
+                            'price_data': {
+                                'currency': 'brl',
+                                'product_data': {
+                                    'name': new_plan.name,
+                                },
+                                'unit_amount': int(new_plan.get_price(billing_period) * 100),
+                                'recurring': {
+                                    'interval': 'year' if billing_period == 'yearly' else 'month',
+                                    'interval_count': 1
+                                }
                             }
-                        }
-                    }],
-                    proration_behavior='create_prorations' if immediate else 'none'
-                )
+                        }],
+                        proration_behavior='create_prorations' if immediate else 'none'
+                    )
                 
                 # Update local subscription
                 subscription.plan = new_plan
@@ -191,24 +250,42 @@ class SubscriptionService:
         else:
             # Schedule change for next billing period
             try:
-                stripe.Subscription.modify(
-                    subscription.stripe_subscription_id,
-                    items=[{
-                        'id': stripe_sub['items']['data'][0]['id'],
-                        'price_data': {
-                            'currency': 'brl',
-                            'product_data': {
-                                'name': new_plan.display_name,
-                            },
-                            'unit_amount': int(new_plan.get_price(billing_period) * 100),
-                            'recurring': {
-                                'interval': 'year' if billing_period == 'yearly' else 'month',
-                                'interval_count': 1
+                stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+                
+                # Get the appropriate price ID
+                price_id = new_plan.stripe_price_id_yearly if billing_period == 'yearly' else new_plan.stripe_price_id_monthly
+                
+                if price_id:
+                    # Use pre-configured price ID (preferred)
+                    stripe.Subscription.modify(
+                        subscription.stripe_subscription_id,
+                        items=[{
+                            'id': stripe_sub['items']['data'][0]['id'],
+                            'price': price_id,
+                            'quantity': 1
+                        }],
+                        proration_behavior='none'
+                    )
+                else:
+                    # Fallback to dynamic pricing if no price ID
+                    stripe.Subscription.modify(
+                        subscription.stripe_subscription_id,
+                        items=[{
+                            'id': stripe_sub['items']['data'][0]['id'],
+                            'price_data': {
+                                'currency': 'brl',
+                                'product_data': {
+                                    'name': new_plan.name,
+                                },
+                                'unit_amount': int(new_plan.get_price(billing_period) * 100),
+                                'recurring': {
+                                    'interval': 'year' if billing_period == 'yearly' else 'month',
+                                    'interval_count': 1
+                                }
                             }
-                        }
-                    }],
-                    proration_behavior='none'
-                )
+                        }],
+                        proration_behavior='none'
+                    )
                 
                 # Store pending change in metadata
                 subscription.metadata = subscription.metadata or {}

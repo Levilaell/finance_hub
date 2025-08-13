@@ -25,19 +25,19 @@ class WebhookHandler:
             'customer.subscription.updated': self._handle_subscription_updated,
             'customer.subscription.deleted': self._handle_subscription_deleted,
             'customer.subscription.trial_will_end': ExtendedWebhookHandlers.handle_trial_ending,
-            'customer.subscription.paused': ProductionWebhookHandlers.handle_subscription_paused,
-            'customer.subscription.resumed': ProductionWebhookHandlers.handle_subscription_resumed,
+            # 'customer.subscription.paused': ProductionWebhookHandlers.handle_subscription_paused,
+            # 'customer.subscription.resumed': ProductionWebhookHandlers.handle_subscription_resumed,
             
             # Invoice events
-            'invoice.created': ProductionWebhookHandlers.handle_invoice_created,
-            'invoice.finalized': ProductionWebhookHandlers.handle_invoice_finalized,
+            # 'invoice.created': ProductionWebhookHandlers.handle_invoice_created,
+            # 'invoice.finalized': ProductionWebhookHandlers.handle_invoice_finalized,
             'invoice.payment_succeeded': self._handle_invoice_payment,
             'invoice.payment_failed': self._handle_payment_failed,
             'invoice.payment_action_required': ExtendedWebhookHandlers.handle_payment_action_required,
             
             # Payment events
-            'charge.succeeded': ProductionWebhookHandlers.handle_charge_succeeded,
-            'charge.failed': ProductionWebhookHandlers.handle_charge_failed,
+            # 'charge.succeeded': ProductionWebhookHandlers.handle_charge_succeeded,
+            # 'charge.failed': ProductionWebhookHandlers.handle_charge_failed,
             'payment_intent.succeeded': self._handle_payment_intent_succeeded,
             'payment_intent.payment_failed': self._handle_payment_intent_failed,
             
@@ -47,7 +47,7 @@ class WebhookHandler:
             'payment_method.updated': ExtendedWebhookHandlers.handle_payment_method_updated,
             
             # Customer events
-            'customer.created': ProductionWebhookHandlers.handle_customer_created,
+            # 'customer.created': ProductionWebhookHandlers.handle_customer_created,
             'customer.updated': self._handle_customer_updated,
             'customer.deleted': self._handle_customer_deleted,
             
@@ -58,17 +58,17 @@ class WebhookHandler:
             'charge.dispute.funds_reinstated': self._handle_dispute_funds_reinstated,
             
             # Price and product events
-            'price.updated': ProductionWebhookHandlers.handle_price_updated,
+            # 'price.updated': ProductionWebhookHandlers.handle_price_updated,
             'product.updated': self._handle_product_updated,
             
             # Billing portal events
-            'billing_portal.session.created': ProductionWebhookHandlers.handle_billing_portal_session_created,
+            # 'billing_portal.session.created': ProductionWebhookHandlers.handle_billing_portal_session_created,
             
             # Security events
-            'radar.early_fraud_warning.created': ProductionWebhookHandlers.handle_radar_early_fraud_warning,
+            # 'radar.early_fraud_warning.created': ProductionWebhookHandlers.handle_radar_early_fraud_warning,
             
             # Schedule events
-            'subscription_schedule.created': ProductionWebhookHandlers.handle_subscription_schedule_created,
+            # 'subscription_schedule.created': ProductionWebhookHandlers.handle_subscription_schedule_created,
             'subscription_schedule.updated': self._handle_subscription_schedule_updated,
         }
         
@@ -86,21 +86,127 @@ class WebhookHandler:
             logger.info(f"Unhandled webhook event type: {event['type']}")
             return {'status': 'unhandled'}
     
+    def _handle_subscription_created(self, event):
+        """Handle subscription created event"""
+        logger.info(f"Subscription created: {event['data']['object']['id']}")
+        return {'status': 'success'}
+    
+    def _handle_subscription_updated(self, event):
+        """Handle subscription updated event"""
+        from ..models import Subscription
+        
+        stripe_sub = event['data']['object']
+        
+        try:
+            subscription = Subscription.objects.get(
+                stripe_subscription_id=stripe_sub['id']
+            )
+            
+            # Update status
+            status_map = {
+                'trialing': 'trial',
+                'active': 'active',
+                'past_due': 'past_due',
+                'canceled': 'cancelled',
+                'unpaid': 'past_due'
+            }
+            
+            subscription.status = status_map.get(stripe_sub['status'], 'expired')
+            subscription.save()
+            
+            logger.info(f"Subscription {subscription.id} updated to status: {subscription.status}")
+            return {'status': 'success'}
+            
+        except Subscription.DoesNotExist:
+            logger.warning(f"Subscription not found for Stripe ID: {stripe_sub['id']}")
+            return {'status': 'not_found'}
+    
+    def _handle_subscription_deleted(self, event):
+        """Handle subscription deleted event"""
+        from ..models import Subscription
+        
+        stripe_sub = event['data']['object']
+        
+        try:
+            subscription = Subscription.objects.get(
+                stripe_subscription_id=stripe_sub['id']
+            )
+            subscription.status = 'cancelled'
+            subscription.cancelled_at = timezone.now()
+            subscription.save()
+            
+            logger.info(f"Subscription {subscription.id} cancelled")
+            return {'status': 'success'}
+            
+        except Subscription.DoesNotExist:
+            logger.warning(f"Subscription not found for Stripe ID: {stripe_sub['id']}")
+            return {'status': 'not_found'}
+    
+    def _handle_payment_intent_succeeded(self, event):
+        """Handle payment intent succeeded"""
+        logger.info(f"Payment intent succeeded: {event['data']['object']['id']}")
+        return {'status': 'success'}
+    
+    def _handle_payment_intent_failed(self, event):
+        """Handle payment intent failed"""
+        logger.error(f"Payment intent failed: {event['data']['object']['id']}")
+        return {'status': 'success'}
+    
+    def _handle_customer_updated(self, event):
+        """Handle customer updated event"""
+        logger.info(f"Customer updated: {event['data']['object']['id']}")
+        return {'status': 'success'}
+    
+    def _handle_customer_deleted(self, event):
+        """Handle customer deleted event"""
+        logger.info(f"Customer deleted: {event['data']['object']['id']}")
+        return {'status': 'success'}
+    
+    def _handle_dispute_funds_withdrawn(self, event):
+        """Handle dispute funds withdrawn"""
+        logger.warning(f"Dispute funds withdrawn: {event['data']['object']['id']}")
+        return {'status': 'success'}
+    
+    def _handle_dispute_funds_reinstated(self, event):
+        """Handle dispute funds reinstated"""
+        logger.info(f"Dispute funds reinstated: {event['data']['object']['id']}")
+        return {'status': 'success'}
+    
+    def _handle_product_updated(self, event):
+        """Handle product updated event"""
+        logger.info(f"Product updated: {event['data']['object']['id']}")
+        return {'status': 'success'}
+    
+    def _handle_subscription_schedule_updated(self, event):
+        """Handle subscription schedule updated"""
+        logger.info(f"Subscription schedule updated: {event['data']['object']['id']}")
+        return {'status': 'success'}
+    
     def _handle_checkout_completed(self, event):
         """Handle successful checkout session"""
         from ..models import Subscription, SubscriptionPlan, Payment
         from apps.companies.models import Company
         
         session = event['data']['object']
-        metadata = session.get('subscription_metadata', {})
         
-        # Get company and plan
+        # Metadata can be at session level or in subscription_data
+        metadata = session.get('metadata', {})
+        
+        # If metadata is not at session level, check subscription_data
+        if not metadata.get('company_id'):
+            subscription_metadata = session.get('subscription_data', {}).get('metadata', {})
+            if subscription_metadata:
+                metadata = subscription_metadata
+        
+        # Get company and plan from metadata
         company_id = metadata.get('company_id')
         plan_id = metadata.get('plan_id')
         billing_period = metadata.get('billing_period', 'monthly')
         
         if not company_id or not plan_id:
             logger.error(f"Missing metadata in checkout session: {session['id']}")
+            logger.error(f"Session metadata: {session.get('metadata')}")
+            logger.error(f"Subscription metadata: {session.get('subscription_data', {}).get('metadata')}")
             return {'status': 'error', 'message': 'Missing metadata'}
         
         try:

@@ -70,7 +70,37 @@ class SubscriptionPlan(models.Model):
         ordering = ['display_order', 'price_monthly']
     
     def __str__(self):
-        return f"{self.name} - ${self.price_monthly}/mo"
+        return f"{self.name} - R$ {self.price_monthly}/mês"
+    
+    def get_price(self, billing_period='monthly'):
+        """Get price based on billing period"""
+        if billing_period == 'yearly':
+            return self.price_yearly
+        return self.price_monthly
+    
+    def get_stripe_price_id(self, billing_period='monthly'):
+        """Get Stripe price ID based on billing period"""
+        if billing_period == 'yearly':
+            return self.stripe_price_id_yearly
+        return self.stripe_price_id_monthly
+    
+    def has_stripe_ids(self):
+        """Check if Stripe price IDs are configured"""
+        return bool(self.stripe_price_id_monthly and self.stripe_price_id_yearly)
+    
+    @property
+    def display_name(self):
+        """Get display name for UI"""
+        return self.name
+    
+    @property
+    def monthly_discount_percentage(self):
+        """Calculate discount percentage for yearly billing"""
+        if self.price_monthly == 0:
+            return 0
+        yearly_monthly = self.price_yearly / 12
+        discount = ((self.price_monthly - yearly_monthly) / self.price_monthly) * 100
+        return round(discount, 0)
 
 
 class Company(models.Model):

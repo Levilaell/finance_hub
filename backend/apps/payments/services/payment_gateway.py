@@ -65,7 +65,7 @@ class StripeGateway(PaymentGateway):
             raise
     
     def create_checkout_session(self, company, plan, billing_period, success_url, cancel_url):
-        """Create Stripe checkout session"""
+        """Create Stripe checkout session using pre-configured price IDs"""
         try:
             # Get or create customer
             subscription = getattr(company, 'subscription', None)
@@ -78,20 +78,32 @@ class StripeGateway(PaymentGateway):
                     user = company.users.first()
                 customer_id = self.create_customer(company, user)
             
-            # Determine price based on billing period
-            price = plan.get_price(billing_period)
-            interval = 'year' if billing_period == 'yearly' else 'month'
+            # Use Stripe Price IDs instead of creating price_data dynamically
+            price_id = None
+            if billing_period == 'yearly':
+                price_id = plan.stripe_price_id_yearly
+            else:
+                price_id = plan.stripe_price_id_monthly
             
-            # Create checkout session
-            session = stripe.checkout.Session.create(
-                customer=customer_id,
-                payment_method_types=['card'],
-                line_items=[{
+            # Create line items based on whether we have price IDs
+            if price_id:
+                # Use pre-configured Stripe price ID (preferred)
+                line_items = [{
+                    'price': price_id,
+                    'quantity': 1
+                }]
+                logger.info(f"Using Stripe price ID: {price_id} for plan: {plan.name}")
+            else:
+                # Fallback to dynamic price_data if IDs not configured
+                logger.warning(f"No Stripe price ID for plan: {plan.name}, using dynamic pricing")
+                price = plan.get_price(billing_period)
+                interval = 'year' if billing_period == 'yearly' else 'month'
+                line_items = [{
                     'price_data': {
                         'currency': 'brl',
                         'product_data': {
-                            'name': plan.display_name,
-                            'description': f'{plan.display_name} - {billing_period.title()} billing'
+                            'name': plan.name,
+                            'description': f'{plan.name} - {billing_period.title()} billing'
                         },
                         'unit_amount': int(price * 100),  # Convert to cents
                         'recurring': {
@@ -100,12 +112,24 @@ class StripeGateway(PaymentGateway):
                         }
                     },
                     'quantity': 1
-                }],
+                }]
+            
+            # Create checkout session with proper metadata
+            session = stripe.checkout.Session.create(
+                customer=customer_id,
+                payment_method_types=['card'],
+                line_items=line_items,
                 mode='subscription',
                 success_url=success_url,
                 cancel_url=cancel_url,
+                # Store metadata at the session level for webhook processing
+                metadata={
+                    'company_id': str(company.id),
+                    'plan_id': str(plan.id),
+                    'billing_period': billing_period
+                },
                 subscription_data={
-                    'trial_period_days': 14 if not subscription else 0,
+                    'trial_period_days': plan.trial_days if not subscription else 0,
                     'metadata': {
                         'company_id': str(company.id),
                         'plan_id': str(plan.id),
@@ -113,6 +137,8 @@ class StripeGateway(PaymentGateway):
                     }
                 }
             )
+            
+            logger.info(f"Created checkout session {session.id} for company {company.id}")
             
             return {
                 'session_id': session.id,
