@@ -141,52 +141,66 @@ const CategoryPieChart = memo(({
     );
   }
 
-  // Prepare data for the chart
-  const chartData = data.slice(0, 10).map((item) => ({
+  // Prepare data for the chart - limit to top 8 for better visualization
+  const chartData = data.slice(0, 8).map((item) => ({
     ...item,
     name: item.category.name,
   }));
 
+  // Calculate chart and legend heights
+  const chartHeight = showLegend ? height - 80 : height;
+  
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <PieChart>
-        <Pie
-          activeIndex={activeIndex}
-          activeShape={renderActiveShape}
-          data={chartData}
-          cx="50%"
-          cy="50%"
-          labelLine={false}
-          outerRadius={100}
-          fill="#8884d8"
-          dataKey="amount"
-          onMouseEnter={onPieEnter}
-        >
-          {chartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip 
-          formatter={(value: number) => formatCurrency(value)}
-          contentStyle={{
-            backgroundColor: 'hsl(var(--card))',
-            border: '1px solid hsl(var(--border))',
-            borderRadius: '6px',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-          }}
-        />
-        {showLegend && (
-          <Legend 
-            verticalAlign="bottom" 
-            height={36}
-            formatter={(value) => {
-              const item = chartData.find(d => d.name === value);
-              return `${value} (${item?.percentage}%)`;
+    <div style={{ height, position: 'relative' }}>
+      <ResponsiveContainer width="100%" height={chartHeight}>
+        <PieChart>
+          <Pie
+            activeIndex={activeIndex}
+            activeShape={renderActiveShape}
+            data={chartData}
+            cx="50%"
+            cy="50%"
+            labelLine={false}
+            outerRadius={showLegend ? 70 : 80}
+            fill="#8884d8"
+            dataKey="amount"
+            onMouseEnter={onPieEnter}
+          >
+            {chartData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip 
+            formatter={(value: number) => formatCurrency(value)}
+            contentStyle={{
+              backgroundColor: 'hsl(var(--card))',
+              border: '1px solid hsl(var(--border))',
+              borderRadius: '6px',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
             }}
           />
-        )}
-      </PieChart>
-    </ResponsiveContainer>
+        </PieChart>
+      </ResponsiveContainer>
+      
+      {showLegend && (
+        <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 px-2 mt-2" style={{ maxHeight: '70px', overflow: 'hidden' }}>
+          {chartData.map((entry, index) => (
+            <div key={`legend-${index}`} className="flex items-center gap-1 text-xs">
+              <div 
+                className="w-2 h-2 rounded-full flex-shrink-0" 
+                style={{ backgroundColor: COLORS[index % COLORS.length] }}
+              />
+              <span className="text-muted-foreground truncate" style={{ maxWidth: '100px' }}>
+                {entry.name.length > 12 ? entry.name.substring(0, 10) + '...' : entry.name}
+              </span>
+              <span className="text-muted-foreground">
+                ({entry.percentage || 0}%)
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 });
 

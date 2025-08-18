@@ -44,7 +44,8 @@ export function useUsageLimits() {
   const shouldShowUsageWarning = (): boolean => {
     if (!usageLimits) return false;
     
-    const types: Array<keyof UsageLimits> = ['transactions', 'bank_accounts', 'ai_requests'];
+    // Temporariamente removido ai_requests até implementação completa
+    const types: Array<keyof UsageLimits> = ['transactions', 'bank_accounts'];
     return types.some(type => getUsagePercentage(type) >= 80);
   };
 

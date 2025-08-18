@@ -29,6 +29,9 @@ export default function Home() {
               <h1 className="text-xl sm:text-2xl font-bold text-white">CaixaHub</h1>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
+              <Link href="/como-funciona" className="hidden sm:inline text-muted-foreground hover:text-foreground transition-colors">
+                Como funciona
+              </Link>
               <Link href="/pricing" className="hidden sm:inline text-muted-foreground hover:text-foreground transition-colors">
                 Planos
               </Link>
@@ -175,9 +178,11 @@ export default function Home() {
                     </p>
                   </div>
                 </div>
-                <Button size="lg" className="mt-6 btn-gradient hover-lift">
-                  Ver Como Funciona
-                  <ArrowRightIcon className="ml-2 h-5 w-5" />
+                <Button size="lg" asChild className="mt-6 btn-gradient hover-lift">
+                  <Link href="/como-funciona">
+                    Ver Como Funciona
+                    <ArrowRightIcon className="ml-2 h-5 w-5" />
+                  </Link>
                 </Button>
               </div>
             </div>

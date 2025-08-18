@@ -208,13 +208,13 @@ export const reportsService = {
     start_date: Date;
     end_date: Date;
   }) {
-    const response = await apiClient.get<any>('/api/reports/dashboard/cash-flow/', {
-      params: {
-        start_date: params.start_date.toISOString().split('T')[0],
-        end_date: params.end_date.toISOString().split('T')[0],
-      }
-    });
-    return response.data;
+    const queryParams = {
+      start_date: params.start_date.toISOString().split('T')[0],
+      end_date: params.end_date.toISOString().split('T')[0],
+    };
+    // Use the apiClient.get method correctly - it expects params as second argument, not as config
+    const data = await apiClient.get<any>('/api/reports/dashboard/cash-flow/', queryParams);
+    return data;
   },
 
   async getCategorySpending(params: {
@@ -222,27 +222,27 @@ export const reportsService = {
     end_date: Date;
     type?: 'expense' | 'income';
   }) {
-    const response = await apiClient.get<any>('/api/reports/dashboard/category-spending/', {
-      params: {
-        start_date: params.start_date.toISOString().split('T')[0],
-        end_date: params.end_date.toISOString().split('T')[0],
-        type: params.type || 'expense',
-      }
-    });
-    return response.data;
+    const queryParams = {
+      start_date: params.start_date.toISOString().split('T')[0],
+      end_date: params.end_date.toISOString().split('T')[0],
+      type: params.type || 'expense',
+    };
+    // Use the apiClient.get method correctly - it expects params as second argument
+    const data = await apiClient.get<any>('/api/reports/dashboard/category-spending/', queryParams);
+    return data;
   },
 
   async getIncomeVsExpenses(params: {
     start_date: Date;
     end_date: Date;
   }) {
-    const response = await apiClient.get<any>('/api/reports/dashboard/income-vs-expenses/', {
-      params: {
-        start_date: params.start_date.toISOString().split('T')[0],
-        end_date: params.end_date.toISOString().split('T')[0],
-      }
-    });
-    return response.data;
+    const queryParams = {
+      start_date: params.start_date.toISOString().split('T')[0],
+      end_date: params.end_date.toISOString().split('T')[0],
+    };
+    // Use the apiClient.get method correctly - it expects params as second argument
+    const data = await apiClient.get<any>('/api/reports/dashboard/income-vs-expenses/', queryParams);
+    return data;
   },
 
   // AI Insights with enhanced error handling
@@ -321,7 +321,12 @@ export const reportsService = {
   // Report templates
   async getReportTemplates() {
     const response = await apiClient.get<any>('/api/reports/templates/');
-    return response.data;
+    // Handle paginated response from Django REST Framework
+    if (response.data && typeof response.data === 'object' && 'results' in response.data) {
+      return response.data.results || [];
+    }
+    // Fallback for direct array response or empty response
+    return response.data || [];
   },
 
   async createReportTemplate(data: {

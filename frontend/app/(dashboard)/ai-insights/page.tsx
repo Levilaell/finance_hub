@@ -11,8 +11,14 @@ import { useInsights } from './hooks/useInsights';
 import { useConversations } from './hooks/useConversations';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { testId, TEST_IDS } from '@/utils/test-helpers';
+import ComingSoon from '@/components/common/ComingSoon';
 
 function AIInsightsContent() {
+  // Temporariamente desabilitado - retornar componente ComingSoon
+  return <ComingSoon />;
+  
+  // Código original mantido para referência futura (comentado)
+  /*
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const { credits, loading: creditsLoading } = useCredits();
   const { insights, loading: insightsLoading, takeAction, dismissInsight } = useInsights();
@@ -30,16 +36,13 @@ function AIInsightsContent() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] gap-6 p-6">
-      {/* Sidebar */}
       <div className="w-80 flex flex-col gap-4">
-        {/* Credit Balance */}
         <CreditBalance 
           balance={credits?.balance || 0}
           monthlyAllowance={credits?.monthly_allowance || 0}
           bonusCredits={credits?.bonus_credits}
         />
         
-        {/* Conversations */}
         <div className="flex-1 glass rounded-xl overflow-hidden hover-lift transition-all duration-300">
           <ConversationList
             conversations={conversations}
@@ -50,7 +53,6 @@ function AIInsightsContent() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col">
         <Tabs defaultValue="chat" className="flex-1 flex flex-col">
           <TabsList className="w-full justify-start bg-card border border-border rounded-xl">
@@ -87,6 +89,7 @@ function AIInsightsContent() {
       </div>
     </div>
   );
+  */
 }
 
 export default function AIInsightsPage() {

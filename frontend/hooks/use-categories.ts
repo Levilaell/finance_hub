@@ -6,7 +6,7 @@ import { TransactionCategory } from '@/types/banking.types';
 
 interface CreateCategoryData {
   name: string;
-  category_type: 'income' | 'expense';
+  type: 'income' | 'expense';
   color?: string;
   icon?: string;
   parent?: number;

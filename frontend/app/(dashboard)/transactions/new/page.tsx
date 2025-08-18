@@ -194,9 +194,9 @@ export default function NewTransactionPage() {
   // Filter categories based on transaction type
   const filteredCategories = categories.filter(cat => {
     if (transactionType === 'credit') {
-      return cat.category_type === 'income';
+      return cat.type === 'income';
     } else {
-      return cat.category_type === 'expense';
+      return cat.type === 'expense';
     }
   });
 

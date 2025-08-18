@@ -102,10 +102,61 @@ function ReportsPageContent() {
     error: reportDataErrorMessage,
   } = useReportData();
   
-  // Temporary data structures until backend integration is complete
-  const cashFlow = { data: [], isLoading: false };
-  const categorySpending = { data: [], isLoading: false };
-  const incomeVsExpenses = { data: [], isLoading: false };
+  // Fetch dashboard data using React Query
+  const [dateRange, setDateRange] = useState(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setMonth(start.getMonth() - 3); // Default to last 3 months
+    return { start, end };
+  });
+
+  const { data: cashFlowData = [], isLoading: cashFlowLoading } = useQuery({
+    queryKey: ['cashFlow', dateRange.start.toISOString(), dateRange.end.toISOString()],
+    queryFn: () => reportsService.getCashFlowData({
+      start_date: dateRange.start,
+      end_date: dateRange.end
+    }),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // First try to get expense data, fallback to income if no expenses exist
+  const { data: categorySpendingData = [], isLoading: categorySpendingLoading } = useQuery({
+    queryKey: ['categorySpending', dateRange.start.toISOString(), dateRange.end.toISOString()],
+    queryFn: async () => {
+      // Try expense data first
+      const expenseData = await reportsService.getCategorySpending({
+        start_date: dateRange.start,
+        end_date: dateRange.end,
+        type: 'expense'
+      });
+      
+      // If no expense data, try income data
+      if (!expenseData || expenseData.length === 0) {
+        const incomeData = await reportsService.getCategorySpending({
+          start_date: dateRange.start,
+          end_date: dateRange.end,
+          type: 'income'
+        });
+        return incomeData;
+      }
+      
+      return expenseData;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: incomeVsExpensesData = [], isLoading: incomeVsExpensesLoading } = useQuery({
+    queryKey: ['incomeVsExpenses', dateRange.start.toISOString(), dateRange.end.toISOString()],
+    queryFn: () => reportsService.getIncomeVsExpenses({
+      start_date: dateRange.start,
+      end_date: dateRange.end
+    }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const cashFlow = { data: cashFlowData, isLoading: cashFlowLoading };
+  const categorySpending = { data: categorySpendingData, isLoading: categorySpendingLoading };
+  const incomeVsExpenses = { data: incomeVsExpensesData, isLoading: incomeVsExpensesLoading };
   const analytics = { data: null, isLoading: false };
   
   const handleQuickPeriod = (periodId: string) => {
@@ -115,28 +166,32 @@ function ReportsPageContent() {
     let endDate = new Date();
     
     switch (periodId) {
-      case 'thisMonth':
+      case 'current_month':
         startDate = new Date(today.getFullYear(), today.getMonth(), 1);
         endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         break;
-      case 'lastMonth':
+      case 'last_month':
         startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         endDate = new Date(today.getFullYear(), today.getMonth(), 0);
         break;
-      case 'last3Months':
+      case 'quarterly':
+        // Last 3 months
         startDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
         endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         break;
-      case 'last6Months':
-        startDate = new Date(today.getFullYear(), today.getMonth() - 5, 1);
-        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        break;
-      case 'thisYear':
+      case 'year_to_date':
         startDate = new Date(today.getFullYear(), 0, 1);
-        endDate = new Date(today.getFullYear(), 11, 31);
+        endDate = today; // Today for year-to-date
+        break;
+      default:
+        // Default to last 3 months if no match
+        startDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         break;
     }
     
+    // Update both date range and selected period
+    setDateRange({ start: startDate, end: endDate });
     setSelectedPeriod({
       start_date: startDate.toISOString().split('T')[0],
       end_date: endDate.toISOString().split('T')[0]
@@ -326,6 +381,11 @@ function ReportsPageContent() {
                 <CardTitle className="flex items-center text-foreground">
                   <ChartPieIcon className="h-5 w-5 mr-2 text-purple-600" />
                   Distribuição por Categoria
+                  {categorySpending.data && categorySpending.data.length > 0 && (
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      ({categorySpending.data[0]?.amount > 0 ? 'Receitas' : 'Despesas'})
+                    </span>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>

@@ -19,8 +19,8 @@ export function UsageIndicators() {
 
   if (isLoading || !limits) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[1, 2, 3].map(i => (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {[1, 2].map(i => (
           <div key={i} className="bg-gray-50 p-4 rounded-lg animate-pulse">
             <div className="h-4 bg-gray-300 rounded w-1/2 mb-2" />
             <div className="h-2 bg-gray-300 rounded" />
@@ -43,16 +43,17 @@ export function UsageIndicators() {
       data: limits.bank_accounts,
       color: 'green',
     },
-    {
-      name: 'Requisições IA',
-      icon: SparklesIcon,
-      data: limits.ai_requests,
-      color: 'purple',
-    },
+    // Requisições IA será implementado em breve
+    // {
+    //   name: 'Requisições IA',
+    //   icon: SparklesIcon,
+    //   data: limits.ai_requests,
+    //   color: 'purple',
+    // },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {usageItems.map(item => {
         const Icon = item.icon;
         const percentage = Math.min(100, item.data.percentage);

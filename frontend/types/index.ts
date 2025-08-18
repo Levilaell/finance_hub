@@ -278,7 +278,7 @@ export interface TransactionCategory {
   id: string;
   name: string;
   slug: string;
-  type: 'income' | 'expense' | 'transfer' | 'both';
+  type: 'income' | 'expense' | 'both';
   parent?: string; // UUID of parent category
   icon: string;
   color: string;
@@ -300,7 +300,7 @@ export interface Category {
   id: string;
   name: string;
   slug: string;
-  category_type: "income" | "expense";
+  type: "income" | "expense";
   icon: string | null;
   color: string | null;
   parent: string | null;
@@ -516,7 +516,7 @@ export interface BankAccountForm {
 
 export interface CategoryForm {
   name: string;
-  category_type: "income" | "expense";
+  type: "income" | "expense";
   icon?: string;
   color?: string;
   parent?: number;

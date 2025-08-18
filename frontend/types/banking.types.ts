@@ -234,7 +234,7 @@ export interface TransactionCategory {
   id: string;
   name: string;
   slug: string;
-  type: 'income' | 'expense' | 'transfer' | 'both';
+  type: 'income' | 'expense' | 'both';
   parent?: string;
   icon?: string;
   color?: string;
@@ -263,6 +263,12 @@ export interface PaginatedResponse<T> {
   next?: string;
   previous?: string;
   results: T[];
+  totals?: {
+    income: number;
+    expenses: number;
+    balance: number;
+    filtered_count: number;
+  };
 }
 
 export interface ConnectTokenRequest {

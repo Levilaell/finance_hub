@@ -26,7 +26,10 @@ class AuthService {
     current_password: string;
     new_password: string;
   }) {
-    return apiClient.post("/api/auth/change-password/", data);
+    return apiClient.post("/api/auth/change-password/", {
+      old_password: data.current_password,
+      new_password: data.new_password
+    });
   }
 
   async setup2FA() {

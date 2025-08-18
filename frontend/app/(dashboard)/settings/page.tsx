@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -33,9 +32,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { RulesList } from '@/components/rules/rules-list';
-import { RuleDialog } from '@/components/rules/rule-dialog';
-import { CreateRuleRequest, rulesService } from '@/services/rules.service';
 import { analyticsService, SummaryMetrics } from '@/services/analytics.service';
 import { 
   calculateTrialInfo, 
@@ -66,7 +62,6 @@ import { useSubscriptionUpdates } from '@/hooks/useSubscriptionUpdates';
 interface ProfileForm {
   first_name: string;
   last_name: string;
-  email: string;
 }
 
 interface PasswordForm {
@@ -89,24 +84,8 @@ export default function SettingsPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [is2FADialogOpen, setIs2FADialogOpen] = useState(false);
-  const [qrCode, setQrCode] = useState<string>('');
-  const [twoFactorCode, setTwoFactorCode] = useState('');
-  const [backupCodesDialogOpen, setBackupCodesDialogOpen] = useState(false);
-  const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
   
-  // AI & Rules settings state
-  const [aiEnabled, setAiEnabled] = useState(true);
-  const [autoApplyHighConfidence, setAutoApplyHighConfidence] = useState(true);
-  const [learningEnabled, setLearningEnabled] = useState(true);
-  const [createRuleDialogOpen, setCreateRuleDialogOpen] = useState(false);
-  
-  // Notification settings state
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [transactionAlerts, setTransactionAlerts] = useState(true);
-  const [lowBalanceWarnings, setLowBalanceWarnings] = useState(true);
-  const [monthlyReports, setMonthlyReports] = useState(true);
 
   // Billing dialogs state
   const [upgradePlanDialogOpen, setUpgradePlanDialogOpen] = useState(false);
@@ -118,7 +97,6 @@ export default function SettingsPage() {
     defaultValues: {
       first_name: user?.first_name || '',
       last_name: user?.last_name || '',
-      email: user?.email || '',
     },
   });
 
@@ -160,10 +138,10 @@ export default function SettingsPage() {
     mutationFn: (data: Partial<User>) => authService.updateProfile(data),
     onSuccess: (updatedUser) => {
       updateUser(updatedUser);
-      toast.success('Profile updated successfully');
+      toast.success('Perfil atualizado com sucesso');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to update profile');
+      toast.error(error.response?.data?.detail || 'Falha ao atualizar perfil');
     },
   });
 
@@ -172,75 +150,37 @@ export default function SettingsPage() {
       authService.changePassword(data),
     onSuccess: () => {
       passwordForm.reset();
-      toast.success('Password changed successfully');
+      toast.success('Senha alterada com sucesso');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to change password');
-    },
-  });
-
-  const setup2FAMutation = useMutation({
-    mutationFn: () => authService.setup2FA(),
-    onSuccess: (data) => {
-      setQrCode(data.qr_code);
-      setIs2FADialogOpen(true);
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to setup 2FA');
-    },
-  });
-
-  const enable2FAMutation = useMutation({
-    mutationFn: (token: string) => authService.enable2FA(token),
-    onSuccess: (data) => {
-      // Update user in store immediately
-      updateUser({ is_two_factor_enabled: true });
+      // Trata erros específicos do backend
+      let errorMessage = 'Falha ao alterar senha';
       
-      // Invalidate queries to refresh from server
-      queryClient.invalidateQueries({ queryKey: ['current-user'] });
-      
-      setIs2FADialogOpen(false);
-      setTwoFactorCode('');
-      toast.success('Two-factor authentication enabled successfully');
-      
-      // Show backup codes dialog
-      if (data.backup_codes) {
-        setBackupCodes(data.backup_codes);
-        setBackupCodesDialogOpen(true);
+      if (error.response?.data) {
+        const data = error.response.data;
+        // Verifica diferentes formatos de erro
+        if (typeof data === 'string') {
+          errorMessage = data;
+        } else if (data.old_password?.[0]) {
+          errorMessage = data.old_password[0];
+        } else if (data.new_password?.[0]) {
+          errorMessage = data.new_password[0];
+        } else if (data.detail) {
+          errorMessage = typeof data.detail === 'string' ? data.detail : data.detail.message || 'Falha ao alterar senha';
+        } else if (data.error) {
+          errorMessage = typeof data.error === 'string' ? data.error : 'Falha ao alterar senha';
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
       }
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Invalid verification code');
+      
+      toast.error(errorMessage);
     },
   });
 
-  const disable2FAMutation = useMutation({
-    mutationFn: (password: string) => authService.disable2FA({ password }),
-    onSuccess: () => {
-      // Update user in store immediately
-      updateUser({ is_two_factor_enabled: false });
-      
-      // Invalidate queries to refresh from server
-      queryClient.invalidateQueries({ queryKey: ['current-user'] });
-      
-      toast.success('Two-factor authentication disabled');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to disable 2FA');
-    },
-  });
 
-  const createRuleMutation = useMutation({
-    mutationFn: rulesService.createRule,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['rules'] });
-      toast.success('Rule created successfully');
-      setCreateRuleDialogOpen(false);
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to create rule');
-    },
-  });
+
+
 
   const deleteAccountMutation = useMutation({
     mutationFn: authService.deleteAccount,
@@ -250,7 +190,28 @@ export default function SettingsPage() {
       window.location.href = '/login';
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Falha ao deletar conta');
+      // Trata erros específicos do backend
+      let errorMessage = 'Falha ao deletar conta';
+      
+      if (error.response?.data) {
+        const data = error.response.data;
+        // Verifica diferentes formatos de erro
+        if (typeof data === 'string') {
+          errorMessage = data;
+        } else if (data.password?.[0]) {
+          errorMessage = data.password[0];
+        } else if (data.confirmation?.[0]) {
+          errorMessage = data.confirmation[0];
+        } else if (data.detail) {
+          errorMessage = typeof data.detail === 'string' ? data.detail : data.detail.message || 'Falha ao deletar conta';
+        } else if (data.error) {
+          errorMessage = typeof data.error === 'string' ? data.error : 'Falha ao deletar conta';
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+      }
+      
+      toast.error(errorMessage);
     },
   });
 
@@ -275,7 +236,7 @@ export default function SettingsPage() {
 
   const onPasswordSubmit = (data: PasswordForm) => {
     if (data.new_password !== data.confirm_password) {
-      toast.error('Passwords do not match');
+      toast.error('As senhas não coincidem');
       return;
     }
     changePasswordMutation.mutate({
@@ -284,11 +245,12 @@ export default function SettingsPage() {
     });
   };
 
-  const handleCreateRule = async (data: CreateRuleRequest) => {
-    await createRuleMutation.mutateAsync(data);
-  };
 
   const onDeleteAccountSubmit = (data: DeleteAccountForm) => {
+    if (data.confirmation.toLowerCase() !== 'deletar') {
+      toast.error('Por favor, digite "deletar" para confirmar');
+      return;
+    }
     deleteAccountMutation.mutate(data);
   };
 
@@ -321,12 +283,11 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1">
           <TabsTrigger value="profile" className="text-xs sm:text-sm">Perfil</TabsTrigger>
           <TabsTrigger value="security" className="text-xs sm:text-sm">Segurança</TabsTrigger>
-          <TabsTrigger value="status" className="text-xs sm:text-sm col-span-2 sm:col-span-1">Status & Limites</TabsTrigger>
+          <TabsTrigger value="status" className="text-xs sm:text-sm">Status & Limites</TabsTrigger>
           <TabsTrigger value="billing" className="text-xs sm:text-sm">Faturamento</TabsTrigger>
-          <TabsTrigger value="notifications" className="text-xs sm:text-sm col-span-2 sm:col-span-1 lg:col-span-1">Notificações (Em Breve)</TabsTrigger>
         </TabsList>
 
         {/* Profile Settings */}
@@ -361,8 +322,11 @@ export default function SettingsPage() {
                   <Input
                     id="email"
                     type="email"
-                    {...profileForm.register('email', { required: true })}
+                    value={user?.email || ''}
+                    disabled
+                    className="bg-white/5 cursor-not-allowed"
                   />
+                  <p className="text-xs text-gray-500 mt-1">O email não pode ser alterado</p>
                 </div>
                 <div className="pt-4">
                   <Button
@@ -399,7 +363,9 @@ export default function SettingsPage() {
                     <Input
                       id="current_password"
                       type={showCurrentPassword ? 'text' : 'password'}
-                      {...passwordForm.register('current_password', { required: true })}
+                      {...passwordForm.register('current_password', { 
+                        required: 'Senha atual é obrigatória'
+                      })}
                     />
                     <button
                       type="button"
@@ -413,6 +379,13 @@ export default function SettingsPage() {
                       )}
                     </button>
                   </div>
+                  {passwordForm.formState.errors.current_password && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {typeof passwordForm.formState.errors.current_password.message === 'string' 
+                        ? passwordForm.formState.errors.current_password.message 
+                        : 'Campo obrigatório'}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="new_password">Nova Senha</Label>
@@ -421,8 +394,11 @@ export default function SettingsPage() {
                       id="new_password"
                       type={showNewPassword ? 'text' : 'password'}
                       {...passwordForm.register('new_password', {
-                        required: true,
-                        minLength: 8,
+                        required: 'Nova senha é obrigatória',
+                        minLength: {
+                          value: 8,
+                          message: 'A senha deve ter pelo menos 8 caracteres'
+                        }
                       })}
                     />
                     <button
@@ -437,6 +413,13 @@ export default function SettingsPage() {
                       )}
                     </button>
                   </div>
+                  {passwordForm.formState.errors.new_password && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {typeof passwordForm.formState.errors.new_password.message === 'string' 
+                        ? passwordForm.formState.errors.new_password.message 
+                        : 'Campo obrigatório'}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="confirm_password">Confirmar Nova Senha</Label>
@@ -444,7 +427,9 @@ export default function SettingsPage() {
                     <Input
                       id="confirm_password"
                       type={showConfirmPassword ? 'text' : 'password'}
-                      {...passwordForm.register('confirm_password', { required: true })}
+                      {...passwordForm.register('confirm_password', { 
+                        required: 'Confirmação de senha é obrigatória'
+                      })}
                     />
                     <button
                       type="button"
@@ -458,6 +443,13 @@ export default function SettingsPage() {
                       )}
                     </button>
                   </div>
+                  {passwordForm.formState.errors.confirm_password && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {typeof passwordForm.formState.errors.confirm_password.message === 'string' 
+                        ? passwordForm.formState.errors.confirm_password.message 
+                        : 'Campo obrigatório'}
+                    </p>
+                  )}
                 </div>
                 <div className="pt-4">
                   <Button
@@ -491,159 +483,45 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">
-                      A Autenticação de Dois Fatores está {user?.is_two_factor_enabled ? 'habilitada' : 'desabilitada'}
+                      Autenticação de Dois Fatores
                     </p>
                     <p className="text-sm text-gray-600">
-                      {user?.is_two_factor_enabled
-                        ? 'Sua conta está protegida com 2FA'
-                        : 'Enable 2FA to secure your account'}
+                      Em breve - Estamos trabalhando para implementar esta funcionalidade
                     </p>
                   </div>
-                  {user?.is_two_factor_enabled ? (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const password = prompt('Enter your password to disable 2FA:');
-                        if (password) {
-                          disable2FAMutation.mutate(password);
-                        }
-                      }}
-                      disabled={disable2FAMutation.isPending}
-                    >
-                      Desabilitar 2FA
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={() => setup2FAMutation.mutate()}
-                      disabled={setup2FAMutation.isPending}
-                    >
-                      {setup2FAMutation.isPending ? <LoadingSpinner /> : 'Enable 2FA'}
-                    </Button>
-                  )}
+                  <Button
+                    disabled
+                    variant="outline"
+                  >
+                    Em Breve
+                  </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* AI & Categorization Rules */}
-        <TabsContent value="ai" className="space-y-4">
-          <Card>
+          {/* Danger Zone */}
+          <Card className="border-red-200">
             <CardHeader>
-              <CardTitle className="flex items-center">
-                <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-                </svg>
-                AI Categorization Settings
+              <CardTitle className="flex items-center text-red-600">
+                <TrashIcon className="h-5 w-5 mr-2" />
+                Zona de Perigo
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div>
-                  <h3 className="font-medium mb-4">Categorização Automática</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Habilitar Categorização por IA</p>
-                        <p className="text-sm text-gray-600">
-                          Categorizar transações automaticamente usando IA
-                        </p>
-                      </div>
-                      <Switch 
-                        checked={aiEnabled}
-                        onCheckedChange={setAiEnabled}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Aplicar automaticamente sugestões de alta confiança</p>
-                        <p className="text-sm text-gray-600">
-                          Aplicar categorias automaticamente quando a confiança da IA estiver acima de 90%
-                        </p>
-                      </div>
-                      <Switch 
-                        checked={autoApplyHighConfidence}
-                        onCheckedChange={setAutoApplyHighConfidence}
-                        disabled={!aiEnabled}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Aprender com correções</p>
-                        <p className="text-sm text-gray-600">
-                          Melhorar a precisão da IA aprendendo com correções manuais
-                        </p>
-                      </div>
-                      <Switch 
-                        checked={learningEnabled}
-                        onCheckedChange={setLearningEnabled}
-                        disabled={!aiEnabled}
-                      />
-                    </div>
-                  </div>
+                  <p className="font-medium text-red-600">Excluir Conta</p>
+                  <p className="text-sm text-gray-600">
+                    Excluir permanentemente sua conta e todos os dados associados. Esta ação não pode ser desfeita.
+                  </p>
                 </div>
-
-                <div>
-                  <h3 className="font-medium mb-4">Métricas de Desempenho</h3>
-                  {isLoadingMetrics ? (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="bg-gray-50 p-4 rounded-lg animate-pulse">
-                          <div className="h-4 bg-gray-300 rounded mb-2"></div>
-                          <div className="h-8 bg-gray-300 rounded"></div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <p className="text-sm text-gray-600">Precisão</p>
-                        <p className="text-2xl font-bold text-green-600">
-                          {performanceMetrics?.overall_accuracy 
-                            ? `${(performanceMetrics.overall_accuracy * 100).toFixed(1)}%` 
-                            : '0%'
-                          }
-                        </p>
-                      </div>
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <p className="text-sm text-gray-600">Auto-categorizadas</p>
-                        <p className="text-2xl font-bold text-blue-600">
-                          {performanceMetrics?.auto_categorized?.toLocaleString() || '0'}
-                        </p>
-                      </div>
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <p className="text-sm text-gray-600">Revisões manuais</p>
-                        <p className="text-2xl font-bold text-orange-600">
-                          {performanceMetrics?.manual_reviews?.toLocaleString() || '0'}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">Regras Personalizadas</h3>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setCreateRuleDialogOpen(true)}
-                    >
-                      Adicionar Regra
-                    </Button>
-                  </div>
-                  <RulesList onCreateRule={() => setCreateRuleDialogOpen(true)} />
-                </div>
-
-                <div className="pt-4">
-                  <Button
-                    onClick={() => {
-                      toast.success('AI settings saved successfully');
-                    }}
-                  >
-                    Salvar Configurações de IA
-                  </Button>
-                </div>
+                <Button 
+                  variant="destructive"
+                  onClick={() => setDeleteAccountDialogOpen(true)}
+                >
+                  Excluir Conta
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -670,7 +548,7 @@ export default function SettingsPage() {
               ) : subscriptionStatus ? (
                 <div className="space-y-4">
                   {/* Status Row */}
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
                     <div>
                       <p className="text-sm text-gray-600">Status Atual</p>
                       <div className="flex items-center mt-1">
@@ -707,7 +585,7 @@ export default function SettingsPage() {
                   {/* Trial Info - only show if trial and not cancelled */}
                   {subscriptionStatus.subscription_status === 'trial' && 
                    !isCancelledOrExpired && (
-                    <div className="p-4 bg-blue-50 rounded-lg">
+                    <div className="p-4 bg-blue-500/10 rounded-lg">
                       <p className="text-sm text-blue-800">
                         {subscriptionStatus.trial_days_left > 0 ? (
                           <>Período de teste expira em <strong>{subscriptionStatus.trial_days_left} dias</strong></>
@@ -725,7 +603,7 @@ export default function SettingsPage() {
 
                   {/* Cancelled subscription info */}
                   {isCancelledOrExpired && (
-                    <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                    <div className="p-4 bg-orange-500/10 rounded-lg border border-orange-500/20">
                       <p className="text-sm text-orange-800">
                         <strong>
                           {user?.company?.subscription_status === 'cancelling' 
@@ -744,7 +622,7 @@ export default function SettingsPage() {
                   )}
 
                   {/* Payment Method Status */}
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
                     <div>
                       <p className="text-sm text-gray-600">Método de Pagamento</p>
                       <p className="mt-1">
@@ -832,8 +710,8 @@ export default function SettingsPage() {
                 {showTrialInfo && (
                   <div className={`border p-4 rounded-lg ${
                     trialInfo.isExpiringSoon 
-                      ? 'bg-orange-50 border-orange-200' 
-                      : 'bg-blue-50 border-blue-200'
+                      ? 'bg-orange-500/10 border-orange-500/20' 
+                      : 'bg-blue-500/10 border-blue-500/20'
                   }`}>
                     <div className="flex items-center justify-between">
                       <div>
@@ -866,7 +744,7 @@ export default function SettingsPage() {
 
                 {/* Expired Trial Warning */}
                 {trialInfo.isExpired && (
-                  <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                  <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-lg">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-red-800">Período de Teste Expirado</p>
@@ -884,7 +762,7 @@ export default function SettingsPage() {
 
                 {/* Payment Method Status */}
                 {isActiveSubscription && (
-                  <div className="bg-green-50 border border-green-200 p-4 rounded-lg mb-6">
+                  <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-lg mb-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
                         <CheckCircleIcon className="h-5 w-5 text-green-600 mr-2" />
@@ -912,7 +790,7 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Next Billing Date */}
                       {billingInfo.nextBillingDate && (
-                        <div className="bg-gray-50 p-4 rounded-lg">
+                        <div className="bg-white/5 p-4 rounded-lg">
                           <p className="text-sm text-gray-600">Próxima Cobrança</p>
                           <p className="font-medium">
                             {formatDate(billingInfo.nextBillingDate)}
@@ -927,7 +805,7 @@ export default function SettingsPage() {
 
                       {/* Subscription Start Date */}
                       {billingInfo.subscriptionStartDate && (
-                        <div className="bg-gray-50 p-4 rounded-lg">
+                        <div className="bg-white/5 p-4 rounded-lg">
                           <p className="text-sm text-gray-600">Assinatura Iniciada</p>
                           <p className="font-medium">
                             {formatDate(billingInfo.subscriptionStartDate)}
@@ -940,7 +818,7 @@ export default function SettingsPage() {
 
                 {/* Cancelled subscription message */}
                 {isCancelledOrExpired && (
-                  <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
+                  <div className="bg-orange-500/10 border border-orange-500/20 p-4 rounded-lg">
                     <h3 className="font-medium text-orange-800 mb-2">
                       {user?.company?.subscription_status === 'cancelling' ? 'Cancelamento em Processo' : 'Assinatura Cancelada'}
                     </h3>
@@ -964,7 +842,7 @@ export default function SettingsPage() {
 
                 {/* Plan Limits */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="bg-white/5 p-4 rounded-lg">
                         <p className="text-sm text-gray-600">Limite de Transações</p>
                         <p className="font-medium">
                           {!user?.company?.subscription_plan?.max_transactions || 
@@ -973,7 +851,7 @@ export default function SettingsPage() {
                             : `${user?.company?.subscription_plan?.max_transactions?.toLocaleString()}/mês`}
                         </p>
                       </div>
-                      <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="bg-white/5 p-4 rounded-lg">
                         <p className="text-sm text-gray-600">Limite de Contas Bancárias</p>
                         <p className="font-medium">
                           {!user?.company?.subscription_plan?.max_bank_accounts ||
@@ -983,7 +861,7 @@ export default function SettingsPage() {
                         </p>
                       </div>
                       {user?.company?.subscription_plan?.enable_ai_insights && (
-                        <div className="bg-gray-50 p-4 rounded-lg">
+                        <div className="bg-white/5 p-4 rounded-lg">
                           <p className="text-sm text-gray-600">Limite de IA</p>
                           <p className="font-medium">
                             {!user?.company?.subscription_plan?.max_ai_requests_per_month ||
@@ -999,7 +877,7 @@ export default function SettingsPage() {
                 {user?.company?.subscription_plan && (
                   <div>
                     <h3 className="font-medium mb-3">Recursos do Plano</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="bg-white/5 p-4 rounded-lg">
                       <ul className="space-y-2">
                         <li className="flex items-center text-sm text-gray-700">
                           <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1059,7 +937,7 @@ export default function SettingsPage() {
 
                 {/* Upgrade Prompt */}
                 {showUpgradePrompt && (
-                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 p-4 rounded-lg">
+                  <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 p-4 rounded-lg">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-blue-900">Hora de fazer upgrade!</p>
@@ -1129,219 +1007,7 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* Notification Settings */}
-        <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <BellIcon className="h-5 w-5 mr-2" />
-                Preferências de Notificação
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Notificações por E-mail</p>
-                      <p className="text-sm text-gray-600">
-                        Receba atualizações por e-mail sobre a atividade da sua conta
-                      </p>
-                    </div>
-                    <Switch 
-                      checked={emailNotifications}
-                      onCheckedChange={setEmailNotifications}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Alertas de Transação</p>
-                      <p className="text-sm text-gray-600">
-                        Seja notificado sobre novas transações
-                      </p>
-                    </div>
-                    <Switch 
-                      checked={transactionAlerts}
-                      onCheckedChange={setTransactionAlerts}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Avisos de Saldo Baixo</p>
-                      <p className="text-sm text-gray-600">
-                        Alerte quando o saldo da conta estiver baixo
-                      </p>
-                    </div>
-                    <Switch 
-                      checked={lowBalanceWarnings}
-                      onCheckedChange={setLowBalanceWarnings}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Relatórios Mensais</p>
-                      <p className="text-sm text-gray-600">
-                        Receba resumos financeiros mensais
-                      </p>
-                    </div>
-                    <Switch 
-                      checked={monthlyReports}
-                      onCheckedChange={setMonthlyReports}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Alertas de Segurança</p>
-                      <p className="text-sm text-gray-600">
-                        Notificações importantes de segurança e conta
-                      </p>
-                    </div>
-                    <Switch defaultChecked disabled />
-                  </div>
-                </div>
-
-                <div className="pt-4">
-                  <Button
-                    onClick={() => {
-                      toast.success('Notification preferences saved successfully');
-                    }}
-                  >
-                    Salvar Preferências
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Danger Zone */}
-          <Card className="border-red-200">
-            <CardHeader>
-              <CardTitle className="flex items-center text-red-600">
-                <TrashIcon className="h-5 w-5 mr-2" />
-                Zona de Perigo
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <p className="font-medium text-red-600">Excluir Conta</p>
-                  <p className="text-sm text-gray-600">
-                    Excluir permanentemente sua conta e todos os dados associados. Esta ação não pode ser desfeita.
-                  </p>
-                </div>
-                <Button 
-                  variant="destructive"
-                  onClick={() => setDeleteAccountDialogOpen(true)}
-                >
-                  Excluir Conta
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
-
-      {/* 2FA Setup Dialog */}
-      <Dialog open={is2FADialogOpen} onOpenChange={setIs2FADialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Enable Two-Factor Authentication</DialogTitle>
-            <DialogDescription>
-              Scan the QR code with your authenticator app and enter the verification code
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {qrCode && (
-              <div className="flex justify-center">
-                <Image src={qrCode} alt="2FA QR Code" width={192} height={192} />
-              </div>
-            )}
-            <div>
-              <Label htmlFor="2fa-code">Verification Code</Label>
-              <Input
-                id="2fa-code"
-                type="text"
-                placeholder="000000"
-                maxLength={6}
-                value={twoFactorCode}
-                onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, ''))}
-                className="text-center text-2xl tracking-widest"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIs2FADialogOpen(false);
-                setTwoFactorCode('');
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => enable2FAMutation.mutate(twoFactorCode)}
-              disabled={enable2FAMutation.isPending || twoFactorCode.length !== 6}
-            >
-              {enable2FAMutation.isPending ? <LoadingSpinner /> : 'Verify & Enable'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Backup Codes Dialog */}
-      <Dialog open={backupCodesDialogOpen} onOpenChange={setBackupCodesDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Your Backup Codes</DialogTitle>
-            <DialogDescription>
-              Save these backup codes in a safe place. Each code can only be used once to access your account if you lose your authenticator device.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="grid grid-cols-2 gap-2 font-mono text-sm">
-                {backupCodes.map((code, index) => (
-                  <div key={index} className="p-2 bg-white rounded border text-center">
-                    {code}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
-              <p className="text-sm text-yellow-800">
-                ⚠️ <strong>Important:</strong> These codes will not be shown again. Save them now!
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() => {
-                navigator.clipboard.writeText(backupCodes.join('\n'));
-                toast.success('Backup codes copied to clipboard');
-              }}
-              variant="outline"
-            >
-              Copy Codes
-            </Button>
-            <Button
-              onClick={() => {
-                setBackupCodesDialogOpen(false);
-                setBackupCodes([]);
-              }}
-            >
-              I&apos;ve Saved My Codes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Rule Dialog */}
-      <RuleDialog
-        open={createRuleDialogOpen}
-        onOpenChange={setCreateRuleDialogOpen}
-        onSave={handleCreateRule}
-      />
 
       {/* Billing Dialogs */}
       <UpgradePlanDialog
@@ -1370,7 +1036,7 @@ export default function SettingsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+            <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-lg">
               <h4 className="font-medium text-yellow-800 mb-2">O que acontecerá:</h4>
               <ul className="text-sm text-yellow-700 space-y-1">
                 <li>• Sua assinatura será cancelada imediatamente</li>
@@ -1411,33 +1077,52 @@ export default function SettingsPage() {
           <DialogHeader>
             <DialogTitle className="text-red-600">Excluir Conta</DialogTitle>
             <DialogDescription>
-              This action will permanently delete your account and all associated data. This cannot be undone.
+              Esta ação excluirá permanentemente sua conta e todos os dados associados. Isso não pode ser desfeito.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={deleteAccountForm.handleSubmit(onDeleteAccountSubmit)} className="space-y-4 py-4">
             <div>
-              <Label htmlFor="delete-password">Confirm your password</Label>
+              <Label htmlFor="delete-password">Confirme sua senha</Label>
               <Input
                 id="delete-password"
                 type="password"
-                placeholder="Enter your password"
-                {...deleteAccountForm.register('password', { required: true })}
+                placeholder="Digite sua senha"
+                {...deleteAccountForm.register('password', { 
+                  required: 'Senha é obrigatória para confirmar exclusão'
+                })}
               />
+              {deleteAccountForm.formState.errors.password && (
+                <p className="text-sm text-red-500 mt-1">
+                  {typeof deleteAccountForm.formState.errors.password.message === 'string' 
+                    ? deleteAccountForm.formState.errors.password.message 
+                    : 'Campo obrigatório'}
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="delete-confirmation">
-                Type <strong>deletar</strong> to confirm
+                Digite <strong>deletar</strong> para confirmar
               </Label>
               <Input
                 id="delete-confirmation"
                 type="text"
                 placeholder="deletar"
-                {...deleteAccountForm.register('confirmation', { required: true })}
+                {...deleteAccountForm.register('confirmation', { 
+                  required: 'Digite "deletar" para confirmar',
+                  validate: value => value.toLowerCase() === 'deletar' || 'Digite "deletar" para confirmar'
+                })}
               />
+              {deleteAccountForm.formState.errors.confirmation && (
+                <p className="text-sm text-red-500 mt-1">
+                  {typeof deleteAccountForm.formState.errors.confirmation.message === 'string' 
+                    ? deleteAccountForm.formState.errors.confirmation.message 
+                    : 'Digite "deletar" para confirmar'}
+                </p>
+              )}
             </div>
-            <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
+            <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg">
               <p className="text-sm text-red-800">
-                ⚠️ <strong>Warning:</strong> This will permanently delete your account, company data, transactions, categories, and all other associated information. This action cannot be undone.
+                ⚠️ <strong>Aviso:</strong> Isso excluirá permanentemente sua conta, dados da empresa, transações, categorias e todas as outras informações associadas. Esta ação não pode ser desfeita.
               </p>
             </div>
           </form>
@@ -1449,7 +1134,7 @@ export default function SettingsPage() {
                 deleteAccountForm.reset();
               }}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button
               variant="destructive"

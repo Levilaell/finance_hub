@@ -131,12 +131,13 @@ export default function SubscriptionPage() {
                       limit={usageLimits.bank_accounts.limit}
                       percentage={usageLimits.bank_accounts.percentage}
                     />
-                    <UsageIndicator
+                    {/* Requisições IA será implementado em breve */}
+                    {/* <UsageIndicator
                       type="ai_request"
                       current={usageLimits.ai_requests.used}
                       limit={usageLimits.ai_requests.limit}
                       percentage={usageLimits.ai_requests.percentage}
-                    />
+                    /> */}
                   </CardContent>
                 </Card>
               )}

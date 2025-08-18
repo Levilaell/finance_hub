@@ -68,12 +68,14 @@ export default function CategoriesPage() {
   const createCategoryMutation = useMutation({
     mutationFn: (data: CategoryForm) => categoriesService.createCategory(data),
     onSuccess: () => {
+      // Invalidate both categories queries to ensure transactions page updates
       queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
       setIsAddingCategory(false);
-      toast.success('Category created successfully');
+      toast.success('Categoria criada com sucesso');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to create category');
+      toast.error(error.response?.data?.detail || 'Falha ao criar categoria');
     },
   });
 
@@ -83,10 +85,10 @@ export default function CategoriesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       setEditingCategory(null);
-      toast.success('Category updated successfully');
+      toast.success('Categoria atualizada com sucesso');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to update category');
+      toast.error(error.response?.data?.detail || 'Falha ao atualizar categoria');
     },
   });
 
@@ -95,10 +97,10 @@ export default function CategoriesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       setSelectedCategory(null);
-      toast.success('Category deleted successfully');
+      toast.success('Categoria excluída com sucesso');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to delete category');
+      toast.error(error.response?.data?.detail || 'Falha ao excluir categoria');
     },
   });
 
@@ -116,8 +118,8 @@ export default function CategoriesPage() {
     return <ErrorMessage message="Falha ao carregar categorias" />;
   }
 
-  const incomeCategories = categories?.filter(cat => cat.category_type === 'income') || [];
-  const expenseCategories = categories?.filter(cat => cat.category_type === 'expense') || [];
+  const incomeCategories = categories?.filter(cat => cat.type === 'income') || [];
+  const expenseCategories = categories?.filter(cat => cat.type === 'expense') || [];
 
   const CategoryCard = ({ category }: { category: Category }) => {
     return (
@@ -135,7 +137,7 @@ export default function CategoriesPage() {
                 <h3 className="font-semibold text-lg">{category.name}</h3>
                 {category.is_system && (
                   <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                    System
+                    Sistema
                   </span>
                 )}
               </div>
@@ -147,8 +149,6 @@ export default function CategoriesPage() {
                   size="sm"
                   onClick={() => {
                     setEditingCategory(category);
-                    setSelectedColor(category.color || DEFAULT_COLORS[0]);
-                    setSelectedIcon(category.icon || ICONS[0]);
                   }}
                 >
                   <PencilIcon className="h-4 w-4" />
@@ -180,7 +180,9 @@ export default function CategoriesPage() {
   }) => {
     const [formData, setFormData] = useState({
       name: category?.name || '',
-      type: category?.category_type || 'expense',
+      type: category?.type || 'expense',
+      color: category?.color || DEFAULT_COLORS[0],
+      icon: category?.icon || ICONS[0],
     });
 
     return (
@@ -189,27 +191,27 @@ export default function CategoriesPage() {
           e.preventDefault();
           onSubmit({
             name: formData.name,
-            category_type: formData.type as 'income' | 'expense',
-            color: selectedColor,
-            icon: selectedIcon,
+            type: formData.type as 'income' | 'expense',
+            color: formData.color,
+            icon: formData.icon,
             parent: undefined,
           });
         }}
       >
         <div className="space-y-4 py-4">
           <div>
-            <Label htmlFor="name">Category Name</Label>
+            <Label htmlFor="name">Nome da Categoria</Label>
             <Input
               id="name"
               name="name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., Groceries"
+              placeholder="Ex: Supermercado"
               required
             />
           </div>
         <div>
-          <Label htmlFor="type">Type</Label>
+          <Label htmlFor="type">Tipo</Label>
           <Select 
             name="type" 
             value={formData.type}
@@ -228,25 +230,25 @@ export default function CategoriesPage() {
               <SelectItem value="expense">
                 <div className="flex items-center">
                   <ArrowTrendingDownIcon className="h-4 w-4 mr-2 text-red-600" />
-                  Expense
+                  Despesa
                 </div>
               </SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div>
-          <Label>Icon</Label>
+          <Label>Ícone</Label>
           <div className="grid grid-cols-8 gap-2 mt-2">
             {ICONS.map((icon) => (
               <button
                 key={icon}
                 type="button"
                 className={`p-2 text-2xl rounded-lg border-2 transition-colors ${
-                  selectedIcon === icon
+                  formData.icon === icon
                     ? 'border-primary bg-primary/10'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
-                onClick={() => setSelectedIcon(icon)}
+                onClick={() => setFormData({ ...formData, icon })}
               >
                 {icon}
               </button>
@@ -254,19 +256,19 @@ export default function CategoriesPage() {
           </div>
         </div>
         <div>
-          <Label>Color</Label>
+          <Label>Cor</Label>
           <div className="grid grid-cols-9 gap-2 mt-2">
             {DEFAULT_COLORS.map((color) => (
               <button
                 key={color}
                 type="button"
                 className={`w-10 h-10 rounded-lg border-2 transition-all ${
-                  selectedColor === color
+                  formData.color === color
                     ? 'border-gray-800 scale-110'
                     : 'border-transparent hover:scale-105'
                 }`}
                 style={{ backgroundColor: color }}
-                onClick={() => setSelectedColor(color)}
+                onClick={() => setFormData({ ...formData, color })}
               />
             ))}
           </div>
@@ -288,7 +290,7 @@ export default function CategoriesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Categories</h1>
+          <h1 className="text-3xl font-bold">Categorias</h1>
           <p className="text-gray-600">Organize suas transações com categorias</p>
         </div>
         <div className="flex space-x-2">
@@ -368,14 +370,11 @@ export default function CategoriesPage() {
           <DialogHeader>
             <DialogTitle>Criar Categoria</DialogTitle>
             <DialogDescription>
-              Add a new category to organize your transactions
+              Adicione uma nova categoria para organizar suas transações
             </DialogDescription>
           </DialogHeader>
           <CategoryForm
             onSubmit={(data) => {
-        // Reset the selected icon and color to default for next category
-        setSelectedIcon(ICONS[0]);
-        setSelectedColor(DEFAULT_COLORS[0]);
         createCategoryMutation.mutate(data);
       }}
             onCancel={() => setIsAddingCategory(false)}
@@ -410,8 +409,8 @@ export default function CategoriesPage() {
           <DialogHeader>
             <DialogTitle>Excluir Categoria</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete &ldquo;{selectedCategory?.name}&rdquo;? 
-              Transactions in this category will become uncategorized.
+              Tem certeza que deseja excluir &ldquo;{selectedCategory?.name}&rdquo;? 
+              As transações nesta categoria ficarão sem categoria.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

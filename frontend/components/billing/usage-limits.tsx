@@ -77,15 +77,16 @@ export function UsageLimitsCard() {
       unit: 'contas',
       hasAccess: true,
     },
-    {
-      icon: SparklesIcon,
-      title: 'Requisições IA',
-      used: limits.ai_requests.used,
-      limit: limits.ai_requests.limit,
-      percentage: limits.ai_requests.percentage,
-      unit: 'requisições',
-      hasAccess: limits.ai_requests.limit > 0,
-    },
+    // Requisições IA será implementado em breve
+    // {
+    //   icon: SparklesIcon,
+    //   title: 'Requisições IA',
+    //   used: limits.ai_requests.used,
+    //   limit: limits.ai_requests.limit,
+    //   percentage: limits.ai_requests.percentage,
+    //   unit: 'requisições',
+    //   hasAccess: limits.ai_requests.limit > 0,
+    // },
   ];
 
   const hasAnyLimitWarning = usageItems.some(item => item.hasAccess && item.percentage >= 80);

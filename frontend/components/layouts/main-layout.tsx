@@ -19,6 +19,7 @@ import {
   ChevronDown,
   Bell,
   Sparkles,
+  Lock,
 } from "lucide-react";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
 import { testId, TEST_IDS } from "@/utils/test-helpers";
@@ -33,7 +34,7 @@ const navigation = [
   { name: "Transações", href: "/transactions", icon: Receipt, testId: "transactions-link" },
   { name: "Contas", href: "/accounts", icon: Wallet, testId: TEST_IDS.navigation.bankingLink },
   { name: "Categorias", href: "/categories", icon: Tags, testId: "categories-link" },
-  { name: "Insights com IA", href: "/ai-insights", icon: Sparkles, testId: TEST_IDS.navigation.aiInsightsLink },
+  { name: "Insights com IA", href: "/ai-insights", icon: Sparkles, testId: TEST_IDS.navigation.aiInsightsLink, comingSoon: true },
   { name: "Relatórios", href: "/reports", icon: FileText, testId: TEST_IDS.navigation.reportsLink },
   { name: "Configurações", href: "/settings", icon: Settings, testId: TEST_IDS.navigation.settingsLink },
 ];
@@ -107,16 +108,23 @@ export function MainLayout({ children }: MainLayoutProps) {
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    "flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300",
+                    "flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300 relative",
                     isActive
                       ? "bg-white/10 text-white border border-white/20"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    item.comingSoon && "opacity-75"
                   )}
                   onClick={() => setSidebarOpen(false)}
                   {...testId(item.testId)}
                 >
                   <item.icon className="h-5 w-5" />
                   <span>{item.name}</span>
+                  {item.comingSoon && (
+                    <div className="ml-auto flex items-center">
+                      <Lock className="h-3.5 w-3.5 text-yellow-500" />
+                      <span className="ml-1 text-xs text-yellow-500 font-medium">Em breve</span>
+                    </div>
+                  )}
                 </Link>
               );
             })}
@@ -171,15 +179,22 @@ export function MainLayout({ children }: MainLayoutProps) {
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    "flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300",
+                    "flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300 relative",
                     isActive
                       ? "bg-white/10 text-white border border-white/20"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    item.comingSoon && "opacity-75"
                   )}
                   {...testId(item.testId)}
                 >
                   <item.icon className="h-5 w-5" />
                   <span>{item.name}</span>
+                  {item.comingSoon && (
+                    <div className="ml-auto flex items-center">
+                      <Lock className="h-3.5 w-3.5 text-yellow-500" />
+                      <span className="ml-1 text-xs text-yellow-500 font-medium">Em breve</span>
+                    </div>
+                  )}
                 </Link>
               );
             })}

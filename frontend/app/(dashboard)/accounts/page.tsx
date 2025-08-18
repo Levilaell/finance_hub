@@ -30,6 +30,7 @@ import {
 import {
   CreditCardIcon,
   LinkIcon,
+  DocumentChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { BankAccountCard } from '@/components/banking/bank-account-card';
 import { testId, TEST_IDS } from '@/utils/test-helpers';
@@ -82,7 +83,7 @@ export default function AccountsPage() {
       
       if (oauthConnectors.length > 0) {
         // TODO: Mostrar modal para selecionar banco se houver OAuth
-        console.log('OAuth connectors available:', oauthConnectors);
+        // OAuth connectors available: oauthConnectors
       }
       
       // Fluxo normal do Connect Widget
@@ -161,7 +162,7 @@ export default function AccountsPage() {
         setTimeout(async () => {
           const account = accounts.find(a => a.id === accountId);
           if (account?.item_status === 'UPDATING') {
-            console.log('Account still updating, fetching again...');
+            // Account still updating, fetching again...
             await fetchAccounts();
           }
         }, 5000);
@@ -170,7 +171,7 @@ export default function AccountsPage() {
         setTimeout(async () => {
           const account = accounts.find(a => a.id === accountId);
           if (account?.item_status === 'UPDATING') {
-            console.log('Account still updating after 10s, fetching again...');
+            // Account still updating after 10s, fetching again...
             await fetchAccounts();
           }
         }, 10000);
@@ -209,7 +210,7 @@ export default function AccountsPage() {
   // Pluggy Connect callbacks
   const handlePluggySuccess = useCallback(async (data: any) => {
     try {
-      console.log('Pluggy success:', data);
+      // Pluggy success
       
       const itemId = data?.item?.id || data?.itemId;
       if (!itemId) {
@@ -315,14 +316,25 @@ export default function AccountsPage() {
             Manage your connected accounts via Open Banking
           </p>
         </div>
-        <Button 
-          onClick={handleConnectBank} 
-          className="w-full sm:w-auto bg-white text-black hover:bg-white/90 transition-all duration-300" 
-          {...testId(TEST_IDS.banking.connectBankButton)}
-        >
-          <LinkIcon className="h-4 w-4 mr-2" />
-          Conectar Banco
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button 
+            onClick={() => router.push('/reports')}
+            variant="outline"
+            className="w-full sm:w-auto border-white/20 text-white hover:bg-white/10 transition-all duration-300" 
+            {...testId('reports-generator-button')}
+          >
+            <DocumentChartBarIcon className="h-4 w-4 mr-2" />
+            Gerar Relatórios
+          </Button>
+          <Button 
+            onClick={handleConnectBank} 
+            className="w-full sm:w-auto bg-white text-black hover:bg-white/90 transition-all duration-300" 
+            {...testId(TEST_IDS.banking.connectBankButton)}
+          >
+            <LinkIcon className="h-4 w-4 mr-2" />
+            Conectar Banco
+          </Button>
+        </div>
       </div>
 
       {/* Accounts Grid */}
@@ -413,10 +425,10 @@ export default function AccountsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remove Account</DialogTitle>
+            <DialogTitle>Remover Conta</DialogTitle>
             <DialogDescription>
-              Are you sure you want to remove {selectedAccount?.display_name}?
-              This will disconnect the account but preserve all transaction history.
+              Tem certeza que deseja remover {selectedAccount?.display_name}?
+              Isso desconectará a conta mas preservará todo o histórico de transações.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -425,7 +437,7 @@ export default function AccountsPage() {
               onClick={() => setSelectedAccount(null)}
               className="hover:bg-accent hover:text-accent-foreground transition-all duration-200"
             >
-              Cancel
+              Cancelar
             </Button>
             <Button
               variant="destructive"
@@ -435,23 +447,23 @@ export default function AccountsPage() {
                     // Find the item for this account
                     const itemId = selectedAccount.item?.id;
                     if (!itemId) {
-                      toast.error('Unable to find connection information');
+                      toast.error('Não foi possível encontrar informações da conexão');
                       return;
                     }
                     
                     // Disconnect the item
                     await bankingService.disconnectItem(itemId);
                     
-                    toast.success('Account disconnected successfully');
+                    toast.success('Conta desconectada com sucesso');
                     setSelectedAccount(null);
                     await fetchAccounts();
                   } catch (error: any) {
-                    toast.error(error.message || 'Failed to disconnect account');
+                    toast.error(error.message || 'Falha ao desconectar conta');
                   }
                 }
               }}
             >
-              Remove Account
+              Remover Conta
             </Button>
           </DialogFooter>
         </DialogContent>
