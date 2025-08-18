@@ -617,6 +617,37 @@ class TransactionViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
         
         return queryset.order_by('-date', '-created_at')
     
+    def list(self, request, *args, **kwargs):
+        """Override list to include totals in response"""
+        # Get the paginated response
+        response = super().list(request, *args, **kwargs)
+        
+        # Get the filtered queryset (same filters applied)
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Calculate totals from the FULL filtered queryset (not just current page)
+        from django.db.models import Sum
+        
+        # Income total (CREDIT transactions)
+        income_total = queryset.filter(type='CREDIT').aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0.00')
+        
+        # Expenses total (DEBIT transactions) 
+        expenses_total = queryset.filter(type='DEBIT').aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0.00')
+        
+        # Add totals to response
+        response.data['totals'] = {
+            'income': float(income_total),
+            'expenses': float(abs(expenses_total)),
+            'balance': float(income_total - abs(expenses_total)),
+            'filtered_count': queryset.count()
+        }
+        
+        return response
+    
     def create(self, request, *args, **kwargs):
         """Prevent manual transaction creation"""
         return Response(

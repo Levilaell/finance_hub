@@ -60,12 +60,9 @@ def handle_transaction_events(sender, instance, created, **kwargs):
         # Auto-categorization is handled by the pluggy_category mapping
         # Category assignment happens during transaction sync
         
-        # Increment transaction usage counter for the company
-        try:
-            instance.company.increment_usage('transactions')
-            logger.info(f"Incremented transaction count for company {instance.company.id}")
-        except Exception as e:
-            logger.error(f"Failed to increment transaction usage: {e}")
+        # NOTE: Transaction usage counter is already incremented in Transaction.create_safe()
+        # Do NOT increment here to avoid double counting
+        # The signal was causing duplicate increments (issue fixed on 2025-08-12)
         
         # Check for large transaction notification
         try:

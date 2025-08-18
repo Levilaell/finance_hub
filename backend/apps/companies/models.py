@@ -28,6 +28,12 @@ class SubscriptionPlan(models.Model):
     """
     Simple subscription plan model with essential fields only
     """
+    # Billing period choices
+    BILLING_PERIODS = [
+        ('monthly', 'Monthly'),
+        ('yearly', 'Yearly'),
+    ]
+    
     # Core identifiers
     name = models.CharField(_('name'), max_length=50)
     slug = models.SlugField(_('slug'), unique=True)
