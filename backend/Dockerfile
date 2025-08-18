@@ -38,6 +38,7 @@ COPY backend/ /app/
 RUN DJANGO_SECRET_KEY="build-key" \
     DJANGO_SETTINGS_MODULE=core.settings.production \
     DATABASE_URL="sqlite:///tmp/db.sqlite3" \
+    DJANGO_COLLECT_STATIC=1 \
     python manage.py collectstatic --noinput
 
 # Stage 3: Final production image
