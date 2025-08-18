@@ -17,7 +17,6 @@ from reportlab.lib.units import inch
 import xlsxwriter
 
 from apps.banking.models import Transaction, BankAccount
-from apps.reports.constants import TransactionType
 
 logger = logging.getLogger(__name__)
 
@@ -82,10 +81,10 @@ class BaseReportGenerator(ABC):
         filters: Optional[Dict] = None
     ) -> QuerySet:
         """Get filtered transactions with optimized queries"""
-        transactions = Transaction.objects.filter(
-            bank_account__company=self.company,
-            transaction_date__gte=start_date,
-            transaction_date__lte=end_date
+        transactions = Transaction.active.filter(
+            company=self.company,
+            date__gte=start_date,
+            date__lte=end_date
         )
         
         # Apply filters
@@ -93,21 +92,21 @@ class BaseReportGenerator(ABC):
             if filters.get('category_ids'):
                 transactions = transactions.filter(category_id__in=filters['category_ids'])
             if filters.get('account_ids'):
-                transactions = transactions.filter(bank_account_id__in=filters['account_ids'])
+                transactions = transactions.filter(account_id__in=filters['account_ids'])
             if filters.get('transaction_type'):
-                transactions = transactions.filter(transaction_type=filters['transaction_type'])
+                transactions = transactions.filter(type=filters['transaction_type'])
         
-        return transactions.select_related('category', 'bank_account').order_by('-transaction_date')
+        return transactions.select_related('category', 'account').order_by('-date')
     
     def _calculate_summary_stats(self, transactions: QuerySet) -> Dict[str, Any]:
         """Calculate summary statistics for transactions"""
         income = transactions.filter(
-            transaction_type__in=TransactionType.income_types()
+            type__in=['credit', 'transfer_in', 'pix_in', 'interest', 'CREDIT', 'INCOME']
         ).aggregate(
             total=Sum('amount'), count=Count('id')
         )
         expenses = transactions.filter(
-            transaction_type__in=TransactionType.expense_types()
+            type__in=['debit', 'transfer_out', 'pix_out', 'fee', 'DEBIT', 'EXPENSE']
         ).aggregate(
             total=Sum('amount'), count=Count('id')
         )

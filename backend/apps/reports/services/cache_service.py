@@ -238,7 +238,7 @@ class ReportCacheService:
             company_id: Company ID
         """
         from datetime import datetime, timedelta
-        from apps.reports.views_optimized import AnalyticsView
+        from apps.reports.views import AnalyticsView
         
         # Warm up common date ranges
         today = datetime.now().date()

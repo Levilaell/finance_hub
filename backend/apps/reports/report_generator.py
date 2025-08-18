@@ -37,10 +37,56 @@ logger = logging.getLogger(__name__)
 class ReportGenerator:
     """Service for generating financial reports"""
     
+    # Transaction type constants for consistency
+    INCOME_TYPES = ['credit', 'transfer_in', 'pix_in', 'interest', 'CREDIT', 'INCOME']
+    EXPENSE_TYPES = ['debit', 'transfer_out', 'pix_out', 'fee', 'DEBIT', 'EXPENSE']
+    
     def __init__(self, company):
         self.company = company
         self.styles = getSampleStyleSheet()
         self._setup_custom_styles()
+    
+    def _get_income_filter(self):
+        """Get Q filter for income transactions (handles case-insensitive)"""
+        return Q(type__iexact='credit') | \
+               Q(type__iexact='transfer_in') | \
+               Q(type__iexact='pix_in') | \
+               Q(type__iexact='interest') | \
+               Q(type__iexact='CREDIT') | \
+               Q(type__iexact='INCOME')
+    
+    def _get_expense_filter(self):
+        """Get Q filter for expense transactions (handles case-insensitive)"""
+        return Q(type__iexact='debit') | \
+               Q(type__iexact='transfer_out') | \
+               Q(type__iexact='pix_out') | \
+               Q(type__iexact='fee') | \
+               Q(type__iexact='DEBIT') | \
+               Q(type__iexact='EXPENSE')
+    
+    def _safe_percentage(self, value, total, decimals=1):
+        """Calculate percentage safely, handling division by zero and invalid values"""
+        try:
+            # Handle None, zero, or invalid total
+            if total is None or total == 0:
+                return 0
+            
+            # Handle None value
+            if value is None:
+                return 0
+            
+            # Convert to float for calculation
+            value_float = float(abs(value))
+            total_float = float(abs(total))
+            
+            # Calculate percentage
+            percentage = (value_float / total_float) * 100
+            
+            # Round to specified decimals
+            return round(percentage, decimals)
+        except (TypeError, ValueError, ZeroDivisionError) as e:
+            logger.warning(f"Error calculating percentage: {e}")
+            return 0
     
     def _setup_custom_styles(self):
         """Setup custom styles for PDF"""
@@ -84,20 +130,45 @@ class ReportGenerator:
         format: str = 'pdf',
         filters: Optional[Dict] = None
     ) -> io.BytesIO:
-        """Generate report based on type"""
+        """Generate report based on type with error handling"""
         
-        # Route to appropriate generator method
-        if report_type == 'profit_loss':
-            return self.generate_profit_loss_report(start_date, end_date, format, filters)
-        elif report_type == 'cash_flow':
-            return self.generate_cash_flow_report(start_date, end_date, format, filters)
-        elif report_type == 'monthly_summary':
-            return self.generate_monthly_summary_report(start_date, end_date, format, filters)
-        elif report_type == 'category_analysis':
-            return self.generate_category_analysis_report(start_date, end_date, format, filters)
-        else:
-            # Default to transaction report for backward compatibility
-            return self.generate_transaction_report(start_date, end_date, format, filters)
+        try:
+            # Validate inputs
+            if not self.company:
+                raise ValueError("Company is required for report generation")
+            
+            if start_date > end_date:
+                raise ValueError("Start date must be before or equal to end date")
+            
+            # Check for available data
+            has_data = Transaction.active.filter(
+                company=self.company,
+                date__gte=start_date,
+                date__lte=end_date
+            ).exists()
+            
+            if not has_data:
+                logger.warning(f"No transactions found for company {self.company.id} between {start_date} and {end_date}")
+                # Generate empty report with message instead of raising error
+                return self._generate_empty_report(report_type, start_date, end_date, format)
+            
+            # Route to appropriate generator method
+            if report_type == 'profit_loss':
+                return self.generate_profit_loss_report(start_date, end_date, format, filters)
+            elif report_type == 'cash_flow':
+                return self.generate_cash_flow_report(start_date, end_date, format, filters)
+            elif report_type == 'monthly_summary':
+                return self.generate_monthly_summary_report(start_date, end_date, format, filters)
+            elif report_type == 'category_analysis':
+                return self.generate_category_analysis_report(start_date, end_date, format, filters)
+            else:
+                # Default to transaction report for backward compatibility
+                return self.generate_transaction_report(start_date, end_date, format, filters)
+                
+        except Exception as e:
+            logger.error(f"Error generating {report_type} report: {str(e)}", exc_info=True)
+            # Generate error report instead of failing completely
+            return self._generate_error_report(report_type, start_date, end_date, format, str(e))
     
     def generate_profit_loss_report(
         self,
@@ -106,51 +177,60 @@ class ReportGenerator:
         format: str = 'pdf',
         filters: Optional[Dict] = None
     ) -> io.BytesIO:
-        """Generate Profit & Loss (DRE) report"""
+        """Generate Profit & Loss (DRE) report with error handling"""
         
-        # Get all transactions in period
-        transactions = self._get_filtered_transactions(start_date, end_date, filters)
+        try:
+            # Get all transactions in period
+            transactions = self._get_filtered_transactions(start_date, end_date, filters)
+            
+            # Check if we have data
+            if not transactions.exists():
+                logger.info(f"No transactions for P&L report between {start_date} and {end_date}")
+                return self._generate_empty_report('profit_loss', start_date, end_date, format)
         
-        # Calculate revenue by category
-        revenue_by_category = transactions.filter(
-            transaction_type__in=['credit', 'transfer_in', 'pix_in', 'interest']
-        ).values(
-            'category__name'
-        ).annotate(
-            total=Sum('amount'),
-            count=Count('id')
-        ).order_by('-total')
-        
-        # Calculate expenses by category
-        expenses_by_category = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
-        ).values(
-            'category__name'
-        ).annotate(
-            total=Sum('amount'),
-            count=Count('id')
-        ).order_by('-total')
-        
-        # Calculate totals
-        total_revenue = sum(item['total'] or 0 for item in revenue_by_category)
-        total_expenses = sum(item['total'] or 0 for item in expenses_by_category)
-        gross_profit = total_revenue + total_expenses  # expenses are negative in DB, so add
-        
-        # Calculate monthly breakdown
-        monthly_data = self._calculate_monthly_breakdown(transactions, start_date, end_date)
-        
-        if format == 'pdf':
-            return self._generate_profit_loss_pdf(
-                revenue_by_category, expenses_by_category,
-                total_revenue, total_expenses, gross_profit,
-                monthly_data, start_date, end_date
-            )
-        else:
-            return self._generate_profit_loss_excel(
-                revenue_by_category, expenses_by_category,
-                total_revenue, total_expenses, gross_profit,
-                monthly_data, start_date, end_date
-            )
+            # Calculate revenue by category (using helper method for consistency)
+            revenue_by_category = transactions.filter(
+                self._get_income_filter()
+            ).values(
+                'category__name'
+            ).annotate(
+                total=Sum('amount'),
+                count=Count('id')
+            ).order_by('-total')
+            
+            # Calculate expenses by category (using helper method for consistency)
+            expenses_by_category = transactions.filter(
+                self._get_expense_filter()
+            ).values(
+                'category__name'
+            ).annotate(
+                total=Sum('amount'),
+                count=Count('id')
+            ).order_by('-total')
+            
+            # Calculate totals
+            total_revenue = sum(item['total'] or 0 for item in revenue_by_category)
+            total_expenses = sum(item['total'] or 0 for item in expenses_by_category)
+            gross_profit = total_revenue + total_expenses  # expenses are negative in DB, so add
+            
+            # Calculate monthly breakdown
+            monthly_data = self._calculate_monthly_breakdown(transactions, start_date, end_date)
+            
+            if format == 'pdf':
+                return self._generate_profit_loss_pdf(
+                    revenue_by_category, expenses_by_category,
+                    total_revenue, total_expenses, gross_profit,
+                    monthly_data, start_date, end_date
+                )
+            else:
+                return self._generate_profit_loss_excel(
+                    revenue_by_category, expenses_by_category,
+                    total_revenue, total_expenses, gross_profit,
+                    monthly_data, start_date, end_date
+                )
+        except Exception as e:
+            logger.error(f"Error generating P&L report: {str(e)}", exc_info=True)
+            return self._generate_error_report('profit_loss', start_date, end_date, format, str(e))
     
     def generate_cash_flow_report(
         self,
@@ -192,9 +272,9 @@ class ReportGenerator:
         # Daily cash flow
         daily_flow = self._calculate_daily_cash_flow(transactions, start_date, end_date)
         
-        # Cash flow by category
+        # Cash flow by category (using helper methods for consistency)
         inflows = transactions.filter(
-            transaction_type__in=['credit', 'transfer_in', 'pix_in', 'interest']
+            self._get_income_filter()
         ).values(
             'category__name'
         ).annotate(
@@ -202,7 +282,7 @@ class ReportGenerator:
         ).order_by('-total')
         
         outflows = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+            self._get_expense_filter()
         ).values(
             'category__name'
         ).annotate(
@@ -239,12 +319,12 @@ class ReportGenerator:
         
         # Top expenses
         top_expenses = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+            type__in=['debit', 'transfer_out', 'pix_out', 'fee', 'DEBIT', 'EXPENSE']
         ).order_by('-amount')[:10]
         
         # Top income
         top_income = transactions.filter(
-            transaction_type__in=['credit', 'transfer_in', 'pix_in', 'interest']
+            type__in=['credit', 'transfer_in', 'pix_in', 'interest', 'CREDIT', 'INCOME']
         ).order_by('-amount')[:10]
         
         # Daily averages
@@ -257,12 +337,12 @@ class ReportGenerator:
         
         # Account activity
         account_activity = transactions.values(
-            'bank_account__id',
-            'bank_account__nickname'
+            'account__id',
+            'account__display_name'
         ).annotate(
             transaction_count=Count('id'),
-            total_credits=Sum('amount', filter=Q(transaction_type__in=['credit', 'transfer_in', 'pix_in', 'interest'])),
-            total_debits=Sum('amount', filter=Q(transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']))
+            total_credits=Sum('amount', filter=Q(type__in=['credit', 'transfer_in', 'pix_in', 'interest', 'CREDIT', 'INCOME'])),
+            total_debits=Sum('amount', filter=Q(type__in=['debit', 'transfer_out', 'pix_out', 'fee', 'DEBIT', 'EXPENSE']))
         )
         
         if format == 'pdf':
@@ -299,25 +379,25 @@ class ReportGenerator:
             total_amount=Sum(
                 'transactions__amount',
                 filter=Q(
-                    transactions__transaction_date__gte=start_date,
-                    transactions__transaction_date__lte=end_date,
-                    transactions__bank_account__company=self.company
+                    transactions__date__gte=start_date,
+                    transactions__date__lte=end_date,
+                    transactions__company=self.company
                 )
             ),
             transaction_count=Count(
                 'transactions',
                 filter=Q(
-                    transactions__transaction_date__gte=start_date,
-                    transactions__transaction_date__lte=end_date,
-                    transactions__bank_account__company=self.company
+                    transactions__date__gte=start_date,
+                    transactions__date__lte=end_date,
+                    transactions__company=self.company
                 )
             ),
             avg_transaction=Avg(
                 'transactions__amount',
                 filter=Q(
-                    transactions__transaction_date__gte=start_date,
-                    transactions__transaction_date__lte=end_date,
-                    transactions__bank_account__company=self.company
+                    transactions__date__gte=start_date,
+                    transactions__date__lte=end_date,
+                    transactions__company=self.company
                 )
             )
         ).order_by('-total_amount')
@@ -341,9 +421,9 @@ class ReportGenerator:
                 })
                 total_all_transactions += abs(category.total_amount)
         
-        # Now calculate percentages based on the actual total
+        # Now calculate percentages based on the actual total (using safe method)
         for item in category_data:
-            item['percentage'] = (abs(item['total']) / total_all_transactions * 100) if total_all_transactions > 0 else 0
+            item['percentage'] = self._safe_percentage(item['total'], total_all_transactions)
         
         # Use the calculated total for the report
         total_expenses = total_all_transactions
@@ -379,10 +459,10 @@ class ReportGenerator:
     # Helper methods
     def _get_filtered_transactions(self, start_date: date, end_date: date, filters: Optional[Dict] = None):
         """Get filtered transactions"""
-        transactions = Transaction.objects.filter(
-            bank_account__company=self.company,
-            transaction_date__gte=start_date,
-            transaction_date__lte=end_date
+        transactions = Transaction.active.filter(
+            company=self.company,
+            date__gte=start_date,
+            date__lte=end_date
         )
         
         # Apply filters
@@ -390,11 +470,11 @@ class ReportGenerator:
             if filters.get('category_ids'):
                 transactions = transactions.filter(category_id__in=filters['category_ids'])
             if filters.get('account_ids'):
-                transactions = transactions.filter(bank_account_id__in=filters['account_ids'])
+                transactions = transactions.filter(account_id__in=filters['account_ids'])
             if filters.get('transaction_type'):
-                transactions = transactions.filter(transaction_type=filters['transaction_type'])
+                transactions = transactions.filter(type=filters['transaction_type'])
         
-        return transactions.select_related('category', 'bank_account').order_by('-transaction_date')
+        return transactions.select_related('category', 'account').order_by('-date')
     
     def _get_account_display_name(self, account):
         """Get display name for bank account"""
@@ -411,12 +491,12 @@ class ReportGenerator:
     def _calculate_summary_stats(self, transactions) -> Dict[str, Any]:
         """Calculate summary statistics for transactions"""
         income = transactions.filter(
-            transaction_type__in=['credit', 'transfer_in', 'pix_in', 'interest']
+            self._get_income_filter()
         ).aggregate(
             total=Sum('amount'), count=Count('id')
         )
         expenses = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+            self._get_expense_filter()
         ).aggregate(
             total=Sum('amount'), count=Count('id')
         )
@@ -436,7 +516,7 @@ class ReportGenerator:
     def _calculate_category_breakdown(self, transactions) -> List[Dict[str, Any]]:
         """Calculate expense breakdown by category"""
         expenses = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
+            type__in=['debit', 'transfer_out', 'pix_out', 'fee', 'DEBIT', 'EXPENSE']
         )
         
         category_data = expenses.values('category__name').annotate(
@@ -458,10 +538,18 @@ class ReportGenerator:
         monthly_data = defaultdict(lambda: {'income': Decimal('0'), 'expenses': Decimal('0')})
         
         for trans in transactions:
-            month_key = trans.transaction_date.strftime('%Y-%m')
-            if trans.transaction_type in ['credit', 'transfer_in', 'pix_in', 'interest']:
+            # Handle both datetime and date fields
+            trans_date = trans.date
+            if hasattr(trans_date, 'date'):
+                trans_date = trans_date.date()  # Convert datetime to date if needed
+            
+            month_key = trans_date.strftime('%Y-%m')
+            
+            # Check transaction type (case-insensitive)
+            trans_type = trans.type.lower() if trans.type else ''
+            if trans_type in ['credit', 'transfer_in', 'pix_in', 'interest', 'income']:
                 monthly_data[month_key]['income'] += trans.amount
-            elif trans.transaction_type in ['debit', 'transfer_out', 'pix_out', 'fee']:
+            elif trans_type in ['debit', 'transfer_out', 'pix_out', 'fee', 'expense']:
                 monthly_data[month_key]['expenses'] += trans.amount
         
         # Convert to sorted list
@@ -490,11 +578,16 @@ class ReportGenerator:
         daily_data = defaultdict(lambda: {'inflow': Decimal('0'), 'outflow': Decimal('0')})
         
         for trans in transactions:
+            # Handle both datetime and date fields consistently
+            trans_date = trans.date
             # Convert datetime to date for consistent key comparison
-            day_key = trans.transaction_date.date() if hasattr(trans.transaction_date, 'date') else trans.transaction_date
-            if trans.transaction_type in ['credit', 'transfer_in', 'pix_in', 'interest']:
+            day_key = trans_date.date() if hasattr(trans_date, 'date') else trans_date
+            
+            # Check transaction type (case-insensitive)
+            trans_type = trans.type.lower() if trans.type else ''
+            if trans_type in ['credit', 'transfer_in', 'pix_in', 'interest', 'income']:
                 daily_data[day_key]['inflow'] += trans.amount
-            elif trans.transaction_type in ['debit', 'transfer_out', 'pix_out', 'fee']:
+            elif trans_type in ['debit', 'transfer_out', 'pix_out', 'fee', 'expense']:
                 daily_data[day_key]['outflow'] += abs(trans.amount)
         
         # Create complete daily series
@@ -523,8 +616,15 @@ class ReportGenerator:
         trends = defaultdict(lambda: defaultdict(Decimal))
         
         for trans in transactions:
-            if trans.transaction_type in ['debit', 'transfer_out', 'pix_out', 'fee']:  # Only expenses for category analysis
-                month_key = trans.transaction_date.strftime('%Y-%m')
+            # Check transaction type (case-insensitive) 
+            trans_type = trans.type.lower() if trans.type else ''
+            if trans_type in ['debit', 'transfer_out', 'pix_out', 'fee', 'expense']:  # Only expenses for category analysis
+                # Handle both datetime and date fields
+                trans_date = trans.date
+                if hasattr(trans_date, 'date'):
+                    trans_date = trans_date.date()  # Convert datetime to date if needed
+                
+                month_key = trans_date.strftime('%Y-%m')
                 category_name = trans.category.name if trans.category else 'Sem categoria'
                 trends[category_name][month_key] += abs(trans.amount)
         
@@ -532,23 +632,122 @@ class ReportGenerator:
     
     def _get_balance_at_date(self, account, date):
         """Calculate account balance at a specific date"""
-        # Get all transactions up to (not including) the date
-        transactions = Transaction.objects.filter(
-            bank_account=account,
-            transaction_date__lt=date
-        )
+        try:
+            # Get all transactions up to (not including) the date
+            transactions = Transaction.active.filter(
+                account=account,
+                date__lt=date
+            )
+            
+            credits = transactions.filter(
+                self._get_income_filter()
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            
+            debits = transactions.filter(
+                self._get_expense_filter()
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            
+            # Calculate balance as credits + debits (debits are negative in DB)
+            # This gives us the net change from all transactions
+            return credits + debits
+        except Exception as e:
+            logger.error(f"Error calculating balance for account {account.id}: {e}")
+            return Decimal('0')
+    
+    def _generate_empty_report(self, report_type: str, start_date: date, end_date: date, format: str) -> io.BytesIO:
+        """Generate an empty report with message when no data is available"""
+        buffer = io.BytesIO()
         
-        credits = transactions.filter(
-            transaction_type__in=['credit', 'transfer_in', 'pix_in', 'interest']
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        if format == 'pdf':
+            doc = SimpleDocTemplate(buffer, pagesize=A4)
+            story = []
+            
+            # Title
+            title = Paragraph(
+                f"Relatório {report_type.replace('_', ' ').title()} - {self.company.name}",
+                self.styles['CustomTitle']
+            )
+            story.append(title)
+            
+            # Period
+            period = Paragraph(
+                f"Período: {start_date.strftime('%d/%m/%Y')} a {end_date.strftime('%d/%m/%Y')}",
+                self.styles['Normal']
+            )
+            story.append(period)
+            story.append(Spacer(1, inch))
+            
+            # Message
+            message = Paragraph(
+                "Não foram encontradas transações para o período selecionado.",
+                self.styles['CustomHeading']
+            )
+            story.append(message)
+            
+            suggestion = Paragraph(
+                "Por favor, verifique se existem transações importadas para este período ou selecione um período diferente.",
+                self.styles['Normal']
+            )
+            story.append(suggestion)
+            
+            doc.build(story)
+        else:  # Excel
+            workbook = xlsxwriter.Workbook(buffer, {'in_memory': True})
+            sheet = workbook.add_worksheet('Relatório')
+            
+            sheet.write('A1', f'Relatório {report_type.replace("_", " ").title()}')
+            sheet.write('A2', f'Período: {start_date.strftime("%d/%m/%Y")} a {end_date.strftime("%d/%m/%Y")}')
+            sheet.write('A4', 'Não foram encontradas transações para o período selecionado.')
+            sheet.write('A5', 'Por favor, verifique se existem transações importadas para este período.')
+            
+            workbook.close()
         
-        debits = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out', 'fee']
-        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        buffer.seek(0)
+        return buffer
+    
+    def _generate_error_report(self, report_type: str, start_date: date, end_date: date, format: str, error_msg: str) -> io.BytesIO:
+        """Generate an error report when generation fails"""
+        buffer = io.BytesIO()
         
-        # Calculate balance as credits + debits (debits are negative in DB)
-        # This gives us the net change from all transactions
-        return credits + debits
+        if format == 'pdf':
+            doc = SimpleDocTemplate(buffer, pagesize=A4)
+            story = []
+            
+            # Title
+            title = Paragraph(
+                f"Erro ao Gerar Relatório - {self.company.name}",
+                self.styles['CustomTitle']
+            )
+            story.append(title)
+            
+            # Error message
+            error = Paragraph(
+                f"Ocorreu um erro ao gerar o relatório {report_type.replace('_', ' ').title()}",
+                self.styles['CustomHeading']
+            )
+            story.append(error)
+            story.append(Spacer(1, 0.5*inch))
+            
+            # Details
+            details = Paragraph(
+                f"Detalhes do erro: {error_msg}",
+                self.styles['Normal']
+            )
+            story.append(details)
+            
+            doc.build(story)
+        else:  # Excel
+            workbook = xlsxwriter.Workbook(buffer, {'in_memory': True})
+            sheet = workbook.add_worksheet('Erro')
+            
+            sheet.write('A1', 'Erro ao Gerar Relatório')
+            sheet.write('A2', f'Tipo: {report_type.replace("_", " ").title()}')
+            sheet.write('A3', f'Erro: {error_msg}')
+            
+            workbook.close()
+        
+        buffer.seek(0)
+        return buffer
     
     # PDF Generation Methods
     def _generate_profit_loss_pdf(self, revenue_by_category, expenses_by_category,
@@ -581,11 +780,11 @@ class ReportGenerator:
             ['', 'Valor (R$)', '% do Total'],
             ['RECEITAS', f'{total_revenue:,.2f}', '100%'],
             ['DESPESAS', f'-{abs(total_expenses):,.2f}', 
-             f'{(abs(total_expenses)/total_revenue*100):.1f}%' if total_revenue > 0 else '0%'],
+             f'{self._safe_percentage(total_expenses, total_revenue)}%'],
             ['', '', ''],
             ['LUCRO/PREJUÍZO', 
              f'{gross_profit:,.2f}',
-             f'{(gross_profit/total_revenue*100):.1f}%' if total_revenue > 0 else '0%'],
+             f'{self._safe_percentage(gross_profit, total_revenue)}%'],
         ]
         
         summary_table = Table(summary_data, colWidths=[3*inch, 2*inch, 1.5*inch])
@@ -611,12 +810,12 @@ class ReportGenerator:
             revenue_data = [['Categoria', 'Valor (R$)', 'Qtd', '%']]
             
             for item in revenue_by_category:
-                percentage = (item['total'] / total_revenue * 100) if total_revenue > 0 else 0
+                percentage = self._safe_percentage(item['total'], total_revenue)
                 revenue_data.append([
                     item['category__name'] or 'Sem categoria',
                     f"{item['total']:,.2f}",
                     str(item['count']),
-                    f"{percentage:.1f}%"
+                    f"{percentage}%"
                 ])
             
             revenue_table = Table(revenue_data, colWidths=[3*inch, 1.5*inch, 0.8*inch, 0.8*inch])
@@ -639,12 +838,12 @@ class ReportGenerator:
             expense_data = [['Categoria', 'Valor (R$)', 'Qtd', '%']]
             
             for item in expenses_by_category:
-                percentage = (abs(item['total']) / abs(total_expenses) * 100) if total_expenses != 0 else 0
+                percentage = self._safe_percentage(item['total'], total_expenses)
                 expense_data.append([
                     item['category__name'] or 'Sem categoria',
                     f"{item['total']:,.2f}",
                     str(item['count']),
-                    f"{percentage:.1f}%"
+                    f"{percentage}%"
                 ])
             
             expense_table = Table(expense_data, colWidths=[3*inch, 1.5*inch, 0.8*inch, 0.8*inch])
@@ -945,7 +1144,7 @@ class ReportGenerator:
             
             for trans in top_expenses:
                 expense_data.append([
-                    trans.transaction_date.strftime('%d/%m'),
+                    trans.date.strftime('%d/%m'),
                     trans.description[:40] + '...' if len(trans.description) > 40 else trans.description,
                     trans.category.name if trans.category else 'Sem categoria',
                     f"R$ {abs(trans.amount):,.2f}"
@@ -971,7 +1170,7 @@ class ReportGenerator:
             
             for trans in top_income:
                 income_data.append([
-                    trans.transaction_date.strftime('%d/%m'),
+                    trans.date.strftime('%d/%m'),
                     trans.description[:40] + '...' if len(trans.description) > 40 else trans.description,
                     trans.category.name if trans.category else 'Sem categoria',
                     f"R$ {trans.amount:,.2f}"
@@ -1055,7 +1254,7 @@ class ReportGenerator:
             account_data = [['Conta', 'Transações', 'Créditos (R$)', 'Débitos (R$)']]
             
             for item in account_activity:
-                account_name = item['bank_account__nickname'] or f"Conta {item['bank_account__id']}"
+                account_name = item['account__display_name'] or f"Conta {item['account__id']}"
                 account_data.append([
                     account_name,
                     str(item['transaction_count']),
@@ -1313,11 +1512,11 @@ class ReportGenerator:
         # Add transactions
         for trans in transactions[:100]:  # Limit to 100 for PDF
             table_data.append([
-                trans.transaction_date.strftime('%d/%m/%Y'),
+                trans.date.strftime('%d/%m/%Y'),
                 trans.description[:40] + '...' if len(trans.description) > 40 else trans.description,
                 trans.category.name if trans.category else 'Sem categoria',
-                self._get_account_display_name(trans.bank_account),
-                'Receita' if trans.transaction_type == 'credit' else 'Despesa',
+                self._get_account_display_name(trans.account),
+                'Receita' if trans.type in ['credit', 'CREDIT', 'INCOME'] else 'Despesa',
                 f"R$ {trans.amount:,.2f}"
             ])
         
@@ -1655,7 +1854,7 @@ class ReportGenerator:
         
         row = 3
         for trans in top_expenses:
-            trans_sheet.write(f'A{row}', trans.transaction_date, date_format)
+            trans_sheet.write(f'A{row}', trans.date, date_format)
             trans_sheet.write(f'B{row}', trans.description)
             trans_sheet.write(f'C{row}', trans.category.name if trans.category else 'Sem categoria')
             trans_sheet.write(f'D{row}', float(trans.amount), money_format)
@@ -1672,7 +1871,7 @@ class ReportGenerator:
         
         row += 1
         for trans in top_income:
-            trans_sheet.write(f'A{row}', trans.transaction_date, date_format)
+            trans_sheet.write(f'A{row}', trans.date, date_format)
             trans_sheet.write(f'B{row}', trans.description)
             trans_sheet.write(f'C{row}', trans.category.name if trans.category else 'Sem categoria')
             trans_sheet.write(f'D{row}', float(trans.amount), money_format)
@@ -1845,11 +2044,11 @@ class ReportGenerator:
         # Data
         row = 1
         for trans in transactions:
-            trans_sheet.write(row, 0, trans.transaction_date, date_format)
+            trans_sheet.write(row, 0, trans.date, date_format)
             trans_sheet.write(row, 1, trans.description)
             trans_sheet.write(row, 2, trans.category.name if trans.category else 'Sem categoria')
-            trans_sheet.write(row, 3, self._get_account_display_name(trans.bank_account))
-            trans_sheet.write(row, 4, 'Receita' if trans.transaction_type == 'credit' else 'Despesa')
+            trans_sheet.write(row, 3, self._get_account_display_name(trans.account))
+            trans_sheet.write(row, 4, 'Receita' if trans.type in ['credit', 'CREDIT', 'INCOME'] else 'Despesa')
             trans_sheet.write(row, 5, float(trans.amount), money_format)
             row += 1
         

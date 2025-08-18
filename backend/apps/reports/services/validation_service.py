@@ -422,16 +422,16 @@ class ReportValidationService:
             )
         
         # Build transaction query
-        transaction_query = Transaction.objects.filter(
-            bank_account__company=company,
-            transaction_date__gte=start_date,
-            transaction_date__lte=end_date
+        transaction_query = Transaction.active.filter(
+            company=company,
+            date__gte=start_date,
+            date__lte=end_date
         )
         
         # Apply filters
         if filters.get('account_ids'):
             transaction_query = transaction_query.filter(
-                bank_account_id__in=filters['account_ids']
+                account_id__in=filters['account_ids']
             )
         
         if filters.get('category_ids'):

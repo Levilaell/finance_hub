@@ -10,7 +10,7 @@ import mimetypes
 import hashlib
 
 from django.core.files.base import ContentFile
-from django.db.models import Count, Q, Sum, Avg, F, Prefetch
+from django.db.models import Count, Q, Sum, Avg, F, Prefetch, Value, CharField
 from django.http import HttpResponse, Http404
 from django.utils import timezone
 from django.core.signing import TimestampSigner, BadSignature
@@ -79,11 +79,19 @@ class ReportViewSet(viewsets.ModelViewSet):
                 'error': 'report_type, period_start, and period_end are required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Date validation
+        # Date validation (handle multiple formats)
         try:
-            start_date = datetime.strptime(period_start, '%Y-%m-%d').date()
-            end_date = datetime.strptime(period_end, '%Y-%m-%d').date()
-        except ValueError as e:
+            # Try ISO format first (from frontend)
+            if 'T' in period_start:
+                start_date = datetime.fromisoformat(period_start.replace('Z', '+00:00')).date()
+            else:
+                start_date = datetime.strptime(period_start, '%Y-%m-%d').date()
+                
+            if 'T' in period_end:
+                end_date = datetime.fromisoformat(period_end.replace('Z', '+00:00')).date()
+            else:
+                end_date = datetime.strptime(period_end, '%Y-%m-%d').date()
+        except (ValueError, TypeError) as e:
             raise InvalidReportPeriodError(f'Invalid date format: {str(e)}')
         
         if start_date > end_date:
@@ -123,10 +131,41 @@ class ReportViewSet(viewsets.ModelViewSet):
                 created_by=request.user
             )
             
-            # Generate asynchronously
-            generate_report_async.delay(report.id)
-            
-            logger.info(f"Report {report.id} created and queued for generation")
+            # Try to generate asynchronously first
+            try:
+                task = generate_report_async.delay(report.id)
+                logger.info(f"Report {report.id} created and queued for async generation")
+            except Exception as celery_error:
+                # Fallback to synchronous generation if Celery is not available
+                logger.warning(f"Celery not available, generating report synchronously: {celery_error}")
+                
+                try:
+                    # Import ReportGenerator and generate synchronously
+                    from .report_generator import ReportGenerator
+                    from django.core.files.base import ContentFile
+                    
+                    generator = ReportGenerator(report.company)
+                    
+                    # Generate the report
+                    buffer = generator.generate_report(
+                        report_type=report.report_type,
+                        start_date=report.period_start,
+                        end_date=report.period_end,
+                        format=report.file_format,
+                        filters=report.filters
+                    )
+                    
+                    # Save the generated file
+                    filename = f"{report.report_type}_{report.id}_{start_date}_{end_date}.{file_format}"
+                    report.file.save(filename, ContentFile(buffer.read()))
+                    report.is_generated = True
+                    report.save(update_fields=['file', 'is_generated'])
+                    
+                    logger.info(f"Report {report.id} generated synchronously")
+                except Exception as sync_error:
+                    logger.error(f"Failed to generate report synchronously: {sync_error}")
+                    report.error_message = str(sync_error)
+                    report.save(update_fields=['error_message'])
         
         serializer = self.get_serializer(report)
         return Response(
@@ -203,11 +242,46 @@ class ReportViewSet(viewsets.ModelViewSet):
         report.error_message = ''
         report.save(update_fields=['is_generated', 'error_message'])
         
-        # Queue for regeneration
-        generate_report_async.delay(report.id, regenerate=True)
+        # Try to queue for regeneration
+        try:
+            generate_report_async.delay(report.id, regenerate=True)
+            message = 'Report queued for regeneration'
+            logger.info(f"Report {report.id} queued for async regeneration")
+        except Exception as celery_error:
+            # Fallback to synchronous regeneration if Celery is not available
+            logger.warning(f"Celery not available, regenerating report synchronously: {celery_error}")
+            
+            try:
+                from .report_generator import ReportGenerator
+                from django.core.files.base import ContentFile
+                
+                generator = ReportGenerator(report.company)
+                
+                # Generate the report
+                buffer = generator.generate_report(
+                    report_type=report.report_type,
+                    start_date=report.period_start,
+                    end_date=report.period_end,
+                    format=report.file_format,
+                    filters=report.filters
+                )
+                
+                # Save the generated file
+                filename = f"{report.report_type}_{report.id}_{report.period_start}_{report.period_end}.{report.file_format}"
+                report.file.save(filename, ContentFile(buffer.read()))
+                report.is_generated = True
+                report.save(update_fields=['file', 'is_generated'])
+                
+                message = 'Report regenerated successfully'
+                logger.info(f"Report {report.id} regenerated synchronously")
+            except Exception as sync_error:
+                logger.error(f"Failed to regenerate report synchronously: {sync_error}")
+                report.error_message = str(sync_error)
+                report.save(update_fields=['error_message'])
+                message = f'Failed to regenerate report: {sync_error}'
         
         return Response({
-            'message': 'Report queued for regeneration',
+            'message': message,
             'report_id': report.id
         })
 
@@ -301,40 +375,36 @@ class AnalyticsView(APIView):
             is_active=True
         ).select_related('bank_provider')
         
-        transactions = Transaction.objects.filter(
-            bank_account__company=company,
-            transaction_date__range=[start_date, end_date]
+        transactions = Transaction.active.filter(
+            company=company,
+            date__range=[start_date, end_date]
         ).select_related(
             'category',
-            'bank_account',
-            'bank_account__bank_provider'
+            'account'
         )
         
         # Aggregate data
         total_income = transactions.filter(
-            transaction_type__in=['credit', 'transfer_in', 'pix_in']
+            type__in=['CREDIT', 'INCOME']
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
         
         total_expenses = transactions.filter(
-            transaction_type__in=['debit', 'transfer_out', 'pix_out']
+            type__in=['DEBIT', 'EXPENSE']
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
         
         # Top income sources
         top_income_sources = transactions.filter(
-            transaction_type='credit',
-            counterpart_name__isnull=False
-        ).values('counterpart_name').annotate(
+            type='CREDIT'
+        ).values('description').annotate(
             total=Sum('amount'),
             count=Count('id')
         ).order_by('-total')[:10]
         
         # Top expense categories
         top_expense_categories = transactions.filter(
-            transaction_type='debit',
-            category__isnull=False
+            type='DEBIT'
         ).values(
-            'category__name',
-            'category__icon'
+            'pluggy_category_description'
         ).annotate(
             total=Sum('amount'),
             count=Count('id'),
@@ -349,10 +419,10 @@ class AnalyticsView(APIView):
             week_end = min(current_date + timedelta(days=6), end_date)
             
             week_data = transactions.filter(
-                transaction_date__range=[current_date, week_end]
+                date__range=[current_date, week_end]
             ).aggregate(
-                income=Sum('amount', filter=Q(transaction_type='credit')),
-                expenses=Sum('amount', filter=Q(transaction_type='debit'))
+                income=Sum('amount', filter=Q(type='CREDIT')),
+                expenses=Sum('amount', filter=Q(type='DEBIT'))
             )
             
             weekly_trend.append({
@@ -426,13 +496,13 @@ class CashFlowView(APIView):
             return Response(cached_data)
         
         # Get transactions with optimized query
-        transactions = Transaction.objects.filter(
-            bank_account__company=company,
-            transaction_date__range=[start_date, end_date]
+        transactions = Transaction.active.filter(
+            company=company,
+            date__range=[start_date, end_date]
         ).select_related(
             'category',
-            'bank_account'
-        ).order_by('transaction_date')
+            'account'
+        ).order_by('date')
         
         # Build daily cash flow
         daily_flow = []
@@ -440,11 +510,11 @@ class CashFlowView(APIView):
         running_balance = Decimal('0')
         
         while current_date <= end_date:
-            day_transactions = transactions.filter(transaction_date=current_date)
+            day_transactions = transactions.filter(date=current_date)
             
             daily_data = day_transactions.aggregate(
-                income=Sum('amount', filter=Q(transaction_type='credit')),
-                expenses=Sum('amount', filter=Q(transaction_type='debit'))
+                income=Sum('amount', filter=Q(type='CREDIT')),
+                expenses=Sum('amount', filter=Q(type='DEBIT'))
             )
             
             income = daily_data['income'] or Decimal('0')
@@ -606,15 +676,15 @@ class DashboardStatsView(APIView):
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
         # Single query for transactions with optimizations
-        transactions = Transaction.objects.filter(
-            bank_account__company=company,
-            transaction_date__gte=month_start
-        ).select_related('bank_account', 'category')
+        transactions = Transaction.active.filter(
+            company=company,
+            date__gte=month_start
+        ).select_related('account', 'category')
         
         # Aggregate in database
         stats = transactions.aggregate(
-            income=Sum('amount', filter=Q(transaction_type__in=['credit', 'transfer_in', 'pix_in'])),
-            expenses=Sum('amount', filter=Q(transaction_type__in=['debit', 'transfer_out', 'pix_out'])),
+            income=Sum('amount', filter=Q(type__in=['credit', 'transfer_in', 'pix_in', 'CREDIT', 'INCOME'])),
+            expenses=Sum('amount', filter=Q(type__in=['debit', 'transfer_out', 'pix_out', 'DEBIT', 'EXPENSE'])),
             transaction_count=Count('id')
         )
         
@@ -666,17 +736,17 @@ class CashFlowDataView(APIView):
             return Response(cached_data)
         
         # Optimized query - get all transactions at once
-        transactions = Transaction.objects.filter(
-            bank_account__company=company,
-            transaction_date__range=[start_date, end_date]
+        transactions = Transaction.active.filter(
+            company=company,
+            date__range=[start_date, end_date]
         ).select_related(
-            'bank_account',
+            'account',
             'category'
         ).values(
-            'transaction_date',
-            'transaction_type',
+            'date',
+            'type',
             'amount'
-        ).order_by('transaction_date')
+        ).order_by('date')
         
         # Process in Python for better performance
         daily_data = {}
@@ -689,14 +759,16 @@ class CashFlowDataView(APIView):
         
         # Aggregate transactions
         for trans in transactions:
-            date = trans['transaction_date']
+            # Convert datetime to date for matching with daily_data keys
+            date_key = trans['date'].date() if hasattr(trans['date'], 'date') else trans['date']
             amount = trans['amount']
-            trans_type = trans['transaction_type']
+            trans_type = trans['type']
             
-            if trans_type in ['credit', 'transfer_in', 'pix_in']:
-                daily_data[date]['income'] += amount
-            elif trans_type in ['debit', 'transfer_out', 'pix_out']:
-                daily_data[date]['expenses'] += abs(amount)
+            if date_key in daily_data:
+                if trans_type in ['CREDIT', 'INCOME']:
+                    daily_data[date_key]['income'] += amount
+                elif trans_type in ['DEBIT', 'EXPENSE']:
+                    daily_data[date_key]['expenses'] += abs(amount)
         
         # Build response with running balance
         cash_flow_data = []
@@ -747,23 +819,43 @@ class CategorySpendingView(APIView):
         if cached_data:
             return Response(cached_data)
         
-        # Map transaction types
-        if category_type == 'expense':
-            transaction_types = ['debit', 'transfer_out', 'pix_out', 'fee']
-        else:
-            transaction_types = ['credit', 'transfer_in', 'pix_in', 'interest']
+        # Build query filter based on type (case-insensitive)
+        from django.db.models import Q
         
-        # Optimized query with proper joins
-        category_data = Transaction.objects.filter(
-            bank_account__company=company,
-            transaction_date__range=[start_date, end_date],
-            transaction_type__in=transaction_types,
-            category__isnull=False
-        ).select_related(
-            'category'
+        if category_type == 'expense':
+            # Include all expense-related transaction types (case-insensitive)
+            type_filter = (
+                Q(type__iexact='DEBIT') | 
+                Q(type__iexact='EXPENSE') | 
+                Q(type__iexact='debit') | 
+                Q(type__iexact='expense') |
+                Q(type__iexact='transfer_out') | 
+                Q(type__iexact='pix_out') | 
+                Q(type__iexact='fee')
+            )
+        else:
+            # Include all income-related transaction types (case-insensitive)
+            type_filter = (
+                Q(type__iexact='CREDIT') | 
+                Q(type__iexact='INCOME') | 
+                Q(type__iexact='credit') | 
+                Q(type__iexact='income') |
+                Q(type__iexact='transfer_in') | 
+                Q(type__iexact='pix_in') | 
+                Q(type__iexact='interest')
+            )
+        
+        # Optimized query with proper joins and case-insensitive filtering
+        category_data = Transaction.active.filter(
+            company=company,
+            date__range=[start_date, end_date]
+        ).filter(
+            type_filter
         ).values(
-            'category__name', 
-            'category__icon'
+            'pluggy_category_description', 'category__name'
+        ).exclude(
+            pluggy_category_description__isnull=True,
+            pluggy_category_description__exact=''
         ).annotate(
             total_amount=Sum('amount'),
             transaction_count=Count('id')
@@ -771,18 +863,43 @@ class CategorySpendingView(APIView):
             '-total_amount' if category_type == 'income' else 'total_amount'
         )
         
+        # If no categorized data, try to get aggregated data without category filter
+        if not category_data:
+            logger.info(f"No categorized transactions found, trying aggregated view for company {company.id}")
+            category_data = Transaction.active.filter(
+                company=company,
+                date__range=[start_date, end_date]
+            ).filter(
+                type_filter
+            ).values(
+                'pluggy_category_description'
+            ).annotate(
+                total_amount=Sum('amount'),
+                transaction_count=Count('id'),
+                category__name=Value('Sem categoria', output_field=CharField())
+            ).order_by(
+                '-total_amount' if category_type == 'income' else 'total_amount'
+            )
+        
         # Calculate percentages
-        total_amount = sum(abs(item['total_amount']) for item in category_data)
+        total_amount = sum(abs(item['total_amount']) for item in category_data if item['total_amount'])
         
         result = []
         for item in category_data:
             amount = abs(item['total_amount'])
             percentage = (amount / total_amount * 100) if total_amount else 0
             
+            # Use internal category name if available, otherwise use Pluggy description
+            category_name = (
+                item.get('category__name') or 
+                item.get('pluggy_category_description') or 
+                'Outros'
+            )
+            
             result.append({
                 'category': {
-                    'name': item['category__name'],
-                    'icon': item['category__icon']
+                    'name': category_name,
+                    'icon': 'folder'
                 },
                 'amount': float(amount),
                 'percentage': round(percentage, 1),
@@ -823,15 +940,15 @@ class IncomeVsExpensesView(APIView):
             return Response(cached_data)
         
         # Get all transactions in date range with optimized query
-        transactions = Transaction.objects.filter(
-            bank_account__company=company,
-            transaction_date__range=[start_date, end_date]
+        transactions = Transaction.active.filter(
+            company=company,
+            date__range=[start_date, end_date]
         ).select_related(
-            'bank_account'
+            'account'
         ).values(
-            'transaction_date__year',
-            'transaction_date__month',
-            'transaction_type',
+            'date__year',
+            'date__month',
+            'type',
             'amount'
         )
         
@@ -839,19 +956,19 @@ class IncomeVsExpensesView(APIView):
         monthly_data = {}
         
         for trans in transactions:
-            year = trans['transaction_date__year']
-            month = trans['transaction_date__month']
+            year = trans['date__year']
+            month = trans['date__month']
             month_key = f"{year}-{month:02d}"
             
             if month_key not in monthly_data:
                 monthly_data[month_key] = {'income': Decimal('0'), 'expenses': Decimal('0')}
             
             amount = trans['amount']
-            trans_type = trans['transaction_type']
+            trans_type = trans['type']
             
-            if trans_type in ['credit', 'transfer_in', 'pix_in', 'interest']:
+            if trans_type in ['CREDIT', 'INCOME']:
                 monthly_data[month_key]['income'] += amount
-            elif trans_type in ['debit', 'transfer_out', 'pix_out', 'fee']:
+            elif trans_type in ['DEBIT', 'EXPENSE']:
                 monthly_data[month_key]['expenses'] += abs(amount)
         
         # Build response
