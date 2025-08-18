@@ -373,3 +373,8 @@ VALIDATE_SESSION_IP = False  # Set to True in production if needed
 SESSION_TIMEOUT = 3600  # 1 hour
 SESSION_ABSOLUTE_TIMEOUT = 86400  # 24 hours
 REMEMBER_ME_LIFETIME = 2592000  # 30 days
+
+# Feature Flags
+FEATURE_FLAGS = {
+    'AI_INSIGHTS_ENABLED': os.environ.get('AI_INSIGHTS_ENABLED', 'false').lower() == 'true',
+}

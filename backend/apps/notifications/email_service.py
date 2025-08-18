@@ -104,6 +104,23 @@ class EmailService:
         )
     
     @staticmethod
+    def send_welcome_email(user) -> bool:
+        """Send welcome email to new user"""
+        context = {
+            'user': user,
+            'login_url': f"{settings.FRONTEND_URL}/login",
+            'site_name': 'Finance Hub',
+            'support_email': 'suporte@financehub.com.br'
+        }
+        
+        return EmailService.send_email(
+            subject='Bem-vindo ao Finance Hub!',
+            template_name='welcome',
+            context=context,
+            recipient_list=[user.email]
+        )
+    
+    @staticmethod
     def send_report_ready_email(user, report) -> bool:
         """Send report ready notification"""
         context = {
@@ -235,14 +252,28 @@ def send_password_reset_email_task(user_id: int, reset_url: str):
 
 
 @shared_task
-def send_verification_email_task(user_id: int, verification_url: str):
-    """Async task to send verification email"""
+# Email verification will be implemented in the future
+# def send_verification_email_task(user_id: int, verification_url: str):
+#     """Async task to send verification email"""
+#     from django.contrib.auth import get_user_model
+#     User = get_user_model()
+#     
+#     try:
+#         user = User.objects.get(id=user_id)
+#         return EmailService.send_verification_email(user, verification_url)
+#     except User.DoesNotExist:
+#         logger.error(f"User {user_id} not found for verification email")
+#         return False
+
+@shared_task
+def send_welcome_email_task(user_id: int):
+    """Async task to send welcome email"""
     from django.contrib.auth import get_user_model
     User = get_user_model()
     
     try:
         user = User.objects.get(id=user_id)
-        return EmailService.send_verification_email(user, verification_url)
+        return EmailService.send_welcome_email(user)
     except User.DoesNotExist:
-        logger.error(f"User {user_id} not found for verification email")
+        logger.error(f"User {user_id} not found for welcome email")
         return False

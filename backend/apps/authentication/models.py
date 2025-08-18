@@ -13,7 +13,8 @@ class User(AbstractUser):
     """
     email = models.EmailField(_('email address'), unique=True)
     phone = models.CharField(_('phone number'), max_length=20, blank=True)
-    is_email_verified = models.BooleanField(_('email verified'), default=False)
+    # Email verification will be implemented in the future
+    # is_email_verified = models.BooleanField(_('email verified'), default=False)
     is_phone_verified = models.BooleanField(_('phone verified'), default=False)
     avatar = models.ImageField(_('avatar'), upload_to='avatars/', blank=True, null=True)
     date_of_birth = models.DateField(_('date of birth'), blank=True, null=True)
@@ -70,7 +71,7 @@ class User(AbstractUser):
         verbose_name_plural = _('Users')
         indexes = [
             models.Index(fields=['email']),
-            models.Index(fields=['is_email_verified']),
+            # models.Index(fields=['is_email_verified']),  # Will be added when email verification is implemented
             models.Index(fields=['created_at']),
         ]
     

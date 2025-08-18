@@ -6,7 +6,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
 from django.urls import reverse
-from .models import User, EmailVerification, PasswordReset
+from .models import User, PasswordReset  # EmailVerification will be implemented in the future
 from django.contrib.admin import SimpleListFilter
 from core.admin import SecureModelAdmin
 
@@ -101,11 +101,12 @@ class UserAdmin(BaseUserAdmin):
     list_display = (
         'email', 'full_name_display', 'company_display',
         'plan_display', 'subscription_status_display', 'trial_info',
-        'is_active', 'is_email_verified', 'two_fa_status', 'created_at'
+        'is_active', 'two_fa_status', 'created_at'  # is_email_verified will be added when implemented
     )
     list_filter = (
         'is_active', 'is_staff', 'is_superuser',
-        'is_email_verified', 'is_phone_verified',
+        # 'is_email_verified',  # Will be added when email verification is implemented
+        'is_phone_verified',
         'is_two_factor_enabled', 'preferred_language',
         'payment_gateway',
         SubscriptionPlanFilter,
@@ -125,7 +126,7 @@ class UserAdmin(BaseUserAdmin):
             'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
         }),
         (_('Verification'), {
-            'fields': ('is_email_verified', 'is_phone_verified'),
+            'fields': ('is_phone_verified',),  # is_email_verified will be added when implemented
         }),
         (_('Preferences'), {
             'fields': ('preferred_language', 'timezone'),
@@ -176,7 +177,9 @@ class UserAdmin(BaseUserAdmin):
     
     def verify_email(self, request, queryset):
         """Mark selected users' emails as verified"""
-        updated = queryset.update(is_email_verified=True)
+        # Email verification will be implemented in the future
+        # updated = queryset.update(is_email_verified=True)
+        updated = 0  # Temporary until email verification is implemented
         self.message_user(request, f'{updated} users\' emails marked as verified.')
     verify_email.short_description = "Mark selected users' emails as verified"
     
@@ -417,62 +420,63 @@ class UserAdmin(BaseUserAdmin):
         )
 
 
-@admin.register(EmailVerification)
-class EmailVerificationAdmin(admin.ModelAdmin):
-    """
-    Admin interface for email verifications
-    """
-    list_display = [
-        'user_email', 'token_display', 'is_used',
-        'created_at', 'expires_at_display'
-    ]
-    list_filter = ['is_used', 'created_at']
-    search_fields = ['user__email', 'token']
-    date_hierarchy = 'created_at'
-    ordering = ['-created_at']
-    
-    readonly_fields = ['token', 'created_at']
-    
-    def user_email(self, obj):
-        return obj.user.email
-    user_email.short_description = 'Email do Usuário'
-    
-    def token_display(self, obj):
-        # Show only first and last 2 chars for security
-        if len(obj.token) > 4:
-            return f"{obj.token[:2]}...{obj.token[-2:]}"
-        return obj.token
-    token_display.short_description = 'Token'
-    
-    def expires_at_display(self, obj):
-        from django.utils import timezone
-        if obj.expires_at > timezone.now():
-            time_left = obj.expires_at - timezone.now()
-            hours = time_left.total_seconds() // 3600
-            minutes = (time_left.total_seconds() % 3600) // 60
-            return format_html(
-                '<span style="color: green;">{}h {}m</span>',
-                int(hours), int(minutes)
-            )
-        return format_html('<span style="color: red;">Expirado</span>')
-    expires_at_display.short_description = 'Expira em'
-    
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.select_related('user')
-    
-    actions = ['mark_as_used']
-    
-    def mark_as_used(self, request, queryset):
-        count = 0
-        for verification in queryset.filter(is_used=False):
-            verification.is_used = True
-            verification.user.is_email_verified = True
-            verification.save()
-            verification.user.save()
-            count += 1
-        self.message_user(request, f'{count} verificações marcadas como usadas.')
-    mark_as_used.short_description = 'Marcar como usado'
+# Email verification will be implemented in the future
+# @admin.register(EmailVerification)
+# class EmailVerificationAdmin(admin.ModelAdmin):
+#     """
+#     Admin interface for email verifications
+#     """
+#     list_display = [
+#         'user_email', 'token_display', 'is_used',
+#         'created_at', 'expires_at_display'
+#     ]
+#     list_filter = ['is_used', 'created_at']
+#     search_fields = ['user__email', 'token']
+#     date_hierarchy = 'created_at'
+#     ordering = ['-created_at']
+#     
+#     readonly_fields = ['token', 'created_at']
+#     
+#     def user_email(self, obj):
+#         return obj.user.email
+#     user_email.short_description = 'Email do Usuário'
+#     
+#     def token_display(self, obj):
+#         # Show only first and last 2 chars for security
+#         if len(obj.token) > 4:
+#             return f"{obj.token[:2]}...{obj.token[-2:]}"
+#         return obj.token
+#     token_display.short_description = 'Token'
+#     
+#     def expires_at_display(self, obj):
+#         from django.utils import timezone
+#         if obj.expires_at > timezone.now():
+#             time_left = obj.expires_at - timezone.now()
+#             hours = time_left.total_seconds() // 3600
+#             minutes = (time_left.total_seconds() % 3600) // 60
+#             return format_html(
+#                 '<span style="color: green;">{}h {}m</span>',
+#                 int(hours), int(minutes)
+#             )
+#         return format_html('<span style="color: red;">Expirado</span>')
+#     expires_at_display.short_description = 'Expira em'
+#     
+#     def get_queryset(self, request):
+#         qs = super().get_queryset(request)
+#         return qs.select_related('user')
+#     
+#     actions = ['mark_as_used']
+#     
+#     def mark_as_used(self, request, queryset):
+#         count = 0
+#         for verification in queryset.filter(is_used=False):
+#             verification.is_used = True
+#             verification.user.is_email_verified = True
+#             verification.save()
+#             verification.user.save()
+#             count += 1
+#         self.message_user(request, f'{count} verificações marcadas como usadas.')
+#     mark_as_used.short_description = 'Marcar como usado'
 
 
 @admin.register(PasswordReset)

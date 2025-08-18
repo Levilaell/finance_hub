@@ -183,6 +183,39 @@ STRIPE_PUBLIC_KEY = config('STRIPE_PUBLIC_KEY', default='')
 STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
 STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
 
+# Validate Stripe Configuration (Warning only in development)
+def warn_stripe_configuration():
+    """
+    Warn about missing Stripe settings in development.
+    Only shows warnings - doesn't block development.
+    """
+    import sys
+    
+    required_stripe_settings = {
+        'STRIPE_PUBLIC_KEY': STRIPE_PUBLIC_KEY,
+        'STRIPE_SECRET_KEY': STRIPE_SECRET_KEY, 
+        'STRIPE_WEBHOOK_SECRET': STRIPE_WEBHOOK_SECRET,
+    }
+    
+    missing_settings = [name for name, value in required_stripe_settings.items() if not value]
+    
+    if missing_settings and 'runserver' in sys.argv:
+        print("\n⚠️  STRIPE CONFIGURATION WARNING:")
+        print("   Missing Stripe environment variables:", ', '.join(missing_settings))
+        print("   Payment functionality will be limited.")
+        print("   Add to .env file or set environment variables:")
+        for setting in missing_settings:
+            if setting == 'STRIPE_PUBLIC_KEY':
+                print("   STRIPE_PUBLIC_KEY=pk_test_...")
+            elif setting == 'STRIPE_SECRET_KEY': 
+                print("   STRIPE_SECRET_KEY=sk_test_...")
+            elif setting == 'STRIPE_WEBHOOK_SECRET':
+                print("   STRIPE_WEBHOOK_SECRET=whsec_...")
+        print()
+
+# Show warning for missing Stripe config
+warn_stripe_configuration()
+
 # Payment Gateway - Stripe Only (MercadoPago removed for PCI DSS compliance)
 # MERCADOPAGO_ACCESS_TOKEN = config('MERCADOPAGO_ACCESS_TOKEN', default='')
 # MERCADOPAGO_PUBLIC_KEY = config('MERCADOPAGO_PUBLIC_KEY', default='')

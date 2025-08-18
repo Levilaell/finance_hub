@@ -308,6 +308,58 @@ STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', '')
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
+# Validate Stripe Configuration
+def validate_stripe_configuration():
+    """
+    Validate that all required Stripe settings are configured.
+    Raises ImproperlyConfigured if any required settings are missing.
+    """
+    from django.core.exceptions import ImproperlyConfigured
+    
+    required_stripe_settings = {
+        'STRIPE_PUBLIC_KEY': STRIPE_PUBLIC_KEY,
+        'STRIPE_SECRET_KEY': STRIPE_SECRET_KEY,
+        'STRIPE_WEBHOOK_SECRET': STRIPE_WEBHOOK_SECRET,
+    }
+    
+    missing_settings = []
+    invalid_settings = []
+    
+    for setting_name, setting_value in required_stripe_settings.items():
+        if not setting_value:
+            missing_settings.append(setting_name)
+        elif setting_name == 'STRIPE_SECRET_KEY' and not setting_value.startswith('sk_'):
+            invalid_settings.append(f"{setting_name} should start with 'sk_'")
+        elif setting_name == 'STRIPE_PUBLIC_KEY' and not setting_value.startswith('pk_'):
+            invalid_settings.append(f"{setting_name} should start with 'pk_'")
+        elif setting_name == 'STRIPE_WEBHOOK_SECRET' and not setting_value.startswith('whsec_'):
+            invalid_settings.append(f"{setting_name} should start with 'whsec_'")
+    
+    errors = []
+    if missing_settings:
+        errors.append(f"Missing required Stripe environment variables: {', '.join(missing_settings)}")
+    if invalid_settings:
+        errors.append(f"Invalid Stripe configuration: {', '.join(invalid_settings)}")
+    
+    if errors:
+        error_message = "\n".join([
+            "❌ STRIPE CONFIGURATION ERROR:",
+            *[f"   • {error}" for error in errors],
+            "",
+            "📋 Required environment variables:",
+            "   • STRIPE_PUBLIC_KEY=pk_test_... or pk_live_...",
+            "   • STRIPE_SECRET_KEY=sk_test_... or sk_live_...",
+            "   • STRIPE_WEBHOOK_SECRET=whsec_...",
+            "",
+            "💡 Set these in your Railway dashboard under Variables section",
+            "   or in your .env file for local development"
+        ])
+        raise ImproperlyConfigured(error_message)
+
+# Only validate Stripe in production if not running collectstatic
+if not os.environ.get('DJANGO_COLLECT_STATIC') and DEFAULT_PAYMENT_GATEWAY == 'stripe':
+    validate_stripe_configuration()
+
 # Payment Gateway - Stripe Only (MercadoPago removed for PCI DSS compliance)
 # MERCADOPAGO_ACCESS_TOKEN = os.environ.get('MERCADOPAGO_ACCESS_TOKEN', '')
 # MERCADOPAGO_PUBLIC_KEY = os.environ.get('MERCADOPAGO_PUBLIC_KEY', '')
@@ -325,3 +377,12 @@ if os.environ.get('RAILWAY_ENVIRONMENT'):
     # Trust Railway's proxy headers
     USE_X_FORWARDED_HOST = True
     USE_X_FORWARDED_PORT = True
+
+# ===== SECURITY VALIDATION =====
+# Validate security configuration on startup
+if not os.environ.get('DJANGO_COLLECT_STATIC'):
+    try:
+        from core.security_validator import validate_security_on_startup
+        validate_security_on_startup()
+    except ImportError:
+        print("⚠️  Security validator not available")
