@@ -156,9 +156,15 @@ class Company(models.Model):
             ('active', 'Active'),
             ('cancelled', 'Cancelled'),
             ('expired', 'Expired'),
+            ('early_access', 'Early Access'),
         ],
         default='trial'
     )
+    
+    # Early Access
+    is_early_access = models.BooleanField(_('is early access'), default=False)
+    early_access_expires_at = models.DateTimeField(_('early access expires at'), null=True, blank=True)
+    used_invite_code = models.CharField(_('used invite code'), max_length=20, blank=True)
     
     # Billing
     billing_cycle = models.CharField(
@@ -220,14 +226,26 @@ class Company(models.Model):
     @property
     def is_trial_active(self):
         """Check if trial is still active"""
+        if self.subscription_status == 'early_access':
+            return self.is_early_access_active
         if self.subscription_status != 'trial':
             return False
         return self.trial_ends_at and timezone.now() < self.trial_ends_at
     
     @property
+    def is_early_access_active(self):
+        """Check if early access is still active"""
+        if not self.is_early_access:
+            return False
+        return self.early_access_expires_at and timezone.now() < self.early_access_expires_at
+    
+    @property
     def days_until_trial_ends(self):
-        """Calculate days remaining in trial"""
-        if not self.is_trial_active:
+        """Calculate days remaining in trial or early access"""
+        if self.subscription_status == 'early_access' and self.is_early_access_active:
+            delta = self.early_access_expires_at - timezone.now()
+            return max(0, delta.days)
+        elif not self.is_trial_active:
             return 0
         delta = self.trial_ends_at - timezone.now()
         return max(0, delta.days)
@@ -499,6 +517,57 @@ class Company(models.Model):
             current_month_ai_requests=0
         )
         self.refresh_from_db(fields=['current_month_transactions', 'current_month_ai_requests'])
+
+
+class EarlyAccessInvite(models.Model):
+    """
+    Early Access Invites for MVP testing
+    """
+    # Core identification
+    invite_code = models.CharField(_('invite code'), max_length=20, unique=True)
+    
+    # Global expiration date for all invites
+    expires_at = models.DateTimeField(_('expires at'), help_text='Date when early access ends')
+    
+    # Usage tracking
+    is_used = models.BooleanField(_('is used'), default=False)
+    used_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='used_invite')
+    used_at = models.DateTimeField(_('used at'), null=True, blank=True)
+    
+    # Metadata
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_invites')
+    notes = models.TextField(_('notes'), blank=True, help_text='Internal notes about this invite')
+    
+    class Meta:
+        db_table = 'early_access_invites'
+        ordering = ['-created_at']
+        verbose_name = _('Early Access Invite')
+        verbose_name_plural = _('Early Access Invites')
+    
+    def __str__(self):
+        status = "Used" if self.is_used else "Available"
+        return f"Invite {self.invite_code} - {status}"
+    
+    def mark_as_used(self, user):
+        """Mark invite as used by a specific user"""
+        self.is_used = True
+        self.used_by = user
+        self.used_at = timezone.now()
+        self.save(update_fields=['is_used', 'used_by', 'used_at'])
+    
+    @property
+    def is_valid(self):
+        """Check if invite is still valid (not used and not expired)"""
+        return not self.is_used and timezone.now() < self.expires_at
+    
+    @property
+    def days_until_expiry(self):
+        """Get days remaining until expiry"""
+        if timezone.now() >= self.expires_at:
+            return 0
+        delta = self.expires_at - timezone.now()
+        return delta.days
 
 
 class ResourceUsage(models.Model):

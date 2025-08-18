@@ -22,6 +22,28 @@ from .integrations.pluggy.client import PluggyClient, PluggyError
 logger = logging.getLogger(__name__)
 
 
+def _get_safe_description(trans_data: Dict) -> str:
+    """
+    Safely extract and truncate transaction description with logging
+    
+    Args:
+        trans_data: Transaction data from Pluggy API
+        
+    Returns:
+        Description truncated to 500 characters if needed
+    """
+    original_description = trans_data.get('description', '')
+    
+    if len(original_description) > 500:
+        logger.warning(
+            f"Transaction description truncated from {len(original_description)} to 500 chars "
+            f"for transaction {trans_data.get('id', 'unknown')}: {original_description[:100]}..."
+        )
+        return original_description[:500]
+    
+    return original_description
+
+
 @shared_task(bind=True, max_retries=5, default_retry_delay=60)
 def sync_bank_account(self, item_id: str, account_id: Optional[str] = None, force_update: bool = False):
     """
@@ -462,7 +484,7 @@ def _process_transaction(account: BankAccount, trans_data: Dict):
                 transaction.company = account.company
                 transaction.type = trans_data['type']
                 transaction.status = trans_data.get('status', 'POSTED')
-                transaction.description = trans_data.get('description', '')[:500]
+                transaction.description = _get_safe_description(trans_data)
                 transaction.description_raw = trans_data.get('descriptionRaw') or ''
                 transaction.amount = Decimal(str(trans_data.get('amount', 0)))
                 transaction.amount_in_account_currency = Decimal(str(trans_data.get('amountInAccountCurrency', 0))) if trans_data.get('amountInAccountCurrency') else None
@@ -490,7 +512,7 @@ def _process_transaction(account: BankAccount, trans_data: Dict):
                         account=account,
                         type=trans_data['type'],
                         status=trans_data.get('status', 'POSTED'),
-                        description=trans_data.get('description', '')[:500],
+                        description=_get_safe_description(trans_data),
                         description_raw=trans_data.get('descriptionRaw') or '',
                         amount=Decimal(str(trans_data.get('amount', 0))),
                         amount_in_account_currency=Decimal(str(trans_data.get('amountInAccountCurrency', 0))) if trans_data.get('amountInAccountCurrency') else None,

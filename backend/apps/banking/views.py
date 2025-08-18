@@ -35,9 +35,52 @@ from .serializers import (
 )
 from .integrations.pluggy.client import PluggyClient, PluggyError
 from .tasks import sync_bank_account, process_webhook_event
+from .utils.encryption import banking_encryption
 from apps.companies.mixins import CompanyAccessMixin
 
 logger = logging.getLogger(__name__)
+
+
+def _handle_pluggy_error(error: Exception, operation: str, item_id: str = None) -> Response:
+    """
+    Standardize Pluggy error handling and responses
+    
+    Args:
+        error: The exception that occurred
+        operation: Description of the operation that failed
+        item_id: Optional item ID for context
+        
+    Returns:
+        Standardized error response
+    """
+    error_context = f"item {item_id}" if item_id else "request"
+    
+    if isinstance(error, PluggyError):
+        logger.error(f"Pluggy API error during {operation} for {error_context}: {error}")
+        return Response({
+            'success': False,
+            'error': 'banking_api_error',
+            'message': f'Banking service error during {operation}',
+            'details': str(error)
+        }, status=status.HTTP_502_BAD_GATEWAY)
+    
+    elif isinstance(error, PermissionDenied):
+        logger.warning(f"Permission denied during {operation} for {error_context}: {error}")
+        return Response({
+            'success': False,
+            'error': 'permission_denied',
+            'message': str(error),
+            'details': f'Access denied for {operation}'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    else:
+        logger.error(f"Unexpected error during {operation} for {error_context}: {error}")
+        return Response({
+            'success': False,
+            'error': 'internal_error',
+            'message': f'Internal error during {operation}',
+            'details': 'Please try again later or contact support if the issue persists'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class StandardPagination(PageNumberPagination):
@@ -121,12 +164,8 @@ class PluggyConnectorViewSet(viewsets.ReadOnlyModelViewSet):
                     'updated': updated
                 })
                 
-        except PluggyError as e:
-            logger.error(f"Failed to sync connectors: {e}")
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        except Exception as e:
+            return _handle_pluggy_error(e, "connectors synchronization")
 
 
 class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
@@ -255,6 +294,15 @@ class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
         if parameter_info and 'name' in parameter_info:
             parameter_name = parameter_info['name']
         
+        # Validate MFA value format and security
+        is_valid, error_message = banking_encryption.validate_mfa_value(mfa_value, parameter_name)
+        if not is_valid:
+            logger.warning(f"Invalid MFA value for item {item.pluggy_item_id}: {error_message}")
+            return Response(
+                {'error': f'Invalid {parameter_name}: {error_message}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         try:
             with PluggyClient() as client:
                 # Build parameters based on Pluggy documentation
@@ -298,12 +346,8 @@ class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
                     'execution_status': item.execution_status,
                     'requires_additional_mfa': item.status == 'WAITING_USER_INPUT'
                 })
-        except PluggyError as e:
-            logger.error(f"Failed to send MFA: {e}")
-            return Response(
-                {'error': str(e)}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        except Exception as e:
+            return _handle_pluggy_error(e, "MFA submission", item.pluggy_item_id)
     
     @action(detail=True, methods=['delete'])
     def disconnect(self, request, pk=None):
@@ -339,12 +383,8 @@ class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
                     'message': 'Account disconnected successfully. Transaction history has been preserved.'
                 }, status=status.HTTP_200_OK)
                 
-        except PluggyError as e:
-            logger.error(f"Failed to disconnect item: {e}")
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        except Exception as e:
+            return _handle_pluggy_error(e, "item disconnection", item.pluggy_item_id)
 
 
 
@@ -853,15 +893,8 @@ class PluggyConnectView(APIView):
                     }
                 })
                 
-        except PluggyError as e:
-            logger.error(f"Failed to create connect token: {e}")
-            return Response(
-                {
-                    'success': False,
-                    'error': str(e)
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        except Exception as e:
+            return _handle_pluggy_error(e, "connect token creation")
 
 
 class PluggyCallbackView(APIView):

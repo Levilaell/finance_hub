@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import requests
 from django.conf import settings
 from django.core.cache import cache
+from apps.banking.utils.encryption import banking_encryption
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +48,19 @@ class PluggyClient:
         """
         Get or create API key using client credentials
         """
-        # Check cache first
+        # Check cache first (encrypted)
         cache_key = f'pluggy_api_key_{self.client_id}'
-        api_key = cache.get(cache_key)
+        encrypted_api_key = cache.get(cache_key)
         
-        if api_key:
-            return api_key
+        if encrypted_api_key:
+            try:
+                # Decrypt cached API key
+                api_key = banking_encryption.encryption_service.decrypt_value(encrypted_api_key)
+                if api_key:
+                    return api_key
+            except Exception as e:
+                logger.warning(f"Failed to decrypt cached API key: {e}")
+                # Continue to get new API key
             
         # Create new API key
         url = f"{self.base_url}/auth"
@@ -71,8 +79,14 @@ class PluggyClient:
             data = response.json()
             api_key = data['apiKey']
             
-            # Cache for 1h50min (tokens expire in 2 hours per Pluggy docs)
-            cache.set(cache_key, api_key, 6600)  # 110 minutes
+            # Encrypt and cache for 1h50min (tokens expire in 2 hours per Pluggy docs)
+            try:
+                encrypted_api_key = banking_encryption.encryption_service.encrypt_value(api_key)
+                cache.set(cache_key, encrypted_api_key, 6600)  # 110 minutes
+                logger.info("API key encrypted and cached successfully")
+            except Exception as e:
+                logger.warning(f"Failed to encrypt API key for cache: {e}")
+                # Continue without caching (less efficient but secure)
             
             return api_key
             
@@ -114,7 +128,7 @@ class PluggyClient:
             if response.status_code == 401:
                 logger.info("API key expired, refreshing...")
                 cache_key = f'pluggy_api_key_{self.client_id}'
-                cache.delete(cache_key)
+                cache.delete(cache_key)  # Delete encrypted cache
                 self.api_key = self._get_api_key()
                 
                 # Retry request

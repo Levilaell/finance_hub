@@ -3,7 +3,7 @@ Simplified Companies admin - Essential functionality only
 """
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Company, SubscriptionPlan, ResourceUsage
+from .models import Company, SubscriptionPlan, ResourceUsage, EarlyAccessInvite
 from core.admin import BaseModelAdmin
 
 
@@ -37,9 +37,9 @@ class SubscriptionPlanAdmin(BaseModelAdmin):
 
 @admin.register(Company)
 class CompanyAdmin(BaseModelAdmin):
-    list_display = ['name', 'owner_email', 'subscription_plan', 'subscription_status', 'trial_days', 'created_at']
-    list_filter = ['subscription_status', 'subscription_plan', 'created_at']
-    search_fields = ['name', 'owner__email']
+    list_display = ['name', 'owner_email', 'subscription_plan', 'subscription_status', 'is_early_access', 'trial_days', 'created_at']
+    list_filter = ['subscription_status', 'subscription_plan', 'is_early_access', 'created_at']
+    search_fields = ['name', 'owner__email', 'used_invite_code']
     readonly_fields = ['created_at', 'trial_days', 'usage_summary']
     
     fieldsets = (
@@ -48,6 +48,10 @@ class CompanyAdmin(BaseModelAdmin):
         }),
         ('Subscription', {
             'fields': ('subscription_plan', 'subscription_status', 'billing_cycle', 'trial_ends_at', 'subscription_id')
+        }),
+        ('Early Access', {
+            'fields': ('is_early_access', 'early_access_expires_at', 'used_invite_code'),
+            'classes': ('collapse',)
         }),
         ('Usage', {
             'fields': ('current_month_transactions', 'current_month_ai_requests', 'usage_summary')
@@ -64,13 +68,20 @@ class CompanyAdmin(BaseModelAdmin):
     owner_email.admin_order_field = 'owner__email'
     
     def trial_days(self, obj):
+        if obj.is_early_access and obj.early_access_expires_at:
+            days = obj.days_until_trial_ends
+            if days > 0:
+                return format_html('<span style="color: purple;">Early Access: {} days</span>', days)
+            else:
+                return format_html('<span style="color: red;">Early Access Expired</span>')
+        
         days = obj.days_until_trial_ends
         if days > 0:
             return format_html('<span style="color: green;">{} days</span>', days)
         elif obj.subscription_status == 'trial':
             return format_html('<span style="color: red;">Expired</span>')
         return '-'
-    trial_days.short_description = 'Trial Days Left'
+    trial_days.short_description = 'Trial/Early Access Days'
     
     def usage_summary(self, obj):
         if not obj.subscription_plan:
@@ -87,6 +98,48 @@ class CompanyAdmin(BaseModelAdmin):
         """Optimize queries"""
         qs = super().get_queryset(request)
         return qs.select_related('owner', 'subscription_plan')
+
+
+@admin.register(EarlyAccessInvite)
+class EarlyAccessInviteAdmin(BaseModelAdmin):
+    list_display = ['invite_code', 'is_used', 'used_by_email', 'expires_at', 'days_remaining', 'created_at']
+    list_filter = ['is_used', 'expires_at', 'created_at']
+    search_fields = ['invite_code', 'used_by__email', 'notes']
+    readonly_fields = ['used_at', 'created_at', 'days_remaining']
+    ordering = ['-created_at']
+    
+    fieldsets = (
+        ('Convite', {
+            'fields': ('invite_code', 'expires_at', 'notes')
+        }),
+        ('Status', {
+            'fields': ('is_used', 'used_by', 'used_at', 'days_remaining')
+        }),
+        ('Metadata', {
+            'fields': ('created_by', 'created_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def used_by_email(self, obj):
+        if obj.used_by:
+            return obj.used_by.email
+        return '-'
+    used_by_email.short_description = 'Used By'
+    used_by_email.admin_order_field = 'used_by__email'
+    
+    def days_remaining(self, obj):
+        days = obj.days_until_expiry
+        if obj.is_used:
+            return format_html('<span style="color: orange;">Used</span>')
+        elif days > 0:
+            return format_html('<span style="color: green;">{} days</span>', days)
+        else:
+            return format_html('<span style="color: red;">Expired</span>')
+    days_remaining.short_description = 'Status'
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('used_by', 'created_by')
 
 
 @admin.register(ResourceUsage)

@@ -5,6 +5,7 @@ from .views import (
     ChangePasswordView,
     CustomTokenRefreshView,
     DeleteAccountView,
+    EarlyAccessRegisterView,
     # EmailVerificationView,  # Will be implemented in the future
     LoginView,
     LogoutView,
@@ -23,6 +24,7 @@ app_name = 'authentication'
 urlpatterns = [
     # Authentication
     path('register/', RegisterView.as_view(), name='register'),
+    path('early-access/register/', EarlyAccessRegisterView.as_view(), name='early_access_register'),
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),
