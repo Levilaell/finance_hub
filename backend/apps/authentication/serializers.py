@@ -23,10 +23,10 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'username', 'email', 'first_name', 'last_name',
             'full_name', 'initials', 'phone', 'avatar',
-            'is_email_verified', 'is_phone_verified',
+            'is_phone_verified',
             'preferred_language', 'timezone', 'date_of_birth', 'company'
         )
-        read_only_fields = ('id', 'username', 'is_email_verified', 'is_phone_verified', 'company')
+        read_only_fields = ('id', 'username', 'is_phone_verified', 'company')
     
     def get_company(self, obj):
         """Get user's company data"""

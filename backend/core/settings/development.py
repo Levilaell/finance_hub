@@ -301,6 +301,15 @@ LOGGING = {
 ENABLE_AI_INSIGHTS = config('NEXT_PUBLIC_ENABLE_AI_INSIGHTS', default=True, cast=bool)
 ENABLE_OPEN_BANKING = config('NEXT_PUBLIC_ENABLE_OPEN_BANKING', default=True, cast=bool)
 
+# AI Insights Encryption Configuration
+if ENABLE_AI_INSIGHTS:
+    try:
+        from apps.ai_insights.encryption_settings import configure_ai_insights_encryption
+        configure_ai_insights_encryption(locals())
+    except ImportError:
+        # Handle case where AI insights app is not available
+        AI_INSIGHTS_ENCRYPTION_KEY = config('AI_INSIGHTS_ENCRYPTION_KEY', default='')
+
 # Site Configuration
 SITE_NAME = config('SITE_NAME', default='CaixaHub')
 LANGUAGE_CODE = config('LANGUAGE_CODE', default='pt-br')

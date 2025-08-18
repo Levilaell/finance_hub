@@ -33,7 +33,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f'   ✅ User found: {user.email}'))
             self.stdout.write(f'   - ID: {user.id}')
             self.stdout.write(f'   - Is active: {user.is_active}')
-            self.stdout.write(f'   - Is verified: {user.is_email_verified}')
+            # self.stdout.write(f'   - Is verified: {user.is_email_verified}')  # Field removed in migration
+            self.stdout.write(f'   - Email verification: Disabled (field removed)')
             self.stdout.write(f'   - Company: {getattr(user, "company", "No company")}\n')
             
             # 3. Generate test tokens

@@ -485,10 +485,11 @@ class EmailVerificationView(APIView):
                 'error': 'Token de verificação inválido ou expirado.'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Verify email
+        # Email verification functionality temporarily disabled
+        # TODO: Re-implement when is_email_verified field is restored
         user = verification.user
-        user.is_email_verified = True
-        user.save()
+        # user.is_email_verified = True  # Field removed in migration
+        # user.save()  # No need to save since no field is being modified
         
         # Mark token as used
         verification.is_used = True
@@ -504,7 +505,14 @@ class ResendVerificationView(APIView):
     def post(self, request):
         user = request.user
         
-        if user.is_email_verified:
+        # Email verification functionality temporarily disabled
+        # TODO: Re-implement when is_email_verified field is restored
+        # if user.is_email_verified:  # Field removed in migration
+        #     return Response({
+        #         'message': 'E-mail já foi verificado.'
+        
+        # For now, always allow resend attempts
+        if False:  # Placeholder condition to maintain structure
             return Response({
                 'message': 'E-mail já foi verificado.'
             }, status=status.HTTP_400_BAD_REQUEST)
