@@ -291,7 +291,7 @@ class AIConversationViewSet(CompanyRequiredMixin, viewsets.ModelViewSet):
         )
         
         # Transações do mês
-        current_month_txns = Transaction.objects.filter(
+        current_month_txns = Transaction.active.filter(
             company=company,
             date__gte=month_start
         ).aggregate(
@@ -301,7 +301,7 @@ class AIConversationViewSet(CompanyRequiredMixin, viewsets.ModelViewSet):
         )
         
         # Transações do mês anterior
-        last_month_txns = Transaction.objects.filter(
+        last_month_txns = Transaction.active.filter(
             company=company,
             date__gte=last_month_start,
             date__lt=month_start

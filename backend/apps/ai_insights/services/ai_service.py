@@ -537,7 +537,7 @@ Cada recomendação deve incluir:
         now = timezone.now()
         three_months_ago = now - timedelta(days=90)
         
-        monthly_expenses = Transaction.objects.filter(
+        monthly_expenses = Transaction.active.filter(
             company=company,
             amount__lt=0,
             date__gte=three_months_ago
@@ -587,7 +587,7 @@ Cada recomendação deve incluir:
         three_months_ago = now - timedelta(days=90)
         
         # Despesas do mês atual
-        current_expenses = Transaction.objects.filter(
+        current_expenses = Transaction.active.filter(
             company=company,
             amount__lt=0,
             date__gte=month_start
@@ -596,7 +596,7 @@ Cada recomendação deve incluir:
         )['total'] or 0
         
         # Média histórica
-        historical_expenses = Transaction.objects.filter(
+        historical_expenses = Transaction.active.filter(
             company=company,
             amount__lt=0,
             date__gte=three_months_ago,
@@ -661,7 +661,7 @@ Cada recomendação deve incluir:
             month_start = (now - timedelta(days=30*i)).replace(day=1)
             month_end = (month_start + timedelta(days=32)).replace(day=1)
             
-            month_stats = Transaction.objects.filter(
+            month_stats = Transaction.active.filter(
                 company=company,
                 date__gte=month_start,
                 date__lt=month_end
@@ -764,7 +764,7 @@ Cada recomendação deve incluir:
         
         try:
             # Analisa transações dos últimos 30 dias
-            recent_transactions = Transaction.objects.filter(
+            recent_transactions = Transaction.active.filter(
                 bank_account__company=company,
                 transaction_date__gte=now - timedelta(days=30)
             ).values('amount', 'description', 'transaction_date')
