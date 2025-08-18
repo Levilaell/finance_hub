@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import SubscriptionPlan, Subscription, PaymentMethod, Payment, UsageRecord
+from .models import Subscription, PaymentMethod, Payment, UsageRecord
+from apps.companies.models import SubscriptionPlan
 from apps.companies.models import Company
 
 

@@ -175,7 +175,7 @@ class StripeService:
                 sub = self.stripe.Subscription.retrieve(subscription_id)
                 
                 # Update subscription item with new price
-                from ..models import SubscriptionPlan
+                from apps.companies.models import SubscriptionPlan
                 plan = SubscriptionPlan.objects.get(id=plan_id)
                 price_id = (
                     plan.stripe_price_id_yearly if billing_period == 'yearly'

@@ -45,6 +45,7 @@ urlpatterns = [
     # Payment history
     path('payments/', PaymentHistoryView.as_view(), name='payment-history'),
     
+    
     # Webhooks
     path('webhooks/stripe/', StripeWebhookView.as_view(), name='stripe-webhook'),
     

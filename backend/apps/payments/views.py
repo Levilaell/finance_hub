@@ -11,7 +11,8 @@ from django.utils import timezone
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from core.cache import cache_api_response
-from .models import SubscriptionPlan, Subscription, PaymentMethod, Payment, UsageRecord
+from .models import Subscription, PaymentMethod, Payment, UsageRecord
+from apps.companies.models import SubscriptionPlan
 from .serializers import (
     SubscriptionPlanSerializer, SubscriptionSerializer,
     PaymentMethodSerializer, CreatePaymentMethodSerializer,

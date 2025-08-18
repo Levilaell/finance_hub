@@ -164,7 +164,8 @@ class StripeGateway(PaymentGateway):
                 customer_id = self.create_customer(company, user)
                 
                 # Create or update subscription record
-                from ..models import Subscription, SubscriptionPlan
+                from ..models import Subscription
+                from apps.companies.models import SubscriptionPlan
                 if not subscription:
                     # Get default plan (starter) for new subscriptions
                     default_plan = SubscriptionPlan.objects.filter(name='starter').first()

@@ -1,30 +1,11 @@
 from django.contrib import admin
-from .models import SubscriptionPlan, Subscription, PaymentMethod, Payment, UsageRecord, CreditTransaction
+from django.utils.html import format_html
+from django.urls import reverse
+from .models import (
+    Subscription, PaymentMethod, Payment, UsageRecord, CreditTransaction
+)
 
-
-@admin.register(SubscriptionPlan)
-class SubscriptionPlanAdmin(admin.ModelAdmin):
-    list_display = ['display_name', 'name', 'price_monthly', 'price_yearly', 'is_active']
-    list_filter = ['is_active']
-    readonly_fields = ['created_at', 'updated_at']
-    fieldsets = (
-        ('Basic Info', {
-            'fields': ('name', 'display_name', 'is_active')
-        }),
-        ('Pricing', {
-            'fields': ('price_monthly', 'price_yearly')
-        }),
-        ('Limits', {
-            'fields': ('max_transactions', 'max_bank_accounts', 'max_ai_requests')
-        }),
-        ('Features', {
-            'fields': ('features',)
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
+# SubscriptionPlan is registered in companies.admin, not here
 
 
 @admin.register(Subscription)
@@ -116,3 +97,5 @@ class CreditTransactionAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+

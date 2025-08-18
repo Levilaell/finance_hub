@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import serializers
-from .models import SubscriptionPlan
+from apps.companies.models import SubscriptionPlan
 from .services.subscription_service import SubscriptionService
 from .services.audit_service import PaymentAuditService
 from .exceptions import PaymentException, SubscriptionNotActiveException

@@ -105,7 +105,7 @@ class PaymentMethodManager:
                 
                 # Create subscription record if doesn't exist
                 if not subscription:
-                    from ..models import SubscriptionPlan
+                    from apps.companies.models import SubscriptionPlan
                     default_plan = SubscriptionPlan.objects.filter(name='starter').first()
                     if not default_plan:
                         raise PaymentMethodException("No default plan available")

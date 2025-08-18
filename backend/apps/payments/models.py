@@ -5,50 +5,8 @@ from decimal import Decimal
 
 User = get_user_model()
 
-
-class SubscriptionPlan(models.Model):
-    """Subscription plan configuration"""
-    PLAN_TYPES = [
-        ('starter', 'Starter'),
-        ('professional', 'Professional'),
-        ('enterprise', 'Enterprise'),
-    ]
-    
-    BILLING_PERIODS = [
-        ('monthly', 'Monthly'),
-        ('yearly', 'Yearly'),
-    ]
-    
-    name = models.CharField(max_length=50, choices=PLAN_TYPES, unique=True)
-    display_name = models.CharField(max_length=100)
-    price_monthly = models.DecimalField(max_digits=10, decimal_places=2)
-    price_yearly = models.DecimalField(max_digits=10, decimal_places=2)
-    
-    # Feature limits
-    max_transactions = models.IntegerField()
-    max_bank_accounts = models.IntegerField()
-    max_ai_requests = models.IntegerField()
-    
-    # Features
-    features = models.JSONField(default=dict)
-    is_active = models.BooleanField(default=True)
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        ordering = ['price_monthly']
-    
-    def __str__(self):
-        return self.display_name
-    
-    def get_price(self, billing_period='monthly'):
-        return self.price_yearly if billing_period == 'yearly' else self.price_monthly
-    
-    def get_monthly_price(self, billing_period='monthly'):
-        if billing_period == 'yearly':
-            return self.price_yearly / 12
-        return self.price_monthly
+# Import SubscriptionPlan from companies to avoid duplication
+from apps.companies.models import SubscriptionPlan
 
 
 class Subscription(models.Model):
@@ -272,7 +230,7 @@ class UsageRecord(models.Model):
         now = timezone.now()
         record, created = cls.objects.get_or_create(
             company=company,
-            type=usage_type,
+            usage_type=usage_type,
             period_start__lte=now,
             period_end__gte=now,
             defaults={
@@ -386,3 +344,5 @@ class CreditTransaction(models.Model):
     def is_debit(self):
         """Check if this transaction removes credits"""
         return self.credits < 0
+
+

@@ -30,7 +30,7 @@ class SubscriptionService:
     @classmethod
     def can_upgrade_plan(cls, current_plan, new_plan) -> Tuple[bool, str]:
         """Check if plan change is allowed with proper validation"""
-        from ..models import SubscriptionPlan
+        from apps.companies.models import SubscriptionPlan
         
         # Define plan hierarchy
         plan_hierarchy = {
@@ -72,14 +72,16 @@ class SubscriptionService:
         
         # Check feature compatibility
         if current_plan.has_ai_categorization and not new_plan.has_ai_categorization:
-            # Check if there are AI-categorized transactions
-            from apps.banking.models import Transaction
-            ai_categorized = Transaction.objects.filter(
-                company=company,
-                categorized_by='ai'
-            ).exists()
-            if ai_categorized:
-                return False, "You have AI-categorized transactions. Please review them before downgrading."
+            # NOTE: categorized_by field doesn't exist in current Transaction model
+            # This check is disabled until the field is added to the model
+            # from apps.banking.models import Transaction
+            # ai_categorized = Transaction.objects.filter(
+            #     company=company,
+            #     categorized_by='ai'
+            # ).exists()
+            # if ai_categorized:
+            #     return False, "You have AI-categorized transactions. Please review them before downgrading."
+            pass
         
         return True, "Downgrade allowed"
     
@@ -347,7 +349,7 @@ class SubscriptionService:
         usage_types = [
             ('transaction', 'max_transactions'),
             ('bank_account', 'max_bank_accounts'),
-            ('ai_request', 'max_ai_requests')
+            ('ai_request', 'max_ai_requests_per_month')
         ]
         
         for usage_type, limit_field in usage_types:

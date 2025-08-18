@@ -551,7 +551,7 @@ class SubscriptionManager:
         Returns:
             Dictionary with 'upgrades' and 'downgrades' lists
         """
-        from ..models import SubscriptionPlan
+        from apps.companies.models import SubscriptionPlan
         
         all_plans = SubscriptionPlan.objects.filter(is_active=True).order_by('price_monthly')
         

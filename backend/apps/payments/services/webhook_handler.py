@@ -7,7 +7,11 @@ from .webhook_handlers_extended import ExtendedWebhookHandlers
 from .notification_service import notification_service
 from .audit_service import PaymentAuditService
 
-logger = logging.getLogger(__name__)
+# Import secure logging and distributed locks
+from core.logging_utils import get_secure_logger, log_webhook_event, sanitize_stripe_event
+from core.locks import webhook_lock, subscription_lock, payment_lock
+
+logger = get_secure_logger(__name__)
 
 
 class WebhookHandler:
@@ -18,6 +22,31 @@ class WebhookHandler:
     
     def handle_stripe_webhook(self, event):
         """Process Stripe webhook events with comprehensive production support"""
+        
+        from core.locks import lock_manager
+        
+        # Use distributed lock to ensure webhook idempotency
+        event_id = event.get('id')
+        if not event_id:
+            logger.error("Webhook event missing ID, cannot ensure idempotency")
+            return {'status': 'error', 'message': 'Missing event ID'}
+        
+        with lock_manager.acquire_lock(
+            lock_key=f"webhook:process:{event_id}",
+            timeout=30,
+            retry_timeout=5
+        ):
+            # Log webhook event securely
+            log_webhook_event(
+                logger, 
+                event, 
+                f"Processing webhook event: {event.get('type')}"
+            )
+            
+            return self._process_webhook_event(event)
+    
+    def _process_webhook_event(self, event):
+        """Internal method to process webhook event"""
         handlers = {
             # Core subscription events
             'checkout.session.completed': self._handle_checkout_completed,
@@ -184,8 +213,10 @@ class WebhookHandler:
     
     def _handle_checkout_completed(self, event):
         """Handle successful checkout session"""
-        from ..models import Subscription, SubscriptionPlan, Payment
+        from ..models import Subscription, Payment
+        from apps.companies.models import SubscriptionPlan
         from apps.companies.models import Company
+        from core.locks import lock_manager
         
         session = event['data']['object']
         
@@ -204,96 +235,126 @@ class WebhookHandler:
         billing_period = metadata.get('billing_period', 'monthly')
         
         if not company_id or not plan_id:
-            logger.error(f"Missing metadata in checkout session: {session['id']}")
-            logger.error(f"Session metadata: {session.get('metadata')}")
-            logger.error(f"Subscription metadata: {session.get('subscription_data', {}).get('metadata')}")
+            logger.error("Missing metadata in checkout session", extra={
+                'session_id': session['id'],
+                'metadata_found': bool(metadata)
+            })
             return {'status': 'error', 'message': 'Missing metadata'}
         
-        try:
-            company = Company.objects.get(id=company_id)
-            plan = SubscriptionPlan.objects.get(id=plan_id)
-        except (Company.DoesNotExist, SubscriptionPlan.DoesNotExist) as e:
-            logger.error(f"Invalid company or plan in checkout: {e}")
-            return {'status': 'error', 'message': 'Invalid data'}
-        
-        # Create or update subscription
-        subscription, created = Subscription.objects.update_or_create(
-            company=company,
-            defaults={
-                'plan': plan,
-                'status': 'active',
-                'billing_period': billing_period,
-                'stripe_subscription_id': session.get('subscription'),
-                'stripe_customer_id': session.get('customer'),
-                'current_period_start': timezone.now(),
-                'current_period_end': timezone.now() + timezone.timedelta(
-                    days=365 if billing_period == 'yearly' else 30
-                ),
-            }
-        )
-        
-        # Record payment
-        amount = Decimal(session['amount_total']) / 100  # Convert from cents
-        payment = Payment.objects.create(
-            company=company,
-            subscription=subscription,
-            amount=amount,
-            currency=session['currency'].upper(),
-            status='succeeded',
-            description=f"{plan.display_name} - {billing_period.title()} subscription",
-            gateway='stripe',
-            stripe_payment_intent_id=session.get('payment_intent'),
-            paid_at=timezone.now(),
-            metadata={
-                'session_id': session['id'],
-                'subscription_id': session.get('subscription')
-            }
-        )
-        
-        # Log subscription creation/activation and payment
-        if created:
-            PaymentAuditService.log_subscription_created(
-                subscription,
-                user=None,  # We don't have user context in webhook
-                metadata={'source': 'checkout_webhook'}
-            )
-        else:
-            PaymentAuditService.log_payment_action(
-                action='subscription_activated',
+        # Use company-specific lock to prevent race conditions
+        with lock_manager.acquire_lock(
+            lock_key=f"subscription:create:{company_id}",
+            timeout=45,
+            retry_timeout=10
+        ):
+            try:
+                company = Company.objects.get(id=company_id)
+                plan = SubscriptionPlan.objects.get(id=plan_id)
+            except (Company.DoesNotExist, SubscriptionPlan.DoesNotExist) as e:
+                logger.error(f"Invalid company or plan in checkout", extra={
+                    'company_id': company_id,
+                    'plan_id': plan_id,
+                    'error': str(e)
+                })
+                return {'status': 'error', 'message': 'Invalid data'}
+            
+            # Check if company already has active subscription (race condition protection)
+            existing_subscription = Subscription.objects.filter(
                 company=company,
-                subscription_id=subscription.id,
-                metadata={
-                    'plan': plan.name,
+                status__in=['active', 'trial']
+            ).first()
+            
+            if existing_subscription:
+                logger.warning("Company already has active subscription", extra={
+                    'company_id': company_id,
+                    'existing_subscription_id': existing_subscription.id,
+                    'session_id': session['id']
+                })
+                return {'status': 'warning', 'message': 'Subscription already exists'}
+            
+            # Create or update subscription
+            subscription, created = Subscription.objects.update_or_create(
+                company=company,
+                defaults={
+                    'plan': plan,
+                    'status': 'active',
                     'billing_period': billing_period,
-                    'source': 'checkout_webhook'
+                    'stripe_subscription_id': session.get('subscription'),
+                    'stripe_customer_id': session.get('customer'),
+                    'current_period_start': timezone.now(),
+                    'current_period_end': timezone.now() + timezone.timedelta(
+                        days=365 if billing_period == 'yearly' else 30
+                    ),
                 }
             )
-        
-        PaymentAuditService.log_payment_attempt(
-            payment,
-            metadata={'source': 'checkout_webhook'}
-        )
-        
-        # Send real-time notification
-        notification_service.notify_subscription_updated(
-            company.id,
-            {
-                'subscription_id': subscription.id,
-                'status': 'active',
-                'plan': plan.name,
-                'changes': {'activated': True}
-            }
-        )
-        
-        # Notify checkout completion
-        if session.get('id'):
-            notification_service.notify_checkout_completed(
-                session['id'],
-                {'subscription_id': subscription.id}
+            
+            # Record payment
+            amount = Decimal(session['amount_total']) / 100  # Convert from cents
+            payment = Payment.objects.create(
+                company=company,
+                subscription=subscription,
+                amount=amount,
+                currency=session['currency'].upper(),
+                status='succeeded',
+                description=f"{plan.display_name} - {billing_period.title()} subscription",
+                gateway='stripe',
+                stripe_payment_intent_id=session.get('payment_intent'),
+                paid_at=timezone.now(),
+                metadata={
+                    'session_id': session['id'],
+                    'subscription_id': session.get('subscription')
+                }
             )
-        
-        logger.info(f"Subscription activated for company {company.name}")
-        return {'status': 'success', 'subscription_id': subscription.id}
+            
+            # Log subscription creation/activation and payment
+            if created:
+                PaymentAuditService.log_subscription_created(
+                    subscription,
+                    user=None,  # We don't have user context in webhook
+                    metadata={'source': 'checkout_webhook'}
+                )
+            else:
+                PaymentAuditService.log_payment_action(
+                    action='subscription_activated',
+                    company=company,
+                    subscription_id=subscription.id,
+                    metadata={
+                        'plan': plan.name,
+                        'billing_period': billing_period,
+                        'source': 'checkout_webhook'
+                    }
+                )
+            
+            PaymentAuditService.log_payment_attempt(
+                payment,
+                metadata={'source': 'checkout_webhook'}
+            )
+            
+            # Send real-time notification
+            notification_service.notify_subscription_updated(
+                company.id,
+                {
+                    'subscription_id': subscription.id,
+                    'status': 'active',
+                    'plan': plan.name,
+                    'changes': {'activated': True}
+                }
+            )
+            
+            # Notify checkout completion
+            if session.get('id'):
+                notification_service.notify_checkout_completed(
+                    session['id'],
+                    {'subscription_id': subscription.id}
+                )
+            
+            logger.info("Subscription activated for company", extra={
+                'company_name': company.name,
+                'subscription_id': subscription.id,
+                'plan': plan.name
+            })
+            
+            return {'status': 'success', 'subscription_id': subscription.id}
     
     def _handle_invoice_payment(self, event):
         """Handle successful invoice payment"""
@@ -496,7 +557,8 @@ class WebhookHandler:
     
     def _handle_subscription_created(self, event):
         """Handle new subscription creation"""
-        from ..models import Subscription, SubscriptionPlan
+        from ..models import Subscription
+        from apps.companies.models import SubscriptionPlan
         from apps.companies.models import Company
         
         stripe_sub = event['data']['object']
