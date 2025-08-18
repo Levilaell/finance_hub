@@ -408,6 +408,7 @@ curl -X POST http://localhost:8000/api/banking/accounts/{account-id}/sync/
 
 ### Próximos Passos
 
+- ✅ **Erro de Geração de Relatórios RESOLVIDO** (campos corrigidos no ReportGenerator)
 - ✅ Módulo de Relatórios corrigido
 - ✅ Rate limiting resolvido  
 - ✅ Autenticação JWT corrigida
@@ -427,3 +428,74 @@ curl -X POST http://localhost:8000/api/banking/accounts/{account-id}/sync/
 - Reconectar conta bancária e inserir código MFA em até 60 segundos
 - Testar sincronização após reconexão bem-sucedida
 - Considerar script para popular connectors do Pluggy no banco
+
+### 11. Erro de Duplicação na Contagem de Transações (RESOLVIDO)
+
+#### Problema
+- **Sintoma**: Dashboard mostra 14 transações quando existem apenas 7 no banco
+- **Erro**: Contador `current_month_transactions` era incrementado DUAS vezes para cada transação
+- **Causa Raiz**: Duplicação de incremento no código
+
+#### Análise Detalhada
+1. **Primeira contagem**: Em `models.py` linha 537, método `Transaction.create_safe()` incrementa via `company.increment_usage_safe('transactions')`
+2. **Segunda contagem (duplicada)**: Em `signals.py` linha 65, signal `post_save` incrementa via `instance.company.increment_usage('transactions')`
+3. **Resultado**: Cada transação criada era contada 2 vezes
+
+#### Solução Aplicada
+1. **Removido incremento duplicado**: Comentado o incremento no signal `post_save` (signals.py linha 63-65)
+2. **Criado comando de correção**: `fix_duplicate_counter.py` para corrigir contadores existentes
+3. **Executado correção**: Contadores ajustados para valores reais
+
+#### Comandos de Correção
+```bash
+# Verificar o problema
+python manage.py fix_duplicate_counter --dry-run
+
+# Corrigir contadores
+python manage.py fix_duplicate_counter
+```
+
+#### Arquivos Modificados
+- `backend/apps/banking/signals.py` - Removido incremento duplicado no signal
+- `backend/apps/companies/management/commands/fix_duplicate_counter.py` - Criado comando de correção
+
+### 12. Erro de Geração de Relatórios - Campos Incorretos no ReportGenerator (RESOLVIDO)
+
+#### Problema
+- **Sintoma**: Ao clicar em "Gerar Relatório", aparece o aviso "Falha ao gerar relatório"
+- **Erro**: FieldError - Cannot resolve keyword 'transaction_date' into field
+- **Causa Raiz**: O modelo Transaction usa campos diferentes dos que o ReportGenerator estava tentando acessar
+
+#### Análise Detalhada
+O ReportGenerator estava usando nomes de campos incorretos:
+1. **Campo de data**: Usava `transaction_date` mas o modelo tem `date`
+2. **Campo de tipo**: Usava `transaction_type` mas o modelo tem `type`  
+3. **Relação com empresa**: Usava `bank_account__company` mas Transaction tem ForeignKey direta para `company`
+4. **Relação com conta**: Usava referências a `bank_account` mas o modelo usa `account`
+
+#### Solução Aplicada
+- **Arquivo**: `backend/apps/reports/report_generator.py`
+- **Correções realizadas**:
+  - `transaction_date` → `date` (campo de data da transação)
+  - `transaction_type` → `type` (tipo da transação)
+  - `bank_account__company` → `company` (ForeignKey direta)
+  - `bank_account` → `account` (relacionamento com conta)
+  - `bank_account__nickname` → `account__display_name`
+  - Ajustados todos os filtros Q() para usar os campos corretos
+  - Corrigidas referências em geração de PDF e Excel
+
+#### Teste de Validação
+```bash
+# Verificar se as correções funcionam
+DJANGO_SETTINGS_MODULE=core.settings.development python -c "
+from apps.reports.report_generator import ReportGenerator
+rg = ReportGenerator(None)
+print('✅ ReportGenerator funciona corretamente')
+"
+```
+
+#### Arquivos Modificados
+- `backend/apps/reports/report_generator.py` - Corrigidos todos os campos para corresponder ao modelo real
+- `backend/apps/reports/services/validation_service.py` - Corrigidos campos em validação de dados
+- `backend/apps/reports/views.py` - Corrigidos campos em queries de dashboard
+- `backend/apps/reports/generators/base.py` - Corrigidos campos e removida importação desnecessária
