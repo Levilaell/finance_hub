@@ -1,8 +1,10 @@
 # Build stage
 FROM node:18-alpine AS builder
 
-# Add timeouts and retry for Alpine packages
-RUN apk update && apk add --no-cache --timeout=300 --retry=3 libc6-compat
+# Install Alpine dependencies with retry logic
+RUN apk update && apk add --no-cache libc6-compat || \
+    (sleep 5 && apk update && apk add --no-cache libc6-compat) || \
+    (sleep 10 && apk update && apk add --no-cache libc6-compat)
 
 # Set working directory
 WORKDIR /app
@@ -27,8 +29,10 @@ RUN npm run build
 # Production stage
 FROM node:18-alpine AS runner
 
-# Install runtime dependencies with timeout and retry
-RUN apk update && apk add --no-cache --timeout=300 --retry=3 dumb-init
+# Install runtime dependencies with retry logic
+RUN apk update && apk add --no-cache dumb-init || \
+    (sleep 5 && apk update && apk add --no-cache dumb-init) || \
+    (sleep 10 && apk update && apk add --no-cache dumb-init)
 
 # Create app user
 RUN addgroup -g 1001 -S nodejs && \
