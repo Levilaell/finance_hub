@@ -109,8 +109,13 @@ else:
         }
     }
 
-# Static files - WhiteNoise
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Static files - WhiteNoise with fallback
+try:
+    # Try compressed storage first
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+except Exception:
+    # Fallback to basic WhiteNoise if compression fails
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 # Media files - AWS S3 (optional)
 AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', '')

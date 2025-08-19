@@ -1,6 +1,7 @@
 /**
  * Banking data caching utilities
  */
+import React from 'react';
 
 interface CacheEntry<T> {
   data: T;
@@ -236,5 +237,3 @@ export function useCachedData<T>(
   return { data, isLoading, error, refresh };
 }
 
-// Import React at the end to avoid circular dependency
-import React from 'react';

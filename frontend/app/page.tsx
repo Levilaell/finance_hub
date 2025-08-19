@@ -23,10 +23,10 @@ export default function Home() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <div className="h-10 w-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
-                <BanknotesIcon className="h-6 w-6 text-white" />
+              <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                <BanknotesIcon className="h-6 w-6 text-primary" />
               </div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white">CaixaHub</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">CaixaHub</h1>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
               <Link href="/como-funciona" className="hidden sm:inline text-muted-foreground hover:text-foreground transition-colors">
@@ -40,7 +40,7 @@ export default function Home() {
                   Entrar
                 </Link>
               </Button>
-              <Button asChild className="text-sm sm:text-base btn-gradient">
+              <Button asChild className="text-sm sm:text-base btn-primary">
                 <Link href="/pricing">
                   Começar Grátis
                 </Link>
@@ -52,17 +52,17 @@ export default function Home() {
 
       {/* Hero Section */}
       <section className="py-20 lg:py-32 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-subtle opacity-50"></div>
+        <div className="absolute inset-0 bg-muted/10"></div>
         <div className="container mx-auto px-4 relative">
           <div className="max-w-4xl mx-auto text-center space-y-8">
-            <Badge variant="secondary" className="mb-4 glass border-white/20">
+            <Badge variant="secondary" className="mb-4 glass">
               <SparklesIcon className="h-4 w-4 mr-1" />
               Gestão financeira inteligente para PMEs
             </Badge>
             
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight">
               Transforme a{" "}
-              <span className="text-white font-semibold">gestão financeira</span>{" "}
+              <span className="text-foreground font-semibold">gestão financeira</span>{" "}
               da sua empresa
             </h1>
             
@@ -72,7 +72,7 @@ export default function Home() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
-              <Button size="lg" asChild className="text-lg px-8 btn-gradient hover-lift">
+              <Button size="lg" asChild className="text-lg px-8 btn-primary hover-lift">
                 <Link href="/pricing">
                   Começar Grátis
                   <ArrowRightIcon className="ml-2 h-5 w-5" />
@@ -178,7 +178,7 @@ export default function Home() {
                     </p>
                   </div>
                 </div>
-                <Button size="lg" asChild className="mt-6 btn-gradient hover-lift">
+                <Button size="lg" asChild className="mt-6 btn-primary hover-lift">
                   <Link href="/como-funciona">
                     Ver Como Funciona
                     <ArrowRightIcon className="ml-2 h-5 w-5" />
@@ -463,14 +463,14 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-primary text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-violet-600/20 to-purple-700/20"></div>
+      <section className="py-20 bg-card border-y relative overflow-hidden">
+        <div className="absolute inset-0 bg-muted/5"></div>
         <div className="container mx-auto px-4 text-center relative">
           <div className="max-w-3xl mx-auto space-y-8">
             <h2 className="text-3xl md:text-4xl font-bold">
               Pronto para revolucionar sua gestão financeira?
             </h2>
-            <p className="text-xl opacity-90">
+            <p className="text-xl text-muted-foreground">
               Junte-se a centenas de empresas brasileiras que já transformaram 
               sua gestão financeira com nossa plataforma.
             </p>
@@ -478,7 +478,7 @@ export default function Home() {
               <Button 
                 size="lg" 
                 asChild 
-                className="text-lg px-8 bg-white text-black hover:bg-white/90 hover-lift"
+                className="text-lg px-8 btn-primary hover-lift"
               >
                 <Link href="/pricing">
                   Ver Planos e Preços
@@ -488,7 +488,7 @@ export default function Home() {
               <Button 
                 size="lg" 
                 asChild 
-                className="text-lg px-8 bg-white/10 backdrop-blur-sm border border-white/30 hover:bg-white/20 hover-lift glass"
+                className="text-lg px-8 btn-secondary hover-lift"
               >
                 <Link href="/register">
                   Começar Grátis Agora
@@ -507,10 +507,10 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center shadow-md">
-                <BanknotesIcon className="h-4 w-4 text-white" />
+              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shadow-md">
+                <BanknotesIcon className="h-4 w-4 text-primary-foreground" />
               </div>
-              <span className="font-semibold text-white">CaixaHub</span>
+              <span className="font-semibold text-foreground">CaixaHub</span>
             </div>
             <div className="flex space-x-6 text-sm text-muted-foreground">
               <Link href="/pricing" className="hover:text-foreground transition-colors">

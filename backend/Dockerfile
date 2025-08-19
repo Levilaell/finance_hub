@@ -34,12 +34,16 @@ ENV PATH=/root/.local/bin:$PATH
 # Copy Django project
 COPY backend/ /app/
 
-# Collect static files
-RUN DJANGO_SECRET_KEY="build-key" \
+# Create necessary directories
+RUN mkdir -p /app/staticfiles /app/static /app/media
+
+# Collect static files with proper environment
+RUN DJANGO_SECRET_KEY="build-key-for-collectstatic-only" \
     DJANGO_SETTINGS_MODULE=core.settings.production \
     DATABASE_URL="sqlite:///tmp/db.sqlite3" \
     DJANGO_COLLECT_STATIC=1 \
-    python manage.py collectstatic --noinput
+    ALLOWED_HOSTS="*" \
+    python manage.py collectstatic --noinput --verbosity=2
 
 # Stage 3: Final production image
 FROM python:3.11-slim

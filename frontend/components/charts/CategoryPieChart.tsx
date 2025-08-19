@@ -28,16 +28,16 @@ interface CategoryPieChartProps {
 }
 
 const COLORS = [
-  '#d946ef', // Primary pink
-  '#9333ea', // Primary purple
-  '#22c55e', // Success green
-  '#3b82f6', // Info blue
-  '#f59e0b', // Warning amber
-  '#ef4444', // Error red
-  '#a78bfa', // Light purple
-  '#f472b6', // Light pink
-  '#14b8a6', // Teal
-  '#f97316', // Orange
+  'hsl(0 0% 9%)',   // Near black
+  'hsl(0 0% 18%)',  // Dark gray
+  'hsl(0 0% 35%)',  // Medium gray
+  'hsl(0 0% 50%)',  // True neutral
+  'hsl(0 0% 65%)',  // Light gray
+  'hsl(0 0% 82%)',  // Very light gray
+  'hsl(120 60% 40%)', // Success green (semantic only)
+  'hsl(0 60% 45%)',   // Error red (semantic only)
+  'hsl(45 90% 40%)',  // Warning amber (semantic only)
+  'hsl(220 60% 45%)', // Info blue (semantic only)
 ];
 
 const renderActiveShape = (props: any) => {

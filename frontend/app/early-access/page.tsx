@@ -16,7 +16,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/auth-store';
 import { RegisterData } from '@/types';
-import { EyeIcon, EyeSlashIcon, CheckIcon, SparklesIcon, GiftIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon, CheckIcon, SparklesIcon, ShieldCheckIcon, BanknotesIcon } from '@heroicons/react/24/outline';
 import { validateCNPJ, validatePhone, cnpjMask, phoneMask } from '@/utils/validation';
 import { testId, TEST_IDS } from '@/utils/test-helpers';
 
@@ -109,57 +109,68 @@ function EarlyAccessContent() {
   ];
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <div className="text-center">
-          <div className="flex items-center justify-center mb-2">
-            <SparklesIcon className="h-8 w-8 text-purple-500 mr-2" />
-            <CardTitle className="text-white text-2xl font-bold">
-              Acesso Antecipado
-            </CardTitle>
-          </div>
-          <CardDescription className="text-center text-muted-foreground">
-            Você foi convidado para testar nosso MVP gratuitamente
-          </CardDescription>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
+      {/* Header with Logo */}
+      <div className="flex items-center space-x-3 mb-8">
+        <div className="h-12 w-12 rounded-full bg-primary flex items-center justify-center">
+          <BanknotesIcon className="h-6 w-6 text-primary-foreground" />
         </div>
-        
-        {/* Early Access Special Banner */}
-        <div className="mt-4 p-4 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-lg border border-purple-500/30">
-          <div className="flex items-center justify-center mb-2">
-            <Badge className="bg-gradient-to-r from-purple-600 to-blue-600 text-white border-none">
-              🚀 MVP Early Access
-            </Badge>
-          </div>
-          <p className="text-sm text-center text-muted-foreground">
-            <strong className="text-white">Acesso gratuito por tempo limitado</strong><br/>
-            Teste todas as funcionalidades sem restrições
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold text-foreground">CaixaHub</h1>
+      </div>
 
-        {/* Benefits */}
-        <Alert className="mt-4 border-green-500/30 bg-green-500/10">
-          <GiftIcon className="h-4 w-4 text-green-400" />
-          <AlertDescription className="text-green-200">
-            <strong>Benefícios exclusivos:</strong> Suporte prioritário, feedback direto com o time, 
-            e desconto especial quando lançarmos oficialmente.
-          </AlertDescription>
-        </Alert>
-      </CardHeader>
+      <Card className="w-full max-w-lg bg-surface">
+        <CardHeader className="text-center space-y-4">
+          <div>
+            <div className="flex items-center justify-center mb-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mr-2">
+                <SparklesIcon className="h-5 w-5 text-primary" />
+              </div>
+              <CardTitle className="text-2xl font-bold text-foreground">
+                Acesso Antecipado
+              </CardTitle>
+            </div>
+            <CardDescription className="text-muted-foreground">
+              Você foi convidado para testar nossa plataforma MVP
+            </CardDescription>
+          </div>
+          
+          {/* Early Access Banner */}
+          <div className="p-4 bg-muted/30 rounded-lg border">
+            <div className="flex items-center justify-center mb-2">
+              <Badge variant="secondary" className="bg-primary text-primary-foreground">
+                🚀 MVP Early Access
+              </Badge>
+            </div>
+            <p className="text-sm text-center text-muted-foreground">
+              <strong className="text-foreground">Acesso completo gratuito</strong><br/>
+              Teste todas as funcionalidades sem limitações
+            </p>
+          </div>
+
+          {/* Benefits */}
+          <Alert className="border-success-subtle bg-success-subtle">
+            <ShieldCheckIcon className="h-4 w-4 text-success" />
+            <AlertDescription className="text-success">
+              <strong>Benefícios exclusivos:</strong> Suporte prioritário, feedback direto com nossa equipe, 
+              e condições especiais no lançamento oficial.
+            </AlertDescription>
+          </Alert>
+        </CardHeader>
       
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent>
           <div className="space-y-4">
             {/* Invite Code Field */}
             <div>
-              <Label htmlFor="invite_code" className="text-purple-200">
-                Código de Convite <span className="text-red-400">*</span>
+              <Label htmlFor="invite_code" className="text-foreground font-medium">
+                Código de Convite <span className="text-error">*</span>
               </Label>
               <Input
                 id="invite_code"
                 type="text"
                 placeholder="MVP-XXXXXXXX"
                 value={inviteCode}
-                className="font-mono bg-purple-900/20 border-purple-500/30"
+                className="font-mono bg-muted/50 border-border focus:border-primary"
                 {...register('invite_code', {
                   required: 'Código de convite é obrigatório',
                   pattern: {
@@ -174,7 +185,7 @@ function EarlyAccessContent() {
                 }}
               />
               {errors.invite_code && (
-                <p className="text-sm text-red-500 mt-1">
+                <p className="text-sm text-error mt-1">
                   {errors.invite_code.message}
                 </p>
               )}
@@ -195,7 +206,7 @@ function EarlyAccessContent() {
                   autoComplete="given-name"
                 />
                 {errors.first_name && (
-                  <p className="text-sm text-red-500 mt-1">
+                  <p className="text-sm text-error mt-1">
                     {errors.first_name.message}
                   </p>
                 )}
@@ -213,7 +224,7 @@ function EarlyAccessContent() {
                   autoComplete="family-name"
                 />
                 {errors.last_name && (
-                  <p className="text-sm text-red-500 mt-1">
+                  <p className="text-sm text-error mt-1">
                     {errors.last_name.message}
                   </p>
                 )}
@@ -237,7 +248,7 @@ function EarlyAccessContent() {
                 autoComplete="email"
               />
               {errors.email && (
-                <p className="text-sm text-red-500 mt-1">
+                <p className="text-sm text-error mt-1">
                   {errors.email.message}
                 </p>
               )}
@@ -256,7 +267,7 @@ function EarlyAccessContent() {
                 autoComplete="organization"
               />
               {errors.company_name && (
-                <p className="text-sm text-red-500 mt-1">
+                <p className="text-sm text-error mt-1">
                   {errors.company_name.message}
                 </p>
               )}
@@ -283,7 +294,7 @@ function EarlyAccessContent() {
                   maxLength={18}
                 />
                 {errors.company_cnpj && (
-                  <p className="text-sm text-red-500 mt-1">
+                  <p className="text-sm text-error mt-1">
                     {errors.company_cnpj.message}
                   </p>
                 )}
@@ -309,7 +320,7 @@ function EarlyAccessContent() {
                   autoComplete="tel"
                 />
                 {errors.phone && (
-                  <p className="text-sm text-red-500 mt-1">
+                  <p className="text-sm text-error mt-1">
                     {errors.phone.message}
                   </p>
                 )}
@@ -336,7 +347,7 @@ function EarlyAccessContent() {
                   <option value="other">Outros</option>
                 </select>
                 {errors.company_type && (
-                  <p className="text-sm text-red-500 mt-1">
+                  <p className="text-sm text-error mt-1">
                     {errors.company_type.message}
                   </p>
                 )}
@@ -365,7 +376,7 @@ function EarlyAccessContent() {
                   <option value="other">Outros</option>
                 </select>
                 {errors.business_sector && (
-                  <p className="text-sm text-red-500 mt-1">
+                  <p className="text-sm text-error mt-1">
                     {errors.business_sector.message}
                   </p>
                 )}
@@ -409,7 +420,7 @@ function EarlyAccessContent() {
                 </button>
               </div>
               {errors.password && (
-                <p className="text-sm text-red-500 mt-1">
+                <p className="text-sm text-error mt-1">
                   {errors.password.message}
                 </p>
               )}
@@ -420,8 +431,8 @@ function EarlyAccessContent() {
                       key={index}
                       className={`flex items-center text-sm ${
                         req.regex.test(password)
-                          ? 'text-green-600'
-                          : 'text-gray-400'
+                          ? 'text-success'
+                          : 'text-muted-foreground'
                       }`}
                     >
                       <CheckIcon
@@ -464,7 +475,7 @@ function EarlyAccessContent() {
                 </button>
               </div>
               {errors.password2 && (
-                <p className="text-sm text-red-500 mt-1">
+                <p className="text-sm text-error mt-1">
                   {errors.password2.message}
                 </p>
               )}
@@ -475,7 +486,8 @@ function EarlyAccessContent() {
         <CardFooter className="flex flex-col space-y-4">
           <Button
             type="submit"
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium"
+            className="w-full btn-primary hover-lift"
+            size="lg"
             disabled={registerMutation.isPending}
             {...testId(TEST_IDS.auth.registerSubmit)}
           >
@@ -491,36 +503,39 @@ function EarlyAccessContent() {
           
           <p className="text-sm text-center text-muted-foreground">
             Ao se cadastrar, você concorda com nossos{' '}
-            <Link href="/terms" className="text-white hover:text-white/80 hover:underline transition-colors">
+            <Link href="/terms" className="text-foreground hover:text-primary hover:underline transition-colors">
               Termos de Serviço
             </Link>{' '}
             e{' '}
-            <Link href="/privacy" className="text-white hover:text-white/80 hover:underline transition-colors">
+            <Link href="/privacy" className="text-foreground hover:text-primary hover:underline transition-colors">
               Política de Privacidade
             </Link>
           </p>
           
           <p className="text-sm text-center text-muted-foreground">
             Já tem uma conta?{' '}
-            <Link href="/login" className="text-white hover:text-white/80 hover:underline transition-colors font-medium">
+            <Link href="/login" className="text-foreground hover:text-primary hover:underline transition-colors font-medium">
               Entrar
             </Link>
           </p>
         </CardFooter>
       </form>
     </Card>
+    </div>
   );
 }
 
 export default function EarlyAccessPage() {
   return (
     <Suspense fallback={
-      <Card className="w-full max-w-md">
-        <CardContent className="flex flex-col items-center space-y-4 pt-6">
-          <LoadingSpinner />
-          <p className="text-sm text-muted-foreground">Carregando...</p>
-        </CardContent>
-      </Card>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center space-y-4 pt-6">
+            <LoadingSpinner />
+            <p className="text-sm text-muted-foreground">Carregando...</p>
+          </CardContent>
+        </Card>
+      </div>
     }>
       <EarlyAccessContent />
     </Suspense>

@@ -42,46 +42,25 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
-        // Finance Hub specific colors - CaixaHub inspired
-        gradient: {
-          start: 'hsl(var(--gradient-start))',
-          end: 'hsl(var(--gradient-end))',
+        // Minimalist grayscale system - only grays needed
+        gray: {
+          50: 'hsl(0 0% 98%)',
+          100: 'hsl(0 0% 94%)',
+          200: 'hsl(0 0% 88%)',
+          300: 'hsl(0 0% 82%)',
+          400: 'hsl(0 0% 65%)',
+          500: 'hsl(0 0% 50%)',
+          600: 'hsl(0 0% 35%)',
+          700: 'hsl(0 0% 18%)',
+          800: 'hsl(0 0% 12%)',
+          900: 'hsl(0 0% 6%)',
+          950: 'hsl(0 0% 2%)',
         },
-        // Vibrant purple palette
-        purple: {
-          50: '#faf5ff',
-          100: '#f3e8ff',
-          200: '#e9d5ff',
-          300: '#d8b4fe',
-          400: '#c084fc',
-          500: '#b146ff', // Primary vibrant purple
-          600: '#9333ea',
-          700: '#8b2eff', // Light mode primary
-          800: '#6b21a8',
-          900: '#581c87',
-          950: '#3b0764',
-        },
-        // Vibrant magenta/pink palette
-        magenta: {
-          400: '#ff6bb5',
-          500: '#ff3b9e', // Accent vibrant magenta
-          600: '#ff2e85', // Light mode accent
-          700: '#e91e73',
-          800: '#cc1862',
-        },
-        // Dark backgrounds
-        dark: {
-          DEFAULT: '#0a0a0a', // Main dark background
-          100: '#14101a', // Card background
-          200: '#1a1424', // Popover background
-          300: '#1f1b2e', // Secondary background
-          400: '#2b2439', // Border color
-        },
-        // Semantic colors - professional and subtle
-        success: '#16a34a',
-        info: '#2563eb',
-        warning: '#ca8a04',
-        error: 'hsl(0, 40%, 45%)',
+        // Semantic colors - minimal and professional
+        success: 'hsl(120 60% 40%)',
+        warning: 'hsl(45 90% 40%)',
+        error: 'hsl(0 60% 45%)',
+        info: 'hsl(220 60% 45%)',
       },
     },
   },

@@ -1,21 +1,25 @@
 # Build stage
 FROM node:18-alpine AS builder
 
-# Install dependencies for building
-RUN apk add --no-cache libc6-compat
+# Add timeouts and retry for Alpine packages
+RUN apk update && apk add --no-cache --timeout=300 --retry=3 libc6-compat
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files first for better caching
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci && \
+# Install dependencies with timeout and error handling
+RUN npm ci --timeout=300000 && \
     npm cache clean --force
 
 # Copy application code
 COPY . .
+
+# Set build environment
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1
 
 # Build the application
 RUN npm run build
@@ -23,8 +27,8 @@ RUN npm run build
 # Production stage
 FROM node:18-alpine AS runner
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install runtime dependencies with timeout and retry
+RUN apk update && apk add --no-cache --timeout=300 --retry=3 dumb-init
 
 # Create app user
 RUN addgroup -g 1001 -S nodejs && \
