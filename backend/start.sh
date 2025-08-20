@@ -63,9 +63,15 @@ except Exception as e:
     print(f'⚠️  Could not fix migration dependencies: {e}')
 " || echo "⚠️  Migration dependency fix failed"
 
-# Run migrations
+# Run migrations - handle inconsistent history gracefully
 echo "🔄 Running migrations..."
-python manage.py migrate --no-input || echo "⚠️  Migration failed, check logs"
+python manage.py migrate --no-input || {
+    echo "⚠️  Migration failed due to inconsistent history, applying fake migrations..."
+    # Mark 0008 as applied if structure exists
+    python manage.py migrate companies 0008 --fake-initial --no-input || echo "⚠️  Could not fake 0008"
+    # Try again with normal migrate
+    python manage.py migrate --no-input || echo "⚠️  Final migration attempt failed"
+}
 
 # Ensure email_verifications table exists (critical fix for admin delete)
 echo "🔧 Checking email_verifications table..."
