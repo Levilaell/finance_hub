@@ -33,6 +33,7 @@ import {
   DocumentChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { BankAccountCard } from '@/components/banking/bank-account-card';
+import { MFATimeoutAlert } from '@/components/banking/MFATimeoutAlert';
 import { testId, TEST_IDS } from '@/utils/test-helpers';
 
 import {
@@ -295,6 +296,9 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-6" {...testId('accounts-page')}>
+      {/* MFA Timeout Alert */}
+      <MFATimeoutAlert />
+      
       {/* Pluggy Connect Widget */}
       {pluggyConnect.isOpen && pluggyConnect.token && (
         <PluggyConnect

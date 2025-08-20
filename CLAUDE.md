@@ -499,3 +499,120 @@ print('✅ ReportGenerator funciona corretamente')
 - `backend/apps/reports/services/validation_service.py` - Corrigidos campos em validação de dados
 - `backend/apps/reports/views.py` - Corrigidos campos em queries de dashboard
 - `backend/apps/reports/generators/base.py` - Corrigidos campos e removida importação desnecessária
+
+### 13. Erro de Produção - Campo is_early_access Não Existe (CRÍTICO)
+
+#### Problema
+- **Sintoma**: Erro 500 ao criar conta em produção
+- **Erro**: `django.db.utils.ProgrammingError: column "is_early_access" of relation "companies" does not exist`
+- **Endpoint**: `/api/auth/register/`
+- **Causa Raiz**: Migração `0009_add_early_access.py` não foi aplicada no banco de produção do Railway
+
+#### Análise Detalhada
+1. **Código Local**: Campo `is_early_access` definido no modelo Company (linha 165 em models.py)
+2. **Migração Local**: `0009_add_early_access.py` aplicada e funcionando localmente
+3. **Banco de Produção**: Migração nunca foi executada no Railway
+4. **Impacto**: Impossível criar novas contas em produção
+
+#### Migração Faltante
+- **Arquivo**: `backend/apps/companies/migrations/0009_add_early_access.py`
+- **Campos Adicionados**:
+  - `is_early_access` (BooleanField, default=False)
+  - `early_access_expires_at` (DateTimeField, nullable)
+  - `used_invite_code` (CharField, max_length=20, blank=True)
+- **Modelo Criado**: `EarlyAccessInvite` com tabela `early_access_invites`
+- **Status Atualizado**: Adicionado 'early_access' às opções de subscription_status
+
+#### Solução URGENTE Requerida
+
+**Opção 1: Aplicar via Railway CLI (Recomendado)**
+```bash
+# 1. Fazer login no Railway
+railway login
+
+# 2. Aplicar migração específica
+railway run python manage.py migrate companies 0009_add_early_access
+
+# 3. Verificar aplicação
+railway run python manage.py showmigrations companies
+```
+
+**Opção 2: Aplicar via Dashboard Railway**
+1. Acesse o projeto no Railway Dashboard
+2. Vá para "Variables" e adicione: `MIGRATION_COMMAND=migrate companies 0009_add_early_access`
+3. Redeploy para executar a migração
+
+**Opção 3: SQL Direto (Emergency)**
+```sql
+-- Adicionar colunas faltantes na tabela companies
+ALTER TABLE companies ADD COLUMN is_early_access BOOLEAN DEFAULT FALSE;
+ALTER TABLE companies ADD COLUMN early_access_expires_at TIMESTAMPTZ NULL;
+ALTER TABLE companies ADD COLUMN used_invite_code VARCHAR(20) DEFAULT '';
+
+-- Atualizar campo subscription_status para incluir 'early_access'
+-- (Verificar se constraints permitem o novo valor)
+
+-- Criar tabela early_access_invites
+CREATE TABLE early_access_invites (
+    id BIGSERIAL PRIMARY KEY,
+    invite_code VARCHAR(20) UNIQUE NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    is_used BOOLEAN DEFAULT FALSE,
+    used_at TIMESTAMPTZ NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    notes TEXT DEFAULT '',
+    created_by_id BIGINT REFERENCES auth_user(id) ON DELETE CASCADE,
+    used_by_id BIGINT REFERENCES auth_user(id) ON DELETE SET NULL
+);
+
+-- Registrar migração como aplicada
+INSERT INTO django_migrations (app, name, applied) 
+VALUES ('companies', '0009_add_early_access', NOW());
+```
+
+#### Script de Validação
+```bash
+# Script completo de validação criado em:
+# backend/validate_early_access_migration.py
+
+# Executar localmente:
+python backend/validate_early_access_migration.py
+
+# Executar em produção via Railway:
+railway run python validate_early_access_migration.py
+```
+
+**O script valida:**
+- ✅ Schema do banco (colunas existem)
+- ✅ Modelos Django (campos funcionam)
+- ✅ Status da migração (foi aplicada)
+- ✅ Funcionalidade (propriedades e métodos)
+- ✅ Criação de convites (modelo EarlyAccessInvite)
+
+#### Status: ✅ RESOLVIDO - Produção Funcionando
+
+**Correção Aplicada**:
+- ✅ Campos adicionados na tabela `companies` via SQL direto
+- ✅ Tabela `early_access_invites` criada com referências corretas (`users` table)
+- ✅ Migração registrada como aplicada no Django
+- ✅ Sistema de registro restaurado e funcionando
+
+**Arquivos Criados**:
+- `backend/fix_production_early_access.sql` - Script SQL completo
+- `backend/fix_early_access_table_only.sql` - Script específico para tabela
+- `backend/validate_early_access_migration.py` - Validação pós-migração
+
+**Validação Realizada**:
+```bash
+# Executado com sucesso:
+railway run python validate_early_access_migration.py
+# ✅ Todos os testes passaram
+```
+
+**Push Realizado**: Commit `2a8d7aa` com todas as correções
+
+#### Prevenção Futura
+1. **CI/CD**: Automatizar aplicação de migrações no deploy
+2. **Monitoramento**: Alertas para migrações pendentes
+3. **Checklist**: Verificar `showmigrations` antes de cada deploy
+4. **Staging**: Sempre testar migrações em ambiente de staging primeiro

@@ -53,6 +53,23 @@ class BankingService {
     return apiClient.get<PaginatedResponse<PluggyItem>>('/api/banking/items/');
   }
   
+  async getWaitingItems(): Promise<{ success: boolean; data: PluggyItem[] }> {
+    try {
+      const response = await apiClient.get<PaginatedResponse<PluggyItem>>('/api/banking/items/', {
+        status: 'WAITING_USER_ACTION'
+      });
+      return {
+        success: true,
+        data: response.results || []
+      };
+    } catch (error) {
+      return {
+        success: false,
+        data: []
+      };
+    }
+  }
+  
   async getItem(id: string): Promise<PluggyItem> {
     return apiClient.get<PluggyItem>(`/api/banking/items/${id}/`);
   }

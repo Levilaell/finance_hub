@@ -221,9 +221,6 @@ class UsageRecord(models.Model):
     def __str__(self):
         return f"{self.company.name} - {self.usage_type} - {self.quantity}"
     
-    def __str__(self):
-        return f"{self.company.name} - {self.type}: {self.count}"
-    
     @classmethod
     def get_current_usage(cls, company, usage_type):
         """Get current billing period usage"""
