@@ -37,6 +37,47 @@ done
 echo "🔄 Running migrations..."
 python manage.py migrate --no-input || echo "⚠️  Migration failed, check logs"
 
+# Ensure email_verifications table exists (critical fix for admin delete)
+echo "🔧 Checking email_verifications table..."
+python -c "
+import django
+django.setup()
+from django.db import connection
+try:
+    with connection.cursor() as cursor:
+        # Check if table exists
+        cursor.execute(\"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'email_verifications';\")
+        exists = cursor.fetchone()[0] > 0
+        if not exists:
+            print('⚠️  email_verifications table missing, creating...')
+            # Create table
+            cursor.execute('''
+                CREATE TABLE email_verifications (
+                    id BIGSERIAL PRIMARY KEY,
+                    token VARCHAR(100) UNIQUE NOT NULL,
+                    is_used BOOLEAN DEFAULT FALSE NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    expires_at TIMESTAMPTZ NOT NULL,
+                    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE
+                );
+            ''')
+            # Create indexes
+            cursor.execute('CREATE INDEX email_verif_user_id_f77c27_idx ON email_verifications (user_id, is_used);')
+            cursor.execute('CREATE INDEX email_verif_token_403404_idx ON email_verifications (token);')
+            cursor.execute('CREATE INDEX email_verif_expires_fdd67c_idx ON email_verifications (expires_at);')
+            # Mark migration as applied
+            cursor.execute('''
+                INSERT INTO django_migrations (app, name, applied) 
+                VALUES ('authentication', '0003_emailverification', NOW())
+                ON CONFLICT (app, name) DO NOTHING;
+            ''')
+            print('✅ email_verifications table created successfully')
+        else:
+            print('✅ email_verifications table already exists')
+except Exception as e:
+    print(f'⚠️  Could not verify/create email_verifications table: {e}')
+" || echo "⚠️  Email verification table check failed"
+
 # Collect static files
 echo "📦 Collecting static files..."
 python manage.py collectstatic --no-input || echo "⚠️  Static files collection had issues"
