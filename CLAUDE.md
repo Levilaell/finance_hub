@@ -406,6 +406,42 @@ curl -X POST http://localhost:8000/api/banking/accounts/{account-id}/sync/
   - `apps/banking/utils/encryption.py` - Criado serviço de criptografia
   - `apps/banking/migrations/0010_add_encrypted_parameter.py` - Migração aplicada
 
+### 14. Erro de Produção - Registro Falhando (Celery Connection Refused) ✅ RESOLVIDO
+
+#### Problema
+- **Sintoma**: Erro 500 ao tentar se registrar em produção
+- **Erro**: `kombu.exceptions.OperationalError: [Errno 111] Connection refused`
+- **Endpoint**: `/api/auth/register/`, `/api/auth/forgot-password/`, `/api/auth/resend-verification/`
+- **Causa Raiz**: Sistema tenta enviar emails via Celery tasks mas não consegue conectar ao Redis em produção
+
+#### Análise Detalhada
+1. **Processo de Registro**: Cria usuário → Gera token de verificação → Envia email via Celery task
+2. **Erro de Conexão**: `send_verification_email_task.delay()` falha ao conectar com Redis/Celery
+3. **Impacto**: Usuário não consegue se registrar, recebe erro 500
+4. **Escopo**: Afeta também reset de senha e reenvio de verificação
+
+#### Solução Aplicada
+- **Arquivo**: `backend/apps/authentication/views.py`
+- **Método**: Adicionado try/except em todas as chamadas `.delay()`
+- **Linhas Corrigidas**:
+  - Linha 123: `send_verification_email_task.delay()` no registro
+  - Linha 421: `send_password_reset_email_task.delay()` no reset de senha
+  - Linha 533: `send_verification_email_task.delay()` no reenvio
+  - (Linha 835 já tinha tratamento de erro)
+
+- **Arquivo**: `backend/apps/reports/views.py`
+- **Linha 641**: `generate_report_async.delay()` no quick reports
+
+#### Comportamento Pós-Correção
+- **Com Redis/Celery**: Emails enviados assincronamente (comportamento ideal)
+- **Sem Redis/Celery**: Usuário registrado com sucesso, email apenas não é enviado
+- **Logs**: Warnings sobre falha no envio de email, mas operação continua
+- **UX**: Usuário pode se registrar e usar o sistema normalmente
+
+#### Arquivos Modificados
+- `backend/apps/authentication/views.py` - Try/except em 3 locais de envio de email
+- `backend/apps/reports/views.py` - Try/except em quick report generation
+
 ### Próximos Passos
 
 - ✅ **Erro de Geração de Relatórios RESOLVIDO** (campos corrigidos no ReportGenerator)
@@ -421,6 +457,7 @@ curl -X POST http://localhost:8000/api/banking/accounts/{account-id}/sync/
 - ✅ **Banco de dados consistente** (campos obsoletos removidos, modelo atualizado)
 - ✅ **USER_INPUT_TIMEOUT em ambiente local** (verificação de status implementada)
 - ✅ **Segurança MFA** - Parâmetros MFA agora criptografados no banco de dados
+- ✅ **Registro em produção FUNCIONANDO** - Usuários podem se registrar mesmo sem email service
 - **Para desenvolvimento local**: Considerar usar ngrok para receber webhooks
 - **Importante**: Servidor backend reiniciado e funcionando
 - **Opcional mas recomendado**: Iniciar Redis para melhor performance (`redis-server`)
