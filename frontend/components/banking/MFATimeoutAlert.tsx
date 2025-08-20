@@ -192,7 +192,7 @@ export function MFATimeoutAlert({ className, onReconnect }: MFATimeoutAlertProps
           {/* Help Text */}
           <div className="text-xs text-muted-foreground pt-2 border-t">
             💡 <strong>Tip:</strong> Check your phone for SMS or push notification from your bank. 
-            If you don't receive the code, try reconnecting the account.
+            If you don&apos;t receive the code, try reconnecting the account.
           </div>
         </div>
       </div>

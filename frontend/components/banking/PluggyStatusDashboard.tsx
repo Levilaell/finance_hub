@@ -3,7 +3,7 @@
  * Real-time monitoring of Pluggy item status with health indicators
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   CheckCircle, 
@@ -24,28 +24,71 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { bankingService } from '@/services/banking.service';
+import { PluggyItem } from '@/types/banking.types';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
-interface PluggyItem {
-  id: string;
-  pluggy_item_id: string;
-  status: string;
-  execution_status: string;
-  connector: {
-    id: number;
-    name: string;
-    institutional_name: string;
-    logo_url?: string;
-  };
-  created_at: string;
-  updated_at: string;
-  last_sync_at?: string;
-  error_message?: string;
-  accounts_count: number;
-  transactions_count: number;
-}
+// Utility functions moved outside to be accessible by ItemStatusCard
+const getStatusInfo = (item: PluggyItem) => {
+  const status = item.execution_status || item.status;
+  
+  switch (status) {
+    case 'UPDATED':
+    case 'SUCCESS':
+      return {
+        color: 'success',
+        icon: CheckCircle,
+        label: 'Funcionando',
+        description: 'Sincronizando normalmente'
+      };
+    case 'WAITING_USER_INPUT':
+      return {
+        color: 'warning',
+        icon: Clock,
+        label: 'Aguardando MFA',
+        description: 'Código de verificação necessário'
+      };
+    case 'LOGIN_ERROR':
+      return {
+        color: 'error',
+        icon: XCircle,
+        label: 'Erro de Login',
+        description: 'Credenciais inválidas'
+      };
+    case 'ERROR':
+      return {
+        color: 'error',
+        icon: XCircle,
+        label: 'Erro',
+        description: 'Falha na sincronização'
+      };
+    case 'USER_INPUT_TIMEOUT':
+      return {
+        color: 'error',
+        icon: AlertTriangle,
+        label: 'Timeout de MFA',
+        description: 'Código não fornecido a tempo'
+      };
+    default:
+      return {
+        color: 'info',
+        icon: AlertTriangle,
+        label: 'Desconhecido',
+        description: 'Status não reconhecido'
+      };
+  }
+};
+
+const getVariantFromColor = (color: string) => {
+  switch (color) {
+    case 'success': return 'default';
+    case 'warning': return 'secondary';
+    case 'error': return 'destructive';
+    case 'info': return 'outline';
+    default: return 'outline';
+  }
+};
 
 interface StatusMetrics {
   total_items: number;
@@ -62,94 +105,67 @@ export function PluggyStatusDashboard() {
   // Query for items status
   const { data: itemsData, isLoading: itemsLoading, refetch: refetchItems } = useQuery({
     queryKey: ['banking', 'items-status'],
-    queryFn: () => bankingService.getItemsStatus(),
+    queryFn: () => bankingService.getItems(),
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
-  // Query for status metrics
-  const { data: metricsData, isLoading: metricsLoading } = useQuery({
-    queryKey: ['banking', 'status-metrics'],
-    queryFn: () => bankingService.getStatusMetrics(),
-    refetchInterval: 60000, // Refresh every minute
-  });
-
-  const items: PluggyItem[] = itemsData?.data || [];
-  const metrics: StatusMetrics = metricsData?.data || {
-    total_items: 0,
-    healthy_items: 0,
-    warning_items: 0,
-    error_items: 0,
-    success_rate: 0,
-    avg_sync_time: 0
-  };
-
-  const getStatusInfo = (item: PluggyItem) => {
-    const status = item.execution_status || item.status;
-    
-    switch (status) {
-      case 'UPDATED':
-      case 'SUCCESS':
-        return {
-          color: 'success',
-          icon: CheckCircle,
-          label: 'Funcionando',
-          description: 'Sincronizando normalmente'
-        };
-      case 'WAITING_USER_ACTION':
-        return {
-          color: 'warning',
-          icon: Clock,
-          label: 'Aguardando MFA',
-          description: 'Código de verificação necessário'
-        };
-      case 'LOGIN_ERROR':
-      case 'INVALID_CREDENTIALS':
-        return {
-          color: 'error',
-          icon: XCircle,
-          label: 'Erro de Login',
-          description: 'Credenciais inválidas'
-        };
-      case 'OUTDATED':
-        return {
-          color: 'warning',
-          icon: AlertTriangle,
-          label: 'Desatualizado',
-          description: 'Necessita sincronização'
-        };
-      case 'CREATING':
-      case 'UPDATING':
-        return {
-          color: 'info',
-          icon: RefreshCw,
-          label: 'Processando',
-          description: 'Sincronização em andamento'
-        };
-      default:
-        return {
-          color: 'secondary',
-          icon: AlertTriangle,
-          label: status || 'Desconhecido',
-          description: 'Status não reconhecido'
-        };
+  const items: PluggyItem[] = itemsData?.results || [];
+  
+  // Calculate metrics from items data
+  const metrics: StatusMetrics = useMemo(() => {
+    if (!items.length) {
+      return {
+        total_items: 0,
+        healthy_items: 0,
+        warning_items: 0,
+        error_items: 0,
+        success_rate: 0,
+        avg_sync_time: 0
+      };
     }
-  };
 
-  const getVariantFromColor = (color: string) => {
-    switch (color) {
-      case 'success': return 'default';
-      case 'warning': return 'secondary';
-      case 'error': return 'destructive';
-      case 'info': return 'outline';
-      default: return 'secondary';
-    }
-  };
+    const total_items = items.length;
+    let healthy_items = 0;
+    let warning_items = 0;
+    let error_items = 0;
+
+    items.forEach(item => {
+      const status = item.execution_status || item.status;
+      switch (status) {
+        case 'UPDATED':
+        case 'SUCCESS':
+          healthy_items++;
+          break;
+        case 'WAITING_USER_INPUT':
+          warning_items++;
+          break;
+        case 'LOGIN_ERROR':
+        case 'ERROR':
+        case 'USER_INPUT_TIMEOUT':
+        default:
+          error_items++;
+          break;
+      }
+    });
+
+    const success_rate = total_items > 0 ? (healthy_items / total_items) * 100 : 0;
+
+    return {
+      total_items,
+      healthy_items,
+      warning_items,
+      error_items,
+      success_rate,
+      avg_sync_time: 0 // We don't have sync time data, so set to 0
+    };
+  }, [items]);
+
 
   const handleRefresh = () => {
     refetchItems();
   };
 
-  if (itemsLoading || metricsLoading) {
+  if (itemsLoading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center h-64">
@@ -285,7 +301,7 @@ export function PluggyStatusDashboard() {
             {items
               .filter(item => {
                 const status = item.execution_status || item.status;
-                return ['WAITING_USER_ACTION', 'OUTDATED'].includes(status);
+                return ['WAITING_USER_INPUT', 'OUTDATED'].includes(status);
               })
               .map((item) => (
                 <ItemStatusCard key={item.id} item={item} />
@@ -321,9 +337,9 @@ function ItemStatusCard({ item }: { item: PluggyItem }) {
           <div className="flex items-center space-x-4">
             {/* Bank Logo */}
             <div className="flex-shrink-0">
-              {item.connector.logo_url ? (
+              {item.connector.image_url ? (
                 <img 
-                  src={item.connector.logo_url} 
+                  src={item.connector.image_url} 
                   alt={item.connector.name}
                   className="w-12 h-12 rounded-lg object-contain"
                 />
@@ -337,7 +353,7 @@ function ItemStatusCard({ item }: { item: PluggyItem }) {
             {/* Bank Info */}
             <div className="flex-1">
               <div className="flex items-center space-x-2">
-                <h3 className="font-semibold">{item.connector.institutional_name}</h3>
+                <h3 className="font-semibold">{item.connector.name}</h3>
                 <Badge variant={getVariantFromColor(statusInfo.color)}>
                   <StatusIcon className="h-3 w-3 mr-1" />
                   {statusInfo.label}
@@ -353,12 +369,11 @@ function ItemStatusCard({ item }: { item: PluggyItem }) {
           {/* Stats */}
           <div className="text-right space-y-1">
             <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-              <span>{item.accounts_count} conta(s)</span>
-              <span>{item.transactions_count} transações</span>
+              <span>{item.accounts_count || 0} conta(s)</span>
             </div>
             <div className="text-xs text-muted-foreground">
-              {item.last_sync_at ? (
-                <span>Última sync: {formatDistanceToNow(new Date(item.last_sync_at), { 
+              {item.last_successful_update ? (
+                <span>Última sync: {formatDistanceToNow(new Date(item.last_successful_update), { 
                   addSuffix: true, 
                   locale: ptBR 
                 })}</span>
@@ -382,7 +397,7 @@ function ItemStatusCard({ item }: { item: PluggyItem }) {
             <Settings className="h-3 w-3 mr-1" />
             Configurar
           </Button>
-          {['WAITING_USER_ACTION', 'LOGIN_ERROR', 'INVALID_CREDENTIALS'].includes(item.execution_status || item.status) && (
+          {['WAITING_USER_INPUT', 'LOGIN_ERROR', 'INVALID_CREDENTIALS'].includes(item.execution_status || item.status) && (
             <Button size="sm">
               <Wifi className="h-3 w-3 mr-1" />
               Reconectar

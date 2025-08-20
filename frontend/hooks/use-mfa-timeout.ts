@@ -147,7 +147,7 @@ export function useMFATimeout(options: UseMFATimeoutOptions = {}) {
       // Start timeout for this item
       startMFATimeout(
         waitingItem.id || waitingItem.pluggy_item_id,
-        waitingItem.connector?.name || waitingItem.institution_name
+        waitingItem.connector?.name || 'Banco'
       );
     }
   }, [waitingItems, state.isActive, startMFATimeout, stopMFATimeout]);
