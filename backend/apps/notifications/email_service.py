@@ -252,18 +252,17 @@ def send_password_reset_email_task(user_id: int, reset_url: str):
 
 
 @shared_task
-# Email verification will be implemented in the future
-# def send_verification_email_task(user_id: int, verification_url: str):
-#     """Async task to send verification email"""
-#     from django.contrib.auth import get_user_model
-#     User = get_user_model()
-#     
-#     try:
-#         user = User.objects.get(id=user_id)
-#         return EmailService.send_verification_email(user, verification_url)
-#     except User.DoesNotExist:
-#         logger.error(f"User {user_id} not found for verification email")
-#         return False
+def send_verification_email_task(user_id: int, verification_url: str):
+    """Async task to send verification email"""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    
+    try:
+        user = User.objects.get(id=user_id)
+        return EmailService.send_verification_email(user, verification_url)
+    except User.DoesNotExist:
+        logger.error(f"User {user_id} not found for verification email")
+        return False
 
 @shared_task
 def send_welcome_email_task(user_id: int):
