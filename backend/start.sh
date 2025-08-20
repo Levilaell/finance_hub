@@ -33,6 +33,36 @@ for i in {1..30}; do
     sleep 1
 done
 
+# Fix migration dependencies first
+echo "🔧 Fixing migration dependencies..."
+python -c "
+import django
+django.setup()
+from django.db import connection
+from django.db.migrations.recorder import MigrationRecorder
+
+try:
+    recorder = MigrationRecorder(connection)
+    applied_migrations = set(recorder.applied_migrations())
+    
+    # Fix companies migration dependency issue
+    companies_0008 = ('companies', '0008_alter_resourceusage_options_and_more')
+    companies_0009 = ('companies', '0009_add_early_access')
+    
+    if companies_0009 in applied_migrations and companies_0008 not in applied_migrations:
+        print('⚠️  Found migration dependency issue, fixing...')
+        with connection.cursor() as cursor:
+            cursor.execute(\"SELECT column_name FROM information_schema.columns WHERE table_name = 'resourceusage'\")
+            columns = [row[0] for row in cursor.fetchall()]
+            if 'created_at' in columns and 'updated_at' in columns:
+                recorder.record_applied(companies_0008[0], companies_0008[1])
+                print('✅ Migration 0008 marked as applied')
+    
+    print('✅ Migration dependencies fixed')
+except Exception as e:
+    print(f'⚠️  Could not fix migration dependencies: {e}')
+" || echo "⚠️  Migration dependency fix failed"
+
 # Run migrations
 echo "🔄 Running migrations..."
 python manage.py migrate --no-input || echo "⚠️  Migration failed, check logs"
