@@ -109,6 +109,86 @@ class PaymentNotificationService:
             'timestamp': timezone.now().isoformat()
         })
     
+    def notify_trial_converted(self, company_id: int, conversion_data: Dict[str, Any]):
+        """Notify about successful trial to paid conversion"""
+        # Send WebSocket notification
+        self._send_to_company_group(company_id, {
+            'type': 'trial_converted',
+            'subscription_id': conversion_data.get('subscription_id'),
+            'plan_name': conversion_data.get('plan_name'),
+            'billing_period': conversion_data.get('billing_period'),
+            'converted_at': conversion_data.get('converted_at'),
+            'timestamp': timezone.now().isoformat()
+        })
+        
+        # Create celebration notification in database
+        try:
+            from apps.companies.models import Company
+            from apps.notifications.services import NotificationService
+            
+            company = Company.objects.get(id=company_id)
+            plan_name = conversion_data.get('plan_name', 'Unknown Plan')
+            
+            NotificationService.create_notification(
+                event_name='trial_converted',
+                company=company,
+                broadcast=True,
+                title="Welcome to Premium! 🎉",
+                message=f"Your trial has been successfully converted to {plan_name}. Thank you for choosing us!",
+                metadata=conversion_data,
+                is_critical=False  # Positive notification
+            )
+        except Exception as e:
+            logger.error(f"Failed to create trial conversion notification: {e}")
+    
+    def notify_payment_action_required(self, company, payment, invoice_url: Optional[str] = None):
+        """Notify about payment requiring additional action (3D Secure, etc)"""
+        company_id = company.id if hasattr(company, 'id') else company
+        
+        # Send WebSocket notification
+        self._send_to_company_group(company_id, {
+            'type': 'payment_action_required',
+            'payment_id': payment.id if hasattr(payment, 'id') else payment.get('id'),
+            'amount': str(payment.amount) if hasattr(payment, 'amount') else payment.get('amount'),
+            'currency': payment.currency if hasattr(payment, 'currency') else payment.get('currency'),
+            'invoice_url': invoice_url,
+            'requires_authentication': True,
+            'timestamp': timezone.now().isoformat()
+        })
+        
+        # Create urgent notification in database
+        try:
+            from apps.companies.models import Company
+            from apps.notifications.services import NotificationService
+            
+            if hasattr(company, 'id'):
+                company_obj = company
+            else:
+                company_obj = Company.objects.get(id=company_id)
+            
+            amount = payment.amount if hasattr(payment, 'amount') else payment.get('amount', 0)
+            currency = payment.currency if hasattr(payment, 'currency') else payment.get('currency', 'BRL')
+            
+            message = f"Payment of {currency} {amount} requires additional authentication. Please complete the verification process."
+            if invoice_url:
+                message += f" Click here to complete: {invoice_url}"
+            
+            NotificationService.create_notification(
+                event_name='payment_action_required',
+                company=company_obj,
+                broadcast=True,
+                title="Payment Authentication Required",
+                message=message,
+                metadata={
+                    'payment_id': payment.id if hasattr(payment, 'id') else payment.get('id'),
+                    'invoice_url': invoice_url,
+                    'requires_3ds': True
+                },
+                is_critical=True  # Requires user action
+            )
+        except Exception as e:
+            logger.error(f"Failed to create payment action required notification: {e}")
+    
     def notify_usage_limit_warning(self, company_id: int, usage_data: Dict[str, Any]):
         """Notify about approaching usage limits"""
         self._send_to_company_group(company_id, {
@@ -182,6 +262,8 @@ def notify_payment_event(event_type: str, company_id: int, data: Dict[str, Any])
         notification_service.notify_payment_method_updated(company_id, data)
     elif event_type == 'trial_ending':
         notification_service.notify_trial_ending(company_id, data)
+    elif event_type == 'trial_converted':
+        notification_service.notify_trial_converted(company_id, data)
     elif event_type == 'usage_limit_warning':
         notification_service.notify_usage_limit_warning(company_id, data)
     else:

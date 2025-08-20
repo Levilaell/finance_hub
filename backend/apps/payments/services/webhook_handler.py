@@ -1,4 +1,5 @@
 import logging
+import time
 from django.utils import timezone
 from django.db import transaction
 from decimal import Decimal
@@ -6,6 +7,7 @@ from .webhook_handlers_extended import ExtendedWebhookHandlers
 # from .webhook_handlers_production import ProductionWebhookHandlers  # TODO: Create this file
 from .notification_service import notification_service
 from .audit_service import PaymentAuditService
+from .webhook_monitoring_service import webhook_monitoring_service
 
 # Import secure logging and distributed locks
 from core.logging_utils import get_secure_logger, log_webhook_event, sanitize_stripe_event
@@ -46,7 +48,11 @@ class WebhookHandler:
             return self._process_webhook_event(event)
     
     def _process_webhook_event(self, event):
-        """Internal method to process webhook event"""
+        """Internal method to process webhook event with monitoring"""
+        start_time = time.time()
+        event_id = event.get('id', 'unknown')
+        event_type = event.get('type', 'unknown')
+        
         handlers = {
             # Core subscription events
             'checkout.session.completed': self._handle_checkout_completed,
@@ -105,14 +111,45 @@ class WebhookHandler:
         if handler:
             try:
                 with transaction.atomic():
-                    return handler(event)
+                    result = handler(event)
+                    
+                    # Record successful processing
+                    processing_time_ms = (time.time() - start_time) * 1000
+                    webhook_monitoring_service.record_webhook_success(
+                        event_id=event_id,
+                        event_type=event_type,
+                        processing_time_ms=processing_time_ms
+                    )
+                    
+                    return result
             except Exception as e:
-                logger.error(f"Webhook handler error for {event['type']}: {e}")
-                # Store failed webhook for retry
-                ExtendedWebhookHandlers.store_failed_webhook(event, str(e))
+                error_message = str(e)
+                logger.error(f"Webhook handler error for {event['type']}: {error_message}")
+                
+                # Record webhook failure
+                webhook_monitoring_service.record_webhook_failure(
+                    event_id=event_id,
+                    event_type=event_type,
+                    event_data=event,
+                    error_message=error_message,
+                    is_retryable=True  # Most webhook failures are retryable
+                )
+                
+                # Store failed webhook for retry (legacy support)
+                ExtendedWebhookHandlers.store_failed_webhook(event, error_message)
                 raise
         else:
             logger.info(f"Unhandled webhook event type: {event['type']}")
+            
+            # Record as non-retryable failure (unsupported event type)
+            webhook_monitoring_service.record_webhook_failure(
+                event_id=event_id,
+                event_type=event_type,
+                event_data=event,
+                error_message=f"Unhandled webhook event type: {event_type}",
+                is_retryable=False
+            )
+            
             return {'status': 'unhandled'}
     
     def _handle_subscription_created(self, event):
@@ -421,8 +458,9 @@ class WebhookHandler:
         return {'status': 'success'}
     
     def _handle_payment_failed(self, event):
-        """Handle failed payment"""
+        """Handle failed payment with intelligent retry logic"""
         from ..models import Subscription, Payment
+        from .payment_retry_service import payment_retry_service
         
         invoice = event['data']['object']
         subscription_id = invoice.get('subscription')
@@ -437,6 +475,16 @@ class WebhookHandler:
             subscription.status = 'past_due'
             subscription.save()
             
+            # Extract error information from invoice
+            error_code = 'generic_decline'
+            error_message = 'Payment failed'
+            
+            # Try to get more specific error from last payment error
+            if invoice.get('last_payment_error'):
+                error_data = invoice['last_payment_error']
+                error_code = error_data.get('decline_code') or error_data.get('code', 'generic_decline')
+                error_message = error_data.get('message', 'Payment failed')
+            
             # Record failed payment
             amount = Decimal(invoice['amount_due']) / 100
             payment = Payment.objects.create(
@@ -448,45 +496,57 @@ class WebhookHandler:
                 description=f"Failed payment - {subscription.plan.display_name}",
                 gateway='stripe',
                 stripe_invoice_id=invoice['id'],
-                metadata={'attempt_count': invoice.get('attempt_count', 1)}
+                metadata={
+                    'attempt_count': invoice.get('attempt_count', 1),
+                    'error_code': error_code,
+                    'error_message': error_message
+                }
             )
             
             # Log failed payment
             PaymentAuditService.log_payment_attempt(
                 payment,
-                error_message='Payment failed at gateway',
+                error_message=f'Payment failed: {error_message}',
                 metadata={
                     'source': 'invoice_webhook',
-                    'attempt_count': invoice.get('attempt_count', 1)
+                    'attempt_count': invoice.get('attempt_count', 1),
+                    'error_code': error_code
                 }
             )
             
-            # Send real-time notification
-            notification_service.notify_payment_failed(
-                subscription.company.id,
-                {
-                    'payment_id': payment.id,
-                    'reason': 'Payment failed - please update payment method',
-                    'retry_available': True
+            # Handle payment failure with retry logic
+            retry_result = payment_retry_service.handle_payment_failure(
+                payment=payment,
+                error_code=error_code,
+                error_message=error_message,
+                stripe_data={
+                    'invoice_id': invoice['id'],
+                    'subscription_id': subscription_id,
+                    'last_payment_error': invoice.get('last_payment_error')
                 }
             )
             
-            logger.warning(f"Payment failed for {subscription.company.name}")
-            return {'status': 'success'}
+            logger.warning(f"Payment failed for {subscription.company.name}: {retry_result}")
+            return {'status': 'success', 'retry_action': retry_result['action']}
             
         except Subscription.DoesNotExist:
+            logger.warning(f"Subscription not found for Stripe ID: {subscription_id}")
             return {'status': 'error', 'message': 'Subscription not found'}
     
     def _handle_subscription_updated(self, event):
-        """Handle subscription updates"""
+        """Handle subscription updates with special handling for trial→active transition"""
         from ..models import Subscription
         
         stripe_sub = event['data']['object']
+        previous_attributes = event.get('data', {}).get('previous_attributes', {})
         
         try:
             subscription = Subscription.objects.get(
                 stripe_subscription_id=stripe_sub['id']
             )
+            
+            # Store previous status for transition detection
+            previous_status = subscription.status
             
             # Update status
             status_map = {
@@ -497,32 +557,105 @@ class WebhookHandler:
                 'unpaid': 'past_due'
             }
             
-            subscription.status = status_map.get(stripe_sub['status'], 'expired')
+            new_status = status_map.get(stripe_sub['status'], 'expired')
+            
+            # Detect trial to active transition
+            is_trial_to_active = (
+                previous_status == 'trial' and 
+                new_status == 'active' and
+                previous_attributes.get('status') == 'trialing'
+            )
+            
+            # Update subscription fields
+            subscription.status = new_status
+            subscription.current_period_start = timezone.datetime.fromtimestamp(
+                stripe_sub['current_period_start'], tz=timezone.utc
+            )
             subscription.current_period_end = timezone.datetime.fromtimestamp(
                 stripe_sub['current_period_end'], tz=timezone.utc
             )
             
+            # Handle trial end
+            if stripe_sub.get('trial_end') and not subscription.trial_ends_at:
+                subscription.trial_ends_at = timezone.datetime.fromtimestamp(
+                    stripe_sub['trial_end'], tz=timezone.utc
+                )
+            
             if stripe_sub.get('cancel_at_period_end'):
                 subscription.cancelled_at = timezone.now()
+            else:
+                subscription.cancelled_at = None  # Clear if reactivated
             
             subscription.save()
             
-            # Log subscription status change
-            PaymentAuditService.log_payment_action(
-                action='subscription_updated',
-                company=subscription.company,
-                subscription_id=subscription.id,
-                metadata={
-                    'status': subscription.status,
-                    'cancel_at_period_end': stripe_sub.get('cancel_at_period_end', False),
-                    'source': 'subscription_webhook'
-                }
-            )
+            # Log subscription status change with enhanced metadata
+            metadata = {
+                'status': new_status,
+                'previous_status': previous_status,
+                'cancel_at_period_end': stripe_sub.get('cancel_at_period_end', False),
+                'source': 'subscription_webhook',
+                'stripe_status': stripe_sub['status']
+            }
             
-            logger.info(f"Subscription updated for {subscription.company.name}")
-            return {'status': 'success'}
+            # Add trial conversion metadata
+            if is_trial_to_active:
+                metadata.update({
+                    'trial_converted': True,
+                    'trial_ended_at': subscription.trial_ends_at.isoformat() if subscription.trial_ends_at else None,
+                    'plan_name': subscription.plan.name if subscription.plan else None,
+                    'billing_period': subscription.billing_period
+                })
+                
+                # Log specific trial conversion event
+                PaymentAuditService.log_payment_action(
+                    action='trial_converted_to_active',
+                    company=subscription.company,
+                    subscription_id=subscription.id,
+                    metadata=metadata
+                )
+                
+                # Send notification for trial conversion
+                notification_service.notify_trial_converted(
+                    subscription.company.id,
+                    {
+                        'subscription_id': subscription.id,
+                        'plan_name': subscription.plan.name if subscription.plan else 'Unknown',
+                        'billing_period': subscription.billing_period,
+                        'converted_at': timezone.now().isoformat()
+                    }
+                )
+                
+                logger.info(f"Trial converted to active subscription for {subscription.company.name}")
+            else:
+                # Regular subscription update
+                PaymentAuditService.log_payment_action(
+                    action='subscription_updated',
+                    company=subscription.company,
+                    subscription_id=subscription.id,
+                    metadata=metadata
+                )
+                
+                logger.info(f"Subscription updated for {subscription.company.name}: {previous_status} → {new_status}")
+            
+            # Send real-time notification for status changes
+            if previous_status != new_status:
+                notification_service.notify_subscription_updated(
+                    subscription.company.id,
+                    {
+                        'subscription_id': subscription.id,
+                        'status': new_status,
+                        'previous_status': previous_status,
+                        'changes': {
+                            'status_changed': True,
+                            'trial_converted': is_trial_to_active
+                        }
+                    }
+                )
+            
+            return {'status': 'success', 'trial_converted': is_trial_to_active}
             
         except Subscription.DoesNotExist:
+            logger.warning(f"Subscription not found for Stripe ID: {stripe_sub['id']}")
             return {'status': 'error', 'message': 'Subscription not found'}
     
     def _handle_subscription_deleted(self, event):

@@ -346,3 +346,62 @@ class CreditTransaction(models.Model):
         return self.credits < 0
 
 
+class PaymentRetry(models.Model):
+    """Track payment retry attempts with intelligent backoff"""
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('completed', 'Completed'),
+        ('exhausted', 'Exhausted'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    payment = models.OneToOneField(
+        Payment,
+        on_delete=models.CASCADE,
+        related_name='retry_record'
+    )
+    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    attempt_count = models.IntegerField(default=0)
+    
+    # Error tracking
+    last_error_code = models.CharField(max_length=100, blank=True)
+    last_error_message = models.TextField(blank=True)
+    
+    # Timing
+    next_retry_at = models.DateTimeField(null=True, blank=True)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    
+    # Metadata
+    stripe_data = models.JSONField(default=dict, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'next_retry_at']),
+            models.Index(fields=['payment', 'status']),
+            models.Index(fields=['next_retry_at']),
+        ]
+    
+    def __str__(self):
+        return f"Retry for Payment {self.payment.id} - {self.status} (attempt {self.attempt_count})"
+    
+    @property
+    def is_active(self):
+        """Check if this retry record is still active"""
+        return self.status == 'active'
+    
+    @property
+    def can_retry(self):
+        """Check if more retries are possible"""
+        from .services.payment_retry_service import PaymentRetryService
+        service = PaymentRetryService()
+        return service._can_retry(self)
+
+

@@ -10,6 +10,7 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 from apps.banking.utils.encryption import banking_encryption
+from apps.banking.utils.rate_limiter import get_pluggy_rate_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,11 @@ class PluggyClient:
         # Configurable timeout with 30s default
         self.timeout = getattr(settings, 'PLUGGY_API_TIMEOUT', 30)
         
+        # Initialize rate limiter for this client
+        self.rate_limiter = get_pluggy_rate_limiter(self.client_id)
+        
         # Log configuration for debugging
-        logger.info(f"Pluggy Client initialized - Base URL: {self.base_url}, Sandbox: {self.use_sandbox}")
+        logger.info(f"Pluggy Client initialized - Base URL: {self.base_url}, Sandbox: {self.use_sandbox}, Rate limiting: enabled")
         
     def __enter__(self):
         """Context manager entry"""
@@ -99,11 +103,18 @@ class PluggyClient:
         method: str, 
         endpoint: str, 
         data: Optional[Dict] = None,
-        params: Optional[Dict] = None
+        params: Optional[Dict] = None,
+        timeout_override: Optional[float] = None
     ) -> Dict[str, Any]:
         """
-        Make authenticated request to Pluggy API
+        Make authenticated request to Pluggy API with rate limiting
         """
+        # Apply rate limiting - wait up to 10 seconds for token
+        rate_limit_timeout = timeout_override or 10.0
+        if not self.rate_limiter.acquire(timeout=rate_limit_timeout):
+            logger.error(f"Rate limit exceeded for Pluggy API: {method} {endpoint}")
+            raise PluggyError("Rate limit exceeded. Please try again later.")
+        
         if not self.api_key:
             self.api_key = self._get_api_key()
             
@@ -124,6 +135,29 @@ class PluggyClient:
                 timeout=self.timeout
             )
             
+            # Handle 429 - Rate limited by API
+            if response.status_code == 429:
+                retry_after = response.headers.get('Retry-After', '1')
+                wait_time = float(retry_after)
+                logger.warning(f"API rate limited, waiting {wait_time}s before retry")
+                
+                # Wait and retry once
+                import time
+                time.sleep(wait_time)
+                
+                # Acquire another rate limit token for retry
+                if self.rate_limiter.acquire(timeout=rate_limit_timeout):
+                    response = requests.request(
+                        method=method,
+                        url=url,
+                        headers=headers,
+                        json=data,
+                        params=params,
+                        timeout=self.timeout
+                    )
+                else:
+                    raise PluggyError("Rate limit exceeded on retry")
+            
             # Handle 401 - token might be expired
             if response.status_code == 401:
                 logger.info("API key expired, refreshing...")
@@ -131,18 +165,29 @@ class PluggyClient:
                 cache.delete(cache_key)  # Delete encrypted cache
                 self.api_key = self._get_api_key()
                 
-                # Retry request
+                # Retry request with new token
                 headers["X-API-KEY"] = self.api_key
-                response = requests.request(
-                    method=method,
-                    url=url,
-                    headers=headers,
-                    json=data,
-                    params=params,
-                    timeout=self.timeout
-                )
+                
+                # Acquire another rate limit token for retry
+                if self.rate_limiter.acquire(timeout=rate_limit_timeout):
+                    response = requests.request(
+                        method=method,
+                        url=url,
+                        headers=headers,
+                        json=data,
+                        params=params,
+                        timeout=self.timeout
+                    )
+                else:
+                    raise PluggyError("Rate limit exceeded on auth retry")
             
             response.raise_for_status()
+            
+            # Log rate limiter status periodically for monitoring
+            status = self.rate_limiter.get_status()
+            if status['tokens_percentage'] < 20:  # Less than 20% tokens remaining
+                logger.debug(f"Rate limiter status: {status['current_tokens']}/{status['max_requests']} tokens")
+            
             return response.json() if response.text else {}
             
         except requests.exceptions.RequestException as e:
@@ -431,3 +476,14 @@ class PluggyClient:
         except Exception as e:
             logger.error(f"Error validating webhook signature: {e}")
             return False
+    
+    # ===== Rate Limiting Status =====
+    
+    def get_rate_limit_status(self) -> dict:
+        """
+        Get current rate limiting status for monitoring
+        
+        Returns:
+            Dict with rate limiting status information
+        """
+        return self.rate_limiter.get_status()

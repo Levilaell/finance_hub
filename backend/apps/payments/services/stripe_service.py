@@ -793,3 +793,190 @@ class StripeService:
         except stripe.error.StripeError as e:
             logger.error(f"Failed to calculate proration: {e}")
             raise
+    
+    # ========== Payment Retry Methods ==========
+    
+    def retry_subscription_payment(self, subscription_id: str) -> Dict[str, Any]:
+        """
+        Retry a failed subscription payment
+        
+        Args:
+            subscription_id: Stripe subscription ID
+            
+        Returns:
+            Dict with retry result
+        """
+        try:
+            # Get the latest invoice for this subscription
+            invoices = self.stripe.Invoice.list(
+                subscription=subscription_id,
+                status='open',
+                limit=1
+            )
+            
+            if not invoices.data:
+                return {
+                    'success': False,
+                    'error_code': 'no_open_invoice',
+                    'error_message': 'No open invoice found for subscription'
+                }
+            
+            invoice = invoices.data[0]
+            
+            # Attempt to pay the invoice
+            paid_invoice = self.stripe.Invoice.pay(
+                invoice.id,
+                expand=['payment_intent']
+            )
+            
+            if paid_invoice.status == 'paid':
+                logger.info(f"Successfully retried payment for subscription {subscription_id}")
+                return {
+                    'success': True,
+                    'invoice_id': paid_invoice.id,
+                    'payment_intent_id': paid_invoice.payment_intent.id if paid_invoice.payment_intent else None
+                }
+            else:
+                # Payment still failed
+                error_message = 'Payment retry failed'
+                error_code = 'payment_failed'
+                
+                if paid_invoice.payment_intent and paid_invoice.payment_intent.last_payment_error:
+                    error_data = paid_invoice.payment_intent.last_payment_error
+                    error_code = error_data.decline_code or error_data.code
+                    error_message = error_data.message
+                
+                return {
+                    'success': False,
+                    'error_code': error_code,
+                    'error_message': error_message,
+                    'stripe_data': {
+                        'invoice_id': paid_invoice.id,
+                        'payment_intent_id': paid_invoice.payment_intent.id if paid_invoice.payment_intent else None,
+                        'last_payment_error': paid_invoice.payment_intent.last_payment_error if paid_invoice.payment_intent else None
+                    }
+                }
+                
+        except stripe.error.CardError as e:
+            # Card was declined
+            return {
+                'success': False,
+                'error_code': e.decline_code or e.code,
+                'error_message': e.user_message or str(e),
+                'stripe_data': {'stripe_error_type': 'card_error'}
+            }
+        except stripe.error.StripeError as e:
+            logger.error(f"Stripe error during payment retry: {e}")
+            return {
+                'success': False,
+                'error_code': 'stripe_error',
+                'error_message': str(e),
+                'stripe_data': {'stripe_error_type': type(e).__name__}
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error during payment retry: {e}")
+            return {
+                'success': False,
+                'error_code': 'unexpected_error',
+                'error_message': str(e)
+            }
+    
+    def retry_payment_intent(self, payment_intent_id: str, amount: Decimal, currency: str) -> Dict[str, Any]:
+        """
+        Retry a failed one-time payment by creating a new payment intent
+        
+        Args:
+            payment_intent_id: Original payment intent ID
+            amount: Payment amount
+            currency: Payment currency
+            
+        Returns:
+            Dict with retry result
+        """
+        try:
+            # Get the original payment intent to copy customer and payment method
+            original_pi = self.stripe.PaymentIntent.retrieve(payment_intent_id)
+            
+            if not original_pi.customer:
+                return {
+                    'success': False,
+                    'error_code': 'no_customer',
+                    'error_message': 'Original payment intent has no customer'
+                }
+            
+            # Create new payment intent
+            new_pi = self.stripe.PaymentIntent.create(
+                amount=int(amount * 100),  # Convert to cents
+                currency=currency.lower(),
+                customer=original_pi.customer,
+                payment_method=original_pi.payment_method,
+                confirm=True,
+                return_url=original_pi.metadata.get('return_url') if original_pi.metadata else None,
+                metadata={
+                    'retry_of': payment_intent_id,
+                    'retry_attempt': 'true'
+                }
+            )
+            
+            if new_pi.status == 'succeeded':
+                logger.info(f"Successfully retried payment intent {payment_intent_id}")
+                return {
+                    'success': True,
+                    'payment_intent_id': new_pi.id,
+                    'amount': Decimal(new_pi.amount) / 100
+                }
+            elif new_pi.status == 'requires_action':
+                # Requires additional authentication
+                return {
+                    'success': False,
+                    'error_code': 'authentication_required',
+                    'error_message': 'Payment requires additional authentication',
+                    'stripe_data': {
+                        'payment_intent_id': new_pi.id,
+                        'client_secret': new_pi.client_secret,
+                        'requires_action': True
+                    }
+                }
+            else:
+                # Payment failed
+                error_message = 'Payment retry failed'
+                error_code = 'payment_failed'
+                
+                if new_pi.last_payment_error:
+                    error_data = new_pi.last_payment_error
+                    error_code = error_data.decline_code or error_data.code
+                    error_message = error_data.message
+                
+                return {
+                    'success': False,
+                    'error_code': error_code,
+                    'error_message': error_message,
+                    'stripe_data': {
+                        'payment_intent_id': new_pi.id,
+                        'last_payment_error': new_pi.last_payment_error
+                    }
+                }
+                
+        except stripe.error.CardError as e:
+            # Card was declined
+            return {
+                'success': False,
+                'error_code': e.decline_code or e.code,
+                'error_message': e.user_message or str(e),
+                'stripe_data': {'stripe_error_type': 'card_error'}
+            }
+        except stripe.error.StripeError as e:
+            logger.error(f"Stripe error during payment intent retry: {e}")
+            return {
+                'success': False,
+                'error_code': 'stripe_error',
+                'error_message': str(e),
+                'stripe_data': {'stripe_error_type': type(e).__name__}
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error during payment intent retry: {e}")
+            return {
+                'success': False,
+                'error_code': 'unexpected_error',
+                'error_message': str(e)
+            }
