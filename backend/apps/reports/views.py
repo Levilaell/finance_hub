@@ -638,7 +638,10 @@ class QuickReportsView(APIView):
             )
             
             # Generate asynchronously
-            generate_report_async.delay(report.id)
+            try:
+                generate_report_async.delay(report.id)
+            except Exception as celery_error:
+                logger.warning(f"Could not queue quick report generation: {celery_error}")
         
         logger.info(f"Quick report {report_id} queued for user {request.user.id}")
         

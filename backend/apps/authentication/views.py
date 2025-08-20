@@ -118,9 +118,14 @@ class RegisterView(generics.CreateAPIView):
         # Send verification email
         from apps.notifications.email_service import send_verification_email_task
         from django.conf import settings
+        import logging
+        logger = logging.getLogger(__name__)
         
         verification_url = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
-        send_verification_email_task.delay(user.id, verification_url)
+        try:
+            send_verification_email_task.delay(user.id, verification_url)
+        except Exception as e:
+            logger.warning(f"Could not queue verification email task: {e}")
         
         # Log account creation
         log_security_event(
@@ -416,9 +421,14 @@ class PasswordResetRequestView(APIView):
         # Send password reset email
         from apps.notifications.email_service import send_password_reset_email_task
         from django.conf import settings
+        import logging
+        logger = logging.getLogger(__name__)
         
         reset_url = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
-        send_password_reset_email_task.delay(user.id, reset_url)
+        try:
+            send_password_reset_email_task.delay(user.id, reset_url)
+        except Exception as e:
+            logger.warning(f"Could not queue password reset email task: {e}")
         
         return Response({
             'message': 'Link de redefinição de senha foi enviado para seu e-mail.'
@@ -528,9 +538,14 @@ class ResendVerificationView(APIView):
         # Send verification email  
         from apps.notifications.email_service import send_verification_email_task
         from django.conf import settings
+        import logging
+        logger = logging.getLogger(__name__)
         
         verification_url = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
-        send_verification_email_task.delay(user.id, verification_url)
+        try:
+            send_verification_email_task.delay(user.id, verification_url)
+        except Exception as e:
+            logger.warning(f"Could not queue verification email task: {e}")
         
         return Response({
             'message': 'E-mail de verificação foi enviado.'
