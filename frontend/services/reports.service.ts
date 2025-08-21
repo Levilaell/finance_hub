@@ -67,7 +67,7 @@ export const reportsService = {
         include_charts: true,
         detailed_breakdown: true,
       },
-      filters: parameters.filters || {},
+      filters: parameters.filters || { generated_via: 'frontend_service' },
     };
 
     try {

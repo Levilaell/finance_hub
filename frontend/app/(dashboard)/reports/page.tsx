@@ -316,7 +316,7 @@ function ReportsPageContent() {
       category_ids: selectedCategories.length > 0 ? selectedCategories : undefined,
       title: `${REPORT_TYPES.find(t => t.value === reportType)?.label} - ${formatDate(selectedPeriod.start_date)} a ${formatDate(selectedPeriod.end_date)}`,
       description: `Relatório gerado via interface web`,
-      filters: {},
+      filters: { report_type: reportType, generated_via: 'web_interface' },
     };
 
     console.log('📋 Parâmetros do relatório:', parameters);
