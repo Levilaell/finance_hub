@@ -83,7 +83,7 @@ def sync_bank_account(self, item_id: str, account_id: Optional[str] = None, forc
             item.status = item_data['status']
             item.execution_status = item_data.get('executionStatus', '')
             item.pluggy_updated_at = item_data['updatedAt']
-            item.status_detail = item_data.get('statusDetail', {})
+            item.status_detail = item_data.get('statusDetail') or {}
             
             if item_data.get('error'):
                 item.error_code = item_data['error'].get('code', '')

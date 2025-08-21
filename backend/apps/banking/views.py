@@ -993,7 +993,7 @@ class PluggyCallbackView(APIView):
                             'execution_status': item_data.get('executionStatus', ''),
                             'pluggy_created_at': item_data['createdAt'],
                             'pluggy_updated_at': item_data['updatedAt'],
-                            'status_detail': item_data.get('statusDetail', {}),
+                            'status_detail': item_data.get('statusDetail') or {},
                             'error_code': item_data.get('error', {}).get('code', '') if item_data.get('error') else '',
                             'error_message': item_data.get('error', {}).get('message', '') if item_data.get('error') else ''
                         }
