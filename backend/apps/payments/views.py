@@ -28,6 +28,25 @@ from .services.customer_portal_service import CustomerPortalService
 from .services.error_handler import ErrorHandler, payment_error_handler
 from .services.health_check import get_health_status
 from .services.monitoring_service import MonitoringService
+
+
+def get_user_company(user):
+    """
+    Get the company for a user. 
+    
+    Note: This fixes the missing current_company property that was being used
+    throughout the payment views but doesn't exist in the User model.
+    """
+    try:
+        from apps.companies.models import Company
+        return Company.objects.get(owner=user)
+    except Company.DoesNotExist:
+        return None
+    except Company.MultipleObjectsReturned:
+        # If user owns multiple companies, get the first one
+        # TODO: Add proper current_company selection logic
+        from apps.companies.models import Company
+        return Company.objects.filter(owner=user).first()
 from .exceptions import (
     PaymentException, StripeException, PaymentMethodRequiredException,
     SubscriptionNotActiveException, SubscriptionLimitExceededException,
@@ -54,7 +73,7 @@ class SubscriptionStatusView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        company = request.user.current_company
+        company = get_user_company(request.user)
         if not company:
             raise PaymentException(
                 message='No active company found',
@@ -74,7 +93,7 @@ class CreateCheckoutSessionView(APIView):
         serializer = CreateCheckoutSessionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        company = request.user.current_company
+        company = get_user_company(request.user)
         if not company:
             raise PaymentException(
                 message='No active company found',
@@ -138,7 +157,7 @@ class ValidatePaymentView(APIView):
         serializer = ValidatePaymentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        company = request.user.current_company
+        company = get_user_company(request.user)
         if not company:
             raise PaymentException(
                 message='No active company found',
@@ -171,7 +190,7 @@ class PaymentMethodListCreateView(generics.ListCreateAPIView):
     
     def get_queryset(self):
         return PaymentMethod.objects.filter(
-            company=self.request.user.current_company
+            company=get_user_company(self.request.user)
         )
     
     def get_serializer_class(self):
@@ -180,7 +199,7 @@ class PaymentMethodListCreateView(generics.ListCreateAPIView):
         return PaymentMethodSerializer
     
     def perform_create(self, serializer):
-        company = self.request.user.current_company
+        company = get_user_company(self.request.user)
         if not company:
             raise ValueError("No active company")
         
@@ -227,7 +246,7 @@ class PaymentMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
     
     def get_queryset(self):
         return PaymentMethod.objects.filter(
-            company=self.request.user.current_company
+            company=get_user_company(self.request.user)
         ).select_related('company').order_by('-is_default', '-created_at')
     
     def perform_update(self, serializer):
@@ -252,7 +271,7 @@ class PaymentHistoryView(generics.ListAPIView):
     
     def get_queryset(self):
         return Payment.objects.filter(
-            company=self.request.user.current_company,
+            company=get_user_company(self.request.user),
             status='succeeded'
         ).select_related('payment_method', 'subscription', 'company').order_by('-created_at')
 
@@ -262,7 +281,7 @@ class CancelSubscriptionView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
-        company = request.user.current_company
+        company = get_user_company(request.user)
         if not company:
             raise PaymentException(
                 message='No active company found',
@@ -453,7 +472,7 @@ class CustomerPortalView(APIView):
     
     def post(self, request):
         """Create portal session for billing management"""
-        company = request.user.current_company
+        company = get_user_company(request.user)
         if not company:
             raise PaymentException(
                 message='No active company found',
@@ -535,7 +554,7 @@ class CustomerPortalLinksView(APIView):
     
     def get(self, request):
         """Get all available portal links"""
-        company = request.user.current_company
+        company = get_user_company(request.user)
         if not company:
             raise PaymentException(
                 message='No active company found',

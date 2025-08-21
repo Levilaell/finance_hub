@@ -13,6 +13,25 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def get_user_company(user):
+    """
+    Get the company for a user. 
+    
+    Note: This fixes the missing current_company property that was being used
+    throughout the payment views but doesn't exist in the User model.
+    """
+    try:
+        from apps.companies.models import Company
+        return Company.objects.get(owner=user)
+    except Company.DoesNotExist:
+        return None
+    except Company.MultipleObjectsReturned:
+        # If user owns multiple companies, get the first one
+        # TODO: Add proper current_company selection logic
+        from apps.companies.models import Company
+        return Company.objects.filter(owner=user).first()
+
+
 class ChangePlanSerializer(serializers.Serializer):
     """Serializer for plan change requests"""
     plan_id = serializers.IntegerField()
@@ -48,7 +67,7 @@ class SubscriptionChangePlanView(APIView):
         serializer = ChangePlanSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        company = request.user.current_company
+        company = get_user_company(request.user)
         if not company:
             raise PaymentException(
                 message='No active company found',
@@ -113,7 +132,7 @@ class SubscriptionProrationView(APIView):
         serializer = CalculateProrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        company = request.user.current_company
+        company = get_user_company(request.user)
         if not company:
             raise PaymentException(
                 message='No active company found',
@@ -182,7 +201,7 @@ class SubscriptionUsageLimitsView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        company = request.user.current_company
+        company = get_user_company(request.user)
         if not company:
             raise PaymentException(
                 message='No active company found',

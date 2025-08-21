@@ -390,8 +390,17 @@ def payment_error_handler(func):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            # Get request object
-            request = args[0] if args else None
+            # Get request object - handle both function-based and class-based views
+            request = None
+            if args:
+                # For function-based views: args[0] is request
+                # For class-based views: args[0] is self, args[1] is request
+                if len(args) >= 2 and hasattr(args[0], '__class__') and hasattr(args[1], 'method'):
+                    # Likely a class-based view (APIView)
+                    request = args[1]
+                elif len(args) >= 1 and hasattr(args[0], 'method'):
+                    # Likely a function-based view
+                    request = args[0]
             
             # Handle the error
             error = ErrorHandler.handle_exception(e)
@@ -401,10 +410,10 @@ def payment_error_handler(func):
                 error,
                 context={
                     'view': func.__name__,
-                    'method': getattr(request, 'method', 'Unknown'),
-                    'path': getattr(request, 'path', 'Unknown'),
+                    'method': getattr(request, 'method', 'Unknown') if request else 'Unknown',
+                    'path': getattr(request, 'path', 'Unknown') if request else 'Unknown',
                 },
-                user_id=getattr(request.user, 'id', None) if request else None
+                user_id=getattr(getattr(request, 'user', None), 'id', None) if request and hasattr(request, 'user') else None
             )
             
             # Return error response

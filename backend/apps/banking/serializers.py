@@ -294,23 +294,6 @@ class DashboardDataSerializer(serializers.Serializer):
     )
 
 
-class WebhookEventSerializer(serializers.Serializer):
-    """Serializer for webhook events"""
-    event = serializers.CharField()
-    data = serializers.DictField()
-    
-    def validate_event(self, value):
-        """Validate event type"""
-        valid_events = [
-            'item.created', 'item.updated', 'item.error', 'item.deleted',
-            'item.login_succeeded', 'item.waiting_user_input',
-            'transactions.created', 'transactions.updated', 'transactions.deleted',
-            'consent.created', 'consent.updated', 'consent.revoked'
-        ]
-        if value not in valid_events:
-            raise serializers.ValidationError(f'Invalid event type: {value}')
-        return value
-    
 class MFASerializer(serializers.Serializer):
     """Serializer for MFA parameters"""
     # Campos genéricos para diferentes tipos de MFA

@@ -31,7 +31,7 @@ from .serializers import (
     PluggyConnectTokenSerializer, PluggyCallbackSerializer,
     AccountSyncSerializer, BulkCategorizeSerializer,
     TransactionFilterSerializer, DashboardDataSerializer,
-    WebhookEventSerializer, DashboardTransactionSerializer
+    DashboardTransactionSerializer
 )
 from .integrations.pluggy.client import PluggyClient, PluggyError
 from .tasks import sync_bank_account, process_webhook_event
@@ -1260,51 +1260,6 @@ class DashboardView(APIView):
         
         return Response(data)
 
-
-@method_decorator(csrf_exempt, name='dispatch')
-class PluggyWebhookView(APIView):
-    """
-    Handle Pluggy webhooks
-    """
-    permission_classes = []  # Webhooks come from Pluggy, not authenticated users
-    authentication_classes = []
-    
-    def post(self, request):
-        """Process webhook event"""
-        signature = request.headers.get('X-Pluggy-Signature', '')
-        
-        try:
-            # Validate webhook signature
-            with PluggyClient() as client:
-                if not client.validate_webhook_signature(signature, request.body):
-                    logger.warning("Invalid webhook signature or payload")
-                    return Response(
-                        {'error': 'Invalid signature'},
-                        status=status.HTTP_401_UNAUTHORIZED
-                    )
-            
-            # Parse event
-            serializer = WebhookEventSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            
-            event_type = serializer.validated_data['event']
-            event_data = serializer.validated_data['data']
-            
-            # Queue processing
-            try:
-                process_webhook_event.delay(event_type, event_data)
-            except Exception as celery_error:
-                logger.warning(f"Could not queue webhook processing: {celery_error}")
-                # Continue - webhook received successfully even if processing is delayed
-            
-            return Response({'status': 'ok'})
-            
-        except Exception as e:
-            logger.error(f"Webhook processing error: {e}")
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 
 
 class CeleryHealthCheckView(APIView):
