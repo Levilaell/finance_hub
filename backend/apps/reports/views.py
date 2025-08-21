@@ -335,8 +335,22 @@ class ReportTemplateViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Get templates with proper filtering"""
+        user = self.request.user
+        
+        # Handle users without company
+        if not hasattr(user, 'company') or user.company is None:
+            # Return only public templates for users without company
+            return ReportTemplate.objects.filter(
+                is_public=True,
+                is_active=True
+            ).select_related(
+                'company',
+                'created_by'
+            ).order_by('name')
+        
+        # Normal filtering for users with company
         return ReportTemplate.objects.filter(
-            Q(company=self.request.user.company) | Q(is_public=True),
+            Q(company=user.company) | Q(is_public=True),
             is_active=True
         ).select_related(
             'company',

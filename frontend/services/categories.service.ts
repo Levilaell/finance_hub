@@ -25,11 +25,11 @@ class CategoriesService {
 
   // Category Rules
   async getRules(): Promise<CategoryRule[] | any> {
-    return apiClient.get<CategoryRule[] | any>("/api/categories/rules/");
+    return apiClient.get<CategoryRule[] | any>("/api/banking/categories/rules/");
   }
 
   async getRule(id: string): Promise<CategoryRule> {
-    return apiClient.get<CategoryRule>(`/api/categories/rules/${id}/`);
+    return apiClient.get<CategoryRule>(`/api/banking/categories/rules/${id}/`);
   }
 
   async createRule(data: {
@@ -39,18 +39,18 @@ class CategoriesService {
     value: string;
     priority?: number;
   }): Promise<CategoryRule> {
-    return apiClient.post<CategoryRule>("/api/categories/rules/", data);
+    return apiClient.post<CategoryRule>("/api/banking/categories/rules/", data);
   }
 
   async updateRule(
     id: string,
     data: Partial<CategoryRule>
   ): Promise<CategoryRule> {
-    return apiClient.patch<CategoryRule>(`/api/categories/rules/${id}/`, data);
+    return apiClient.patch<CategoryRule>(`/api/banking/categories/rules/${id}/`, data);
   }
 
   async deleteRule(id: string): Promise<void> {
-    return apiClient.delete(`/api/categories/rules/${id}/`);
+    return apiClient.delete(`/api/banking/categories/rules/${id}/`);
   }
 
   async testRule(data: {
@@ -59,14 +59,14 @@ class CategoriesService {
     value: string;
     test_string: string;
   }): Promise<{ matches: boolean }> {
-    return apiClient.post("/api/categories/rules/test/", data);
+    return apiClient.post("/api/banking/categories/rules/test/", data);
   }
 
   async applyRules(transactionIds?: string[]): Promise<{
     categorized: number;
     errors: string[];
   }> {
-    return apiClient.post("/api/categories/bulk/", {
+    return apiClient.post("/api/banking/categories/bulk/", {
       operation: "categorize_uncategorized",
       limit: transactionIds ? transactionIds.length : 100,
       transaction_ids: transactionIds,
