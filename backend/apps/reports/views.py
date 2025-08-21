@@ -55,8 +55,16 @@ class ReportViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Optimized queryset with proper select_related and prefetch_related"""
+        user = self.request.user
+        
+        # Handle users without company
+        if not hasattr(user, 'company') or user.company is None:
+            # Return empty queryset for users without company
+            # Reports are always company-specific, unlike templates which can be public
+            return Report.objects.none()
+        
         return Report.objects.filter(
-            company=self.request.user.company
+            company=user.company
         ).select_related(
             'created_by',
             'company',
@@ -66,6 +74,12 @@ class ReportViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         """Create report with async generation and validation"""
         logger.info(f"Report creation request from user {request.user.id}")
+        
+        # Check if user has a company
+        if not hasattr(request.user, 'company') or request.user.company is None:
+            return Response({
+                'error': 'You must have a company associated to create reports'
+            }, status=status.HTTP_403_FORBIDDEN)
         
         # Extract and validate data
         report_type = request.data.get('report_type')
@@ -201,6 +215,16 @@ class ReportViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def summary(self, request):
         """Get reports summary with caching"""
+        # Check if user has a company
+        if not hasattr(request.user, 'company') or request.user.company is None:
+            return Response({
+                'total_reports': 0,
+                'reports_generated': 0,
+                'pending_reports': 0,
+                'failed_reports': 0,
+                'recent_reports': []
+            })
+        
         company = request.user.company
         cache_key = f'report_summary_{company.id}'
         
