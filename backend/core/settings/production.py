@@ -204,8 +204,7 @@ else:
     DEFAULT_FROM_EMAIL = 'noreply@caixahub.com.br'
     SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
-# Frontend URL
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://finance-frontend-production-24be.up.railway.app')
+# Frontend URL (updated above with JWT cookie configuration)
 
 # OpenAI API
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
@@ -382,6 +381,50 @@ if os.environ.get('RAILWAY_ENVIRONMENT'):
     # Trust Railway's proxy headers
     USE_X_FORWARDED_HOST = True
     USE_X_FORWARDED_PORT = True
+
+# ===== JWT COOKIE CONFIGURATION FOR CROSS-ORIGIN =====
+# Configure JWT cookies for cross-origin requests in production
+# Frontend and backend are on different Railway subdomains
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://financehub-frontend-production.up.railway.app')
+BACKEND_URL = os.environ.get('BACKEND_URL', 'https://financehub-production.up.railway.app')
+
+# Check if frontend and backend are on different domains
+from urllib.parse import urlparse
+try:
+    frontend_domain = urlparse(FRONTEND_URL).netloc
+    backend_domain = urlparse(BACKEND_URL).netloc
+    is_cross_origin = frontend_domain != backend_domain
+    
+    if is_cross_origin:
+        # Cross-origin setup requires SameSite=None and Secure=True
+        JWT_COOKIE_SAMESITE = 'None'
+        JWT_COOKIE_SECURE = True
+        JWT_COOKIE_DOMAIN = None  # Let browser handle domain
+        
+        print(f"✅ Cross-origin JWT cookies configured:")
+        print(f"   Frontend: {frontend_domain}")
+        print(f"   Backend: {backend_domain}")
+        print(f"   SameSite: None, Secure: True")
+    else:
+        # Same-origin setup can use more restrictive settings
+        JWT_COOKIE_SAMESITE = 'Lax'
+        JWT_COOKIE_SECURE = True
+        JWT_COOKIE_DOMAIN = None
+        
+        print(f"✅ Same-origin JWT cookies configured:")
+        print(f"   Domain: {frontend_domain}")
+        print(f"   SameSite: Lax, Secure: True")
+        
+except Exception as e:
+    # Fallback to cross-origin settings for safety
+    JWT_COOKIE_SAMESITE = 'None'
+    JWT_COOKIE_SECURE = True
+    JWT_COOKIE_DOMAIN = None
+    print(f"⚠️  URL parsing failed, using cross-origin defaults: {e}")
+
+# JWT Cookie Names
+JWT_ACCESS_COOKIE_NAME = 'access_token'
+JWT_REFRESH_COOKIE_NAME = 'refresh_token'
 
 # ===== SECURITY VALIDATION =====
 # Validate security configuration on startup
