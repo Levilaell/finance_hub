@@ -116,19 +116,31 @@ def pluggy_webhook(request):
             logger.error(f"Error storing webhook: {webhook_error}")
             # Continue - webhook storage is not critical
         
-        # Process event asynchronously following best practices
-        # Temporarily disabled to avoid import issues
+        # Process event following best practices
+        processed_async = False
         try:
-            # Import here to avoid module-level import issues
+            # Try asynchronous processing first (preferred)
             from .tasks import process_webhook_event
             process_webhook_event.delay(event_type, data)
-            logger.info(f"Queued webhook processing for event {event_type}")
+            logger.info(f"✅ Queued async webhook processing for event {event_type}")
+            processed_async = True
         except ImportError as import_error:
             logger.warning(f"Could not import process_webhook_event: {import_error}")
-            # Continue - webhook received successfully even if processing is delayed
         except Exception as celery_error:
             logger.warning(f"Could not queue webhook processing (Celery may not be running): {celery_error}")
-            # Continue - webhook received successfully even if processing is delayed
+        
+        # Fallback: Basic synchronous processing if async failed
+        if not processed_async and item:
+            try:
+                logger.info(f"⚡ Falling back to synchronous processing for {event_type}")
+                processed_sync = _process_webhook_basic(item, event_type, data)
+                if processed_sync:
+                    logger.info(f"✅ Synchronous processing completed for {event_type}")
+                else:
+                    logger.warning(f"⚠️ Synchronous processing failed for {event_type}")
+            except Exception as sync_error:
+                logger.error(f"❌ Synchronous processing error: {sync_error}")
+                # Continue - webhook received successfully even if processing failed
         
         # Return immediate 2XX response as required by Pluggy
         response_data = {
@@ -153,3 +165,119 @@ def pluggy_webhook(request):
             "status": "error", 
             "message": "Internal processing error - logged for review"
         }, status=200)
+
+
+def _process_webhook_basic(item, event_type, event_data):
+    """
+    Basic synchronous webhook processing when Celery is not available.
+    Only handles essential item status updates to keep webhooks functional.
+    
+    Returns True if processing was successful, False otherwise.
+    """
+    try:
+        from django.utils import timezone
+        
+        logger.info(f"🔄 Processing webhook {event_type} for item {item.pluggy_item_id}")
+        
+        # Extract relevant data safely
+        item_data = None
+        if isinstance(event_data, dict):
+            if 'data' in event_data and isinstance(event_data['data'], dict):
+                item_data = event_data['data'].get('item', {})
+            elif 'item' in event_data:
+                item_data = event_data['item']
+        
+        # Update item status based on event type
+        status_updated = False
+        
+        if event_type == 'item/login_succeeded':
+            # Login successful - item should be ready for sync
+            old_status = item.status
+            item.status = 'UPDATED'
+            item.last_successful_update = timezone.now()
+            item.pluggy_updated_at = timezone.now()
+            status_updated = True
+            logger.info(f"📝 Status updated: {old_status} → UPDATED (login succeeded)")
+            
+        elif event_type == 'item/updated':
+            # Item updated successfully
+            old_status = item.status
+            item.status = 'UPDATED'
+            item.last_successful_update = timezone.now()
+            item.pluggy_updated_at = timezone.now()
+            status_updated = True
+            logger.info(f"📝 Status updated: {old_status} → UPDATED (item updated)")
+            
+        elif event_type == 'item/error':
+            # Item encountered an error
+            old_status = item.status
+            if item_data and 'executionStatus' in item_data:
+                execution_status = item_data['executionStatus']
+                if execution_status in ['INVALID_CREDENTIALS', 'LOGIN_ERROR']:
+                    item.status = 'LOGIN_ERROR'
+                elif execution_status == 'USER_INPUT_TIMEOUT':
+                    item.status = 'USER_INPUT_TIMEOUT'
+                else:
+                    item.status = 'ERROR'
+            else:
+                item.status = 'ERROR'
+            status_updated = True
+            logger.info(f"📝 Status updated: {old_status} → {item.status} (item error)")
+            
+        elif event_type == 'item/waiting_user_input':
+            # Waiting for user input (MFA, etc)
+            old_status = item.status
+            item.status = 'WAITING_USER_INPUT'
+            status_updated = True
+            logger.info(f"📝 Status updated: {old_status} → WAITING_USER_INPUT")
+            
+        elif event_type == 'item/created':
+            # Item created successfully
+            old_status = item.status
+            item.status = 'CREATED'
+            status_updated = True
+            logger.info(f"📝 Status updated: {old_status} → CREATED")
+        
+        # Update additional fields if available in webhook data
+        if item_data:
+            if 'status' in item_data:
+                item.status = item_data['status']
+                status_updated = True
+                logger.info(f"📝 Status set from webhook data: {item_data['status']}")
+                
+            if 'executionStatus' in item_data:
+                item.execution_status = item_data['executionStatus']
+                logger.info(f"📝 Execution status: {item_data['executionStatus']}")
+        
+        # Update timestamp to indicate webhook was processed
+        item.pluggy_updated_at = timezone.now()
+        
+        # Save changes if any status was updated
+        if status_updated or item_data:
+            try:
+                item.save()
+                logger.info(f"💾 Item {item.pluggy_item_id} saved successfully")
+                
+                # Update related accounts if status changed to ERROR states
+                if item.status in ['LOGIN_ERROR', 'INVALID_CREDENTIALS', 'ERROR']:
+                    accounts_updated = item.accounts.update(is_active=False)
+                    if accounts_updated > 0:
+                        logger.info(f"🔒 Deactivated {accounts_updated} accounts due to error status")
+                        
+                elif item.status in ['UPDATED', 'CREATED']:
+                    accounts_updated = item.accounts.update(is_active=True)
+                    if accounts_updated > 0:
+                        logger.info(f"🔓 Activated {accounts_updated} accounts due to success status")
+                
+                return True
+                
+            except Exception as save_error:
+                logger.error(f"💥 Error saving item: {save_error}")
+                return False
+        else:
+            logger.info(f"ℹ️ No status changes for event {event_type}")
+            return True
+            
+    except Exception as e:
+        logger.error(f"💥 Error in basic webhook processing: {e}", exc_info=True)
+        return False
