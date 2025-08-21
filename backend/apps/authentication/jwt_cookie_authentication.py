@@ -19,11 +19,15 @@ class JWTCookieAuthentication(JWTAuthentication):
             # Fallback to header-based authentication for backwards compatibility
             return super().authenticate(request)
         
-        # Validate the token
-        validated_token = self.get_validated_token(raw_token)
-        user = self.get_user(validated_token)
-        
-        return user, validated_token
+        try:
+            # Validate the token
+            validated_token = self.get_validated_token(raw_token)
+            user = self.get_user(validated_token)
+            return user, validated_token
+        except (InvalidToken, TokenError):
+            # Token is invalid/expired - return None to allow other auth methods or AllowAny views
+            # This prevents login failures when users have expired tokens in cookies
+            return None
     
     def get_raw_token_from_cookie(self, request):
         """
@@ -51,7 +55,8 @@ class JWTRefreshCookieAuthentication(JWTAuthentication):
             user = self.get_user(validated_token)
             return user, validated_token
         except TokenError:
-            raise InvalidToken('Invalid refresh token')
+            # Return None instead of raising exception to allow graceful fallback
+            return None
     
     def get_raw_token_from_cookie(self, request):
         """
