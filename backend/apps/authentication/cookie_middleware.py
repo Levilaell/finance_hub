@@ -89,7 +89,7 @@ def set_jwt_cookies(response, tokens, request=None):
             httponly=True,
             samesite=samesite,
             domain=domain,
-            path='/api/auth/'  # Restrict refresh token to auth endpoints
+            path='/'  # Make refresh token available globally for token refresh
         )
         
         # Log refresh token issuance
@@ -136,7 +136,7 @@ def clear_jwt_cookies(response):
         httponly=True,
         samesite=samesite,
         domain=domain,
-        path='/api/auth/'
+        path='/'
     )
     
     return response
