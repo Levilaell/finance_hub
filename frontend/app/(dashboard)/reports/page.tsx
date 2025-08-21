@@ -89,7 +89,15 @@ function ReportsPageContent() {
     checkAuth();
   }, []);
   
-  // Use custom hook for report data
+  // Fetch dashboard data using React Query
+  const [dateRange, setDateRange] = useState(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setMonth(start.getMonth() - 3); // Default to last 3 months
+    return { start, end };
+  });
+
+  // Use custom hook for report data with initial period
   const {
     selectedPeriod,
     setSelectedPeriod,
@@ -100,14 +108,11 @@ function ReportsPageContent() {
     isLoading: reportDataLoading,
     isError: reportDataError,
     error: reportDataErrorMessage,
-  } = useReportData();
-  
-  // Fetch dashboard data using React Query
-  const [dateRange, setDateRange] = useState(() => {
-    const end = new Date();
-    const start = new Date();
-    start.setMonth(start.getMonth() - 3); // Default to last 3 months
-    return { start, end };
+  } = useReportData({
+    initialPeriod: {
+      start_date: dateRange.start.toISOString().split('T')[0],
+      end_date: dateRange.end.toISOString().split('T')[0]
+    }
   });
 
   const { data: cashFlowData = [], isLoading: cashFlowLoading } = useQuery({
@@ -240,7 +245,18 @@ function ReportsPageContent() {
       }
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Falha ao gerar relatório');
+      console.error('❌ Erro na geração de relatório:', error);
+      console.error('📊 Response data:', error.response?.data);
+      console.error('📈 Status:', error.response?.status);
+      
+      const errorMessage = 
+        error.response?.data?.error ||
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        'Falha ao gerar relatório';
+        
+      toast.error(errorMessage);
     },
   });
 
@@ -261,14 +277,34 @@ function ReportsPageContent() {
       }
     },
     onError: (error: any) => {
-      toast.error('Falha ao baixar relatório');
+      console.error('❌ Erro no download de relatório:', error);
+      console.error('📊 Response data:', error.response?.data);
+      console.error('📈 Status:', error.response?.status);
+      
+      const errorMessage = 
+        error.response?.data?.error ||
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        'Falha ao baixar relatório';
+        
+      toast.error(errorMessage);
     },
   });
 
   // Handlers
 
   const handleGenerateReport = useCallback(() => {
+    console.log('🚀 Iniciando geração de relatório...', {
+      selectedPeriod,
+      reportType,
+      exportFormat,
+      selectedAccounts,
+      selectedCategories
+    });
+
     if (!selectedPeriod || !selectedPeriod.start_date || !selectedPeriod.end_date) {
+      console.error('❌ Validação falhou: período não selecionado', { selectedPeriod });
       toast.error('Por favor, selecione um período');
       return;
     }
@@ -282,6 +318,8 @@ function ReportsPageContent() {
       description: `Relatório gerado via interface web`,
       filters: {},
     };
+
+    console.log('📋 Parâmetros do relatório:', parameters);
 
     generateReportMutation.mutate({ 
       type: reportType, 

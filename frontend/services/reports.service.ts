@@ -44,9 +44,12 @@ export const reportsService = {
 
   // Generate a new report - CORRIGIDO
   async generateReport(type: string, parameters: ReportParameters, format: 'pdf' | 'xlsx' | 'csv' | 'json' = 'pdf') {
+    console.log('🎯 reportsService.generateReport chamado:', { type, parameters, format });
+    
     // Validar parâmetros antes de enviar
     const errors = this.validateReportParameters(parameters);
     if (errors.length > 0) {
+      console.error('❌ Validação de parâmetros falhou:', errors);
       throw new Error(errors.join(', '));
     }
 
@@ -68,10 +71,14 @@ export const reportsService = {
     };
 
     try {
+      console.log('🌐 Enviando requisição POST /api/reports/reports/:', reportData);
       const response = await apiClient.post<any>('/api/reports/reports/', reportData);
+      console.log('✅ Resposta recebida:', response.data);
       return response.data;
     } catch (error: any) {
-      console.error('Generate report error:', error.response?.data);
+      console.error('❌ Erro na requisição POST:', error);
+      console.error('📊 Response data:', error.response?.data);
+      console.error('📈 Status:', error.response?.status);
       throw error;
     }
   },
