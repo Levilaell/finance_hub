@@ -38,8 +38,18 @@ export const reportsService = {
     report_type?: string;
     is_generated?: boolean;
   }) {
-    const response = await apiClient.get<any>('/api/reports/reports/', { params });
-    return response.data;
+    try {
+      console.log('🚀 reportsService.getReports chamado', { params });
+      const response = await apiClient.get<any>('/api/reports/reports/', { params });
+      console.log('✅ reportsService.getReports resposta recebida:', response);
+      return response;
+    } catch (error: any) {
+      console.error('❌ Erro em reportsService.getReports:', error);
+      console.error('📊 Response data:', error.response?.data);
+      console.error('📈 Status:', error.response?.status);
+      console.error('🔧 Config:', error.config?.url);
+      throw error;
+    }
   },
 
   // Generate a new report - CORRIGIDO

@@ -48,6 +48,9 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
   const [selectedPeriod, setSelectedPeriod] = useState<DateRange | undefined>(initialPeriod);
   const [retryCount, setRetryCount] = useState(0);
 
+  // Ensure selectedPeriod is always defined with a default fallback
+  const effectiveSelectedPeriod = selectedPeriod || initialPeriod;
+
   // Common query options with retry logic
   const commonQueryOptions: Partial<UseQueryOptions> = {
     staleTime,
@@ -73,26 +76,51 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
     error: reportsErrorObj,
     refetch: refetchReports
   } = useQuery({
-    queryKey: selectedPeriod ? ['reports', selectedPeriod] : ['reports'],
+    queryKey: ['reports', effectiveSelectedPeriod || 'default'],
     queryFn: async () => {
       try {
+        console.log('📋 useReportData: Iniciando busca de relatórios');
         const data = await reportsService.getReports();
         setRetryCount(0); // Reset retry count on success
+        
+        console.log('📋 useReportData: Dados recebidos:', data);
+        console.log('📋 useReportData: Tipo dos dados:', typeof data);
+        console.log('📋 useReportData: É array?', Array.isArray(data));
+        
         // Ensure we return an array, handling both paginated and non-paginated responses
         if (Array.isArray(data)) {
+          console.log('📋 useReportData: Retornando array direto');
           return data;
         } else if (data && data.results) {
+          console.log('📋 useReportData: Retornando data.results');
           return data.results;
         }
+        console.log('📋 useReportData: Retornando array vazio (fallback)');
         return [];
-      } catch (error) {
+      } catch (error: any) {
+        console.error('❌ useReportData: Erro ao buscar relatórios:', error);
+        console.error('📊 useReportData: Response data:', error.response?.data);
+        console.error('📈 useReportData: Status:', error.response?.status);
+        
         // Check if we have cached data to fall back on
         const cachedData = queryClient.getQueryData(['reports']);
         if (cachedData) {
-          console.log('Using cached reports data as fallback');
+          console.log('📋 useReportData: Usando dados em cache como fallback');
           toast.info('Usando dados em cache enquanto reconectamos...');
           return cachedData;
         }
+        
+        // Provide specific error messages based on error type
+        if (error.response?.status === 401) {
+          toast.error('Sessão expirada. Por favor, faça login novamente.');
+        } else if (error.response?.status === 403) {
+          toast.error('Você não tem permissão para acessar os relatórios.');
+        } else if (error.response?.status === 500) {
+          toast.error('Erro interno do servidor. Tente novamente em alguns minutos.');
+        } else {
+          toast.error('Falha ao carregar relatórios. Verifique sua conexão.');
+        }
+        
         throw error;
       }
     },
@@ -136,7 +164,7 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
       const reportsData = reports as { results: Report[] } | undefined;
       if (reportsData && reportsData.results && reportsData.results.length > 0) {
         await queryClient.prefetchQuery({
-          queryKey: ['analytics', selectedPeriod],
+          queryKey: ['analytics', effectiveSelectedPeriod],
           queryFn: () => reportsService.getAnalytics(30),
           staleTime: 15 * 60 * 1000 // 15 minutes
         });
@@ -144,7 +172,7 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
     };
 
     prefetchRelatedData();
-  }, [reports, selectedPeriod, queryClient]);
+  }, [reports, effectiveSelectedPeriod, queryClient]);
 
   // Refetch all data with proper error handling
   const refetchAll = useCallback(async () => {
@@ -191,7 +219,7 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
     error,
     refetch: refetchAll,
     refetchAll,
-    selectedPeriod,
+    selectedPeriod: effectiveSelectedPeriod,
     setSelectedPeriod,
     retryCount
   };
