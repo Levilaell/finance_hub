@@ -33,9 +33,13 @@ for i in {1..30}; do
     sleep 1
 done
 
-# Fix migration dependencies first
+# Fix migration dependencies with comprehensive approach
 echo "🔧 Fixing migration dependencies..."
-python -c "
+python fix_migration_history.py || {
+    echo "⚠️  Comprehensive migration fix failed, trying fallback method..."
+    
+    # Fallback: Simple fix for the most common issue
+    python -c "
 import django
 django.setup()
 from django.db import connection
@@ -50,26 +54,21 @@ try:
     companies_0009 = ('companies', '0009_add_early_access')
     
     if companies_0009 in applied_migrations and companies_0008 not in applied_migrations:
-        print('⚠️  Found migration dependency issue, fixing...')
+        print('⚠️  Found migration dependency issue, applying fallback fix...')
         with connection.cursor() as cursor:
-            cursor.execute(\"SELECT column_name FROM information_schema.columns WHERE table_name = 'resourceusage'\")
+            cursor.execute(\"SELECT column_name FROM information_schema.columns WHERE table_name = 'companies_resourceusage'\")
             columns = [row[0] for row in cursor.fetchall()]
             if 'created_at' in columns and 'updated_at' in columns:
                 recorder.record_applied(companies_0008[0], companies_0008[1])
-                print('✅ Migration 0008 marked as applied')
+                print('✅ Migration 0008 marked as applied (fallback)')
     
-    print('✅ Migration dependencies fixed')
+    print('✅ Fallback migration fix completed')
 except Exception as e:
-    print(f'⚠️  Could not fix migration dependencies: {e}')
-" || echo "⚠️  Migration dependency fix failed"
-
-# Run migrations - handle inconsistent history gracefully
-echo "🔄 Running migrations..."
-python manage.py migrate --no-input || {
-    echo "⚠️  Migration failed due to inconsistent history, applying fake migrations..."
-    # Mark 0008 as applied if structure exists
-    python manage.py migrate companies 0008 --fake-initial --no-input || echo "⚠️  Could not fake 0008"
-    # Try again with normal migrate
+    print(f'⚠️  Fallback migration fix failed: {e}')
+" || echo "⚠️  All migration dependency fixes failed"
+    
+    # If all else fails, try to migrate anyway
+    echo "🔄 Attempting migrations despite dependency issues..."
     python manage.py migrate --no-input || echo "⚠️  Final migration attempt failed"
 }
 

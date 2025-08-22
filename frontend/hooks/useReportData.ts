@@ -79,28 +79,43 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
     queryKey: ['reports', effectiveSelectedPeriod || 'default'],
     queryFn: async () => {
       try {
-        console.log('📋 useReportData: Iniciando busca de relatórios');
+        // LOGS PERMANENTES PARA DIAGNÓSTICO EM PRODUÇÃO
+        console.log('📋 [PROD-DEBUG] useReportData: Iniciando busca de relatórios', {
+          effectiveSelectedPeriod,
+          environment: process.env.NODE_ENV,
+          apiUrl: process.env.NEXT_PUBLIC_API_URL,
+          timestamp: new Date().toISOString()
+        });
         const data = await reportsService.getReports();
         setRetryCount(0); // Reset retry count on success
         
-        console.log('📋 useReportData: Dados recebidos:', data);
-        console.log('📋 useReportData: Tipo dos dados:', typeof data);
-        console.log('📋 useReportData: É array?', Array.isArray(data));
+        console.log('📋 [PROD-DEBUG] useReportData: Dados recebidos:', {
+          dataType: typeof data,
+          isArray: Array.isArray(data),
+          hasResults: data?.results ? true : false,
+          dataKeys: data ? Object.keys(data) : 'null',
+          arrayLength: Array.isArray(data) ? data.length : 'N/A',
+          resultsLength: data?.results?.length || 'N/A'
+        });
         
         // Ensure we return an array, handling both paginated and non-paginated responses
         if (Array.isArray(data)) {
-          console.log('📋 useReportData: Retornando array direto');
+          console.log('📋 [PROD-DEBUG] useReportData: Retornando array direto', data.length, 'items');
           return data;
         } else if (data && data.results) {
-          console.log('📋 useReportData: Retornando data.results');
+          console.log('📋 [PROD-DEBUG] useReportData: Retornando data.results', data.results.length, 'items');
           return data.results;
         }
-        console.log('📋 useReportData: Retornando array vazio (fallback)');
+        console.log('📋 [PROD-DEBUG] useReportData: Retornando array vazio (fallback)');
         return [];
       } catch (error: any) {
-        console.error('❌ useReportData: Erro ao buscar relatórios:', error);
-        console.error('📊 useReportData: Response data:', error.response?.data);
-        console.error('📈 useReportData: Status:', error.response?.status);
+        console.error('❌ [PROD-DEBUG] useReportData: Erro ao buscar relatórios:', {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data,
+          url: error.config?.url,
+          timestamp: new Date().toISOString()
+        });
         
         // Check if we have cached data to fall back on
         const cachedData = queryClient.getQueryData(['reports']);

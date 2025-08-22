@@ -39,15 +39,30 @@ export const reportsService = {
     is_generated?: boolean;
   }) {
     try {
-      console.log('🚀 reportsService.getReports chamado', { params });
+      // LOGS HABILITADOS PERMANENTEMENTE PARA DIAGNÓSTICO PRODUÇÃO
+      console.log('🚀 [PROD-DEBUG] reportsService.getReports chamado', { 
+        params, 
+        apiUrl: process.env.NEXT_PUBLIC_API_URL,
+        nodeEnv: process.env.NODE_ENV,
+        timestamp: new Date().toISOString()
+      });
       const response = await apiClient.get<any>('/api/reports/reports/', { params });
-      console.log('✅ reportsService.getReports resposta recebida:', response);
+      console.log('✅ [PROD-DEBUG] reportsService.getReports resposta recebida:', {
+        status: response?.status,
+        dataType: typeof response,
+        isArray: Array.isArray(response),
+        hasResults: response?.results ? 'sim' : 'não',
+        dataLength: Array.isArray(response) ? response.length : (response?.results?.length || 'N/A')
+      });
       return response;
     } catch (error: any) {
-      console.error('❌ Erro em reportsService.getReports:', error);
-      console.error('📊 Response data:', error.response?.data);
-      console.error('📈 Status:', error.response?.status);
-      console.error('🔧 Config:', error.config?.url);
+      console.error('❌ [PROD-DEBUG] Erro em reportsService.getReports:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        url: error.config?.url,
+        timestamp: new Date().toISOString()
+      });
       throw error;
     }
   },

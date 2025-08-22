@@ -7,23 +7,20 @@ import { retryManager } from "./retry-manager";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-// Helper para logs condicionais
+// Helper para logs condicionais - TEMPORARIAMENTE HABILITADO EM PRODUÇÃO PARA DEBUG
 const debugLog = (...args: any[]) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log(...args);
-  }
+  // Temporariamente logando em produção para diagnosticar o problema dos relatórios
+  console.log('[DEBUG]', ...args);
 };
 
 const debugWarn = (...args: any[]) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.warn(...args);
-  }
+  // Temporariamente logando em produção para diagnosticar o problema dos relatórios
+  console.warn('[WARN]', ...args);
 };
 
 const debugError = (...args: any[]) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.error(...args);
-  }
+  // Temporariamente logando em produção para diagnosticar o problema dos relatórios
+  console.error('[ERROR]', ...args);
 };
 
 class ApiClient {
