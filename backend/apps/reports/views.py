@@ -25,6 +25,26 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.throttling import UserRateThrottle
 
+
+def parse_date_to_timezone_aware(date_str: str) -> datetime:
+    """
+    Convert date string to timezone-aware datetime
+    This prevents timezone warnings when filtering DateTimeField with date objects
+    """
+    date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+    # Convert to timezone-aware datetime at start of day
+    return timezone.make_aware(date_obj.replace(hour=0, minute=0, second=0, microsecond=0))
+
+
+def parse_end_date_to_timezone_aware(date_str: str) -> datetime:
+    """
+    Convert end date string to timezone-aware datetime at end of day
+    This ensures we capture all transactions for the end date
+    """
+    date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+    # Convert to timezone-aware datetime at end of day
+    return timezone.make_aware(date_obj.replace(hour=23, minute=59, second=59, microsecond=999999))
+
 from apps.banking.models import BankAccount, Transaction
 from .models import Report, ReportTemplate
 from .serializers import ReportSerializer, ReportTemplateSerializer
@@ -99,12 +119,12 @@ class ReportViewSet(viewsets.ModelViewSet):
             if 'T' in period_start:
                 start_date = datetime.fromisoformat(period_start.replace('Z', '+00:00')).date()
             else:
-                start_date = datetime.strptime(period_start, '%Y-%m-%d').date()
+                start_date = parse_date_to_timezone_aware(period_start)
                 
             if 'T' in period_end:
                 end_date = datetime.fromisoformat(period_end.replace('Z', '+00:00')).date()
             else:
-                end_date = datetime.strptime(period_end, '%Y-%m-%d').date()
+                end_date = parse_end_date_to_timezone_aware(period_end)
         except (ValueError, TypeError) as e:
             raise InvalidReportPeriodError(f'Invalid date format: {str(e)}')
         
@@ -519,8 +539,8 @@ class CashFlowView(APIView):
         
         # Parse dates
         try:
-            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+            start_date = parse_date_to_timezone_aware(start_date)
+            end_date = parse_end_date_to_timezone_aware(end_date)
         except ValueError:
             return Response({
                 'error': 'Invalid date format. Use YYYY-MM-DD'
@@ -763,8 +783,8 @@ class CashFlowDataView(APIView):
                           status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+            start_date = parse_date_to_timezone_aware(start_date)
+            end_date = parse_end_date_to_timezone_aware(end_date)
         except ValueError:
             return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, 
                           status=status.HTTP_400_BAD_REQUEST)
@@ -847,8 +867,8 @@ class CategorySpendingView(APIView):
                           status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+            start_date = parse_date_to_timezone_aware(start_date)
+            end_date = parse_end_date_to_timezone_aware(end_date)
         except ValueError:
             return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, 
                           status=status.HTTP_400_BAD_REQUEST)
@@ -967,8 +987,8 @@ class IncomeVsExpensesView(APIView):
                           status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+            start_date = parse_date_to_timezone_aware(start_date)
+            end_date = parse_end_date_to_timezone_aware(end_date)
         except ValueError:
             return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, 
                           status=status.HTTP_400_BAD_REQUEST)

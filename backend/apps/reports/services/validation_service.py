@@ -17,6 +17,26 @@ from apps.reports.exceptions import (
 from apps.reports.models import Report
 
 
+def parse_date_to_timezone_aware(date_str: str) -> datetime:
+    """
+    Convert date string to timezone-aware datetime
+    This prevents timezone warnings when filtering DateTimeField with date objects
+    """
+    date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+    # Convert to timezone-aware datetime at start of day
+    return timezone.make_aware(date_obj.replace(hour=0, minute=0, second=0, microsecond=0))
+
+
+def parse_end_date_to_timezone_aware(date_str: str) -> datetime:
+    """
+    Convert end date string to timezone-aware datetime at end of day
+    This ensures we capture all transactions for the end date
+    """
+    date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+    # Convert to timezone-aware datetime at end of day
+    return timezone.make_aware(date_obj.replace(hour=23, minute=59, second=59, microsecond=999999))
+
+
 class ReportValidationService:
     """Service for validating report generation inputs"""
     
@@ -155,8 +175,8 @@ class ReportValidationService:
         
         # Parse dates
         try:
-            start = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end = datetime.strptime(end_date, '%Y-%m-%d').date()
+            start = parse_date_to_timezone_aware(start_date)
+            end = parse_end_date_to_timezone_aware(end_date)
         except ValueError as e:
             raise InvalidReportPeriodError(
                 f"Invalid date format. Use YYYY-MM-DD. Error: {str(e)}"
