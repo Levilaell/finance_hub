@@ -49,6 +49,14 @@ python fix_early_access_duplicate_column.py && {
     echo "❌ SMART FIX FAILED - Could not resolve early access column conflict..."
 }
 
+# COMPANIES MIGRATION DEPENDENCY FIX - Resolves 0009 vs 0008 dependency issue (PRIORITY 3)
+echo "🛠️  COMPANIES MIGRATION DEPENDENCY FIX - Resolving companies migration order..."
+python fix_companies_migration_dependency.py && {
+    echo "✅ COMPANIES DEPENDENCY FIX SUCCESS - Migration order corrected!"
+} || {
+    echo "❌ COMPANIES DEPENDENCY FIX FAILED - Could not fix migration dependency..."
+}
+
 # Fix migration dependencies with comprehensive approach
 echo "🔧 Fixing migration dependencies..."
 python fix_migration_history.py || {
