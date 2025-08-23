@@ -41,12 +41,12 @@ python ultimate_migration_fixer.py && {
     echo "❌ ULTIMATE MIGRATION FIX FAILED - Falling back to comprehensive approach..."
 }
 
-# ULTRA-DEEP DIAGNOSTIC - Early Access Column Conflict Analysis (PRIORITY 2)
-echo "🔍 ULTRA-DEEP DIAGNOSTIC - Analyzing early access column conflict..."
-python diagnose_early_access_conflict.py && {
-    echo "✅ DIAGNOSTIC SUCCESS - Early access conflict analysis completed!"
+# SMART EARLY ACCESS FIX - Resolves DuplicateColumn error (PRIORITY 2)
+echo "🛠️  SMART EARLY ACCESS FIX - Resolving DuplicateColumn error..."
+python fix_early_access_duplicate_column.py && {
+    echo "✅ SMART FIX SUCCESS - Early access DuplicateColumn error resolved!"
 } || {
-    echo "❌ DIAGNOSTIC FAILED - Could not analyze early access conflict..."
+    echo "❌ SMART FIX FAILED - Could not resolve early access column conflict..."
 }
 
 # Fix migration dependencies with comprehensive approach
