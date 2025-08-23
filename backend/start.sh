@@ -77,22 +77,34 @@ try:
         for app, name, applied in reports_migrations:
             print(f'    {app}.{name} (applied: {applied})')
             
-        # Check if 0003 exists and if there's an inconsistent history issue
-        migration_0003_exists = any('0003_aianalysistemplate_aianalysis' in name for _, name, _ in reports_migrations)
-        migration_0002_exists = any('0002_alter_aianalysis_options_and_more' in name for _, name, _ in reports_migrations)
+        # Check for all problematic migrations that cause dependency issues
+        problematic_migrations = [
+            '0002_alter_aianalysis_options_and_more',
+            '0003_aianalysistemplate_aianalysis', 
+            '0004_merge_20250803_2225',
+            '0005_fix_inconsistent_history'
+        ]
         
-        if migration_0003_exists:
-            print('⚠️  Found reports migration 0003 causing InconsistentMigrationHistory error')
-            print('🔧 Removing migration 0003 to allow correct reapplication order (0002 → 0003)')
-            cursor.execute(\"DELETE FROM django_migrations WHERE app = 'reports' AND name = '0003_aianalysistemplate_aianalysis'\")
-            deleted_count = cursor.rowcount
-            print(f'✅ Removed {deleted_count} reports migration 0003 record for correct reordering')
+        migrations_to_remove = []
+        for _, name, _ in reports_migrations:
+            for problematic in problematic_migrations:
+                if problematic in name:
+                    migrations_to_remove.append(name)
+                    break
+        
+        if migrations_to_remove:
+            print(f'⚠️  Found {len(migrations_to_remove)} problematic reports migrations causing InconsistentMigrationHistory')
+            print(f'🔧 Removing migrations: {migrations_to_remove}')
+            print('   This allows Django to reapply them in correct dependency order')
             
-            # Also remove 0002 if it exists to ensure clean reapplication
-            if migration_0002_exists:
-                cursor.execute(\"DELETE FROM django_migrations WHERE app = 'reports' AND name = '0002_alter_aianalysis_options_and_more'\")
-                deleted_0002 = cursor.rowcount
-                print(f'✅ Also removed {deleted_0002} reports migration 0002 record for clean reapplication')
+            total_removed = 0
+            for migration_name in migrations_to_remove:
+                cursor.execute(\"DELETE FROM django_migrations WHERE app = 'reports' AND name = %s\", [migration_name])
+                deleted = cursor.rowcount
+                total_removed += deleted
+                print(f'   ✅ Removed migration: {migration_name} ({deleted} record)')
+            
+            print(f'✅ Total removed {total_removed} reports migration records for correct reordering')
         else:
             print('✅ No reports migration inconsistency detected')
     
