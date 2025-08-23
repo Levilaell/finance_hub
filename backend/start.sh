@@ -57,26 +57,35 @@ python fix_companies_migration_dependency.py && {
     echo "❌ COMPANIES DEPENDENCY FIX FAILED - Could not fix migration dependency..."
 }
 
-# CELERY BEAT MIGRATION FIX - Resolves DuplicateTable error (PRIORITY 4)
-echo "🛠️  CELERY BEAT MIGRATION FIX - Resolving DuplicateTable error..."
-python fix_celery_beat_migration_conflict.py && {
-    echo "✅ CELERY BEAT CONFLICT DETECTED - Applying --fake flag fix"
-    
-    # Check if conflict marker exists
-    if [ -f "/tmp/celery_beat_conflict_detected" ]; then
-        echo "📋 Conflict detected - using --fake flag for django_celery_beat"
-        python manage.py migrate django_celery_beat --fake || echo "⚠️  Could not fake apply django_celery_beat migrations"
-    else
-        echo "📋 No conflict detected - applying migrations normally"
-        python manage.py migrate django_celery_beat || echo "⚠️  Django Celery Beat migrations had issues"
-    fi
-    
-    echo "✅ CELERY BEAT FIX SUCCESS - DuplicateTable error resolved!"
-} || {
-    echo "❌ CELERY BEAT FIX FAILED - Could not resolve conflict..."
-    echo "📋 Attempting normal migration anyway..."
-    python manage.py migrate django_celery_beat || echo "⚠️  Django Celery Beat migrations failed"
-}
+# RAILWAY-SPECIFIC CELERY BEAT FIX - Resolves DuplicateTable error (PRIORITY 4)
+echo "🛠️  RAILWAY CELERY BEAT FIX - Direct database state check..."
+CELERY_FIX_RESULT=$(python railway_celery_beat_fix.py 2>/dev/null)
+
+case "$CELERY_FIX_RESULT" in
+    "NEED_FAKE")
+        echo "📋 DOUBLE_APPLICATION detected - using --fake flag"
+        python manage.py migrate django_celery_beat --fake || echo "⚠️  Fake migration failed"
+        ;;
+    "NEED_FAKE_INITIAL") 
+        echo "📋 SCHEMA_AHEAD detected - using --fake-initial flag"
+        python manage.py migrate django_celery_beat --fake-initial || echo "⚠️  Fake initial failed"
+        ;;
+    "NEED_MIGRATION")
+        echo "📋 ROLLBACK detected - running full migration"
+        python manage.py migrate django_celery_beat || echo "⚠️  Migration failed"
+        ;;
+    "NORMAL")
+        echo "📋 Clean state - normal migration"
+        python manage.py migrate django_celery_beat || echo "⚠️  Normal migration failed"
+        ;;
+    *)
+        echo "❌ Celery Beat fix check failed or returned: $CELERY_FIX_RESULT"
+        echo "📋 Attempting normal migration as fallback..."
+        python manage.py migrate django_celery_beat || echo "⚠️  Fallback migration failed"
+        ;;
+esac
+
+echo "✅ RAILWAY CELERY BEAT FIX COMPLETED!"
 
 # Fix migration dependencies with comprehensive approach
 echo "🔧 Fixing migration dependencies..."
