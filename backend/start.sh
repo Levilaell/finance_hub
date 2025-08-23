@@ -38,7 +38,7 @@ echo "🔧 Fixing migration dependencies..."
 python fix_migration_history.py || {
     echo "⚠️  Comprehensive migration fix failed, trying fallback method..."
     
-    # Fallback: Simple fix for the most common issue
+    # Fallback: Simple fix for the most common issues
     python -c "
 import django
 django.setup()
@@ -54,13 +54,25 @@ try:
     companies_0009 = ('companies', '0009_add_early_access')
     
     if companies_0009 in applied_migrations and companies_0008 not in applied_migrations:
-        print('⚠️  Found migration dependency issue, applying fallback fix...')
+        print('⚠️  Found companies migration dependency issue, applying fallback fix...')
         with connection.cursor() as cursor:
             cursor.execute(\"SELECT column_name FROM information_schema.columns WHERE table_name = 'companies_resourceusage'\")
             columns = [row[0] for row in cursor.fetchall()]
             if 'created_at' in columns and 'updated_at' in columns:
                 recorder.record_applied(companies_0008[0], companies_0008[1])
-                print('✅ Migration 0008 marked as applied (fallback)')
+                print('✅ Companies migration 0008 marked as applied (fallback)')
+    
+    # Fix reports migration dependency issue (ULTRA-DEEP ANALYSIS)
+    reports_0002 = ('reports', '0002_alter_aianalysis_options_and_more')
+    reports_0003 = ('reports', '0003_aianalysistemplate_aianalysis')
+    
+    if reports_0003 in applied_migrations and reports_0002 not in applied_migrations:
+        print('⚠️  Found reports migration dependency issue (0003 before 0002), fixing...')
+        # Remove the problematic migration to allow correct order reapplication
+        with connection.cursor() as cursor:
+            cursor.execute(\"DELETE FROM django_migrations WHERE app = 'reports' AND name = '0003_aianalysistemplate_aianalysis'\")
+            deleted_count = cursor.rowcount
+            print(f'✅ Removed {deleted_count} reports migration 0003 record for correct reordering')
     
     print('✅ Fallback migration fix completed')
 except Exception as e:
