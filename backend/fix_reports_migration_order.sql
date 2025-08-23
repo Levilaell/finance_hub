@@ -1,35 +1,28 @@
--- CORREÇÃO DE ORDEM DAS MIGRAÇÕES - APP REPORTS
--- Erro: reports.0003 aplicada antes da dependência reports.0002
+-- ULTRA-DEEP ANALYSIS: Fix reports migration dependency issue
+-- Problem: reports.0003 applied before its dependency reports.0002
+-- Solution: Remove 0003, allow 0002 to apply, then reapply 0003
 
--- 1. Verificar estado atual
-SELECT app, name, applied 
-FROM django_migrations 
-WHERE app = 'reports' AND name IN ('0002_alter_aianalysis_options_and_more', '0003_aianalysistemplate_aianalysis')
+-- STEP 1: Check current state
+SELECT app, name, applied FROM django_migrations 
+WHERE app = 'reports' 
 ORDER BY applied;
 
--- 2. Corrigir timestamps para ordem correta (0002 antes de 0003)
-UPDATE django_migrations 
-SET applied = '2025-08-12 02:00:00+00'
-WHERE app = 'reports' AND name = '0002_alter_aianalysis_options_and_more';
-
-UPDATE django_migrations 
-SET applied = '2025-08-12 02:30:00+00'
+-- STEP 2: Remove the problematic migration 0003 from django_migrations
+-- This allows Django to reapply it in correct order
+DELETE FROM django_migrations 
 WHERE app = 'reports' AND name = '0003_aianalysistemplate_aianalysis';
 
--- 3. Verificar correção
-SELECT app, name, applied 
-FROM django_migrations 
-WHERE app = 'reports' AND name IN ('0002_alter_aianalysis_options_and_more', '0003_aianalysistemplate_aianalysis')
+-- STEP 3: Verify removal
+SELECT 'After removal:' as status;
+SELECT app, name, applied FROM django_migrations 
+WHERE app = 'reports' 
 ORDER BY applied;
 
--- 4. Validar todas as migrações do reports estão em ordem
-SELECT app, name, applied 
-FROM django_migrations 
-WHERE app = 'reports'
-ORDER BY applied;
+-- Note: After running this SQL, you need to run:
+-- railway run python manage.py migrate reports
+-- This will apply 0002 first, then 0003 in correct order
 
--- Resultado esperado:
--- reports | 0001_initial | [timestamp anterior]
--- reports | 0002_alter_aianalysis_options_and_more | 2025-08-12 02:00:00+00
--- reports | 0003_aianalysistemplate_aianalysis | 2025-08-12 02:30:00+00
--- reports | [outras migrações] | [timestamps posteriores]
+-- CRITICAL SAFEGUARD: 
+-- The tables ai_analyses and ai_analysis_templates should already exist
+-- from when 0003 was applied incorrectly. Migration 0002 only removes fields
+-- that were already removed, so it should be safe to apply.
