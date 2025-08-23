@@ -80,11 +80,18 @@ def ultimate_migration_fix():
                 for app, name, timestamp in required_migrations:
                     if (app, name) not in existing_set:
                         print(f"   📝 INSERTING missing migration: {app}.{name}")
+                        # Check if migration already exists before inserting
                         cursor.execute("""
-                            INSERT INTO django_migrations (app, name, applied) 
-                            VALUES (%s, %s, %s)
-                            ON CONFLICT (app, name) DO NOTHING
-                        """, [app, name, timestamp])
+                            SELECT COUNT(*) FROM django_migrations 
+                            WHERE app = %s AND name = %s
+                        """, [app, name])
+                        exists = cursor.fetchone()[0] > 0
+                        
+                        if not exists:
+                            cursor.execute("""
+                                INSERT INTO django_migrations (app, name, applied) 
+                                VALUES (%s, %s, %s)
+                            """, [app, name, timestamp])
                     else:
                         print(f"   ✅ Updating existing migration: {app}.{name}")
                         cursor.execute("""
