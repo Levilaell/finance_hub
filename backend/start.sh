@@ -63,16 +63,38 @@ try:
                 print('✅ Companies migration 0008 marked as applied (fallback)')
     
     # Fix reports migration dependency issue (ULTRA-DEEP ANALYSIS)
-    reports_0002 = ('reports', '0002_alter_aianalysis_options_and_more')
-    reports_0003 = ('reports', '0003_aianalysistemplate_aianalysis')
-    
-    if reports_0003 in applied_migrations and reports_0002 not in applied_migrations:
-        print('⚠️  Found reports migration dependency issue (0003 before 0002), fixing...')
-        # Remove the problematic migration to allow correct order reapplication
-        with connection.cursor() as cursor:
+    # Check for InconsistentMigrationHistory error condition
+    with connection.cursor() as cursor:
+        cursor.execute(\"\"\"
+            SELECT app, name, applied 
+            FROM django_migrations 
+            WHERE app = 'reports' 
+            ORDER BY applied
+        \"\"\")
+        reports_migrations = cursor.fetchall()
+        
+        print(f'📊 Found {len(reports_migrations)} applied reports migrations:')
+        for app, name, applied in reports_migrations:
+            print(f'    {app}.{name} (applied: {applied})')
+            
+        # Check if 0003 exists and if there's an inconsistent history issue
+        migration_0003_exists = any('0003_aianalysistemplate_aianalysis' in name for _, name, _ in reports_migrations)
+        migration_0002_exists = any('0002_alter_aianalysis_options_and_more' in name for _, name, _ in reports_migrations)
+        
+        if migration_0003_exists:
+            print('⚠️  Found reports migration 0003 causing InconsistentMigrationHistory error')
+            print('🔧 Removing migration 0003 to allow correct reapplication order (0002 → 0003)')
             cursor.execute(\"DELETE FROM django_migrations WHERE app = 'reports' AND name = '0003_aianalysistemplate_aianalysis'\")
             deleted_count = cursor.rowcount
             print(f'✅ Removed {deleted_count} reports migration 0003 record for correct reordering')
+            
+            # Also remove 0002 if it exists to ensure clean reapplication
+            if migration_0002_exists:
+                cursor.execute(\"DELETE FROM django_migrations WHERE app = 'reports' AND name = '0002_alter_aianalysis_options_and_more'\")
+                deleted_0002 = cursor.rowcount
+                print(f'✅ Also removed {deleted_0002} reports migration 0002 record for clean reapplication')
+        else:
+            print('✅ No reports migration inconsistency detected')
     
     print('✅ Fallback migration fix completed')
 except Exception as e:
