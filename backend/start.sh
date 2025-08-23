@@ -33,6 +33,18 @@ for i in {1..30}; do
     sleep 1
 done
 
+# NUCLEAR MIGRATION FIX - Resolve all conflicts at once (PRIORITY 1)
+echo "⚡ NUCLEAR MIGRATION FIX - Resolving all migration conflicts..."
+if [ -f "nuclear_migration_fix.py" ]; then
+    python nuclear_migration_fix.py && {
+        echo "✅ NUCLEAR FIX SUCCESS - All migration conflicts resolved!"
+    } || {
+        echo "❌ NUCLEAR FIX FAILED - Falling back to comprehensive approach..."
+    }
+else
+    echo "⚠️  Nuclear fix script not found, using comprehensive approach..."
+fi
+
 # Fix migration dependencies with comprehensive approach
 echo "🔧 Fixing migration dependencies..."
 python fix_migration_history.py || {
