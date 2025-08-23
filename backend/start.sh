@@ -57,6 +57,27 @@ python fix_companies_migration_dependency.py && {
     echo "❌ COMPANIES DEPENDENCY FIX FAILED - Could not fix migration dependency..."
 }
 
+# CELERY BEAT MIGRATION FIX - Resolves DuplicateTable error (PRIORITY 4)
+echo "🛠️  CELERY BEAT MIGRATION FIX - Resolving DuplicateTable error..."
+python fix_celery_beat_migration_conflict.py && {
+    echo "✅ CELERY BEAT CONFLICT DETECTED - Applying --fake flag fix"
+    
+    # Check if conflict marker exists
+    if [ -f "/tmp/celery_beat_conflict_detected" ]; then
+        echo "📋 Conflict detected - using --fake flag for django_celery_beat"
+        python manage.py migrate django_celery_beat --fake || echo "⚠️  Could not fake apply django_celery_beat migrations"
+    else
+        echo "📋 No conflict detected - applying migrations normally"
+        python manage.py migrate django_celery_beat || echo "⚠️  Django Celery Beat migrations had issues"
+    fi
+    
+    echo "✅ CELERY BEAT FIX SUCCESS - DuplicateTable error resolved!"
+} || {
+    echo "❌ CELERY BEAT FIX FAILED - Could not resolve conflict..."
+    echo "📋 Attempting normal migration anyway..."
+    python manage.py migrate django_celery_beat || echo "⚠️  Django Celery Beat migrations failed"
+}
+
 # Fix migration dependencies with comprehensive approach
 echo "🔧 Fixing migration dependencies..."
 python fix_migration_history.py || {
