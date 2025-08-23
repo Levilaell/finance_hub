@@ -41,6 +41,14 @@ python ultimate_migration_fixer.py && {
     echo "❌ ULTIMATE MIGRATION FIX FAILED - Falling back to comprehensive approach..."
 }
 
+# ULTRA-DEEP DIAGNOSTIC - Early Access Column Conflict Analysis (PRIORITY 2)
+echo "🔍 ULTRA-DEEP DIAGNOSTIC - Analyzing early access column conflict..."
+python diagnose_early_access_conflict.py && {
+    echo "✅ DIAGNOSTIC SUCCESS - Early access conflict analysis completed!"
+} || {
+    echo "❌ DIAGNOSTIC FAILED - Could not analyze early access conflict..."
+}
+
 # Fix migration dependencies with comprehensive approach
 echo "🔧 Fixing migration dependencies..."
 python fix_migration_history.py || {
