@@ -70,29 +70,20 @@ def set_jwt_cookies(response, tokens, request=None, user=None):
     secure = getattr(settings, 'JWT_COOKIE_SECURE', not settings.DEBUG)
     samesite = getattr(settings, 'JWT_COOKIE_SAMESITE', 'Lax')
     
-    # Mobile Safari Compatibility: Detect mobile browsers and adjust SameSite
-    if request:
-        user_agent = request.META.get('HTTP_USER_AGENT', '')
-        is_mobile_safari = _is_mobile_safari(user_agent)
-        
-        if is_mobile_safari:
-            # Mobile Safari blocks SameSite=None even with Secure=True
-            # Fallback to Lax for better compatibility
-            original_samesite = samesite
-            samesite = 'Lax'
-            logger.info(f"Mobile Safari detected - SameSite changed from {original_samesite} to {samesite}")
+    # Mobile Safari compatibility now handled at settings level (SameSite=Lax by default)
+    # No browser-specific overrides needed anymore
     
     # Convert Python None to string "None" for SameSite attribute
     if samesite is None:
         samesite = 'None'
     
-    # CRITICAL: Additional Mobile Safari check after None conversion
+    # Legacy Mobile Safari override no longer needed - fixed at settings level
+    # Keep for backward compatibility during transition
     if request and samesite == 'None':
         user_agent = request.META.get('HTTP_USER_AGENT', '')
         if _is_mobile_safari(user_agent):
-            # FORCE Lax even if settings say None - Mobile Safari BLOCKS SameSite=None
             samesite = 'Lax'
-            logger.error(f"🚨 EMERGENCY MOBILE SAFARI FIX: Forced SameSite=Lax (was None)")
+            logger.info(f"Legacy Mobile Safari override applied (should not be needed with new settings)")
     
     # Special handling for development: Chrome allows Secure=False with SameSite=None on localhost
     if settings.DEBUG and samesite == 'None':
@@ -279,14 +270,14 @@ def set_mobile_compatible_cookies(response, tokens, request=None, user=None):
     access_token = tokens.get('access')
     refresh_token = tokens.get('refresh')
     
-    # Mobile Safari Specific Configuration - HARDCODED for compatibility  
+    # Mobile Safari compatibility now built into settings (SameSite=Lax by default)
     secure = True  # Always secure in production
-    samesite = 'Lax'  # HARD FORCE Lax for mobile Safari - NEVER None
+    samesite = 'Lax'  # Use Lax for mobile compatibility (now matches settings)
     domain = None  # Let browser handle domain
     
-    # Log the override
-    original_setting = getattr(settings, 'JWT_COOKIE_SAMESITE', 'unknown')
-    logger.warning(f"🚨 MOBILE SAFARI FORCE OVERRIDE: Settings={original_setting} → Forced=Lax")
+    # Log the configuration (should match settings now)
+    settings_samesite = getattr(settings, 'JWT_COOKIE_SAMESITE', 'unknown')
+    logger.info(f"✅ Mobile Safari compatible cookies - Settings: {settings_samesite}, Applied: {samesite}")
     
     # Strategy 1: Set cookies with explicit path and no domain
     if access_token:

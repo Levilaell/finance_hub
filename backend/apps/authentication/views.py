@@ -287,25 +287,13 @@ class LoginView(APIView):
         })
         
         # Set httpOnly cookies with user object for accurate logging
-        # Debug: Log what we're passing to set_jwt_cookies
-        logger.info(f"LoginView: About to call set_jwt_cookies with user ID={user.id}, email={user.email}")
+        logger.info(f"LoginView: Setting JWT cookies for user ID={user.id}, email={user.email}")
         
-        # Check if mobile browser and use appropriate strategy
-        from .cookie_middleware import _is_mobile_safari, set_mobile_compatible_cookies
-        user_agent = request.META.get('HTTP_USER_AGENT', '')
-        is_mobile_safari = _is_mobile_safari(user_agent)
-        
-        if is_mobile_safari:
-            logger.info(f"Mobile Safari detected in login - using enhanced cookie strategy")
-            set_mobile_compatible_cookies(response, {
-                'access': str(refresh.access_token),
-                'refresh': str(refresh)
-            }, request, user)
-        else:
-            set_jwt_cookies(response, {
-                'access': str(refresh.access_token),
-                'refresh': str(refresh)
-            }, request, user)
+        # Use standard JWT cookies (now mobile-compatible via settings)
+        set_jwt_cookies(response, {
+            'access': str(refresh.access_token),
+            'refresh': str(refresh)
+        }, request, user)
         
         return response
 
@@ -627,23 +615,12 @@ class CustomTokenRefreshView(APIView):
                 'refresh': str(refresh),
             })
             
-            # Set cookies with user object for accurate logging
-            # Check if mobile browser and use appropriate strategy
-            from .cookie_middleware import _is_mobile_safari, set_mobile_compatible_cookies
-            user_agent = request.META.get('HTTP_USER_AGENT', '')
-            is_mobile_safari = _is_mobile_safari(user_agent)
-            
-            if is_mobile_safari:
-                logger.info(f"Mobile Safari detected in token refresh - using enhanced cookie strategy")
-                set_mobile_compatible_cookies(response, {
-                    'access': str(access_token),
-                    'refresh': str(refresh)
-                }, request, user)
-            else:
-                set_jwt_cookies(response, {
-                    'access': str(access_token),
-                    'refresh': str(refresh)
-                }, request, user)
+            # Set cookies with user object for accurate logging  
+            # Use standard JWT cookies (now mobile-compatible via settings)
+            set_jwt_cookies(response, {
+                'access': str(access_token),
+                'refresh': str(refresh)
+            }, request, user)
             
             return response
             

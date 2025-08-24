@@ -385,45 +385,36 @@ if os.environ.get('RAILWAY_ENVIRONMENT'):
     USE_X_FORWARDED_HOST = True
     USE_X_FORWARDED_PORT = True
 
-# ===== JWT COOKIE CONFIGURATION FOR CROSS-ORIGIN =====
-# Configure JWT cookies for cross-origin requests in production
-# Frontend and backend are on different Railway subdomains
+# ===== JWT COOKIE CONFIGURATION - SIMPLIFIED & MOBILE COMPATIBLE =====
+# Use SameSite=Lax for all cases - works perfectly for cross-origin first-party requests
+# Only third-party embedded contexts need SameSite=None (not our use case)
+
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://financehub-frontend-production.up.railway.app')
 BACKEND_URL = os.environ.get('BACKEND_URL', 'https://financehub-production.up.railway.app')
 
-# Check if frontend and backend are on different domains
+# CORRECTED: SameSite=Lax works for cross-origin first-party requests
+# Mobile Safari compatible, secure, and follows best practices
+JWT_COOKIE_SAMESITE = 'Lax'
+JWT_COOKIE_SECURE = True
+JWT_COOKIE_DOMAIN = None  # Let browser handle domain
+
+# Log the corrected configuration
 from urllib.parse import urlparse
 try:
     frontend_domain = urlparse(FRONTEND_URL).netloc
     backend_domain = urlparse(BACKEND_URL).netloc
     is_cross_origin = frontend_domain != backend_domain
     
-    if is_cross_origin:
-        # Cross-origin setup requires SameSite=None and Secure=True
-        JWT_COOKIE_SAMESITE = 'None'
-        JWT_COOKIE_SECURE = True
-        JWT_COOKIE_DOMAIN = None  # Let browser handle domain
-        
-        print(f"✅ Cross-origin JWT cookies configured:")
-        print(f"   Frontend: {frontend_domain}")
-        print(f"   Backend: {backend_domain}")
-        print(f"   SameSite: None, Secure: True")
-    else:
-        # Same-origin setup can use more restrictive settings
-        JWT_COOKIE_SAMESITE = 'Lax'
-        JWT_COOKIE_SECURE = True
-        JWT_COOKIE_DOMAIN = None
-        
-        print(f"✅ Same-origin JWT cookies configured:")
-        print(f"   Domain: {frontend_domain}")
-        print(f"   SameSite: Lax, Secure: True")
-        
+    print(f"✅ Mobile-compatible JWT cookies configured:")
+    print(f"   Frontend: {frontend_domain}")
+    print(f"   Backend: {backend_domain}")
+    print(f"   Cross-origin: {is_cross_origin}")
+    print(f"   SameSite: Lax (works for cross-origin first-party + Mobile Safari compatible)")
+    print(f"   Secure: True")
+    
 except Exception as e:
-    # Fallback to cross-origin settings for safety
-    JWT_COOKIE_SAMESITE = 'None'
-    JWT_COOKIE_SECURE = True
-    JWT_COOKIE_DOMAIN = None
-    print(f"⚠️  URL parsing failed, using cross-origin defaults: {e}")
+    print(f"⚠️  URL parsing failed, but using secure defaults: {e}")
+    print(f"   SameSite: Lax, Secure: True")
 
 # JWT Cookie Names
 JWT_ACCESS_COOKIE_NAME = 'access_token'
