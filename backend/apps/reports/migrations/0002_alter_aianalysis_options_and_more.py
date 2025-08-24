@@ -37,10 +37,11 @@ class Migration(migrations.Migration):
             model_name='aianalysis',
             name='ai_analyses_is_favo_a7a1b0_idx',
         ),
-        migrations.RemoveIndex(
-            model_name='report',
-            name='reports_company_c4b7ee_idx',
-        ),
+        # migrations.RemoveIndex(
+        #     model_name='report',
+        #     name='reports_company_c4b7ee_idx',
+        # ),
+        # ↑ COMMENTED OUT: Index was recreated by ultra-nuclear fix, removing causes ValueError
         migrations.RemoveIndex(
             model_name='report',
             name='reports_created_c5f642_idx',
