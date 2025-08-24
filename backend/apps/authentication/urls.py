@@ -26,6 +26,8 @@ if settings.DEBUG:
 # Import troubleshooting views (available in production for urgent debugging)
 from .mobile_troubleshoot_view import MobileTroubleshootView
 from .emergency_cookie_test import EmergencyCookieTestView
+from .simple_cookie_test import SimpleCookieTestView, immediate_cookie_test
+from .jwt_size_test import JWTSizeTestView
 
 app_name = 'authentication'
 
@@ -58,6 +60,9 @@ urlpatterns = [
     # Mobile troubleshooting endpoints (available in production for critical debugging)
     path('troubleshoot/mobile/', MobileTroubleshootView.as_view(), name='mobile_troubleshoot'),
     path('emergency/cookie-test/', EmergencyCookieTestView.as_view(), name='emergency_cookie_test'),
+    path('simple/cookie-test/', SimpleCookieTestView.as_view(), name='simple_cookie_test'),
+    path('immediate/cookie-test/', immediate_cookie_test, name='immediate_cookie_test'),
+    path('jwt-size-test/', JWTSizeTestView.as_view(), name='jwt_size_test'),
 ]
 
 # Debug endpoints only in development
