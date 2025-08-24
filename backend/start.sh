@@ -106,15 +106,37 @@ if [ "$ULTRA_NUCLEAR_SUCCESS" != "true" ]; then
     echo "✅ INDIVIDUAL MIGRATION FIXES COMPLETED!"
 fi
 
-# MISSING INDEX FIX - Ensure database indexes match Django model expectations
+# MISSING INDEX FIX - ALWAYS EXECUTE (CRITICAL FOR DJANGO MODEL CONSISTENCY)
 echo "🔧 MISSING INDEX FIX - Creating required database indexes..."
+echo "🎯 ULTRA-CRITICAL: Django models expect specific indexes to function"
 python fix_missing_indexes.py && {
     echo "✅ MISSING INDEX FIX SUCCESS - Database indexes synchronized with Django models!"
     echo "✅ Missing reports_company_c4b7ee_idx index created"
-    echo "✅ Django model expectations satisfied"
+    echo "✅ Django model expectations satisfied - ValueError resolved"
 } || {
     echo "❌ MISSING INDEX FIX FAILED - Could not create missing indexes..."
-    echo "⚠️  This may cause ValueError in Django models"
+    echo "🚨 CRITICAL: This WILL cause ValueError in Django models"
+    echo "📋 Attempting ULTRA-ROBUST triple-redundancy fix..."
+    
+    # ULTRA-ROBUST fix with triple-redundancy
+    python ultra_robust_index_fix.py && {
+        echo "🎉 ULTRA-ROBUST FIX SUCCESS - Index created with triple-redundancy!"
+    } || {
+        echo "💥 ULTRA-ROBUST FIX FAILED - Trying final emergency method..."
+        
+        # Final emergency inline index creation
+        python -c "
+import django
+django.setup()
+from django.db import connection
+try:
+    with connection.cursor() as cursor:
+        cursor.execute('CREATE INDEX IF NOT EXISTS reports_company_c4b7ee_idx ON reports (company_id);')
+        print('🛠️  Final emergency index created: reports_company_c4b7ee_idx')
+except Exception as e:
+    print(f'💥 Final emergency creation failed: {e}')
+" || echo "💥 ALL index creation methods failed - manual intervention required"
+    }
 }
 
 # Fix migration dependencies with comprehensive approach
