@@ -28,6 +28,7 @@ from .mobile_troubleshoot_view import MobileTroubleshootView
 from .emergency_cookie_test import EmergencyCookieTestView
 from .simple_cookie_test import SimpleCookieTestView, immediate_cookie_test
 from .jwt_size_test import JWTSizeTestView
+from .mobile_fallback_auth import MobileAuthFallbackView, TokenValidationView
 
 app_name = 'authentication'
 
@@ -63,6 +64,10 @@ urlpatterns = [
     path('simple/cookie-test/', SimpleCookieTestView.as_view(), name='simple_cookie_test'),
     path('immediate/cookie-test/', immediate_cookie_test, name='immediate_cookie_test'),
     path('jwt-size-test/', JWTSizeTestView.as_view(), name='jwt_size_test'),
+    
+    # Multi-strategy authentication fallback (available in production)
+    path('mobile-auth-fallback/', MobileAuthFallbackView.as_view(), name='mobile_auth_fallback'),
+    path('validate-token/', TokenValidationView.as_view(), name='validate_token'),
 ]
 
 # Debug endpoints only in development
