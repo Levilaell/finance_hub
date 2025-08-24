@@ -143,11 +143,11 @@ class RegisterView(generics.CreateAPIView):
             'message': 'Cadastro realizado com sucesso. Por favor, verifique seu e-mail para confirmar sua conta.'
         }, status=status.HTTP_201_CREATED)
         
-        # Set httpOnly cookies
+        # Set httpOnly cookies with user object for accurate logging
         set_jwt_cookies(response, {
             'access': str(refresh.access_token),
             'refresh': str(refresh)
-        }, request)
+        }, request, user)
         
         return response
 
@@ -286,11 +286,13 @@ class LoginView(APIView):
             }
         })
         
-        # Set httpOnly cookies
+        # Set httpOnly cookies with user object for accurate logging
+        # Debug: Log what we're passing to set_jwt_cookies
+        logger.info(f"LoginView: About to call set_jwt_cookies with user ID={user.id}, email={user.email}")
         set_jwt_cookies(response, {
             'access': str(refresh.access_token),
             'refresh': str(refresh)
-        }, request)
+        }, request, user)
         
         return response
 
@@ -387,11 +389,11 @@ class ChangePasswordView(generics.UpdateAPIView):
             }
         })
         
-        # Set new tokens as cookies
+        # Set new tokens as cookies with user object for accurate logging
         set_jwt_cookies(response, {
             'access': str(refresh.access_token),
             'refresh': str(refresh)
-        }, request)
+        }, request, user)
         
         return response
 
@@ -607,11 +609,11 @@ class CustomTokenRefreshView(APIView):
                 'refresh': str(refresh),
             })
             
-            # Set cookies
+            # Set cookies with user object for accurate logging
             set_jwt_cookies(response, {
                 'access': str(access_token),
                 'refresh': str(refresh)
-            }, request)
+            }, request, user)
             
             return response
             
@@ -875,10 +877,10 @@ class EarlyAccessRegisterView(generics.CreateAPIView):
                       invite.expires_at.strftime('%d/%m/%Y') + '. Verifique seu e-mail para confirmar sua conta.'
         }, status=status.HTTP_201_CREATED)
         
-        # Set httpOnly cookies
+        # Set httpOnly cookies with user object for accurate logging
         set_jwt_cookies(response, {
             'access': str(refresh.access_token),
             'refresh': str(refresh)
-        }, request)
+        }, request, user)
         
         return response

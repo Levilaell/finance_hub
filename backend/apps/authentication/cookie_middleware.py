@@ -37,9 +37,15 @@ class JWTCookieMiddleware:
             response['Expires'] = '0'
 
 
-def set_jwt_cookies(response, tokens, request=None):
+def set_jwt_cookies(response, tokens, request=None, user=None):
     """
     Set JWT tokens as httpOnly cookies
+    
+    Args:
+        response: Django response object
+        tokens: Dict containing 'access' and 'refresh' tokens
+        request: Django request object (optional, for IP logging)
+        user: User object (optional, for accurate logging)
     """
     access_token = tokens.get('access')
     refresh_token = tokens.get('refresh')
@@ -59,6 +65,28 @@ def set_jwt_cookies(response, tokens, request=None):
         pass  # Keep secure as configured
     domain = getattr(settings, 'JWT_COOKIE_DOMAIN', None)
     
+    # Determine user ID for logging (prefer passed user over request.user)
+    user_id = None
+    client_ip = get_client_ip(request) if request else 'unknown'
+    
+    # Debug logging to identify the issue
+    if user:
+        try:
+            user_id = user.id
+            logger.info(f"Cookie middleware: Using passed user object, ID={user_id}, email={getattr(user, 'email', 'unknown')}")
+        except Exception as e:
+            logger.error(f"Cookie middleware: Error accessing user.id: {e}")
+            user_id = None
+    elif request and hasattr(request, 'user') and hasattr(request.user, 'id'):
+        try:
+            user_id = request.user.id
+            logger.info(f"Cookie middleware: Using request.user, ID={user_id}")
+        except Exception as e:
+            logger.error(f"Cookie middleware: Error accessing request.user.id: {e}")
+            user_id = None
+    else:
+        logger.warning(f"Cookie middleware: No user available - passed user: {user}, request.user: {getattr(request, 'user', 'missing')}")
+    
     # Set access token cookie
     if access_token:
         response.set_cookie(
@@ -72,12 +100,8 @@ def set_jwt_cookies(response, tokens, request=None):
             path='/'
         )
         
-        # Log token issuance
-        if request and hasattr(request, 'user'):
-            logger.info(
-                f"Access token issued for user {getattr(request.user, 'id', 'unknown')} "
-                f"from IP {get_client_ip(request)}"
-            )
+        # Log token issuance with accurate user ID
+        logger.info(f"Access token issued for user {user_id or 'unknown'} from IP {client_ip}")
     
     # Set refresh token cookie
     if refresh_token:
@@ -92,12 +116,8 @@ def set_jwt_cookies(response, tokens, request=None):
             path='/'  # Make refresh token available globally for token refresh
         )
         
-        # Log refresh token issuance
-        if request and hasattr(request, 'user'):
-            logger.info(
-                f"Refresh token issued for user {getattr(request.user, 'id', 'unknown')} "
-                f"from IP {get_client_ip(request)}"
-            )
+        # Log refresh token issuance with accurate user ID
+        logger.info(f"Refresh token issued for user {user_id or 'unknown'} from IP {client_ip}")
     
     return response
 

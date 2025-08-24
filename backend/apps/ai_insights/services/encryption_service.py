@@ -55,7 +55,8 @@ class EncryptionService:
         
         if not encryption_key:
             # Generate a key from SECRET_KEY if specific key not provided
-            logger.warning("AI_INSIGHTS_ENCRYPTION_KEY not set, deriving from SECRET_KEY")
+            if getattr(settings, 'DEBUG', False):
+                logger.info("AI_INSIGHTS_ENCRYPTION_KEY not set, deriving from SECRET_KEY (dev environment)")
             encryption_key = self._derive_key_from_secret(settings.SECRET_KEY)
         
         try:

@@ -209,6 +209,9 @@ else:
 # OpenAI API
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 
+# AI Insights Encryption Key
+AI_INSIGHTS_ENCRYPTION_KEY = os.environ.get('AI_INSIGHTS_ENCRYPTION_KEY', '')
+
 # Open Banking API
 OPEN_BANKING_CLIENT_ID = os.environ.get('OPEN_BANKING_CLIENT_ID', '')
 OPEN_BANKING_CLIENT_SECRET = os.environ.get('OPEN_BANKING_CLIENT_SECRET', '')
