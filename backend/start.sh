@@ -212,10 +212,9 @@ except Exception as e:
     print(f'⚠️  Ultra-nuclear cleanup failed: {e}')
 " || echo "⚠️  Migration cleanup failed"
     
-    # If all else fails, try to migrate anyway
-    echo "🔄 Attempting migrations despite dependency issues..."
-    python manage.py migrate --no-input || echo "⚠️  Final migration attempt failed"
-}
+# If all else fails, try to migrate anyway
+echo "🔄 Attempting migrations despite dependency issues..."
+python manage.py migrate --no-input || echo "⚠️  Final migration attempt failed"
 
 # Ensure email_verifications table exists (critical fix for admin delete)
 echo "🔧 Checking email_verifications table..."
