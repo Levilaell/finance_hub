@@ -106,6 +106,17 @@ if [ "$ULTRA_NUCLEAR_SUCCESS" != "true" ]; then
     echo "✅ INDIVIDUAL MIGRATION FIXES COMPLETED!"
 fi
 
+# MISSING INDEX FIX - Ensure database indexes match Django model expectations
+echo "🔧 MISSING INDEX FIX - Creating required database indexes..."
+python fix_missing_indexes.py && {
+    echo "✅ MISSING INDEX FIX SUCCESS - Database indexes synchronized with Django models!"
+    echo "✅ Missing reports_company_c4b7ee_idx index created"
+    echo "✅ Django model expectations satisfied"
+} || {
+    echo "❌ MISSING INDEX FIX FAILED - Could not create missing indexes..."
+    echo "⚠️  This may cause ValueError in Django models"
+}
+
 # Fix migration dependencies with comprehensive approach
 echo "🔧 Fixing migration dependencies..."
 python fix_migration_history.py || {
