@@ -19,6 +19,10 @@ from .views import (
     Disable2FAView,
 )
 
+# Import debug views for mobile troubleshooting
+if settings.DEBUG:
+    from .mobile_debug_views import MobileCookieDebugView, MobileAuthTestView
+
 app_name = 'authentication'
 
 urlpatterns = [
@@ -51,5 +55,7 @@ urlpatterns = [
 # Debug endpoints only in development
 if settings.DEBUG:
     urlpatterns += [
-        # Debug endpoints can be added here when needed
+        # Mobile cookie debugging endpoints
+        path('debug/mobile-cookies/', MobileCookieDebugView.as_view(), name='mobile_cookie_debug'),
+        path('debug/mobile-auth/', MobileAuthTestView.as_view(), name='mobile_auth_test'),
     ]

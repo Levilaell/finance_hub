@@ -429,6 +429,9 @@ except Exception as e:
 JWT_ACCESS_COOKIE_NAME = 'access_token'
 JWT_REFRESH_COOKIE_NAME = 'refresh_token'
 
+# Enable debug headers for mobile cookie troubleshooting
+ADD_DEBUG_HEADERS = True  # Temporary for mobile Safari debugging
+
 # ===== SECURITY VALIDATION =====
 # Validate security configuration on startup
 if not os.environ.get('DJANGO_COLLECT_STATIC'):

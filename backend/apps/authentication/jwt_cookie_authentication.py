@@ -31,10 +31,16 @@ class JWTCookieAuthentication(JWTAuthentication):
     
     def get_raw_token_from_cookie(self, request):
         """
-        Extract JWT token from httpOnly cookie
+        Extract JWT token from httpOnly cookie with mobile fallback
         """
         cookie_name = getattr(settings, 'JWT_ACCESS_COOKIE_NAME', 'access_token')
-        return request.COOKIES.get(cookie_name)
+        token = request.COOKIES.get(cookie_name)
+        
+        # Fallback for mobile browsers - try mobile-specific cookie
+        if not token:
+            token = request.COOKIES.get('mobile_access_token')
+        
+        return token
 
 
 class JWTRefreshCookieAuthentication(JWTAuthentication):
@@ -60,7 +66,13 @@ class JWTRefreshCookieAuthentication(JWTAuthentication):
     
     def get_raw_token_from_cookie(self, request):
         """
-        Extract refresh token from httpOnly cookie
+        Extract refresh token from httpOnly cookie with mobile fallback
         """
         cookie_name = getattr(settings, 'JWT_REFRESH_COOKIE_NAME', 'refresh_token')
-        return request.COOKIES.get(cookie_name)
+        token = request.COOKIES.get(cookie_name)
+        
+        # Fallback for mobile browsers - try mobile-specific cookie
+        if not token:
+            token = request.COOKIES.get('mobile_refresh_token')
+        
+        return token
