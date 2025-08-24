@@ -147,13 +147,41 @@ def set_jwt_cookies(response, tokens, request=None, user=None):
         # Log refresh token issuance with accurate user ID
         logger.info(f"Refresh token issued for user {user_id or 'unknown'} from IP {client_ip}")
     
-    # Add debug headers for cookie troubleshooting
+    # Add comprehensive debug headers for cookie troubleshooting
     if request and (settings.DEBUG or hasattr(settings, 'ADD_DEBUG_HEADERS')):
         user_agent = request.META.get('HTTP_USER_AGENT', '')
         is_mobile_safari = _is_mobile_safari(user_agent)
+        
+        # Basic cookie info
         response['X-Cookie-Set-For-Mobile-Safari'] = str(is_mobile_safari)
         response['X-Cookie-SameSite-Used'] = samesite
         response['X-Cookie-Secure-Used'] = str(secure)
+        response['X-Cookie-Domain-Used'] = str(domain) if domain else 'None'
+        response['X-Cookie-Path-Used'] = '/'
+        
+        # Request origin info
+        response['X-Request-Origin'] = request.META.get('HTTP_ORIGIN', 'None')
+        response['X-Request-Host'] = request.META.get('HTTP_HOST', 'None')
+        response['X-Request-Referer'] = request.META.get('HTTP_REFERER', 'None')[:100]
+        
+        # Token size info (for debugging large cookie issues)
+        if access_token:
+            response['X-Access-Token-Length'] = str(len(access_token))
+        if refresh_token:
+            response['X-Refresh-Token-Length'] = str(len(refresh_token))
+        
+        # Current cookies in request (to see what browser is sending back)
+        current_cookies = request.COOKIES.keys()
+        response['X-Current-Cookies-Count'] = str(len(current_cookies))
+        response['X-Current-Cookies'] = ','.join(list(current_cookies)[:5])  # First 5 only
+        
+        logger.info(f"Cookie debug info - Mobile: {is_mobile_safari}, SameSite: {samesite}, Secure: {secure}, Domain: {domain}, Origin: {request.META.get('HTTP_ORIGIN')}")
+        
+        # Add cookie size warning if tokens are too large
+        if access_token and len(access_token) > 4000:
+            logger.warning(f"Access token very large ({len(access_token)} chars) - may cause mobile cookie issues")
+        if refresh_token and len(refresh_token) > 4000:
+            logger.warning(f"Refresh token very large ({len(refresh_token)} chars) - may cause mobile cookie issues")
     
     return response
 

@@ -23,6 +23,9 @@ from .views import (
 if settings.DEBUG:
     from .mobile_debug_views import MobileCookieDebugView, MobileAuthTestView
 
+# Import troubleshooting view (available in production for urgent debugging)
+from .mobile_troubleshoot_view import MobileTroubleshootView
+
 app_name = 'authentication'
 
 urlpatterns = [
@@ -50,6 +53,9 @@ urlpatterns = [
     path('2fa/setup/', Setup2FAView.as_view(), name='setup_2fa'),
     path('2fa/enable/', Enable2FAView.as_view(), name='enable_2fa'),
     path('2fa/disable/', Disable2FAView.as_view(), name='disable_2fa'),
+    
+    # Mobile troubleshooting endpoint (available in production for critical debugging)
+    path('troubleshoot/mobile/', MobileTroubleshootView.as_view(), name='mobile_troubleshoot'),
 ]
 
 # Debug endpoints only in development
