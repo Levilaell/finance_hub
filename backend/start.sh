@@ -139,85 +139,78 @@ except Exception as e:
     }
 }
 
-# Fix migration dependencies with comprehensive approach
-echo "🔧 Fixing migration dependencies..."
-python fix_migration_history.py || {
-    echo "⚠️  Comprehensive migration fix failed, trying fallback method..."
-    
-    # Fallback: Simple fix for the most common issues
-    python -c "
+# ✅ MIGRATION DEPENDENCIES - Handled by Ultra-Nuclear Fix
+# Ultra-Nuclear Fix above already resolved all migration dependencies
+# Legacy fallback method kept for emergency scenarios only
+echo "🔧 Migration dependencies already resolved by Ultra-Nuclear Fix"
+echo "📋 Running emergency fallback cleanup (if needed)..."
+
+# ULTRA-NUCLEAR CLEANUP - Remove residual problematic migration records
+echo "🧹 ULTRA-NUCLEAR CLEANUP - Removing residual problematic migration records..."
+python -c "
 import django
 django.setup()
 from django.db import connection
-from django.db.migrations.recorder import MigrationRecorder
 
 try:
-    recorder = MigrationRecorder(connection)
-    applied_migrations = set(recorder.applied_migrations())
-    
-    # Fix companies migration dependency issue
-    companies_0008 = ('companies', '0008_alter_resourceusage_options_and_more')
-    companies_0009 = ('companies', '0009_add_early_access')
-    
-    if companies_0009 in applied_migrations and companies_0008 not in applied_migrations:
-        print('⚠️  Found companies migration dependency issue, applying fallback fix...')
-        with connection.cursor() as cursor:
+    with connection.cursor() as cursor:
+        # Remove old problematic migration records that were disabled
+        problematic_migrations = [
+            ('reports', '0002_alter_aianalysis_options_and_more'),
+            ('reports', '0003_aianalysistemplate_aianalysis'), 
+            ('reports', '0004_merge_20250803_2225'),
+            ('reports', '0005_fix_inconsistent_history')
+        ]
+        
+        cursor.execute(\"\"\"
+            SELECT app, name FROM django_migrations 
+            WHERE app = 'reports'
+            ORDER BY applied
+        \"\"\")
+        existing_records = cursor.fetchall()
+        
+        print('📊 Current reports migrations in database:')
+        for app, name in existing_records:
+            print(f'    {app}.{name}')
+        
+        total_removed = 0
+        for app, migration_name in problematic_migrations:
+            cursor.execute(
+                \"DELETE FROM django_migrations WHERE app = %s AND name = %s\", 
+                [app, migration_name]
+            )
+            deleted = cursor.rowcount
+            if deleted > 0:
+                total_removed += deleted
+                print(f'   ✅ Removed obsolete migration record: {app}.{migration_name}')
+        
+        if total_removed > 0:
+            print(f'✅ ULTRA-NUCLEAR CLEANUP SUCCESS - Removed {total_removed} obsolete migration records')
+            print('✅ Migration state now clean - only active migrations remain')
+        else:
+            print('✅ Migration state already clean - no obsolete records found')
+            
+    # Fix companies migration dependency if needed
+    with connection.cursor() as cursor:
+        cursor.execute(\"SELECT name FROM django_migrations WHERE app = 'companies' ORDER BY applied\")
+        companies_migrations = [row[0] for row in cursor.fetchall()]
+        
+        if '0009_add_early_access' in companies_migrations and '0008_alter_resourceusage_options_and_more' not in companies_migrations:
+            print('🔧 Fixing companies migration dependency...')
             cursor.execute(\"SELECT column_name FROM information_schema.columns WHERE table_name = 'companies_resourceusage'\")
             columns = [row[0] for row in cursor.fetchall()]
             if 'created_at' in columns and 'updated_at' in columns:
-                recorder.record_applied(companies_0008[0], companies_0008[1])
-                print('✅ Companies migration 0008 marked as applied (fallback)')
+                cursor.execute(\"\"\"
+                    INSERT INTO django_migrations (app, name, applied) 
+                    VALUES ('companies', '0008_alter_resourceusage_options_and_more', NOW())
+                    ON CONFLICT (app, name) DO NOTHING
+                \"\"\")
+                print('✅ Companies migration 0008 marked as applied')
     
-    # Fix reports migration dependency issue (ULTRA-DEEP ANALYSIS)
-    # Check for InconsistentMigrationHistory error condition
-    with connection.cursor() as cursor:
-        cursor.execute(\"\"\"
-            SELECT app, name, applied 
-            FROM django_migrations 
-            WHERE app = 'reports' 
-            ORDER BY applied
-        \"\"\")
-        reports_migrations = cursor.fetchall()
-        
-        print(f'📊 Found {len(reports_migrations)} applied reports migrations:')
-        for app, name, applied in reports_migrations:
-            print(f'    {app}.{name} (applied: {applied})')
-            
-        # Check for all problematic migrations that cause dependency issues
-        problematic_migrations = [
-            '0002_alter_aianalysis_options_and_more',
-            '0003_aianalysistemplate_aianalysis', 
-            '0004_merge_20250803_2225',
-            '0005_fix_inconsistent_history'
-        ]
-        
-        migrations_to_remove = []
-        for _, name, _ in reports_migrations:
-            for problematic in problematic_migrations:
-                if problematic in name:
-                    migrations_to_remove.append(name)
-                    break
-        
-        if migrations_to_remove:
-            print(f'⚠️  Found {len(migrations_to_remove)} problematic reports migrations causing InconsistentMigrationHistory')
-            print(f'🔧 Removing migrations: {migrations_to_remove}')
-            print('   This allows Django to reapply them in correct dependency order')
-            
-            total_removed = 0
-            for migration_name in migrations_to_remove:
-                cursor.execute(\"DELETE FROM django_migrations WHERE app = 'reports' AND name = %s\", [migration_name])
-                deleted = cursor.rowcount
-                total_removed += deleted
-                print(f'   ✅ Removed migration: {migration_name} ({deleted} record)')
-            
-            print(f'✅ Total removed {total_removed} reports migration records for correct reordering')
-        else:
-            print('✅ No reports migration inconsistency detected')
-    
-    print('✅ Fallback migration fix completed')
+    print('✅ ULTRA-NUCLEAR CLEANUP COMPLETED')
 except Exception as e:
-    print(f'⚠️  Fallback migration fix failed: {e}')
-" || echo "⚠️  All migration dependency fixes failed"
+    print(f'⚠️  Ultra-nuclear cleanup failed: {e}')
+" || echo "⚠️  Migration cleanup failed"
     
     # If all else fails, try to migrate anyway
     echo "🔄 Attempting migrations despite dependency issues..."
