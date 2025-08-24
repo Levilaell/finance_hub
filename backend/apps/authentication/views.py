@@ -277,12 +277,7 @@ class LoginView(APIView):
             extra_data={'session_count': SessionManager.get_active_session_count(user)}
         )
         
-        # Detect Mobile Safari for enhanced fallback
-        from .cookie_middleware import _is_mobile_safari
-        user_agent = request.META.get('HTTP_USER_AGENT', '')
-        is_mobile_safari = _is_mobile_safari(user_agent)
-        
-        # Create response with user data and mobile fallback instructions
+        # Simple response data
         response_data = {
             'user': UserSerializer(user).data,
             'tokens': {
@@ -293,43 +288,14 @@ class LoginView(APIView):
             }
         }
         
-        # Add mobile-specific fallback instructions  
-        if is_mobile_safari:
-            response_data['mobile_fallback'] = {
-                'detected': True,
-                'instructions': {
-                    'primary': 'Cookies will be attempted first',
-                    'fallback_1': 'Store tokens from response body in sessionStorage',
-                    'fallback_2': 'Store tokens from X-Access-Token header in localStorage',
-                    'usage': 'Try cookies first, then sessionStorage, then localStorage on API calls'
-                },
-                'browser_info': {
-                    'user_agent': user_agent[:100],
-                    'issues': 'Mobile Safari may not send cookies on subsequent CORS requests'
-                }
-            }
-            logger.warning(f"Mobile Safari detected for user {user.email} - enabling fallback strategies")
-        
         response = Response(response_data)
         
-        # Set httpOnly cookies with user object for accurate logging
+        # Set JWT cookies
         logger.info(f"LoginView: Setting JWT cookies for user ID={user.id}, email={user.email}")
-        
-        # Use standard JWT cookies (now mobile-compatible via settings)
         set_jwt_cookies(response, {
             'access': str(refresh.access_token),
             'refresh': str(refresh)
         }, request, user)
-        
-        # Add tokens to headers for Mobile Safari fallback
-        if is_mobile_safari:
-            response['X-Access-Token'] = str(refresh.access_token)
-            response['X-Refresh-Token'] = str(refresh)
-            response['X-Token-Type'] = 'Bearer'
-            response['X-Expires-In'] = str(int(settings.SIMPLE_JWT.get('ACCESS_TOKEN_LIFETIME').total_seconds()))
-            # Allow frontend to access these headers
-            response['Access-Control-Expose-Headers'] = 'X-Access-Token, X-Refresh-Token, X-Token-Type, X-Expires-In'
-            logger.info(f"Mobile Safari fallback headers set for user {user.email}")
         
         return response
 

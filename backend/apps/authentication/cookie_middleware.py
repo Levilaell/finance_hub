@@ -55,64 +55,33 @@ class JWTCookieMiddleware:
 
 def set_jwt_cookies(response, tokens, request=None, user=None):
     """
-    Set JWT tokens as httpOnly cookies with mobile browser compatibility
-    
-    Args:
-        response: Django response object
-        tokens: Dict containing 'access' and 'refresh' tokens
-        request: Django request object (optional, for IP logging)
-        user: User object (optional, for accurate logging)
+    Set JWT tokens as httpOnly cookies - MVP Mobile Safari Fix
     """
     access_token = tokens.get('access')
     refresh_token = tokens.get('refresh')
     
-    # Get cookie settings from Django settings
-    secure = getattr(settings, 'JWT_COOKIE_SECURE', not settings.DEBUG)
-    samesite = getattr(settings, 'JWT_COOKIE_SAMESITE', 'Lax')
-    
-    # Mobile Safari compatibility now handled at settings level (SameSite=Lax by default)
-    # No browser-specific overrides needed anymore
-    
-    # Convert Python None to string "None" for SameSite attribute
-    if samesite is None:
-        samesite = 'None'
-    
-    # Legacy Mobile Safari override no longer needed - fixed at settings level
-    # Keep for backward compatibility during transition
-    if request and samesite == 'None':
+    # MOBILE SAFARI MVP FIX
+    is_mobile_safari = False
+    if request:
         user_agent = request.META.get('HTTP_USER_AGENT', '')
-        if _is_mobile_safari(user_agent):
-            samesite = 'Lax'
-            logger.info(f"Legacy Mobile Safari override applied (should not be needed with new settings)")
+        is_mobile_safari = _is_mobile_safari(user_agent)
     
-    # Special handling for development: Chrome allows Secure=False with SameSite=None on localhost
-    if settings.DEBUG and samesite == 'None':
-        # In development, we can use SameSite=None without Secure for localhost
-        # This allows cross-origin requests between localhost:3000 and localhost:8000
-        pass  # Keep secure as configured
+    # Configure cookies specifically for Mobile Safari
+    if is_mobile_safari:
+        # Mobile Safari needs SameSite=None + Secure=True
+        samesite = 'None'
+        secure = True
+        logger.info("Mobile Safari detected - using SameSite=None configuration")
+    else:
+        # Standard configuration for other browsers
+        samesite = 'Lax'
+        secure = getattr(settings, 'JWT_COOKIE_SECURE', not settings.DEBUG)
+    
     domain = getattr(settings, 'JWT_COOKIE_DOMAIN', None)
     
-    # Determine user ID for logging (prefer passed user over request.user)
-    user_id = None
+    # Simple logging
+    user_id = getattr(user, 'id', None) if user else None
     client_ip = get_client_ip(request) if request else 'unknown'
-    
-    # Debug logging to identify the issue
-    if user:
-        try:
-            user_id = user.id
-            logger.info(f"Cookie middleware: Using passed user object, ID={user_id}, email={getattr(user, 'email', 'unknown')}")
-        except Exception as e:
-            logger.error(f"Cookie middleware: Error accessing user.id: {e}")
-            user_id = None
-    elif request and hasattr(request, 'user') and hasattr(request.user, 'id'):
-        try:
-            user_id = request.user.id
-            logger.info(f"Cookie middleware: Using request.user, ID={user_id}")
-        except Exception as e:
-            logger.error(f"Cookie middleware: Error accessing request.user.id: {e}")
-            user_id = None
-    else:
-        logger.warning(f"Cookie middleware: No user available - passed user: {user}, request.user: {getattr(request, 'user', 'missing')}")
     
     # Set access token cookie
     if access_token:
@@ -126,9 +95,7 @@ def set_jwt_cookies(response, tokens, request=None, user=None):
             domain=domain,
             path='/'
         )
-        
-        # Log token issuance with accurate user ID
-        logger.info(f"Access token issued for user {user_id or 'unknown'} from IP {client_ip}")
+        logger.info(f"Access token set for user {user_id or 'unknown'} from IP {client_ip}")
     
     # Set refresh token cookie
     if refresh_token:
@@ -140,47 +107,12 @@ def set_jwt_cookies(response, tokens, request=None, user=None):
             httponly=True,
             samesite=samesite,
             domain=domain,
-            path='/'  # Make refresh token available globally for token refresh
+            path='/'
         )
-        
-        # Log refresh token issuance with accurate user ID
-        logger.info(f"Refresh token issued for user {user_id or 'unknown'} from IP {client_ip}")
+        logger.info(f"Refresh token set for user {user_id or 'unknown'} from IP {client_ip}")
     
-    # Add comprehensive debug headers for cookie troubleshooting
-    if request and (settings.DEBUG or hasattr(settings, 'ADD_DEBUG_HEADERS')):
-        user_agent = request.META.get('HTTP_USER_AGENT', '')
-        is_mobile_safari = _is_mobile_safari(user_agent)
-        
-        # Basic cookie info
-        response['X-Cookie-Set-For-Mobile-Safari'] = str(is_mobile_safari)
-        response['X-Cookie-SameSite-Used'] = samesite
-        response['X-Cookie-Secure-Used'] = str(secure)
-        response['X-Cookie-Domain-Used'] = str(domain) if domain else 'None'
-        response['X-Cookie-Path-Used'] = '/'
-        
-        # Request origin info
-        response['X-Request-Origin'] = request.META.get('HTTP_ORIGIN', 'None')
-        response['X-Request-Host'] = request.META.get('HTTP_HOST', 'None')
-        response['X-Request-Referer'] = request.META.get('HTTP_REFERER', 'None')[:100]
-        
-        # Token size info (for debugging large cookie issues)
-        if access_token:
-            response['X-Access-Token-Length'] = str(len(access_token))
-        if refresh_token:
-            response['X-Refresh-Token-Length'] = str(len(refresh_token))
-        
-        # Current cookies in request (to see what browser is sending back)
-        current_cookies = request.COOKIES.keys()
-        response['X-Current-Cookies-Count'] = str(len(current_cookies))
-        response['X-Current-Cookies'] = ','.join(list(current_cookies)[:5])  # First 5 only
-        
-        logger.info(f"Cookie debug info - Mobile: {is_mobile_safari}, SameSite: {samesite}, Secure: {secure}, Domain: {domain}, Origin: {request.META.get('HTTP_ORIGIN')}")
-        
-        # Add cookie size warning if tokens are too large
-        if access_token and len(access_token) > 4000:
-            logger.warning(f"Access token very large ({len(access_token)} chars) - may cause mobile cookie issues")
-        if refresh_token and len(refresh_token) > 4000:
-            logger.warning(f"Refresh token very large ({len(refresh_token)} chars) - may cause mobile cookie issues")
+    # Simple debug log
+    logger.info(f"Cookie config - Mobile Safari: {is_mobile_safari}, SameSite: {samesite}, Secure: {secure}")
     
     return response
 
