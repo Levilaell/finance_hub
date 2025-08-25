@@ -176,27 +176,39 @@ class PluggyItem(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.connector.name} - {self.pluggy_item_id}"
+        try:
+            connector_name = self.connector.name if self.connector else "No Connector"
+            return f"{connector_name} - {self.pluggy_item_id}"
+        except Exception:
+            return f"PluggyItem {self.pluggy_item_id}"
     
     def get_mfa_parameter(self):
         """
         Get decrypted MFA parameter
         Returns the decrypted parameter or falls back to unencrypted if needed
         """
-        from apps.banking.utils.encryption import banking_encryption
-        
-        # First try encrypted parameter
-        if self.encrypted_parameter:
-            try:
-                return banking_encryption.decrypt_mfa_parameter(self.encrypted_parameter)
-            except Exception as e:
-                logger.error(f"Failed to decrypt parameter for item {self.pluggy_item_id}: {e}")
-        
-        # Fall back to unencrypted parameter for backward compatibility
-        if self.parameter:
-            return self.parameter
-        
-        return {}
+        try:
+            from apps.banking.utils.encryption import banking_encryption
+            
+            # First try encrypted parameter
+            if self.encrypted_parameter:
+                try:
+                    return banking_encryption.decrypt_mfa_parameter(self.encrypted_parameter)
+                except Exception as e:
+                    logger.error(f"Failed to decrypt parameter for item {self.pluggy_item_id}: {e}")
+            
+            # Fall back to unencrypted parameter for backward compatibility
+            if self.parameter:
+                return self.parameter
+            
+            return {}
+        except ImportError as e:
+            logger.error(f"Failed to import encryption service for item {self.pluggy_item_id}: {e}")
+            # Fallback to unencrypted parameter if encryption service unavailable
+            return self.parameter if self.parameter else {}
+        except Exception as e:
+            logger.error(f"Unexpected error in get_mfa_parameter for item {self.pluggy_item_id}: {e}")
+            return {}
     
     def set_mfa_parameter(self, parameter_data):
         """
@@ -205,21 +217,32 @@ class PluggyItem(models.Model):
         Args:
             parameter_data: Dictionary with MFA parameter information
         """
-        from apps.banking.utils.encryption import banking_encryption
-        
         if not parameter_data:
             self.encrypted_parameter = ''
             self.parameter = {}
             return
         
         try:
-            # Encrypt the parameter
-            self.encrypted_parameter = banking_encryption.encrypt_mfa_parameter(parameter_data)
-            # Clear the unencrypted field for security
-            self.parameter = {}
+            from apps.banking.utils.encryption import banking_encryption
+            
+            try:
+                # Encrypt the parameter
+                self.encrypted_parameter = banking_encryption.encrypt_mfa_parameter(parameter_data)
+                # Clear the unencrypted field for security
+                self.parameter = {}
+            except Exception as e:
+                logger.error(f"Failed to encrypt parameter for item {self.pluggy_item_id}: {e}")
+                # Fallback to unencrypted (not recommended but prevents breaking)
+                self.parameter = parameter_data
+                self.encrypted_parameter = ''
+        except ImportError as e:
+            logger.error(f"Failed to import encryption service for item {self.pluggy_item_id}: {e}")
+            # Fallback to unencrypted if encryption service unavailable
+            self.parameter = parameter_data
+            self.encrypted_parameter = ''
         except Exception as e:
-            logger.error(f"Failed to encrypt parameter for item {self.pluggy_item_id}: {e}")
-            # Fallback to unencrypted (not recommended but prevents breaking)
+            logger.error(f"Unexpected error in set_mfa_parameter for item {self.pluggy_item_id}: {e}")
+            # Fallback to unencrypted
             self.parameter = parameter_data
             self.encrypted_parameter = ''
     
@@ -232,12 +255,17 @@ class PluggyItem(models.Model):
         """Override save to handle parameter migration"""
         # Migrate unencrypted parameters to encrypted on save
         if self.parameter and not self.encrypted_parameter:
-            from apps.banking.utils.encryption import banking_encryption
             try:
-                self.encrypted_parameter = banking_encryption.encrypt_mfa_parameter(self.parameter)
-                self.parameter = {}  # Clear unencrypted after successful encryption
+                from apps.banking.utils.encryption import banking_encryption
+                try:
+                    self.encrypted_parameter = banking_encryption.encrypt_mfa_parameter(self.parameter)
+                    self.parameter = {}  # Clear unencrypted after successful encryption
+                except Exception as e:
+                    logger.warning(f"Could not migrate parameter to encrypted format: {e}")
+            except ImportError as e:
+                logger.warning(f"Encryption service not available for parameter migration: {e}")
             except Exception as e:
-                logger.warning(f"Could not migrate parameter to encrypted format: {e}")
+                logger.warning(f"Unexpected error during parameter migration: {e}")
         
         super().save(*args, **kwargs)
 

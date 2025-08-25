@@ -1,6 +1,7 @@
 """
 Banking app admin configuration - Pluggy Integration
 """
+import logging
 from django.contrib import admin
 from django.utils.html import format_html
 from django.db.models import Count
@@ -8,6 +9,8 @@ from .models import (
     PluggyConnector, PluggyItem, BankAccount, 
     Transaction, TransactionCategory, PluggyCategory, ItemWebhook
 )
+
+logger = logging.getLogger(__name__)
 
 
 @admin.register(PluggyConnector)
@@ -48,7 +51,7 @@ class PluggyItemAdmin(admin.ModelAdmin):
     list_display = ['pluggy_item_id', 'company', 'connector', 'status', 'execution_status', 'accounts_count', 'last_successful_update']
     list_filter = ['status', 'execution_status', 'connector__name', 'created_at']
     search_fields = ['pluggy_item_id', 'company__name', 'connector__name', 'client_user_id']
-    readonly_fields = ['pluggy_item_id', 'pluggy_created_at', 'pluggy_updated_at', 'last_successful_update', 'created_at', 'updated_at']
+    readonly_fields = ['pluggy_item_id', 'encrypted_parameter', 'pluggy_created_at', 'pluggy_updated_at', 'last_successful_update', 'created_at', 'updated_at']
     raw_id_fields = ['company', 'connector']
     
     fieldsets = (
@@ -57,6 +60,11 @@ class PluggyItemAdmin(admin.ModelAdmin):
         }),
         ('Status', {
             'fields': ('status', 'execution_status', 'last_successful_update')
+        }),
+        ('Parameters', {
+            'fields': ('parameter', 'encrypted_parameter'),
+            'classes': ('collapse',),
+            'description': 'MFA parameters - handle with care'
         }),
         ('Error Information', {
             'fields': ('error_code', 'error_message', 'status_detail'),
@@ -76,18 +84,36 @@ class PluggyItemAdmin(admin.ModelAdmin):
     )
     
     def accounts_count(self, obj):
-        return obj.accounts.count()
+        try:
+            return obj.accounts.count()
+        except Exception as e:
+            logger.error(f"Error getting accounts count for PluggyItem {obj.id}: {e}")
+            return "Error"
     accounts_count.short_description = 'Accounts'
     
     actions = ['sync_items']
     
     def sync_items(self, request, queryset):
-        from .tasks import sync_bank_account
+        try:
+            from .tasks import sync_bank_account
+        except ImportError as e:
+            self.message_user(request, f'Could not import sync task: {e}', level='ERROR')
+            return
+        
         count = 0
+        error_count = 0
         for item in queryset:
-            sync_bank_account.delay(str(item.id))
-            count += 1
-        self.message_user(request, f'{count} items queued for synchronization')
+            try:
+                sync_bank_account.delay(str(item.id))
+                count += 1
+            except Exception as e:
+                logger.error(f"Could not queue sync for item {item.id}: {e}")
+                error_count += 1
+        
+        if count > 0:
+            self.message_user(request, f'{count} items queued for synchronization')
+        if error_count > 0:
+            self.message_user(request, f'{error_count} items failed to queue (check logs)', level='WARNING')
     sync_items.short_description = 'Queue sync for selected items'
 
 
