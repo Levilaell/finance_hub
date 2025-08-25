@@ -570,9 +570,19 @@ class CashFlowView(APIView):
         while current_date <= end_date:
             day_transactions = transactions.filter(date=current_date)
             
+            # Use broader filters consistent with CategorySpendingView
+            income_filter = (
+                Q(type__iexact='CREDIT') | Q(type__iexact='INCOME') |
+                Q(type__iexact='TRANSFER_IN') | Q(type__iexact='PIX_IN') | Q(type__iexact='INTEREST')
+            )
+            expense_filter = (
+                Q(type__iexact='DEBIT') | Q(type__iexact='EXPENSE') |
+                Q(type__iexact='TRANSFER_OUT') | Q(type__iexact='PIX_OUT') | Q(type__iexact='FEE')
+            )
+            
             daily_data = day_transactions.aggregate(
-                income=Sum('amount', filter=Q(type='CREDIT')),
-                expenses=Sum('amount', filter=Q(type='DEBIT'))
+                income=Sum('amount', filter=income_filter),
+                expenses=Sum('amount', filter=expense_filter)
             )
             
             income = daily_data['income'] or Decimal('0')
@@ -823,12 +833,15 @@ class CashFlowDataView(APIView):
             # Convert datetime to date for matching with daily_data keys
             date_key = trans['date'].date() if hasattr(trans['date'], 'date') else trans['date']
             amount = trans['amount']
-            trans_type = trans['type']
+            trans_type = trans['type'].upper() if trans['type'] else ''
             
             if date_key in daily_data:
-                if trans_type in ['CREDIT', 'INCOME']:
+                # Use case-insensitive matching and include all transaction types
+                # Income types (consistent with CategorySpendingView)
+                if trans_type.upper() in ['CREDIT', 'INCOME', 'TRANSFER_IN', 'PIX_IN', 'INTEREST']:
                     daily_data[date_key]['income'] += amount
-                elif trans_type in ['DEBIT', 'EXPENSE']:
+                # Expense types (consistent with CategorySpendingView)
+                elif trans_type.upper() in ['DEBIT', 'EXPENSE', 'TRANSFER_OUT', 'PIX_OUT', 'FEE']:
                     daily_data[date_key]['expenses'] += abs(amount)
         
         # Build response with running balance

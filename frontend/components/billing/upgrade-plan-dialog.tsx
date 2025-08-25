@@ -45,7 +45,7 @@ export function UpgradePlanDialog({
   const checkoutMutation = useMutation({
     mutationFn: (data: { plan_slug: string; billing_cycle: 'monthly' | 'yearly' }) =>
       subscriptionService.createCheckoutSession({
-        plan_id: plans?.find(p => p.name === data.plan_slug)?.id || 0,
+        plan_id: plans?.find(p => p.slug === data.plan_slug)?.id || 0,
         billing_period: data.billing_cycle,
         success_url: `${window.location.origin}/subscription/success`,
         cancel_url: `${window.location.origin}/subscription`
