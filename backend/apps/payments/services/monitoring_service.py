@@ -60,7 +60,7 @@ class PaymentMetrics:
         tags = tags or {}
         
         # Add environment tag
-        tags['environment'] = settings.ENVIRONMENT_NAME
+        tags['environment'] = getattr(settings, 'ENVIRONMENT_NAME', 'production')
         
         # Log to structured logger
         performance_logger.info(

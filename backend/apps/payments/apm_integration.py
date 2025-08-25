@@ -51,7 +51,7 @@ class DataDogAPM(APMIntegration):
                 self.tracer.configure(
                     hostname=settings.DATADOG_AGENT_HOST,
                     port=settings.DATADOG_AGENT_PORT,
-                    env=settings.ENVIRONMENT_NAME,
+                    env=getattr(settings, 'ENVIRONMENT_NAME', 'production'),
                     service='finance-hub-payments',
                     version=settings.VERSION
                 )
@@ -74,7 +74,7 @@ class DataDogAPM(APMIntegration):
                 span.set_tag(key, value)
         
         # Add default tags
-        span.set_tag('environment', settings.ENVIRONMENT_NAME)
+        span.set_tag('environment', getattr(settings, 'ENVIRONMENT_NAME', 'production'))
         
         return span
     
@@ -179,7 +179,7 @@ class ElasticAPM(APMIntegration):
                     'SERVICE_NAME': 'finance-hub-payments',
                     'SECRET_TOKEN': settings.ELASTIC_APM_SECRET_TOKEN,
                     'SERVER_URL': settings.ELASTIC_APM_SERVER_URL,
-                    'ENVIRONMENT': settings.ENVIRONMENT_NAME,
+                    'ENVIRONMENT': getattr(settings, 'ENVIRONMENT_NAME', 'production'),
                 })
                 self.elasticapm = elasticapm
             except ImportError:

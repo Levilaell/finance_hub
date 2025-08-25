@@ -217,7 +217,7 @@ def get_logging_config():
         config['handlers']['cloudwatch'] = {
             'class': 'watchtower.CloudWatchLogHandler',
             'log_group': settings.AWS_CLOUDWATCH_LOG_GROUP,
-            'stream_name': f'payments-{settings.ENVIRONMENT_NAME}',
+            'stream_name': f'payments-{getattr(settings, "ENVIRONMENT_NAME", "production")}',
             'formatter': 'json',
             'filters': ['payment_context', 'sensitive_data']
         }
@@ -252,7 +252,7 @@ def setup_payment_logging():
                 DjangoIntegration(),
                 sentry_logging
             ],
-            environment=settings.ENVIRONMENT_NAME,
+            environment=getattr(settings, 'ENVIRONMENT_NAME', 'production'),
             traces_sample_rate=0.1,  # 10% of transactions
             send_default_pii=False,  # Don't send PII
             before_send=filter_sensitive_data

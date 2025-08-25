@@ -77,7 +77,7 @@ class HealthCheckService:
         return {
             'status': overall_status,
             'timestamp': timezone.now().isoformat(),
-            'environment': settings.ENVIRONMENT_NAME,
+            'environment': getattr(settings, 'ENVIRONMENT_NAME', 'production'),
             'version': getattr(settings, 'VERSION', 'unknown'),
             'response_time_ms': round(response_time_ms, 2),
             'checks': checks,
