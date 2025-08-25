@@ -182,9 +182,16 @@ class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
         if error_response:
             return PluggyItem.objects.none()
         
-        return PluggyItem.objects.filter(
+        queryset = PluggyItem.objects.filter(
             company=company
         ).select_related('connector').prefetch_related('accounts')
+        
+        # Filter by status if provided
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+            
+        return queryset
     
     @action(detail=True, methods=['post'])
     def sync(self, request, pk=None):

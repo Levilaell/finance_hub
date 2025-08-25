@@ -139,8 +139,8 @@ export function useMFATimeout(options: UseMFATimeoutOptions = {}) {
 
     // Find item waiting for MFA
     const waitingItem = waitingItems.find((item: any) => 
-      item.status === 'WAITING_USER_ACTION' || 
-      item.execution_status === 'WAITING_USER_ACTION'
+      item.status === 'WAITING_USER_INPUT' || 
+      item.execution_status === 'WAITING_USER_INPUT'
     );
 
     if (waitingItem && !state.isActive) {

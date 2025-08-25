@@ -56,7 +56,7 @@ class BankingService {
   async getWaitingItems(): Promise<{ success: boolean; data: PluggyItem[] }> {
     try {
       const response = await apiClient.get<PaginatedResponse<PluggyItem>>('/api/banking/items/', {
-        status: 'WAITING_USER_ACTION'
+        status: 'WAITING_USER_INPUT'
       });
       return {
         success: true,
