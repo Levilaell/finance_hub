@@ -167,6 +167,19 @@ else:
 # Never allow all origins in production
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
+# CORS Headers - Explicit Authorization header for Mobile Safari
+CORS_ALLOWED_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',  # Required for Mobile Safari localStorage auth
+    'cache-control',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 # Additional CORS security for production
 # CORS_REPLACE_HTTPS_REFERER = True  # Removed - deprecated in django-cors-headers
