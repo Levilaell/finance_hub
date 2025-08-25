@@ -277,9 +277,13 @@ class LoginView(APIView):
             extra_data={'session_count': SessionManager.get_active_session_count(user)}
         )
         
-        # Simple response - just user data  
+        # Response includes both user data AND tokens for cross-origin compatibility
         response_data = {
             'user': UserSerializer(user).data,
+            'tokens': {
+                'access': str(refresh.access_token),
+                'refresh': str(refresh)
+            }
         }
         
         response = Response(response_data)
@@ -557,12 +561,8 @@ class CustomTokenRefreshView(APIView):
     throttle_classes = [TokenRefreshRateThrottle]
     
     def post(self, request):
-        # Try to get refresh token from cookie first, then from body
+        # Try to get refresh token from cookie first, then from request body
         refresh_token = request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
-        
-        # Fallback for mobile browsers
-        if not refresh_token:
-            refresh_token = request.COOKIES.get('mobile_refresh_token')
         
         if not refresh_token:
             refresh_token = request.data.get('refresh')
