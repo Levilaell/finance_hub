@@ -28,7 +28,6 @@ const CONNECTION_STATUS_MESSAGES: Record<string, string> = {
   'LOGIN_ERROR': 'Erro de login',
   'OUTDATED': 'Desatualizado',
   'UPDATING': 'Atualizando',
-  'UPDATED': 'Atualizado',
   'ERROR': 'Erro',
   'WAITING_USER_INPUT': 'Aguardando ação',
   'CREATING': 'Criando',
@@ -58,7 +57,6 @@ export function BankConnectionCard({
 
   const getStatusBadge = () => {
     const statusConfig = {
-      UPDATED: { variant: 'outline' as const, icon: null },
       UPDATING: { variant: 'default' as const, icon: <RefreshCw className="w-3 h-3 animate-spin mr-1" /> },
       LOGIN_IN_PROGRESS: { variant: 'default' as const, icon: <RefreshCw className="w-3 h-3 animate-spin mr-1" /> },
       LOGIN_ERROR: { variant: 'destructive' as const, icon: <AlertCircle className="w-3 h-3 mr-1" /> },
@@ -67,7 +65,9 @@ export function BankConnectionCard({
       ERROR: { variant: 'destructive' as const, icon: <AlertCircle className="w-3 h-3 mr-1" /> },
     };
 
-    const config = statusConfig[connection.status as keyof typeof statusConfig] || { variant: 'default' as const, icon: null };
+    const config = statusConfig[connection.status as keyof typeof statusConfig];
+    
+    if (!config) return null;
     
     return (
       <Badge variant={config.variant} className="flex items-center">

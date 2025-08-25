@@ -56,10 +56,6 @@ export function BankAccountCard({
       label: string; 
       color: string;
     }> = {
-      'UPDATED': { 
-        label: 'Atualizado', 
-        color: 'bg-green-100 text-green-800'
-      },
       'LOGIN_ERROR': { 
         label: 'Erro de Login', 
         color: 'bg-red-100 text-red-800'
@@ -85,7 +81,7 @@ export function BankAccountCard({
         color: 'bg-blue-100 text-blue-800'
       },
     };
-    return statusMap[status || ''] || statusMap.ERROR;
+    return statusMap[status || ''];
   };
 
   const formatLastSync = (date?: string) => {
@@ -152,13 +148,15 @@ export function BankAccountCard({
           <span className="text-sm text-muted-foreground">
             {getAccountTypeLabel(account.type)}
           </span>
-          <Badge 
-            variant="secondary" 
-            className={`${statusInfo.color}`}
-            {...testId(TEST_IDS.banking.accountStatus)}
-          >
-            {statusInfo.label}
-          </Badge>
+          {statusInfo && (
+            <Badge 
+              variant="secondary" 
+              className={`${statusInfo.color}`}
+              {...testId(TEST_IDS.banking.accountStatus)}
+            >
+              {statusInfo.label}
+            </Badge>
+          )}
         </div>
 
         {/* Balance */}

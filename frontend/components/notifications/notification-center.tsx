@@ -46,7 +46,7 @@ export function NotificationCenter() {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[380px]">
+      <DropdownMenuContent align="end" className="w-[350px] sm:w-[380px] max-w-[90vw]">
         <div className="flex items-center justify-between p-2 pb-0">
           <div className="font-semibold">Notifications</div>
           {unreadCount > 0 && (
@@ -114,36 +114,49 @@ function NotificationItem({
   return (
     <div
       className={cn(
-        "group relative flex gap-3 p-3 hover:bg-accent cursor-pointer transition-colors",
-        !notification.is_read && "bg-accent/50"
+        // Mobile-optimized padding and spacing
+        'group relative flex gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-accent cursor-pointer transition-colors',
+        !notification.is_read && 'bg-accent/50'
       )}
       onClick={handleClick}
     >
-      <div className="flex-1 space-y-1">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium leading-none">
+      <div className="flex-1 space-y-1 min-w-0">
+        <div className={cn(
+          // Mobile: Stack title and badge, Desktop: Side by side
+          'flex flex-col space-y-1',
+          'sm:flex-row sm:items-start sm:justify-between sm:space-y-0 sm:gap-2'
+        )}>
+          <p className="text-sm font-medium leading-none truncate">
             {notification.title}
           </p>
           {notification.is_critical && (
-            <Badge variant="destructive" className="text-xs px-1 py-0">
+            <Badge variant="destructive" className="text-xs px-1 py-0 w-fit">
               Critical
             </Badge>
           )}
         </div>
-        <p className="text-sm text-muted-foreground line-clamp-2">
+        
+        <p className={cn(
+          // Mobile: More compact, Desktop: Standard
+          'text-xs sm:text-sm text-muted-foreground',
+          // Mobile: Single line, Desktop: Two lines
+          'line-clamp-1 sm:line-clamp-2'
+        )}>
           {notification.message}
         </p>
+        
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <NotificationIcon event={notification.event} />
-          <span>
+          <span className="truncate">
             {formatDistanceToNow(new Date(notification.created_at), {
               addSuffix: true,
             })}
           </span>
         </div>
       </div>
+      
       {!notification.is_read && (
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r" />
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 sm:h-8 bg-primary rounded-r" />
       )}
     </div>
   );

@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ExclamationTriangleIcon, XMarkIcon, CreditCardIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/store/auth-store';
 import { subscriptionService, SubscriptionStatus } from '@/services/unified-subscription.service';
+import { 
+  ResponsiveBannerContainer, 
+  ResponsiveBannerContent, 
+  ResponsiveButtonGroup,
+  ResponsiveDismissButton 
+} from '@/components/ui/responsive-banner';
 
 export function PaymentSetupBanner() {
   const router = useRouter();
@@ -64,62 +68,55 @@ export function PaymentSetupBanner() {
   const isUrgent = status.trial_days_left <= 3;
   const isWarning = status.trial_days_left <= 7;
 
-  const bannerColor = isUrgent ? 'border-red-200 bg-red-50' : isWarning ? 'border-orange-200 bg-orange-50' : 'border-yellow-200 bg-yellow-50';
-  const iconColor = isUrgent ? 'text-red-600' : isWarning ? 'text-orange-600' : 'text-yellow-600';
-  const textColor = isUrgent ? 'text-red-900' : isWarning ? 'text-orange-900' : 'text-yellow-900';
-  const subtextColor = isUrgent ? 'text-red-700' : isWarning ? 'text-orange-700' : 'text-yellow-700';
+  const getBannerVariant = (): 'warning' | 'critical' => {
+    return isUrgent ? 'critical' : 'warning';
+  };
+
+  const getTitle = (): string => {
+    if (isUrgent) {
+      return `Período de teste expira em ${status.trial_days_left} dia${status.trial_days_left > 1 ? 's' : ''}!`;
+    }
+    return 'Configure seu método de pagamento';
+  };
+
+  const getDescription = (): string => {
+    if (isUrgent) {
+      return 'Configure o pagamento agora para não perder acesso ao sistema.';
+    }
+    return `Teste do plano ${status.plan?.name || 'Starter'} expira em ${status.trial_days_left} dias. Configure o pagamento para continuar.`;
+  };
+
+  const getIconColor = (): string => {
+    return isUrgent ? 'text-red-600' : 'text-orange-600';
+  };
 
   return (
-    <Card className={`mb-6 ${bannerColor} relative`}>
-      <button
-        onClick={handleDismiss}
-        className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
-        aria-label="Fechar banner"
-      >
-        <XMarkIcon className="h-5 w-5" />
-      </button>
-      
-      <CardContent className="flex items-center justify-between p-4">
-        <div className="flex items-center space-x-3 flex-1">
-          {isUrgent ? (
-            <ExclamationTriangleIcon className={`h-6 w-6 ${iconColor}`} />
+    <ResponsiveBannerContainer variant={getBannerVariant()}>
+      <ResponsiveBannerContent
+        icon={
+          isUrgent ? (
+            <ExclamationTriangleIcon className={`h-4 w-4 sm:h-5 sm:w-5 ${getIconColor()}`} />
           ) : (
-            <CreditCardIcon className={`h-6 w-6 ${iconColor}`} />
-          )}
-          <div>
-            <p className={`font-medium ${textColor}`}>
-              {isUrgent 
-                ? `Atenção: Seu período de teste expira em ${status.trial_days_left} dia${status.trial_days_left > 1 ? 's' : ''}!`
-                : isWarning
-                ? `Seu período de teste expira em ${status.trial_days_left} dias`
-                : 'Configure seu método de pagamento'}
-            </p>
-            <p className={`text-sm ${subtextColor}`}>
-              {isUrgent
-                ? 'Configure o pagamento agora para não perder acesso ao sistema.'
-                : `Você está testando o plano ${status.plan?.name || 'Starter'}. Configure o pagamento para continuar após o trial.`}
-            </p>
-          </div>
-        </div>
-        <div className="flex space-x-2 ml-4">
-          <Button 
-            size="sm" 
-            onClick={handleSetupPayment}
-            variant={isUrgent ? 'destructive' : 'default'}
-          >
-            Configurar Agora
-          </Button>
-          {!isUrgent && (
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              onClick={handleDismiss}
-            >
-              Depois
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+            <CreditCardIcon className={`h-4 w-4 sm:h-5 sm:w-5 ${getIconColor()}`} />
+          )
+        }
+        title={getTitle()}
+        description={getDescription()}
+        dismissButton={<ResponsiveDismissButton onClick={handleDismiss} />}
+        actions={
+          <ResponsiveButtonGroup
+            primary={{
+              label: "Configurar",
+              onClick: handleSetupPayment,
+              variant: isUrgent ? 'destructive' : 'default'
+            }}
+            secondary={!isUrgent ? {
+              label: "Depois",
+              onClick: handleDismiss
+            } : undefined}
+          />
+        }
+      />
+    </ResponsiveBannerContainer>
   );
 }

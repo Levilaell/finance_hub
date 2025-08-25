@@ -1,11 +1,15 @@
 // frontend/components/PlanLimitAlert.tsx
 'use client';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { AlertTriangle, TrendingUp, X } from 'lucide-react';
+import { AlertTriangle, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { 
+  ResponsiveBannerContainer, 
+  ResponsiveBannerContent, 
+  ResponsiveButtonGroup,
+  ResponsiveDismissButton 
+} from '@/components/ui/responsive-banner';
 
 interface PlanLimitAlertProps {
   type: 'transactions' | 'bank_accounts' | 'ai_requests';
@@ -75,37 +79,29 @@ export function PlanLimitAlert({
   };
   
   const message = messages[type];
+
+  const getBannerVariant = (): 'warning' | 'critical' => {
+    return actualPercentage >= 100 ? 'critical' : 'warning';
+  };
   
   return (
-    <Alert variant={variant} className={className}>
-      <AlertTriangle className="h-4 w-4" />
-      <AlertTitle className="flex items-center justify-between">
-        {message.title}
-        {dismissible && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-4 w-4 p-0 hover:bg-transparent"
-            onClick={() => setDismissed(true)}
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        )}
-      </AlertTitle>
-      <AlertDescription className="space-y-2">
-        <p>{message.description}</p>
-        {actualPercentage >= 80 && (
-          <Button 
-            size="sm" 
-            variant={actualPercentage >= 100 ? 'default' : 'outline'}
-            onClick={() => router.push('/dashboard/subscription/upgrade')}
-          >
-            <TrendingUp className="h-3 w-3 mr-1" />
-            {message.action}
-          </Button>
-        )}
-      </AlertDescription>
-    </Alert>
+    <ResponsiveBannerContainer variant={getBannerVariant()} className={className}>
+      <ResponsiveBannerContent
+        icon={<AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-current" />}
+        title={message.title}
+        description={message.description}
+        dismissButton={dismissible ? <ResponsiveDismissButton onClick={() => setDismissed(true)} /> : undefined}
+        actions={actualPercentage >= 80 ? (
+          <ResponsiveButtonGroup
+            primary={{
+              label: message.action,
+              onClick: () => router.push('/dashboard/subscription/upgrade'),
+              variant: actualPercentage >= 100 ? 'destructive' : 'default'
+            }}
+          />
+        ) : undefined}
+      />
+    </ResponsiveBannerContainer>
   );
 }
 
