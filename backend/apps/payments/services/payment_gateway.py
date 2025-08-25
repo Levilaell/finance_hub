@@ -72,10 +72,8 @@ class StripeGateway(PaymentGateway):
             customer_id = subscription.stripe_customer_id if subscription else None
             
             if not customer_id:
-                # Find primary user for company
-                user = company.users.filter(is_company_admin=True).first()
-                if not user:
-                    user = company.users.first()
+                # Use company owner as the primary user
+                user = company.owner
                 customer_id = self.create_customer(company, user)
             
             # Use Stripe Price IDs instead of creating price_data dynamically
@@ -156,10 +154,8 @@ class StripeGateway(PaymentGateway):
             
             # Create customer if doesn't exist
             if not subscription or not subscription.stripe_customer_id:
-                # Find primary user for company
-                user = company.users.filter(is_company_admin=True).first()
-                if not user:
-                    user = company.users.first()
+                # Use company owner as the primary user
+                user = company.owner
                     
                 customer_id = self.create_customer(company, user)
                 

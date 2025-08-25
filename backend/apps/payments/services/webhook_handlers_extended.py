@@ -99,7 +99,7 @@ class ExtendedWebhookHandlers:
             )
             
             # Send trial ending email
-            user = subscription.company.users.filter(is_company_admin=True).first()
+            user = subscription.company.owner
             if user and user.email:
                 send_mail(
                     subject='Your Finance Hub trial is ending soon',

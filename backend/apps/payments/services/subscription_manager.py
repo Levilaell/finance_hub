@@ -60,7 +60,7 @@ class SubscriptionManager:
         
         # Get or create Stripe customer
         if not user:
-            user = company.users.filter(is_company_admin=True).first() or company.users.first()
+            user = company.owner
         
         customer_id = self.stripe_service.create_or_get_customer(company, user)
         

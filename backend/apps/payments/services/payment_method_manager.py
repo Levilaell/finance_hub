@@ -100,7 +100,7 @@ class PaymentMethodManager:
             subscription = getattr(company, 'subscription', None)
             if not subscription or not subscription.stripe_customer_id:
                 # Create customer if doesn't exist
-                user_for_customer = user or company.users.first()
+                user_for_customer = user or company.owner
                 customer_id = self.stripe_service.create_or_get_customer(company, user_for_customer)
                 
                 # Create subscription record if doesn't exist

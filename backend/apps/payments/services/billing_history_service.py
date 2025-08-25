@@ -308,7 +308,7 @@ class BillingHistoryService:
             # Get company details
             company_data = {
                 'name': company.name,
-                'email': company.users.first().email if company.users.exists() else '',
+                'email': company.owner.email if company.owner else '',
                 'address': company.metadata.get('address', {})
             }
             
@@ -384,7 +384,7 @@ class BillingHistoryService:
             },
             'company': {
                 'name': company.name,
-                'email': company.users.first().email if company.users.exists() else ''
+                'email': company.owner.email if company.owner else ''
             },
             'transaction_id': payment.stripe_payment_intent_id or payment.id,
             'invoice_id': payment.stripe_invoice_id
