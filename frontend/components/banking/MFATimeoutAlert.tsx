@@ -4,13 +4,13 @@
  */
 
 import React from 'react';
-import { AlertTriangle, Clock, Wifi } from 'lucide-react';
+import { AlertTriangle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { CardContent } from '@/components/ui/card';
 import { useMFATimeout } from '@/hooks/use-mfa-timeout';
-import { usePluggyConnect } from '@/hooks/use-pluggy-connect';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { 
   ResponsiveBannerContainer, 
@@ -23,7 +23,7 @@ interface MFATimeoutAlertProps {
 }
 
 export function MFATimeoutAlert({ className, onReconnect }: MFATimeoutAlertProps) {
-  const { openConnect } = usePluggyConnect();
+  const router = useRouter();
   
   const mfaTimeout = useMFATimeout({
     timeout: 60, // 60 seconds
@@ -56,8 +56,8 @@ export function MFATimeoutAlert({ className, onReconnect }: MFATimeoutAlertProps
     if (onReconnect) {
       onReconnect();
     } else if (itemId) {
-      // Use Pluggy Connect to update the item
-      await openConnect({ item_id: itemId });
+      // Navigate to MFA input page
+      router.push(`/accounts/mfa/${itemId}`);
     }
   };
 

@@ -119,7 +119,8 @@ class PluggyConnectorViewSet(viewsets.ReadOnlyModelViewSet):
         country = self.request.query_params.get('country', 'BR')
         queryset = queryset.filter(country=country)
         
-        return queryset.order_by('name')
+        # Prioritize Open Finance connectors (safer, OAuth-based)
+        return queryset.order_by('-is_open_finance', 'name')
     
     @action(detail=False, methods=['post'])
     def sync(self, request):
