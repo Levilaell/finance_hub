@@ -38,27 +38,35 @@ class JWTCookieMiddleware:
             response['Expires'] = '0'
     
     def _add_debug_headers(self, request, response):
-        """Add debug headers for troubleshooting"""
+        """Add debug headers for troubleshooting (especially mobile Safari)"""
         if settings.DEBUG or hasattr(settings, 'ADD_DEBUG_HEADERS'):
             user_agent = request.META.get('HTTP_USER_AGENT', '')
             response['X-User-Agent-Short'] = user_agent[:50] + '...' if len(user_agent) > 50 else user_agent
+            
+            # Mobile Safari detection
+            is_mobile_safari = 'Mobile/' in user_agent and 'Safari/' in user_agent and 'iPhone' in user_agent
+            response['X-Is-Mobile-Safari'] = str(is_mobile_safari)
             
             # Cookie presence debug
             has_access = bool(request.COOKIES.get(getattr(settings, 'JWT_ACCESS_COOKIE_NAME', 'access_token')))
             has_refresh = bool(request.COOKIES.get(getattr(settings, 'JWT_REFRESH_COOKIE_NAME', 'refresh_token')))
             response['X-Cookie-Access-Present'] = str(has_access)
             response['X-Cookie-Refresh-Present'] = str(has_refresh)
+            
+            # Cookie configuration debug
+            response['X-Cookie-SameSite'] = getattr(settings, 'JWT_COOKIE_SAMESITE', 'Lax')
+            response['X-Cookie-Secure'] = str(getattr(settings, 'JWT_COOKIE_SECURE', True))
 
 
 def set_jwt_cookies(response, tokens, request=None, user=None):
     """
-    Set JWT tokens as httpOnly cookies - SIMPLE VERSION
+    Set JWT tokens as httpOnly cookies - MOBILE SAFARI COMPATIBLE
     """
     access_token = tokens.get('access')
     refresh_token = tokens.get('refresh')
     
-    # Standard configuration for ALL browsers - no special cases
-    samesite = 'Lax'
+    # Use settings-configured values for mobile Safari compatibility
+    samesite = getattr(settings, 'JWT_COOKIE_SAMESITE', 'Lax')
     secure = getattr(settings, 'JWT_COOKIE_SECURE', not settings.DEBUG)
     domain = getattr(settings, 'JWT_COOKIE_DOMAIN', None)
     
@@ -99,15 +107,10 @@ def set_jwt_cookies(response, tokens, request=None, user=None):
 
 def clear_jwt_cookies(response):
     """
-    Clear JWT cookies on logout
+    Clear JWT cookies on logout - mobile Safari compatible
     """
     secure = getattr(settings, 'JWT_COOKIE_SECURE', not settings.DEBUG)
     samesite = getattr(settings, 'JWT_COOKIE_SAMESITE', 'Lax')
-    
-    # Convert Python None to string "None" for SameSite attribute
-    if samesite is None:
-        samesite = 'None'
-    
     domain = getattr(settings, 'JWT_COOKIE_DOMAIN', None)
     
     # Clear access token

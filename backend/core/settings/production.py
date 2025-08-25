@@ -385,35 +385,35 @@ if os.environ.get('RAILWAY_ENVIRONMENT'):
     USE_X_FORWARDED_HOST = True
     USE_X_FORWARDED_PORT = True
 
-# ===== JWT COOKIE CONFIGURATION - SIMPLIFIED & MOBILE COMPATIBLE =====
-# Use SameSite=Lax for all cases - works perfectly for cross-origin first-party requests
-# Only third-party embedded contexts need SameSite=None (not our use case)
+# ===== JWT COOKIE CONFIGURATION - MOBILE SAFARI COMPATIBLE =====
+# Mobile Safari (iOS) requires SameSite=None for cross-origin scenarios
+# This is a first-party cross-origin case (frontend on caixahub.com.br, backend on Railway)
 
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://financehub-frontend-production.up.railway.app')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://caixahub.com.br')
 BACKEND_URL = os.environ.get('BACKEND_URL', 'https://financehub-production.up.railway.app')
 
-# SameSite=Lax works for cross-origin first-party requests
-JWT_COOKIE_SAMESITE = 'Lax'
-JWT_COOKIE_SECURE = True
-JWT_COOKIE_DOMAIN = None  # Let browser handle domain
+# Mobile Safari compatibility: Use SameSite=None for cross-origin requests
+JWT_COOKIE_SAMESITE = 'None'  # Required for mobile Safari cross-origin
+JWT_COOKIE_SECURE = True      # Required when SameSite=None
+JWT_COOKIE_DOMAIN = None      # Let browser handle domain
 
-# Log the corrected configuration
+# Log the mobile-compatible configuration  
 from urllib.parse import urlparse
 try:
     frontend_domain = urlparse(FRONTEND_URL).netloc
     backend_domain = urlparse(BACKEND_URL).netloc
     is_cross_origin = frontend_domain != backend_domain
     
-    print(f"✅ Mobile-compatible JWT cookies configured:")
+    print(f"📱 Mobile Safari compatible JWT cookies:")
     print(f"   Frontend: {frontend_domain}")
     print(f"   Backend: {backend_domain}")
     print(f"   Cross-origin: {is_cross_origin}")
-    print(f"   SameSite: Lax (works for cross-origin first-party)")
-    print(f"   Secure: True")
+    print(f"   SameSite: None (mobile Safari cross-origin compatible)")
+    print(f"   Secure: True (required with SameSite=None)")
     
 except Exception as e:
-    print(f"⚠️  URL parsing failed, but using secure defaults: {e}")
-    print(f"   SameSite: Lax, Secure: True")
+    print(f"⚠️  URL parsing failed, using mobile-safe defaults: {e}")
+    print(f"   SameSite: None, Secure: True")
 
 # JWT Cookie Names
 JWT_ACCESS_COOKIE_NAME = 'access_token'
