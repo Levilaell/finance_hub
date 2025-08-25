@@ -277,44 +277,19 @@ class LoginView(APIView):
             extra_data={'session_count': SessionManager.get_active_session_count(user)}
         )
         
-        # Detect Mobile Safari
-        user_agent = request.META.get('HTTP_USER_AGENT', '')
-        is_mobile_safari = 'safari' in user_agent.lower() and 'mobile' in user_agent.lower() and 'chrome' not in user_agent.lower()
-        
-        # Response data - always include tokens for Mobile Safari fallback
+        # Simple response - just user data  
         response_data = {
             'user': UserSerializer(user).data,
-            'tokens': {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-                'expires_in': int(settings.SIMPLE_JWT.get('ACCESS_TOKEN_LIFETIME').total_seconds()),
-                'token_type': 'Bearer'
-            }
         }
-        
-        # Add Mobile Safari instructions
-        if is_mobile_safari:
-            response_data['mobile_safari'] = {
-                'detected': True,
-                'instruction': 'Use tokens.access in Authorization header for API calls',
-                'reason': 'Mobile Safari cookies may not work consistently'
-            }
-            logger.warning(f"Mobile Safari detected for {user.email} - tokens provided in response body")
         
         response = Response(response_data)
         
-        # Set JWT cookies (for standard browsers)
+        # Set JWT cookies
         logger.info(f"LoginView: Setting JWT cookies for user ID={user.id}, email={user.email}")
         set_jwt_cookies(response, {
             'access': str(refresh.access_token),
             'refresh': str(refresh)
         }, request, user)
-        
-        # Mobile Safari: Also provide tokens in headers for easy access
-        if is_mobile_safari:
-            response['X-Access-Token'] = str(refresh.access_token)
-            response['X-Refresh-Token'] = str(refresh)
-            logger.info(f"Mobile Safari tokens set in headers for {user.email}")
         
         return response
 

@@ -55,28 +55,14 @@ class JWTCookieMiddleware:
 
 def set_jwt_cookies(response, tokens, request=None, user=None):
     """
-    Set JWT tokens as httpOnly cookies - MVP Mobile Safari Fix
+    Set JWT tokens as httpOnly cookies - SIMPLE VERSION
     """
     access_token = tokens.get('access')
     refresh_token = tokens.get('refresh')
     
-    # MOBILE SAFARI MVP FIX
-    is_mobile_safari = False
-    if request:
-        user_agent = request.META.get('HTTP_USER_AGENT', '')
-        is_mobile_safari = _is_mobile_safari(user_agent)
-    
-    # Configure cookies specifically for Mobile Safari
-    if is_mobile_safari:
-        # Mobile Safari needs SameSite=None + Secure=True
-        samesite = 'None'
-        secure = True
-        logger.info("Mobile Safari detected - using SameSite=None configuration")
-    else:
-        # Standard configuration for other browsers
-        samesite = 'Lax'
-        secure = getattr(settings, 'JWT_COOKIE_SECURE', not settings.DEBUG)
-    
+    # Standard configuration for ALL browsers - no special cases
+    samesite = 'Lax'
+    secure = getattr(settings, 'JWT_COOKIE_SECURE', not settings.DEBUG)
     domain = getattr(settings, 'JWT_COOKIE_DOMAIN', None)
     
     # Simple logging
@@ -95,7 +81,7 @@ def set_jwt_cookies(response, tokens, request=None, user=None):
             domain=domain,
             path='/'
         )
-        logger.info(f"Access token set for user {user_id or 'unknown'} from IP {client_ip}")
+        logger.info(f"Access token set for user {user_id or 'unknown'}")
     
     # Set refresh token cookie
     if refresh_token:
@@ -109,10 +95,7 @@ def set_jwt_cookies(response, tokens, request=None, user=None):
             domain=domain,
             path='/'
         )
-        logger.info(f"Refresh token set for user {user_id or 'unknown'} from IP {client_ip}")
-    
-    # Simple debug log
-    logger.info(f"Cookie config - Mobile Safari: {is_mobile_safari}, SameSite: {samesite}, Secure: {secure}")
+        logger.info(f"Refresh token set for user {user_id or 'unknown'}")
     
     return response
 

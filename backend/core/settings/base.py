@@ -250,9 +250,6 @@ CORS_EXPOSE_HEADERS = [
     'x-content-type-options',
     'x-frame-options',
     'content-security-policy',
-    # Mobile Safari fallback headers
-    'X-Access-Token',
-    'X-Refresh-Token',
 ]
 CORS_MAX_AGE = 86400  # 24 hours
 CORS_PREFLIGHT_MAX_AGE = 86400
