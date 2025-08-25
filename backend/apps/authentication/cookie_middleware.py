@@ -11,7 +11,7 @@ logger = logging.getLogger('security')
 
 class JWTCookieMiddleware:
     """
-    Middleware to handle JWT cookies and security headers with mobile browser support
+    Middleware to handle JWT cookies and security headers
     """
     
     def __init__(self, get_response):
@@ -24,7 +24,7 @@ class JWTCookieMiddleware:
         # Add security headers for API responses
         if request.path.startswith('/api/'):
             self._add_security_headers(response)
-            self._add_mobile_debug_headers(request, response)
+            self._add_debug_headers(request, response)
         
         return response
     
@@ -37,13 +37,10 @@ class JWTCookieMiddleware:
             response['Pragma'] = 'no-cache'
             response['Expires'] = '0'
     
-    def _add_mobile_debug_headers(self, request, response):
-        """Add debug headers for mobile browser troubleshooting"""
+    def _add_debug_headers(self, request, response):
+        """Add debug headers for troubleshooting"""
         if settings.DEBUG or hasattr(settings, 'ADD_DEBUG_HEADERS'):
             user_agent = request.META.get('HTTP_USER_AGENT', '')
-            is_mobile_safari = _is_mobile_safari(user_agent)
-            
-            response['X-Mobile-Safari-Detected'] = str(is_mobile_safari)
             response['X-User-Agent-Short'] = user_agent[:50] + '...' if len(user_agent) > 50 else user_agent
             
             # Cookie presence debug
@@ -150,103 +147,3 @@ def get_client_ip(request):
     return ip
 
 
-def _is_mobile_safari(user_agent):
-    """Detect Mobile Safari browsers that have issues with SameSite=None"""
-    user_agent = user_agent.lower()
-    
-    # Mobile Safari indicators
-    is_safari = 'safari' in user_agent and 'chrome' not in user_agent
-    is_mobile = any(mobile in user_agent for mobile in [
-        'mobile', 'iphone', 'ipad', 'ipod', 'ios'
-    ])
-    
-    # WebKit-based mobile browsers
-    is_webkit_mobile = 'webkit' in user_agent and is_mobile
-    
-    return (is_safari and is_mobile) or is_webkit_mobile
-
-
-def set_mobile_compatible_cookies(response, tokens, request=None, user=None):
-    """
-    Alternative cookie setting strategy specifically for mobile browsers
-    Uses multiple approaches to ensure compatibility
-    """
-    if not request:
-        return set_jwt_cookies(response, tokens, request, user)
-    
-    user_agent = request.META.get('HTTP_USER_AGENT', '')
-    is_mobile_safari = _is_mobile_safari(user_agent)
-    
-    if not is_mobile_safari:
-        return set_jwt_cookies(response, tokens, request, user)
-    
-    logger.info(f"Mobile Safari detected - using enhanced cookie strategy")
-    
-    access_token = tokens.get('access')
-    refresh_token = tokens.get('refresh')
-    
-    # Mobile Safari compatibility now built into settings (SameSite=Lax by default)
-    secure = True  # Always secure in production
-    samesite = 'Lax'  # Use Lax for mobile compatibility (now matches settings)
-    domain = None  # Let browser handle domain
-    
-    # Log the configuration (should match settings now)
-    settings_samesite = getattr(settings, 'JWT_COOKIE_SAMESITE', 'unknown')
-    logger.info(f"✅ Mobile Safari compatible cookies - Settings: {settings_samesite}, Applied: {samesite}")
-    
-    # Strategy 1: Set cookies with explicit path and no domain
-    if access_token:
-        response.set_cookie(
-            key=getattr(settings, 'JWT_ACCESS_COOKIE_NAME', 'access_token'),
-            value=access_token,
-            max_age=int(settings.SIMPLE_JWT.get('ACCESS_TOKEN_LIFETIME', timedelta(minutes=30)).total_seconds()),
-            secure=secure,
-            httponly=True,
-            samesite=samesite,
-            domain=domain,
-            path='/',
-        )
-        
-        # Strategy 2: Also try setting a fallback cookie with different name
-        response.set_cookie(
-            key='mobile_access_token',
-            value=access_token,
-            max_age=int(settings.SIMPLE_JWT.get('ACCESS_TOKEN_LIFETIME', timedelta(minutes=30)).total_seconds()),
-            secure=secure,
-            httponly=False,  # Make it accessible to JS as fallback
-            samesite=samesite,
-            domain=domain,
-            path='/'
-        )
-    
-    if refresh_token:
-        response.set_cookie(
-            key=getattr(settings, 'JWT_REFRESH_COOKIE_NAME', 'refresh_token'),
-            value=refresh_token,
-            max_age=int(settings.SIMPLE_JWT.get('REFRESH_TOKEN_LIFETIME', timedelta(days=3)).total_seconds()),
-            secure=secure,
-            httponly=True,
-            samesite=samesite,
-            domain=domain,
-            path='/'
-        )
-        
-        # Fallback refresh token
-        response.set_cookie(
-            key='mobile_refresh_token',
-            value=refresh_token,
-            max_age=int(settings.SIMPLE_JWT.get('REFRESH_TOKEN_LIFETIME', timedelta(days=3)).total_seconds()),
-            secure=secure,
-            httponly=False,  # Make it accessible to JS as fallback
-            samesite=samesite,
-            domain=domain,
-            path='/'
-        )
-    
-    # Add debug headers
-    response['X-Mobile-Cookie-Strategy'] = 'enhanced'
-    response['X-Mobile-Safari-Fallback'] = 'true'
-    
-    logger.info(f"Mobile Safari cookies set with enhanced strategy - SameSite={samesite}, Secure={secure}")
-    
-    return response

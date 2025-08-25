@@ -392,8 +392,7 @@ if os.environ.get('RAILWAY_ENVIRONMENT'):
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://financehub-frontend-production.up.railway.app')
 BACKEND_URL = os.environ.get('BACKEND_URL', 'https://financehub-production.up.railway.app')
 
-# CORRECTED: SameSite=Lax works for cross-origin first-party requests
-# Mobile Safari compatible, secure, and follows best practices
+# SameSite=Lax works for cross-origin first-party requests
 JWT_COOKIE_SAMESITE = 'Lax'
 JWT_COOKIE_SECURE = True
 JWT_COOKIE_DOMAIN = None  # Let browser handle domain
@@ -409,7 +408,7 @@ try:
     print(f"   Frontend: {frontend_domain}")
     print(f"   Backend: {backend_domain}")
     print(f"   Cross-origin: {is_cross_origin}")
-    print(f"   SameSite: Lax (works for cross-origin first-party + Mobile Safari compatible)")
+    print(f"   SameSite: Lax (works for cross-origin first-party)")
     print(f"   Secure: True")
     
 except Exception as e:

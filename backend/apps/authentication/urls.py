@@ -19,8 +19,6 @@ from .views import (
     Disable2FAView,
 )
 
-# Mobile Safari authentication system imports
-# All debug views have been removed - using automatic authentication now
 
 app_name = 'authentication'
 
@@ -50,9 +48,5 @@ urlpatterns = [
     path('2fa/enable/', Enable2FAView.as_view(), name='enable_2fa'),
     path('2fa/disable/', Disable2FAView.as_view(), name='disable_2fa'),
     
-    # Mobile Safari authentication is now handled automatically
-    # via MobileSafariJWTAuthentication and MobileSafariAutoAuthMiddleware
 ]
 
-# Mobile Safari authentication is now automatic
-# No debug endpoints needed - system works transparently
