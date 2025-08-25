@@ -706,7 +706,7 @@ def process_webhook_event(event_type: str, event_data: Dict):
                 _handle_item_error(event_data)
             elif event_type == 'item.deleted':
                 _handle_item_deleted(event_data)
-            elif event_type == 'item.waiting_user_input':
+            elif event_type in ['item.waiting_user_input', 'item.waiting_user_action']:
                 _handle_item_waiting_input(event_data)
             elif event_type == 'item.login_succeeded':
                 _handle_item_login_succeeded(event_data)

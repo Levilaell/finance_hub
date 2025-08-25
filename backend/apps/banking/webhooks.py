@@ -224,12 +224,12 @@ def _process_webhook_basic(item, event_type, event_data):
             status_updated = True
             logger.info(f"📝 Status updated: {old_status} → {item.status} (item error)")
             
-        elif event_type == 'item/waiting_user_input':
+        elif event_type in ['item/waiting_user_input', 'item/waiting_user_action']:
             # Waiting for user input (MFA, etc)
             old_status = item.status
             item.status = 'WAITING_USER_INPUT'
             status_updated = True
-            logger.info(f"📝 Status updated: {old_status} → WAITING_USER_INPUT")
+            logger.info(f"📝 Status updated: {old_status} → WAITING_USER_INPUT (from {event_type})")
             
         elif event_type == 'item/created':
             # Item created successfully
