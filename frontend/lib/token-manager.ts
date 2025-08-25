@@ -1,5 +1,9 @@
+import { authStorage } from './auth-storage';
+import { requiresLocalStorageAuth } from './browser-detection';
+
 /**
  * Enhanced Token Manager for secure JWT token management with comprehensive validation
+ * Now supports both cookie and localStorage authentication methods
  */
 class TokenManager {
   private refreshPromise: Promise<any> | null = null;
@@ -150,15 +154,31 @@ class TokenManager {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      const response = await fetch(`${apiUrl}/api/auth/refresh/`, {
+      // Prepare request based on authentication method
+      const requestInit: RequestInit = {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           'X-Requested-With': 'XMLHttpRequest', // CSRF protection
         },
         signal: controller.signal,
-      });
+      };
+
+      if (requiresLocalStorageAuth()) {
+        // Use localStorage refresh token in request body
+        const refreshToken = authStorage.getRefreshToken();
+        if (refreshToken) {
+          requestInit.body = JSON.stringify({ refresh: refreshToken });
+        }
+        // Don't send credentials for localStorage auth
+        requestInit.credentials = 'omit';
+      } else {
+        // Use httpOnly cookie (sent automatically)
+        requestInit.credentials = 'include';
+        requestInit.body = JSON.stringify({});
+      }
+      
+      const response = await fetch(`${apiUrl}/api/auth/refresh/`, requestInit);
       
       clearTimeout(timeoutId);
       
@@ -192,6 +212,12 @@ class TokenManager {
       // Validate response structure
       if (!this.validateRefreshResponse(data)) {
         throw new Error('Invalid refresh response format');
+      }
+      
+      // Store new tokens if using localStorage auth
+      if (requiresLocalStorageAuth() && data.tokens) {
+        console.debug('Storing refreshed tokens in localStorage');
+        authStorage.setTokens(data.tokens);
       }
       
       // Reset retry count on success
@@ -386,14 +412,31 @@ class TokenManager {
     }
     
     try {
-      // Try to make a simple authenticated request to check token validity
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/auth/profile/`, {
+      // Prepare request based on authentication method
+      const requestInit: RequestInit = {
         method: 'GET',
-        credentials: 'include',
         headers: {
           'X-Requested-With': 'XMLHttpRequest',
         },
-      });
+      };
+
+      if (requiresLocalStorageAuth()) {
+        // Add Authorization header for localStorage auth
+        const accessToken = authStorage.getAccessToken();
+        if (accessToken) {
+          requestInit.headers = {
+            ...requestInit.headers,
+            'Authorization': `Bearer ${accessToken}`,
+          };
+        }
+        requestInit.credentials = 'omit';
+      } else {
+        // Use cookie authentication
+        requestInit.credentials = 'include';
+      }
+
+      // Try to make a simple authenticated request to check token validity
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/auth/profile/`, requestInit);
       
       if (response.status === 401) {
         // Token is invalid, try to refresh

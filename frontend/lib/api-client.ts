@@ -4,6 +4,8 @@ import { RegisterData } from "@/types";
 import { tokenManager } from "./token-manager";
 import { requestManager, createRequestKey } from "./request-manager";
 import { retryManager } from "./retry-manager";
+import { authStorage } from "./auth-storage";
+import { requiresLocalStorageAuth } from "./browser-detection";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -48,11 +50,20 @@ class ApiClient {
     // Request interceptor with enhanced security
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        // httpOnly cookies are automatically sent by the browser
-        // No need to manually add Authorization header
-        
-        // Ensure credentials are included
-        config.withCredentials = true;
+        // Mobile Safari requires Authorization header instead of cookies
+        if (requiresLocalStorageAuth()) {
+          const accessToken = authStorage.getAccessToken();
+          if (accessToken) {
+            config.headers.Authorization = `Bearer ${accessToken}`;
+            debugLog('[API Client] Using Authorization header for mobile Safari');
+          }
+          // Don't send credentials for localStorage auth to avoid CORS issues
+          config.withCredentials = false;
+        } else {
+          // Use httpOnly cookies for other browsers
+          config.withCredentials = true;
+          debugLog('[API Client] Using cookie authentication');
+        }
         
         // Add security headers
         config.headers['X-Requested-With'] = 'XMLHttpRequest'; // CSRF protection
@@ -198,35 +209,17 @@ class ApiClient {
     );
   }
 
+  // Legacy token methods - now handled by authStorage
   private getAccessToken(): string | null {
-    // Access token is now in httpOnly cookie, handled by backend
-    // This method is kept for backward compatibility but returns null
-    return null;
-  }
-
-  private setAccessToken(token: string) {
-    // Access token is now in httpOnly cookie, handled by backend
-    // This method is kept for backward compatibility but does nothing
+    return authStorage.getAccessToken();
   }
 
   private getRefreshToken(): string | null {
-    // Refresh token is now in httpOnly cookie, handled by backend
-    // This method is kept for backward compatibility but returns null
-    return null;
-  }
-
-  private setRefreshToken(token: string) {
-    // Refresh token is now in httpOnly cookie, handled by backend
-    // This method is kept for backward compatibility but does nothing
+    return authStorage.getRefreshToken();
   }
 
   private clearTokens() {
-    // Tokens are now in httpOnly cookies, cleared by backend
-    // Clear any legacy localStorage tokens
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-    }
+    authStorage.clearTokens();
   }
 
   private async refreshToken() {
@@ -243,18 +236,35 @@ class ApiClient {
     }
     
     const response = await this.client.post("/api/auth/login/", loginData);
-    // Tokens are now set as httpOnly cookies by the backend
-    // Clear any legacy localStorage tokens
-    this.clearTokens();
+    
+    // Handle token storage based on browser capabilities
+    if (requiresLocalStorageAuth() && response.data.tokens) {
+      debugLog('[API Client] Storing tokens in localStorage for mobile Safari');
+      authStorage.setTokens(response.data.tokens);
+    } else {
+      debugLog('[API Client] Using cookie authentication, tokens handled by backend');
+      // Clear any legacy localStorage tokens
+      authStorage.clearTokens();
+    }
+    
     return response.data;
   }
 
   async logout() {
     try {
-      // No need to send refresh token, it's in the cookie
-      await this.client.post("/api/auth/logout/", {});
+      // Send refresh token if using localStorage auth
+      if (requiresLocalStorageAuth()) {
+        const refreshToken = authStorage.getRefreshToken();
+        await this.client.post("/api/auth/logout/", { 
+          refresh: refreshToken 
+        });
+      } else {
+        // Cookie-based logout (refresh token in httpOnly cookie)
+        await this.client.post("/api/auth/logout/", {});
+      }
     } finally {
-      this.clearTokens();
+      // Clear tokens using appropriate method
+      authStorage.clearTokens();
     }
   }
 

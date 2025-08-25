@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import apiClient from "@/lib/api-client";
 import { User, LoginCredentials, RegisterData } from "@/types";
+import { authStorage } from "@/lib/auth-storage";
 
 interface AuthState {
   user: User | null;
@@ -72,16 +73,8 @@ export const useAuthStore = create<AuthState>()(
         try {
           await apiClient.logout();
         } finally {
-          // httpOnly cookies are cleared by the backend
-          // Clear any legacy localStorage tokens
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("access_token");
-            localStorage.removeItem("refresh_token");
-            
-            // Clear any non-httpOnly cookies we may have set before
-            document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-            document.cookie = "refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          }
+          // Clear tokens using appropriate method
+          authStorage.clearTokens();
           
           set({
             user: null,
@@ -141,15 +134,9 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setAuth: (user, tokens) => {
-        // Tokens are now handled as httpOnly cookies by the backend
-        // Clear any legacy localStorage tokens
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("access_token");
-          localStorage.removeItem("refresh_token");
-          
-          // Clear any non-httpOnly cookies we may have set before
-          document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          document.cookie = "refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        // Store tokens using appropriate method (localStorage for mobile Safari, cookies for others)
+        if (tokens) {
+          authStorage.setTokens(tokens);
         }
         
         set({
