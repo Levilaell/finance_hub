@@ -8,6 +8,10 @@ env/
 venv/
 ENV/
 env.bak/
+
+# JWT Keys (security)
+jwt_keys_backup.txt
+backend/jwt_keys_backup.txt
 venv.bak/
 *.egg-info/
 dist/

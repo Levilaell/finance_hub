@@ -96,6 +96,20 @@ def save_jwt_keys(private_key: str, public_key: str) -> None:
 
 def load_jwt_keys() -> Tuple[str, str]:
     """Load JWT keys from files or environment variables"""
+    # First, try base64-encoded environment variables (Railway-compatible)
+    private_key_b64 = os.environ.get('JWT_PRIVATE_KEY_B64')
+    public_key_b64 = os.environ.get('JWT_PUBLIC_KEY_B64')
+    
+    if private_key_b64 and public_key_b64:
+        try:
+            import base64
+            private_key = base64.b64decode(private_key_b64).decode('utf-8')
+            public_key = base64.b64decode(public_key_b64).decode('utf-8')
+            logger.info("Using JWT keys from base64 environment variables (Railway-compatible)")
+            return private_key, public_key
+        except Exception as e:
+            logger.error(f"Failed to decode base64 JWT keys from environment: {e}")
+    
     # Try environment variables first (for containerized deployments)
     private_key_env = os.environ.get('JWT_PRIVATE_KEY')
     public_key_env = os.environ.get('JWT_PUBLIC_KEY')
