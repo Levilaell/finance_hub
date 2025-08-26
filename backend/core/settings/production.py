@@ -417,12 +417,7 @@ try:
     backend_domain = urlparse(BACKEND_URL).netloc
     is_cross_origin = frontend_domain != backend_domain
     
-    print(f"📱 Mobile Safari compatible JWT cookies:")
-    print(f"   Frontend: {frontend_domain}")
-    print(f"   Backend: {backend_domain}")
-    print(f"   Cross-origin: {is_cross_origin}")
-    print(f"   SameSite: None (mobile Safari cross-origin compatible)")
-    print(f"   Secure: True (required with SameSite=None)")
+    # Mobile Safari compatible JWT cookies configured
     
 except Exception as e:
     print(f"⚠️  URL parsing failed, using mobile-safe defaults: {e}")

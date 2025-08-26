@@ -70,8 +70,11 @@ class WebhookSecurityManager:
         if not ip_address:
             raise WebhookSecurityException("Missing source IP address")
         
-        # Allow localhost in development
-        if settings.DEBUG and ip_address in ['127.0.0.1', '::1']:
+        # Allow localhost in development only when explicitly enabled
+        if (hasattr(settings, 'ALLOW_LOCALHOST_WEBHOOKS') and 
+            settings.ALLOW_LOCALHOST_WEBHOOKS and 
+            ip_address in ['127.0.0.1', '::1']):
+            logger.warning(f"Allowing localhost webhook from {ip_address} - development mode")
             return True
         
         try:
@@ -137,23 +140,32 @@ class WebhookSecurityManager:
         cache.set(cache_key, current_count + 1, self.RATE_LIMIT_WINDOW)
         return True
     
-    def check_idempotency(self, event_id: str) -> bool:
+    def check_idempotency(self, event_id: str, source: str = 'stripe') -> bool:
         """
-        Check if event has already been processed (idempotency)
+        Check if event has already been processed (database-level idempotency)
         
         Args:
-            event_id: Stripe event ID
+            event_id: Payment gateway event ID
+            source: Payment gateway source (stripe, mercadopago, etc.)
             
         Returns:
             bool: True if event is new, False if already processed
         """
-        cache_key = f"webhook_processed:{event_id}"
+        # Database-level check for idempotency (primary)
+        from ..models_webhook import WebhookEvent
         
-        if cache.get(cache_key):
-            logger.info(f"Duplicate webhook event detected: {event_id}")
+        if WebhookEvent.is_duplicate(event_id, source):
+            logger.info(f"Duplicate webhook event detected in database: {source}:{event_id}")
             return False
         
-        # Mark as processed
+        # Cache-level check as secondary (faster lookup)
+        cache_key = f"webhook_processed:{source}:{event_id}"
+        
+        if cache.get(cache_key):
+            logger.info(f"Duplicate webhook event detected in cache: {source}:{event_id}")
+            return False
+        
+        # Mark as processed in cache for faster future lookups
         cache.set(cache_key, True, self.IDEMPOTENCY_CACHE_TTL)
         return True
     

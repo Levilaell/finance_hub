@@ -151,7 +151,7 @@ def validate_security_on_startup():
             print()
         
         if report['environment'] == 'production' and report['is_secure']:
-            print("✅ SECURITY VALIDATION PASSED - Production ready")
+            print("✅ Security validation passed")
         
     except Exception as e:
         # Don't break startup for validation errors, just log them

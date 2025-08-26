@@ -8,6 +8,9 @@ User = get_user_model()
 # Import SubscriptionPlan from companies to avoid duplication
 from apps.companies.models import SubscriptionPlan
 
+# Import webhook tracking models
+from .models_webhook import WebhookEvent, WebhookDeliveryAttempt
+
 
 class Subscription(models.Model):
     """Company subscription status"""

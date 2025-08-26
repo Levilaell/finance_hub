@@ -284,64 +284,72 @@ class WebhookHandler:
             timeout=45,
             retry_timeout=10
         ):
-            try:
-                company = Company.objects.get(id=company_id)
-                plan = SubscriptionPlan.objects.get(id=plan_id)
-            except (Company.DoesNotExist, SubscriptionPlan.DoesNotExist) as e:
-                logger.error(f"Invalid company or plan in checkout", extra={
-                    'company_id': company_id,
-                    'plan_id': plan_id,
-                    'error': str(e)
-                })
-                return {'status': 'error', 'message': 'Invalid data'}
-            
-            # Check if company already has active subscription (race condition protection)
-            existing_subscription = Subscription.objects.filter(
-                company=company,
-                status__in=['active', 'trial']
-            ).first()
-            
-            if existing_subscription:
-                logger.warning("Company already has active subscription", extra={
-                    'company_id': company_id,
-                    'existing_subscription_id': existing_subscription.id,
-                    'session_id': session['id']
-                })
-                return {'status': 'warning', 'message': 'Subscription already exists'}
-            
-            # Create or update subscription
-            subscription, created = Subscription.objects.update_or_create(
-                company=company,
-                defaults={
-                    'plan': plan,
-                    'status': 'active',
-                    'billing_period': billing_period,
-                    'stripe_subscription_id': session.get('subscription'),
-                    'stripe_customer_id': session.get('customer'),
-                    'current_period_start': timezone.now(),
-                    'current_period_end': timezone.now() + timezone.timedelta(
-                        days=365 if billing_period == 'yearly' else 30
-                    ),
-                }
-            )
-            
-            # Record payment
-            amount = Decimal(session['amount_total']) / 100  # Convert from cents
-            payment = Payment.objects.create(
-                company=company,
-                subscription=subscription,
-                amount=amount,
-                currency=session['currency'].upper(),
-                status='succeeded',
-                description=f"{plan.display_name} - {billing_period.title()} subscription",
-                gateway='stripe',
-                stripe_payment_intent_id=session.get('payment_intent'),
-                paid_at=timezone.now(),
-                metadata={
-                    'session_id': session['id'],
-                    'subscription_id': session.get('subscription')
-                }
-            )
+            # Use atomic transaction to ensure data consistency
+            with transaction.atomic():
+                try:
+                    company = Company.objects.get(id=company_id)
+                    plan = SubscriptionPlan.objects.get(id=plan_id)
+                except (Company.DoesNotExist, SubscriptionPlan.DoesNotExist) as e:
+                    logger.error(f"Invalid company or plan in checkout", extra={
+                        'company_id': company_id,
+                        'plan_id': plan_id,
+                        'error': str(e)
+                    })
+                    return {'status': 'error', 'message': 'Invalid data'}
+                
+                # Check if company already has active subscription (race condition protection)
+                # Use select_for_update to prevent concurrent modifications
+                existing_subscription = Subscription.objects.select_for_update().filter(
+                    company=company,
+                    status__in=['active', 'trial']
+                ).first()
+                
+                if existing_subscription:
+                    logger.warning("Company already has active subscription", extra={
+                        'company_id': company_id,
+                        'existing_subscription_id': existing_subscription.id,
+                        'session_id': session['id']
+                    })
+                    return {'status': 'warning', 'message': 'Subscription already exists'}
+                
+                # Create or update subscription
+                subscription, created = Subscription.objects.update_or_create(
+                    company=company,
+                    defaults={
+                        'plan': plan,
+                        'status': 'active',
+                        'billing_period': billing_period,
+                        'stripe_subscription_id': session.get('subscription'),
+                        'stripe_customer_id': session.get('customer'),
+                        'current_period_start': timezone.now(),
+                        'current_period_end': timezone.now() + timezone.timedelta(
+                            days=365 if billing_period == 'yearly' else 30
+                        ),
+                    }
+                )
+                
+                # Synchronize company subscription status
+                company.subscription_status = 'active'
+                company.subscription_plan = plan
+                company.save()
+                
+                # Record payment
+                amount = Decimal(session['amount_total']) / 100  # Convert from cents
+                payment = Payment.objects.create(
+                    company=company,
+                    subscription=subscription,
+                    amount=amount,
+                    currency=session['currency'].upper(),
+                    status='succeeded',
+                    description=f"{plan.display_name} - {billing_period.title()} subscription",
+                    gateway='stripe',
+                    stripe_payment_intent_id=session.get('payment_intent'),
+                    paid_at=timezone.now(),
+                    metadata={
+                        'session_id': session['id'],
+                        'subscription_id': session.get('subscription')
+                    }
+                )
             
             # Log subscription creation/activation and payment
             if created:

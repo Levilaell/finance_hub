@@ -86,7 +86,7 @@ def set_jwt_cookies(response, tokens, request=None, user=None):
             domain=domain,
             path='/'
         )
-        logger.info(f"Access token set for user {user_id or 'unknown'}")
+        logger.debug(f"Access token set for user {user_id or 'unknown'}")
     
     # Set refresh token cookie
     if refresh_token:
@@ -100,7 +100,7 @@ def set_jwt_cookies(response, tokens, request=None, user=None):
             domain=domain,
             path='/'
         )
-        logger.info(f"Refresh token set for user {user_id or 'unknown'}")
+        logger.debug(f"Refresh token set for user {user_id or 'unknown'}")
     
     return response
 

@@ -100,79 +100,53 @@ def load_jwt_keys() -> Tuple[str, str]:
     private_key_b64 = os.environ.get('JWT_PRIVATE_KEY_B64')
     public_key_b64 = os.environ.get('JWT_PUBLIC_KEY_B64')
     
-    # Debug logging for environment variable detection
-    logger.info("AUTH-CONFIG: Checking for JWT environment variables...")
-    logger.info(f"AUTH-CONFIG: JWT_PRIVATE_KEY_B64 found: {'Yes' if private_key_b64 else 'No'}")
-    logger.info(f"AUTH-CONFIG: JWT_PUBLIC_KEY_B64 found: {'Yes' if public_key_b64 else 'No'}")
-    
-    if private_key_b64:
-        logger.info(f"AUTH-CONFIG: Private key B64 length: {len(private_key_b64)} chars")
-        logger.info(f"AUTH-CONFIG: Private key B64 starts with: {private_key_b64[:20]}...")
-    
-    if public_key_b64:
-        logger.info(f"AUTH-CONFIG: Public key B64 length: {len(public_key_b64)} chars")
-        logger.info(f"AUTH-CONFIG: Public key B64 starts with: {public_key_b64[:20]}...")
+    # Check environment variables (reduced logging)
+    if not private_key_b64 or not public_key_b64:
+        logger.debug("AUTH-CONFIG: JWT base64 environment variables not found")
     
     if private_key_b64 and public_key_b64:
         try:
             import base64
-            logger.info("AUTH-CONFIG: Attempting to decode base64 JWT keys...")
             private_key = base64.b64decode(private_key_b64).decode('utf-8')
             public_key = base64.b64decode(public_key_b64).decode('utf-8')
             
-            # Validate PEM format
-            logger.info(f"AUTH-CONFIG: Private key decoded length: {len(private_key)} chars")
-            logger.info(f"AUTH-CONFIG: Public key decoded length: {len(public_key)} chars")
-            logger.info(f"AUTH-CONFIG: Private key starts with: {'-----BEGIN PRIVATE KEY-----' if private_key.startswith('-----BEGIN PRIVATE KEY-----') else 'INVALID FORMAT'}")
-            logger.info(f"AUTH-CONFIG: Public key starts with: {'-----BEGIN PUBLIC KEY-----' if public_key.startswith('-----BEGIN PUBLIC KEY-----') else 'INVALID FORMAT'}")
-            
-            logger.info("AUTH-CONFIG: ✅ JWT keys loaded successfully from base64 environment variables (Railway-compatible)")
+            logger.info("✅ JWT keys loaded from environment")
             return private_key, public_key
         except Exception as e:
-            logger.error(f"AUTH-CONFIG: ❌ Failed to decode base64 JWT keys from environment: {e}")
-            import traceback
-            logger.error(f"AUTH-CONFIG: Traceback: {traceback.format_exc()}")
+            logger.error(f"Failed to decode JWT keys from environment: {e}")
     
-    # Try environment variables first (for containerized deployments)
-    logger.info("AUTH-CONFIG: Checking for raw PEM environment variables...")
+    # Try raw PEM environment variables
     private_key_env = os.environ.get('JWT_PRIVATE_KEY')
     public_key_env = os.environ.get('JWT_PUBLIC_KEY')
     
-    logger.info(f"AUTH-CONFIG: JWT_PRIVATE_KEY found: {'Yes' if private_key_env else 'No'}")
-    logger.info(f"AUTH-CONFIG: JWT_PUBLIC_KEY found: {'Yes' if public_key_env else 'No'}")
-    
     if private_key_env and public_key_env:
-        logger.info("AUTH-CONFIG: ✅ Using JWT keys from raw PEM environment variables")
+        logger.info("✅ JWT keys loaded from PEM environment")
         return private_key_env, public_key_env
     
     # Try loading from files
-    logger.info("AUTH-CONFIG: Checking for JWT key files...")
     try:
         private_key_path, public_key_path = get_jwt_keys_path()
-        logger.info(f"AUTH-CONFIG: Key paths - Private: {private_key_path}, Public: {public_key_path}")
-        logger.info(f"AUTH-CONFIG: Private key file exists: {private_key_path.exists()}")
-        logger.info(f"AUTH-CONFIG: Public key file exists: {public_key_path.exists()}")
         
         if private_key_path.exists() and public_key_path.exists():
-            logger.info(f"AUTH-CONFIG: ✅ Using JWT keys from file system: {private_key_path.parent}")
+            logger.info("✅ JWT keys loaded from files")
             private_key = private_key_path.read_text()
             public_key = public_key_path.read_text()
             return private_key, public_key
     except Exception as e:
-        logger.warning(f"AUTH-CONFIG: Could not access JWT key files: {e}")
+        logger.debug(f"Could not access JWT key files: {e}")
     
     # Generate new keys if none exist
-    logger.warning("AUTH-CONFIG: ❌ No JWT keys found, generating new keypair")
+    logger.warning("🔑 No JWT keys found, generating new keypair")
     private_key, public_key = generate_jwt_keypair()
     
     # Try to save the keys, but don't fail if we can't
     try:
         save_jwt_keys(private_key, public_key)
-        logger.info("AUTH-CONFIG: ✅ Generated keys saved to disk")
+        logger.info("✅ Generated keys saved")
     except Exception as e:
-        logger.warning(f"AUTH-CONFIG: Could not save JWT keys to disk (using in-memory only): {e}")
-        # In production, you should set JWT_PRIVATE_KEY and JWT_PUBLIC_KEY env vars
-        logger.warning("AUTH-CONFIG: ⚠️  IMPORTANT: Set JWT_PRIVATE_KEY_B64 and JWT_PUBLIC_KEY_B64 environment variables for production!")
+        logger.warning(f"Could not save JWT keys: {e}")
+        if not settings.DEBUG:
+            logger.warning("⚠️ Set JWT_PRIVATE_KEY_B64 and JWT_PUBLIC_KEY_B64 for production")
     
     return private_key, public_key
 
@@ -226,7 +200,7 @@ def clean_jwt_key(key: str) -> str:
                 key.encode('utf-8')
             )
             
-        logger.info("JWT key format validation: SUCCESS")
+        logger.debug("JWT key format validation: SUCCESS")
         
     except Exception as validation_error:
         logger.error(f"JWT key validation failed: {validation_error}")
@@ -238,20 +212,18 @@ def clean_jwt_key(key: str) -> str:
 def get_jwt_private_key() -> str:
     """Get JWT private key for signing tokens"""
     try:
-        logger.info("AUTH-CONFIG: Getting JWT private key...")
         private_key, _ = load_jwt_keys()
-        logger.info(f"AUTH-CONFIG: Private key length: {len(private_key)} chars")
         
         # Clean and validate key for PyJWT compatibility
         cleaned_key = clean_jwt_key(private_key)
-        logger.info("AUTH-CONFIG: Private key cleaning and validation: SUCCESS")
+        logger.debug("JWT private key loaded and validated")
         
         return cleaned_key
     except Exception as e:
-        logger.error(f"AUTH-CONFIG: ❌ Failed to load JWT private key: {e}")
+        logger.error(f"Failed to load JWT private key: {e}")
         # In development/testing, generate a temporary key
         if settings.DEBUG or os.environ.get('DJANGO_SETTINGS_MODULE', '').endswith('.development'):
-            logger.warning("AUTH-CONFIG: Generating temporary JWT key for development")
+            logger.warning("Generating temporary JWT key for development")
             private_key, _ = generate_jwt_keypair()
             return clean_jwt_key(private_key)
         raise ValueError("JWT private key configuration is invalid")
@@ -260,21 +232,18 @@ def get_jwt_private_key() -> str:
 def get_jwt_public_key() -> str:
     """Get JWT public key for verifying tokens"""
     try:
-        logger.info("AUTH-CONFIG: Getting JWT public key...")
         _, public_key = load_jwt_keys()
-        logger.info(f"AUTH-CONFIG: Public key length: {len(public_key)} chars")
         
         # Clean and validate key for PyJWT compatibility
         cleaned_key = clean_jwt_key(public_key)
-        logger.info("AUTH-CONFIG: Public key cleaning and validation: SUCCESS")
+        logger.debug("JWT public key loaded and validated")
         
-        logger.info(f"AUTH-CONFIG: JWT Algorithm: RS256")
         return cleaned_key
     except Exception as e:
-        logger.error(f"AUTH-CONFIG: ❌ Failed to load JWT public key: {e}")
+        logger.error(f"Failed to load JWT public key: {e}")
         # In development/testing, generate a temporary key
         if settings.DEBUG or os.environ.get('DJANGO_SETTINGS_MODULE', '').endswith('.development'):
-            logger.warning("AUTH-CONFIG: Generating temporary JWT key for development")
+            logger.warning("Generating temporary JWT key for development")
             _, public_key = generate_jwt_keypair()
             return clean_jwt_key(public_key)
         raise ValueError("JWT public key configuration is invalid")
