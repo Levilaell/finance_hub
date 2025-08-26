@@ -29,6 +29,32 @@ try:
     from django.core.wsgi import get_wsgi_application
     application = get_wsgi_application()
     
+    # Run JWT authentication diagnostics on startup (production only)
+    if os.environ.get('DJANGO_ENV') == 'production':
+        try:
+            import django
+            django.setup()
+            from django.core.management import call_command
+            from io import StringIO
+            
+            # Capture diagnostic output
+            output = StringIO()
+            print("🔐 Running JWT Authentication diagnostics during WSGI startup...")
+            call_command('diagnose_jwt_auth', '--fix-permissions', stdout=output, stderr=output)
+            diag_output = output.getvalue()
+            
+            # Parse and log critical issues
+            for line in diag_output.split('\n'):
+                if '❌' in line:
+                    print(f"🚨 CRITICAL AUTH ERROR: {line}")
+                elif '⚠️' in line:
+                    print(f"⚠️ AUTH WARNING: {line}")
+                elif '✅' in line and ('JWT' in line or 'Token' in line or 'Cookie' in line):
+                    print(f"✅ AUTH OK: {line}")
+                    
+        except Exception as diag_error:
+            print(f"⚠️ JWT diagnostics failed during WSGI startup: {diag_error}")
+    
 except Exception as e:
     print(f"CRITICAL ERROR during Django startup: {e}")
     print(f"Error type: {type(e).__name__}")
