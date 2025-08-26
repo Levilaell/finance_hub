@@ -132,10 +132,10 @@ class StripeService:
                 'expand': ['latest_invoice.payment_intent']
             }
             
-            # Add trial period
+            # Add trial period - only if explicitly provided and > 0
             if trial_days is None:
-                trial_days = plan.trial_days
-            if trial_days:
+                trial_days = 0  # No trial by default - handled at company level
+            if trial_days and trial_days > 0:
                 sub_params['trial_period_days'] = trial_days
             
             # Add payment method if provided
