@@ -182,12 +182,42 @@ class ValidatePaymentView(APIView):
                 if subscription_metadata:
                     metadata = subscription_metadata
             
-            if str(metadata.get('company_id')) != str(company.id):
-                return Response({
-                    'status': 'error',
-                    'message': 'Invalid payment session. Please try again.',
-                    'code': 'INVALID_SESSION'
-                }, status=400)
+            # Enhanced company validation with better error handling
+            metadata_company_id = str(metadata.get('company_id', ''))
+            current_company_id = str(company.id)
+            
+            if metadata_company_id != current_company_id:
+                logger.warning(
+                    f"Company ID mismatch during payment validation. "
+                    f"Session company_id: {metadata_company_id}, "
+                    f"Current company_id: {current_company_id}, "
+                    f"User: {request.user.email}, "
+                    f"Session: {session_id}"
+                )
+                
+                # Check if payment was actually successful
+                if session.payment_status == 'paid':
+                    # Payment successful but company mismatch - this could be due to:
+                    # 1. Company was deleted/recreated after checkout
+                    # 2. User switched companies
+                    # 3. Session belongs to different user's company
+                    
+                    return Response({
+                        'status': 'error',
+                        'message': 'Payment was processed successfully, but there was an account issue. Please contact support for assistance.',
+                        'code': 'COMPANY_MISMATCH',
+                        'details': {
+                            'payment_processed': True,
+                            'session_id': session_id,
+                            'support_message': f'Reference session ID: {session_id}'
+                        }
+                    }, status=400)
+                else:
+                    return Response({
+                        'status': 'error',
+                        'message': 'Invalid payment session. Please try again.',
+                        'code': 'INVALID_SESSION'
+                    }, status=400)
             
             # Check payment status
             if session.payment_status != 'paid':

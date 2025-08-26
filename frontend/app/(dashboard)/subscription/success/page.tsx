@@ -15,6 +15,7 @@ export default function PaymentSuccessPage() {
   const queryClient = useQueryClient();
   const { validatePayment } = useSubscription();
   const [status, setStatus] = useState<'checking' | 'success' | 'error' | 'pending'>('checking');
+  const [errorDetails, setErrorDetails] = useState<{ code?: string; message?: string; supportMessage?: string }>({});
   const sessionId = searchParams.get('session_id');
   
   // Use WebSocket for real-time checkout status
@@ -55,8 +56,16 @@ export default function PaymentSuccessPage() {
         } else {
           setStatus('pending');
         }
-      } catch (error) {
+      } catch (error: any) {
         setStatus('error');
+        // Capture error details for better messaging
+        if (error?.response?.data) {
+          setErrorDetails({
+            code: error.response.data.code,
+            message: error.response.data.message,
+            supportMessage: error.response.data.details?.support_message
+          });
+        }
       }
     }, 5000);
 
@@ -87,12 +96,26 @@ export default function PaymentSuccessPage() {
           showButton: false,
         };
       case 'error':
+        // Enhanced error messaging based on error type
+        let title = 'Payment Failed';
+        let description = 'Invalid payment session. Please try again.';
+        
+        if (errorDetails.code === 'COMPANY_MISMATCH') {
+          title = 'Account Issue Detected';
+          description = errorDetails.message || 'Payment was processed successfully, but there was an account issue. Please contact support for assistance.';
+        } else if (sessionId) {
+          description = errorDetails.message || 'We couldn\'t verify your payment. Please contact support if you were charged.';
+        }
+        
+        // Add support reference if available
+        if (errorDetails.supportMessage) {
+          description += `\n\n${errorDetails.supportMessage}`;
+        }
+        
         return {
           icon: <XCircle className="h-16 w-16 text-red-500" />,
-          title: 'Payment Failed',
-          description: sessionId 
-            ? 'We couldn\'t verify your payment. Please contact support if you were charged.'
-            : 'Invalid payment session. Please try again.',
+          title,
+          description,
           showButton: true,
         };
     }

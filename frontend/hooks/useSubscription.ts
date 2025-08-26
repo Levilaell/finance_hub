@@ -46,6 +46,20 @@ export function useSubscription() {
         toast.success('Your subscription has been activated!');
       }
     },
+    onError: (error: any) => {
+      // Enhanced error handling for payment validation
+      if (error?.response?.data?.code === 'COMPANY_MISMATCH') {
+        toast.error(
+          'Payment processed successfully, but there was an account issue. Please contact support.',
+          {
+            description: error.response.data.details?.support_message || 'We\'ll help you resolve this quickly.',
+            duration: 10000, // Show longer for important message
+          }
+        );
+      } else {
+        toast.error('Payment validation failed. Please try again or contact support.');
+      }
+    },
   });
 
   // Cancel subscription
