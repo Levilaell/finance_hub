@@ -258,11 +258,23 @@ def _process_webhook_basic(item, event_type, event_data):
                 item.save()
                 logger.info(f"💾 Item {item.pluggy_item_id} saved successfully")
                 
-                # Update related accounts if status changed to ERROR states
-                if item.status in ['LOGIN_ERROR', 'INVALID_CREDENTIALS', 'ERROR']:
+                # Update related accounts with smart error classification
+                if item.status in ['LOGIN_ERROR', 'INVALID_CREDENTIALS']:
+                    # Permanent authentication errors - always deactivate
                     accounts_updated = item.accounts.update(is_active=False)
                     if accounts_updated > 0:
-                        logger.info(f"🔒 Deactivated {accounts_updated} accounts due to error status")
+                        logger.info(f"🔒 Deactivated {accounts_updated} accounts due to authentication failure ({item.status})")
+                
+                elif item.status == 'ERROR':
+                    # Analyze if this is a temporary or permanent error
+                    should_deactivate = _should_deactivate_on_error(item, data)
+                    
+                    if should_deactivate:
+                        accounts_updated = item.accounts.update(is_active=False)
+                        if accounts_updated > 0:
+                            logger.info(f"🔒 Deactivated {accounts_updated} accounts due to permanent error")
+                    else:
+                        logger.info(f"⚠️ Keeping accounts active despite ERROR status - classified as temporary")
                         
                 elif item.status in ['UPDATED', 'CREATED']:
                     accounts_updated = item.accounts.update(is_active=True)
@@ -281,3 +293,92 @@ def _process_webhook_basic(item, event_type, event_data):
     except Exception as e:
         logger.error(f"💥 Error in basic webhook processing: {e}", exc_info=True)
         return False
+
+
+def _should_deactivate_on_error(item, data):
+    """
+    Intelligent error classification to decide if accounts should be deactivated.
+    
+    Args:
+        item: PluggyItem instance
+        data: Event data from webhook
+        
+    Returns:
+        bool: True if accounts should be deactivated, False otherwise
+    """
+    from django.utils import timezone
+    from datetime import timedelta
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Extract execution status from event data
+    execution_status = None
+    if isinstance(data, dict):
+        if 'data' in data and isinstance(data['data'], dict):
+            item_data = data['data'].get('item', {})
+            execution_status = item_data.get('executionStatus')
+        elif 'item' in data:
+            execution_status = data['item'].get('executionStatus')
+    
+    # Use stored execution status if not in event data
+    if not execution_status:
+        execution_status = getattr(item, 'execution_status', None)
+    
+    # Define temporary errors that shouldn't trigger deactivation
+    TEMPORARY_ERRORS = {
+        'CONNECTION_ERROR',
+        'SITE_NOT_AVAILABLE', 
+        'MAINTENANCE',
+        'TIMEOUT',
+        'RATE_LIMIT_EXCEEDED',
+        'TEMPORARY_UNAVAILABLE',
+        'NETWORK_ERROR'
+    }
+    
+    # Define permanent errors that should trigger deactivation
+    PERMANENT_ERRORS = {
+        'INVALID_CREDENTIALS',
+        'LOGIN_ERROR',
+        'ACCOUNT_BLOCKED',
+        'ACCOUNT_SUSPENDED',
+        'PERMISSION_DENIED',
+        'UNAUTHORIZED_ACCESS'
+    }
+    
+    # Check if this is a known temporary error
+    if execution_status in TEMPORARY_ERRORS:
+        logger.info(f"🟡 Temporary error detected: {execution_status} - keeping accounts active")
+        return False
+    
+    # Check if this is a known permanent error
+    if execution_status in PERMANENT_ERRORS:
+        logger.info(f"🔴 Permanent error detected: {execution_status} - will deactivate accounts")
+        return True
+    
+    # Temporal protection: Check if we had a recent successful sync
+    now = timezone.now()
+    recent_threshold = now - timedelta(minutes=10)  # 10 minutes protection window
+    
+    # Check for recent successful syncs in any related account
+    recent_success = False
+    for account in item.accounts.all():
+        # Use balance_date as indicator of recent successful sync
+        if account.balance_date and account.balance_date >= recent_threshold:
+            recent_success = True
+            logger.info(f"🟢 Found recent successful sync at {account.balance_date} - protecting from deactivation")
+            break
+    
+    if recent_success:
+        logger.info(f"⏰ Temporal protection active - recent sync within 10 minutes, keeping accounts active")
+        return False
+    
+    # For unknown errors, check item's error history
+    # If this item has failed multiple times recently, then deactivate
+    if hasattr(item, 'error_count') and item.error_count >= 3:
+        logger.info(f"📈 Multiple consecutive errors ({item.error_count}) - will deactivate accounts")
+        return True
+    
+    # Default: For unknown errors without recent success, be conservative and keep active
+    logger.info(f"❓ Unknown error type: {execution_status} - keeping accounts active by default")
+    return False
