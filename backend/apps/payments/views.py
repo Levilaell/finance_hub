@@ -157,22 +157,33 @@ class ValidatePaymentView(APIView):
         import stripe
         from django.conf import settings
         
+        logger.info(f"🔍 Payment validation started for user: {request.user.email}")
+        
         serializer = ValidatePaymentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
         session_id = serializer.validated_data['session_id']
+        logger.info(f"📋 Session ID to validate: {session_id}")
         
         company = get_user_company(request.user)
         if not company:
+            logger.error(f"❌ No company found for user: {request.user.email}")
             raise PaymentException(
                 message='No active company found',
                 details={'user_id': request.user.id}
             )
         
+        logger.info(f"🏢 User company: {company.id} - {company.name}")
+        
         try:
             # Validate session with Stripe
             stripe.api_key = settings.STRIPE_SECRET_KEY
+            stripe_mode = "TEST" if settings.STRIPE_SECRET_KEY.startswith('sk_test_') else "LIVE"
+            logger.info(f"🔑 Stripe mode: {stripe_mode}")
+            logger.info(f"🌐 Retrieving session from Stripe: {session_id}")
+            
             session = stripe.checkout.Session.retrieve(session_id)
+            logger.info(f"✅ Session retrieved - Status: {session.payment_status}, Amount: {session.amount_total}")
             
             # Check if session belongs to this company
             metadata = session.get('metadata', {})
@@ -185,6 +196,11 @@ class ValidatePaymentView(APIView):
             # Enhanced company validation with better error handling
             metadata_company_id = str(metadata.get('company_id', ''))
             current_company_id = str(company.id)
+            
+            logger.info(f"🔍 Company ID comparison:")
+            logger.info(f"   Metadata company_id: '{metadata_company_id}'")
+            logger.info(f"   Current company_id: '{current_company_id}'")
+            logger.info(f"   Session metadata: {metadata}")
             
             if metadata_company_id != current_company_id:
                 logger.warning(
@@ -263,11 +279,27 @@ class ValidatePaymentView(APIView):
                     'retry_after': 10  # Suggest retry after 10 seconds
                 })
                 
-        except stripe.error.InvalidRequestError:
+        except stripe.error.InvalidRequestError as e:
+            # This is the main error we're trying to fix - log detailed info
+            logger.error(f"❌ Stripe InvalidRequestError:")
+            logger.error(f"   Message: {str(e)}")
+            logger.error(f"   Code: {getattr(e, 'code', 'N/A')}")
+            logger.error(f"   Param: {getattr(e, 'param', 'N/A')}")
+            logger.error(f"   Type: {getattr(e, 'type', 'N/A')}")
+            logger.error(f"   Session ID attempted: {session_id}")
+            logger.error(f"   User: {request.user.email}")
+            logger.error(f"   Company: {company.id} - {company.name}")
+            
             return Response({
                 'status': 'error',
                 'message': 'Invalid payment session. Please try again.',
-                'code': 'INVALID_SESSION_ID'
+                'code': 'INVALID_SESSION_ID',
+                'details': {
+                    'session_id': session_id,
+                    'stripe_error': str(e),
+                    'stripe_code': getattr(e, 'code', None),
+                    'help': 'Session may have expired or does not exist. Please create a new payment.'
+                }
             }, status=400)
         except stripe.error.StripeError as e:
             logger.error(f"Stripe error during payment validation: {e}")
