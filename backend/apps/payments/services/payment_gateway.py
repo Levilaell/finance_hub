@@ -127,7 +127,7 @@ class StripeGateway(PaymentGateway):
                     'billing_period': billing_period
                 },
                 subscription_data={
-                    'trial_period_days': plan.trial_days if not subscription else 0,
+                    'trial_period_days': 0,  # No trial in checkout - trial already given at registration
                     'metadata': {
                         'company_id': str(company.id),
                         'plan_id': str(plan.id),

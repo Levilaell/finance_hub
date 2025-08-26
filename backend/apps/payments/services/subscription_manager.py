@@ -64,10 +64,10 @@ class SubscriptionManager:
         
         customer_id = self.stripe_service.create_or_get_customer(company, user)
         
-        # Validate payment method if not in trial
-        if not plan.trial_days and not payment_method_id:
+        # Validate payment method - always required since trial is handled at company level
+        if not payment_method_id:
             raise PaymentMethodRequiredException(
-                "Payment method required for non-trial subscriptions"
+                "Payment method required for subscription creation"
             )
         
         try:
@@ -76,7 +76,7 @@ class SubscriptionManager:
                 customer_id=customer_id,
                 plan=plan,
                 billing_period=billing_period,
-                trial_days=plan.trial_days,
+                trial_days=0,  # No trial in Stripe - trial already given at registration
                 payment_method_id=payment_method_id
             )
             
@@ -84,7 +84,7 @@ class SubscriptionManager:
             subscription = Subscription.objects.create(
                 company=company,
                 plan=plan,
-                status='trial' if plan.trial_days else 'active',
+                status='active',  # Always active since trial was already handled at company level
                 billing_period=billing_period,
                 stripe_subscription_id=stripe_sub['id'],
                 stripe_customer_id=customer_id,
@@ -92,7 +92,7 @@ class SubscriptionManager:
                 current_period_end=timezone.now() + timedelta(
                     days=365 if billing_period == 'yearly' else 30
                 ),
-                trial_ends_at=timezone.now() + timedelta(days=plan.trial_days) if plan.trial_days else None,
+                trial_ends_at=None,  # No trial at Stripe subscription level
                 metadata={
                     'created_by': str(user.id) if user else None,
                     'stripe_status': stripe_sub['status'],
