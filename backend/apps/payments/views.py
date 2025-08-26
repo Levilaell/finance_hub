@@ -154,8 +154,13 @@ class ValidatePaymentView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
+        import stripe
+        from django.conf import settings
+        
         serializer = ValidatePaymentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
+        session_id = serializer.validated_data['session_id']
         
         company = get_user_company(request.user)
         if not company:
@@ -164,24 +169,83 @@ class ValidatePaymentView(APIView):
                 details={'user_id': request.user.id}
             )
         
-        # Check if subscription is now active
         try:
-            subscription = company.subscription
-            if subscription and subscription.is_active:
+            # Validate session with Stripe
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            session = stripe.checkout.Session.retrieve(session_id)
+            
+            # Check if session belongs to this company
+            metadata = session.get('metadata', {})
+            if not metadata.get('company_id'):
+                # Try subscription_data metadata
+                subscription_metadata = session.get('subscription_data', {}).get('metadata', {})
+                if subscription_metadata:
+                    metadata = subscription_metadata
+            
+            if str(metadata.get('company_id')) != str(company.id):
                 return Response({
-                    'status': 'success',
-                    'subscription': SubscriptionSerializer(subscription).data
-                })
-            else:
+                    'status': 'error',
+                    'message': 'Invalid payment session. Please try again.',
+                    'code': 'INVALID_SESSION'
+                }, status=400)
+            
+            # Check payment status
+            if session.payment_status != 'paid':
                 return Response({
-                    'status': 'pending',
-                    'message': 'Payment is still being processed'
+                    'status': 'error',
+                    'message': f'Payment not completed. Status: {session.payment_status}',
+                    'code': 'PAYMENT_NOT_COMPLETED'
+                }, status=400)
+            
+            # Check if webhook was processed (subscription created)
+            try:
+                subscription = company.subscription
+                if subscription and subscription.is_active:
+                    # Payment was successful and subscription is active
+                    PaymentAuditService.log_payment_validated(
+                        company=company,
+                        user=request.user,
+                        metadata={
+                            'session_id': session_id,
+                            'subscription_id': subscription.id,
+                            'validation_status': 'success'
+                        }
+                    )
+                    
+                    return Response({
+                        'status': 'success',
+                        'message': 'Payment validated successfully',
+                        'subscription': SubscriptionSerializer(subscription).data
+                    })
+                else:
+                    # Payment completed but webhook not processed yet
+                    return Response({
+                        'status': 'processing',
+                        'message': 'Payment completed. Activating subscription...',
+                        'retry_after': 5  # Suggest retry after 5 seconds
+                    })
+                    
+            except Subscription.DoesNotExist:
+                # Payment completed but webhook not processed yet
+                return Response({
+                    'status': 'processing',
+                    'message': 'Payment completed. Setting up subscription...',
+                    'retry_after': 10  # Suggest retry after 10 seconds
                 })
-        except Subscription.DoesNotExist:
+                
+        except stripe.error.InvalidRequestError:
             return Response({
-                'status': 'pending',
-                'message': 'Subscription not found yet'
-            })
+                'status': 'error',
+                'message': 'Invalid payment session. Please try again.',
+                'code': 'INVALID_SESSION_ID'
+            }, status=400)
+        except stripe.error.StripeError as e:
+            logger.error(f"Stripe error during payment validation: {e}")
+            return Response({
+                'status': 'error',
+                'message': 'Unable to validate payment. Please contact support.',
+                'code': 'STRIPE_ERROR'
+            }, status=500)
 
 
 class PaymentMethodListCreateView(generics.ListCreateAPIView):

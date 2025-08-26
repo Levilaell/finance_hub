@@ -145,8 +145,8 @@ export interface SubscriptionPlan {
   stripe_price_id_monthly?: string;
   stripe_price_id_yearly?: string;
   // mercadopago_plan_id?: string; - Removed with MercadoPago integration
-  price_monthly: number;
-  price_yearly: number;
+  price_monthly: number | string; // Django DecimalField serializes as string
+  price_yearly: number | string;   // Django DecimalField serializes as string
   max_transactions: number;
   max_bank_accounts: number;
   has_ai_categorization: boolean;

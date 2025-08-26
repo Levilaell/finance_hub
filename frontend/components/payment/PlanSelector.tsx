@@ -79,8 +79,13 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading }: Pl
       <div className="grid gap-6 md:grid-cols-3">
         {plans.map((plan, index) => {
           const features = planFeatures[plan.name as keyof typeof planFeatures] || [];
-          const price = billingPeriod === 'yearly' ? plan.price_yearly : plan.price_monthly;
-          const monthlyEquivalent = billingPeriod === 'yearly' ? plan.price_yearly / 12 : plan.price_monthly;
+          
+          // Convert string prices to numbers and handle edge cases
+          const priceMonthly = typeof plan.price_monthly === 'string' ? parseFloat(plan.price_monthly) : (plan.price_monthly || 0);
+          const priceYearly = typeof plan.price_yearly === 'string' ? parseFloat(plan.price_yearly) : (plan.price_yearly || 0);
+          
+          const price = billingPeriod === 'yearly' ? priceYearly : priceMonthly;
+          const monthlyEquivalent = billingPeriod === 'yearly' ? priceYearly / 12 : priceMonthly;
           const isCurrentPlan = plan.id === currentPlanId;
           const isRecommended = plan.name === recommendedPlan;
 

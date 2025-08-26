@@ -83,15 +83,17 @@ export function UpgradePlanDialog({
   };
 
   const getDiscount = (plan: SubscriptionPlan) => {
-    const monthly = plan.price_monthly;
-    const yearly = plan.price_yearly;
+    const monthly = typeof plan.price_monthly === 'string' ? parseFloat(plan.price_monthly) : (plan.price_monthly || 0);
+    const yearly = typeof plan.price_yearly === 'string' ? parseFloat(plan.price_yearly) : (plan.price_yearly || 0);
     const monthlyTotal = monthly * 12;
     return Math.round(((monthlyTotal - yearly) / monthlyTotal) * 100);
   };
 
   const isPlanUpgrade = (plan: SubscriptionPlan) => {
     if (!currentPlan) return true;
-    return plan.price_monthly > currentPlan.price_monthly;
+    const planPrice = typeof plan.price_monthly === 'string' ? parseFloat(plan.price_monthly) : (plan.price_monthly || 0);
+    const currentPrice = typeof currentPlan.price_monthly === 'string' ? parseFloat(currentPlan.price_monthly) : (currentPlan.price_monthly || 0);
+    return planPrice > currentPrice;
   };
 
   return (

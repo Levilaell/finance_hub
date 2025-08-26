@@ -95,7 +95,7 @@ export function SubscriptionCard() {
                 <span>Plan Price</span>
               </span>
               <span className="text-muted-foreground">
-                R$ {subscription.plan.price_monthly}/month
+                R$ {typeof subscription.plan.price_monthly === 'string' ? parseFloat(subscription.plan.price_monthly).toFixed(2) : (subscription.plan.price_monthly || 0).toFixed(2)}/month
               </span>
             </div>
           )}

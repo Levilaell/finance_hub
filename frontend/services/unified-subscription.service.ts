@@ -17,8 +17,8 @@ export interface SubscriptionPlan {
   id: number;
   name: string;
   slug: string;
-  price_monthly: number;
-  price_yearly: number;
+  price_monthly: number | string; // Django DecimalField serializes as string
+  price_yearly: number | string;   // Django DecimalField serializes as string
   yearly_discount?: number;
   max_transactions: number;
   max_bank_accounts: number;

@@ -220,6 +220,19 @@ class PaymentAuditService:
         )
     
     @staticmethod
+    def log_payment_validated(company, user=None, metadata=None, **kwargs):
+        """Log payment validation event"""
+        return PaymentAuditService.log_payment_action(
+            action='payment_validated',
+            severity='info',
+            user=user,
+            company=company,
+            status='success',
+            metadata=metadata or {},
+            **kwargs
+        )
+    
+    @staticmethod
     @transaction.atomic
     def update_daily_summary(company, date=None):
         """Update daily payment activity summary"""
