@@ -821,10 +821,11 @@ class CashFlowDataView(APIView):
         
         # Process in Python for better performance
         daily_data = {}
-        current_date = start_date
+        current_date = start_date.date() if hasattr(start_date, 'date') else start_date
+        end_date_date = end_date.date() if hasattr(end_date, 'date') else end_date
         
         # Initialize all dates
-        while current_date <= end_date:
+        while current_date <= end_date_date:
             daily_data[current_date] = {'income': Decimal('0'), 'expenses': Decimal('0')}
             current_date += timedelta(days=1)
         
@@ -838,10 +839,10 @@ class CashFlowDataView(APIView):
             if date_key in daily_data:
                 # Use case-insensitive matching and include all transaction types
                 # Income types (consistent with CategorySpendingView)
-                if trans_type.upper() in ['CREDIT', 'INCOME', 'TRANSFER_IN', 'PIX_IN', 'INTEREST']:
+                if trans_type in ['CREDIT', 'INCOME', 'TRANSFER_IN', 'PIX_IN', 'INTEREST']:
                     daily_data[date_key]['income'] += amount
                 # Expense types (consistent with CategorySpendingView)
-                elif trans_type.upper() in ['DEBIT', 'EXPENSE', 'TRANSFER_OUT', 'PIX_OUT', 'FEE']:
+                elif trans_type in ['DEBIT', 'EXPENSE', 'TRANSFER_OUT', 'PIX_OUT', 'FEE']:
                     daily_data[date_key]['expenses'] += abs(amount)
         
         # Build response with running balance

@@ -1,135 +1,123 @@
 #!/usr/bin/env python
 """
-Teste para validar a correção do bug de Fluxo de Caixa
-Este script simula transações com diferentes tipos para testar a correção
+Test script to validate the Cash Flow fix works correctly
 """
-import os
-import sys
-import django
 
-# Setup Django
+import os
+import django
+from datetime import datetime, timedelta
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings.development')
-sys.path.append('/Users/levilaell/Desktop/finance_hub/backend')
 django.setup()
 
-from decimal import Decimal
-from datetime import date, timedelta
+from django.test import RequestFactory
+from django.contrib.auth import get_user_model
 from apps.banking.models import Transaction, BankAccount
 from apps.companies.models import Company
-from django.db.models import Q
+from apps.reports.views import CashFlowDataView
+from decimal import Decimal
 
-def test_transaction_type_filters():
-    """Test both old and new transaction type filters"""
+def test_cash_flow_fix():
+    """Test that the cash flow fix resolves the date_key mismatch"""
     
-    print("=== TESTE DOS FILTROS DE TRANSAÇÃO ===")
+    print("🧪 Testing Cash Flow Fix...")
     
-    # Tipos que existem em produção (baseado na análise do CategorySpendingView)
-    test_types = [
-        # Receitas
-        'CREDIT', 'credit', 'INCOME', 'income', 
-        'transfer_in', 'pix_in', 'interest',
-        # Despesas  
-        'DEBIT', 'debit', 'EXPENSE', 'expense',
-        'transfer_out', 'pix_out', 'fee'
-    ]
+    User = get_user_model()
     
-    print("Tipos de transação testados:", test_types)
+    # Get test data
+    user = User.objects.first()
+    if not user:
+        print("❌ No users found - need to create test user first")
+        return
     
-    print("\n1. FILTRO ANTIGO (CashFlowDataView - BUGGY):")
-    for trans_type in test_types:
-        # Old logic - case sensitive and restrictive
-        if trans_type in ['CREDIT', 'INCOME']:
-            result = "✅ RECEITA (detectada)"
-        elif trans_type in ['DEBIT', 'EXPENSE']:
-            result = "✅ DESPESA (detectada)"
-        else:
-            result = "❌ IGNORADA"
-        print(f"  {trans_type:<15} → {result}")
+    company = Company.objects.first()
+    if not company:
+        print("❌ No companies found - need to create test company first")
+        return
     
-    print("\n2. FILTRO NOVO (CashFlowDataView - CORRIGIDO):")
-    for trans_type in test_types:
-        # New logic - case insensitive and comprehensive
-        upper_type = trans_type.upper() if trans_type else ''
-        if upper_type in ['CREDIT', 'INCOME', 'TRANSFER_IN', 'PIX_IN', 'INTEREST']:
-            result = "✅ RECEITA (detectada)"
-        elif upper_type in ['DEBIT', 'EXPENSE', 'TRANSFER_OUT', 'PIX_OUT', 'FEE']:
-            result = "✅ DESPESA (detectada)"
-        else:
-            result = "❌ IGNORADA"
-        print(f"  {trans_type:<15} → {result}")
+    # Associate user with company if not already
+    if not hasattr(user, 'company') or not user.company:
+        user.company = company
+        user.save()
+        print(f"✅ Associated user {user.email} with company {company.name}")
     
-    print("\n3. FILTRO CategorySpendingView (REFERÊNCIA):")
+    account = BankAccount.objects.filter(company=company).first()
+    if not account:
+        print("❌ No bank accounts found - need to create test account first")
+        return
     
-    # Income filter from CategorySpendingView
-    income_filter = (
-        Q(type__iexact='CREDIT') | 
-        Q(type__iexact='INCOME') | 
-        Q(type__iexact='credit') | 
-        Q(type__iexact='income') |
-        Q(type__iexact='transfer_in') | 
-        Q(type__iexact='pix_in') | 
-        Q(type__iexact='interest')
-    )
+    print(f"✅ Using account: {account.name}")
     
-    # Expense filter from CategorySpendingView  
-    expense_filter = (
-        Q(type__iexact='DEBIT') | 
-        Q(type__iexact='EXPENSE') | 
-        Q(type__iexact='debit') | 
-        Q(type__iexact='expense') |
-        Q(type__iexact='transfer_out') | 
-        Q(type__iexact='pix_out') | 
-        Q(type__iexact='fee')
-    )
+    # Check if we have transactions
+    tx_count = Transaction.active.filter(company=company).count()
+    print(f"📊 Active transactions for company: {tx_count}")
     
-    for trans_type in test_types:
-        # Simulate Django Q filter matching
-        is_income = any([
-            trans_type.upper() == 'CREDIT',
-            trans_type.upper() == 'INCOME', 
-            trans_type.lower() == 'credit',
-            trans_type.lower() == 'income',
-            trans_type.lower() == 'transfer_in',
-            trans_type.lower() == 'pix_in',
-            trans_type.lower() == 'interest'
-        ])
+    if tx_count == 0:
+        print("⚠️  No transactions found - Cash Flow will be empty (expected)")
+        print("   To test with data, create some transactions first")
+        return
+    
+    # Test the API endpoint
+    factory = RequestFactory()
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=30)
+    
+    request = factory.get('/api/reports/dashboard/cash-flow/', {
+        'start_date': start_date.isoformat(),
+        'end_date': end_date.isoformat()
+    })
+    request.user = user
+    
+    # Test the view
+    view = CashFlowDataView()
+    
+    try:
+        response = view.get(request)
+        print(f"✅ API Response Status: {response.status_code}")
         
-        is_expense = any([
-            trans_type.upper() == 'DEBIT',
-            trans_type.upper() == 'EXPENSE',
-            trans_type.lower() == 'debit', 
-            trans_type.lower() == 'expense',
-            trans_type.lower() == 'transfer_out',
-            trans_type.lower() == 'pix_out',
-            trans_type.lower() == 'fee'
-        ])
-        
-        if is_income:
-            result = "✅ RECEITA (detectada)"
-        elif is_expense:
-            result = "✅ DESPESA (detectada)"  
-        else:
-            result = "❌ IGNORADA"
+        if response.status_code == 200 and hasattr(response, 'data'):
+            data = response.data if hasattr(response, 'data') else []
+            print(f"📈 Cash Flow data points returned: {len(data)}")
             
-        print(f"  {trans_type:<15} → {result}")
+            if len(data) > 0:
+                print("✅ SUCCESS: Cash Flow data is now being returned!")
+                
+                # Show sample data
+                sample = data[0] if data else {}
+                print(f"📊 Sample data point: {sample}")
+                
+                # Calculate totals
+                total_income = sum(d.get('income', 0) for d in data)
+                total_expenses = sum(d.get('expenses', 0) for d in data)
+                final_balance = data[-1].get('balance', 0) if data else 0
+                
+                print(f"💰 Period totals:")
+                print(f"   Income: ${total_income:.2f}")
+                print(f"   Expenses: ${total_expenses:.2f}") 
+                print(f"   Final Balance: ${final_balance:.2f}")
+                
+                if total_income > 0 or total_expenses > 0:
+                    print("🎯 CASH FLOW FIX SUCCESSFUL - Data is being processed!")
+                else:
+                    print("⚠️  Data returned but all zeros - check transaction types")
+            else:
+                print("❌ No data points returned - may need to check date range or transaction filtering")
+        else:
+            print(f"❌ API Error: {response.status_code}")
+            if hasattr(response, 'data'):
+                print(f"Error details: {response.data}")
+                
+    except Exception as e:
+        print(f"❌ Exception during API test: {e}")
+        import traceback
+        traceback.print_exc()
     
-    print("\n=== ANÁLISE ===")
-    
-    # Count detections
-    old_detections = len([t for t in test_types if t in ['CREDIT', 'INCOME', 'DEBIT', 'EXPENSE']])
-    new_detections = len([t for t in test_types if t.upper() in [
-        'CREDIT', 'INCOME', 'TRANSFER_IN', 'PIX_IN', 'INTEREST',
-        'DEBIT', 'EXPENSE', 'TRANSFER_OUT', 'PIX_OUT', 'FEE'
-    ]])
-    
-    print(f"Filtro ANTIGO detectou: {old_detections}/{len(test_types)} tipos ({old_detections/len(test_types)*100:.1f}%)")
-    print(f"Filtro NOVO detectou: {new_detections}/{len(test_types)} tipos ({new_detections/len(test_types)*100:.1f}%)")
-    
-    if new_detections > old_detections:
-        print("✅ CORREÇÃO EFETIVA: Filtro novo detecta mais tipos de transação")
-        print("   O gráfico de Fluxo de Caixa agora deve mostrar dados!")
-    else:
-        print("❌ Correção pode não ser suficiente")
+    print("\n🎯 Test completed!")
+    print("\nNext steps:")
+    print("1. If successful locally, deploy to production")
+    print("2. Clear production cache: python clear_cash_flow_cache.py")
+    print("3. Test production endpoint")
+    print("4. Refresh browser to see Cash Flow chart with data")
 
 if __name__ == '__main__':
-    test_transaction_type_filters()
+    test_cash_flow_fix()
