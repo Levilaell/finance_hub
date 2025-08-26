@@ -177,20 +177,83 @@ def load_jwt_keys() -> Tuple[str, str]:
     return private_key, public_key
 
 
+def clean_jwt_key(key: str) -> str:
+    """Clean and validate JWT key format for PyJWT compatibility"""
+    if not key:
+        raise ValueError("JWT key cannot be empty")
+    
+    # Remove any extra whitespace and normalize line endings
+    key = key.strip()
+    
+    # Ensure consistent line endings (Unix style)
+    key = key.replace('\r\n', '\n').replace('\r', '\n')
+    
+    # Validate PEM format
+    if 'BEGIN PRIVATE KEY' in key:
+        # Private key validation
+        if not key.startswith('-----BEGIN PRIVATE KEY-----'):
+            raise ValueError("Invalid private key format: missing header")
+        if not key.endswith('-----END PRIVATE KEY-----'):
+            raise ValueError("Invalid private key format: missing footer")
+    elif 'BEGIN PUBLIC KEY' in key:
+        # Public key validation  
+        if not key.startswith('-----BEGIN PUBLIC KEY-----'):
+            raise ValueError("Invalid public key format: missing header")
+        if not key.endswith('-----END PUBLIC KEY-----'):
+            raise ValueError("Invalid public key format: missing footer")
+    elif 'BEGIN RSA PRIVATE KEY' in key:
+        # Legacy RSA private key format
+        if not key.startswith('-----BEGIN RSA PRIVATE KEY-----'):
+            raise ValueError("Invalid RSA private key format: missing header")
+        if not key.endswith('-----END RSA PRIVATE KEY-----'):
+            raise ValueError("Invalid RSA private key format: missing footer")
+    else:
+        raise ValueError(f"Unrecognized key format. Key starts with: {key[:50]}")
+    
+    # Test PyJWT compatibility
+    try:
+        from cryptography.hazmat.primitives import serialization
+        
+        if 'PRIVATE KEY' in key:
+            # Test private key parsing
+            serialization.load_pem_private_key(
+                key.encode('utf-8'), 
+                password=None
+            )
+        else:
+            # Test public key parsing
+            serialization.load_pem_public_key(
+                key.encode('utf-8')
+            )
+            
+        logger.info("JWT key format validation: SUCCESS")
+        
+    except Exception as validation_error:
+        logger.error(f"JWT key validation failed: {validation_error}")
+        raise ValueError(f"Key format invalid for cryptography library: {validation_error}")
+    
+    return key
+
+
 def get_jwt_private_key() -> str:
     """Get JWT private key for signing tokens"""
     try:
         logger.info("AUTH-CONFIG: Getting JWT private key...")
         private_key, _ = load_jwt_keys()
         logger.info(f"AUTH-CONFIG: Private key length: {len(private_key)} chars")
-        return private_key
+        
+        # Clean and validate key for PyJWT compatibility
+        cleaned_key = clean_jwt_key(private_key)
+        logger.info("AUTH-CONFIG: Private key cleaning and validation: SUCCESS")
+        
+        return cleaned_key
     except Exception as e:
         logger.error(f"AUTH-CONFIG: ❌ Failed to load JWT private key: {e}")
         # In development/testing, generate a temporary key
         if settings.DEBUG or os.environ.get('DJANGO_SETTINGS_MODULE', '').endswith('.development'):
             logger.warning("AUTH-CONFIG: Generating temporary JWT key for development")
             private_key, _ = generate_jwt_keypair()
-            return private_key
+            return clean_jwt_key(private_key)
         raise ValueError("JWT private key configuration is invalid")
 
 
@@ -200,15 +263,20 @@ def get_jwt_public_key() -> str:
         logger.info("AUTH-CONFIG: Getting JWT public key...")
         _, public_key = load_jwt_keys()
         logger.info(f"AUTH-CONFIG: Public key length: {len(public_key)} chars")
+        
+        # Clean and validate key for PyJWT compatibility
+        cleaned_key = clean_jwt_key(public_key)
+        logger.info("AUTH-CONFIG: Public key cleaning and validation: SUCCESS")
+        
         logger.info(f"AUTH-CONFIG: JWT Algorithm: RS256")
-        return public_key
+        return cleaned_key
     except Exception as e:
         logger.error(f"AUTH-CONFIG: ❌ Failed to load JWT public key: {e}")
         # In development/testing, generate a temporary key
         if settings.DEBUG or os.environ.get('DJANGO_SETTINGS_MODULE', '').endswith('.development'):
             logger.warning("AUTH-CONFIG: Generating temporary JWT key for development")
             _, public_key = generate_jwt_keypair()
-            return public_key
+            return clean_jwt_key(public_key)
         raise ValueError("JWT public key configuration is invalid")
 
 
