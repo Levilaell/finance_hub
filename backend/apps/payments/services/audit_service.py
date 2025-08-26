@@ -97,7 +97,11 @@ class PaymentAuditService:
             return audit_log
             
         except Exception as e:
-            logger.error(f"Failed to create audit log: {e}")
+            error_msg = str(e)
+            if 'relation "payments_paymentauditlog" does not exist' in error_msg:
+                logger.warning(f"PaymentAuditLog table not ready yet - skipping audit log for action: {action}")
+            else:
+                logger.error(f"Failed to create audit log: {e}")
             # Don't raise exception - audit logging should not break the flow
             return None
     

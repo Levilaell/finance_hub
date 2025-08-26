@@ -225,6 +225,38 @@ class UnifiedSubscriptionService {
   // -------------------------------------------------------------------------
 
   /**
+   * Safely convert price field to number (handles Django DecimalField strings)
+   */
+  parsePrice(price: number | string | null | undefined): number {
+    if (typeof price === 'number') return price;
+    if (typeof price === 'string') {
+      const parsed = parseFloat(price);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  }
+
+  /**
+   * Get plan price for billing period with proper type conversion
+   */
+  getPlanPrice(plan: SubscriptionPlan, billingPeriod: 'monthly' | 'yearly'): number {
+    if (billingPeriod === 'yearly') {
+      return this.parsePrice(plan.price_yearly);
+    }
+    return this.parsePrice(plan.price_monthly);
+  }
+
+  /**
+   * Calculate monthly equivalent price (for yearly plans)
+   */
+  getMonthlyEquivalent(plan: SubscriptionPlan, billingPeriod: 'monthly' | 'yearly'): number {
+    if (billingPeriod === 'monthly') {
+      return this.parsePrice(plan.price_monthly);
+    }
+    return this.parsePrice(plan.price_yearly) / 12;
+  }
+
+  /**
    * Check if user can use specific feature based on plan
    */
   canUseFeature(plan: SubscriptionPlan | null, feature: string): boolean {
