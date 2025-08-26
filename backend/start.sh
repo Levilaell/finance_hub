@@ -185,6 +185,66 @@ try:
 except Exception: pass
 " 2>/dev/null
 
+# ===== JWT AUTHENTICATION DIAGNOSTICS =====
+echo "🔐 Running JWT Authentication Diagnostics..."
+python manage.py diagnose_jwt_auth --fix-permissions 2>&1 | {
+    while IFS= read -r line; do
+        echo "AUTH-DIAG: $line"
+        case "$line" in
+            *"❌"*) echo "🚨 CRITICAL AUTH ERROR: $line" ;;
+            *"⚠️"*) echo "⚠️ AUTH WARNING: $line" ;;
+            *"✅"*) echo "✅ AUTH OK: $line" ;;
+        esac
+    done
+} || {
+    echo "🚨 CRITICAL: JWT Authentication diagnostic failed!"
+    echo "🚨 This may cause authentication failures in production"
+    echo "🚨 Check logs above for specific issues"
+}
+
+# Run additional authentication validation
+echo "🔐 Validating authentication configuration..."
+python -c "
+import django
+django.setup()
+from django.conf import settings
+import os
+
+print('=== AUTHENTICATION CONFIGURATION ===')
+print(f'Frontend URL: {getattr(settings, \"FRONTEND_URL\", \"NOT SET\")}')
+print(f'Backend URL: {getattr(settings, \"BACKEND_URL\", \"NOT SET\")}')
+print(f'CORS Origins: {getattr(settings, \"CORS_ALLOWED_ORIGINS\", [])}')
+print(f'JWT Cookie SameSite: {getattr(settings, \"JWT_COOKIE_SAMESITE\", \"NOT SET\")}')
+print(f'JWT Cookie Secure: {getattr(settings, \"JWT_COOKIE_SECURE\", \"NOT SET\")}')
+print(f'JWT Algorithm: {settings.SIMPLE_JWT.get(\"ALGORITHM\", \"NOT SET\")}')
+
+# Check if JWT keys are loadable
+try:
+    from core.security import get_jwt_private_key, get_jwt_public_key
+    private_key = get_jwt_private_key()
+    public_key = get_jwt_public_key()
+    print('✅ JWT keys loaded successfully (RS256 mode)')
+    print(f'Private key length: {len(private_key)} chars')
+    print(f'Public key length: {len(public_key)} chars')
+except Exception as e:
+    print(f'❌ JWT key loading failed: {e}')
+    print('⚠️ System will fallback to HS256 with temporary key')
+
+# Test authentication classes
+try:
+    from apps.authentication.jwt_cookie_authentication import JWTCookieAuthentication
+    auth_instance = JWTCookieAuthentication()
+    print('✅ JWT Cookie Authentication class loaded')
+except Exception as e:
+    print(f'❌ JWT Cookie Authentication failed to load: {e}')
+
+print('=== END AUTHENTICATION CONFIG ===')
+" 2>&1 | {
+    while IFS= read -r line; do
+        echo "AUTH-CONFIG: $line"
+    done
+}
+
 echo "✅ System ready - Starting server..."
 
 # Start the server
