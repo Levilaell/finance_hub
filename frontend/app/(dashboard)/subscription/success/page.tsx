@@ -18,17 +18,23 @@ export default function PaymentSuccessPage() {
   const [errorDetails, setErrorDetails] = useState<{ code?: string; message?: string; supportMessage?: string }>({});
   const sessionId = searchParams.get('session_id');
   
+  console.log('🚀 PaymentSuccessPage loaded with session ID:', sessionId);
+  
   // Use WebSocket for real-time checkout status
   const { status: wsStatus } = useCheckoutWebSocket(sessionId);
 
   useEffect(() => {
     if (!sessionId) {
+      console.log('❌ No session ID provided');
       setStatus('error');
       return;
     }
     
+    console.log('🔍 WebSocket status changed:', wsStatus, 'for session:', sessionId);
+    
     // Update status based on WebSocket events
     if (wsStatus === 'success') {
+      console.log('✅ WebSocket reported success');
       setStatus('success');
       // Invalidate all relevant queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['user'] });
@@ -36,16 +42,21 @@ export default function PaymentSuccessPage() {
       queryClient.invalidateQueries({ queryKey: ['company'] });
       queryClient.invalidateQueries({ queryKey: ['payment-methods'] });
     } else if (wsStatus === 'failed') {
+      console.log('❌ WebSocket reported failed');
       setStatus('error');
     }
   }, [wsStatus, sessionId, queryClient]);
 
-  // Fallback: validate payment if WebSocket doesn't update within 5 seconds
+  // Fallback: validate payment if WebSocket doesn't update within 5 seconds, or immediately if failed
   useEffect(() => {
-    if (!sessionId || wsStatus) return;
+    if (!sessionId || wsStatus === 'success') return;
 
+    // If WebSocket failed, validate immediately. Otherwise wait 5 seconds.
+    const delay = wsStatus === 'failed' ? 0 : 5000;
+    
     const timeout = setTimeout(async () => {
       try {
+        console.log('🔍 Attempting payment validation fallback for session:', sessionId);
         const result = await validatePayment.mutateAsync(sessionId);
         
         if (result.status === 'success') {
@@ -57,6 +68,7 @@ export default function PaymentSuccessPage() {
           setStatus('pending');
         }
       } catch (error: any) {
+        console.error('❌ Payment validation failed:', error);
         setStatus('error');
         // Capture error details for better messaging
         if (error?.response?.data) {
@@ -67,7 +79,7 @@ export default function PaymentSuccessPage() {
           });
         }
       }
-    }, 5000);
+    }, delay);
 
     return () => clearTimeout(timeout);
   }, [sessionId, wsStatus, validatePayment, queryClient]);
