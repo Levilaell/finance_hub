@@ -16,9 +16,39 @@ export default function PaymentSuccessPage() {
   const { validatePayment } = useSubscription();
   const [status, setStatus] = useState<'checking' | 'success' | 'error' | 'pending'>('checking');
   const [errorDetails, setErrorDetails] = useState<{ code?: string; message?: string; supportMessage?: string }>({});
-  const sessionId = searchParams.get('session_id');
+  // Try multiple methods to get session_id 
+  let sessionId = searchParams.get('session_id');
+  
+  // Fallback: Extract from URL fragment or current URL
+  if (!sessionId && typeof window !== 'undefined') {
+    const url = window.location.href;
+    
+    // Try to extract from various URL patterns
+    const patterns = [
+      /[?&]session_id=([^&#]+)/,
+      /[?&]session_id%3D([^&#]+)/,  // URL encoded
+      /#session_id=([^&#]+)/,        // Fragment
+      /cs_[a-zA-Z0-9_]+/             // Direct Stripe session pattern
+    ];
+    
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) {
+        sessionId = match[1] || match[0];
+        console.log('🔍 Extracted session_id from URL pattern:', sessionId);
+        break;
+      }
+    }
+    
+    // Manual override for debugging - use session from recent logs
+    if (!sessionId && process.env.NODE_ENV === 'development') {
+      // This should be the session_id from the recent logs: cs_test_a1Bi1X9LGZi6qwAGFr69SDJIEvTG7npVERtrk11Md2S9r1o3FecMWEI9Iw
+      console.log('⚠️ No session_id found, checking for manual override...');
+    }
+  }
   
   console.log('🚀 PaymentSuccessPage loaded with session ID:', sessionId);
+  console.log('🔍 Full URL for debugging:', typeof window !== 'undefined' ? window.location.href : 'N/A');
   
   // Use WebSocket for real-time checkout status
   const { status: wsStatus } = useCheckoutWebSocket(sessionId);
@@ -32,7 +62,7 @@ export default function PaymentSuccessPage() {
     
     console.log('🔍 WebSocket status changed:', wsStatus, 'for session:', sessionId);
     
-    // Update status based on WebSocket events
+    // Update status based on WebSocket events (but WebSocket may not exist)
     if (wsStatus === 'success') {
       console.log('✅ WebSocket reported success');
       setStatus('success');
@@ -47,28 +77,48 @@ export default function PaymentSuccessPage() {
     }
   }, [wsStatus, sessionId, queryClient]);
 
-  // Fallback: validate payment if WebSocket doesn't update within 5 seconds, or immediately if failed
+  // Always try HTTP validation - WebSocket is unreliable/may not exist
   useEffect(() => {
-    if (!sessionId || wsStatus === 'success') return;
+    if (!sessionId) return;
+    
+    // Skip if WebSocket already succeeded  
+    if (wsStatus === 'success') return;
 
-    // If WebSocket failed, validate immediately. Otherwise wait 5 seconds.
-    const delay = wsStatus === 'failed' ? 0 : 5000;
+    // Try HTTP validation immediately if WebSocket failed, otherwise wait 2 seconds
+    const delay = wsStatus === 'failed' ? 0 : 2000;
+    
+    console.log(`🔍 Scheduling HTTP validation in ${delay}ms for session:`, sessionId);
     
     const timeout = setTimeout(async () => {
       try {
-        console.log('🔍 Attempting payment validation fallback for session:', sessionId);
+        console.log('🔍 Attempting HTTP payment validation for session:', sessionId);
+        console.log('🔍 Current WebSocket status:', wsStatus);
+        
         const result = await validatePayment.mutateAsync(sessionId);
         
+        console.log('✅ HTTP validation result:', result);
+        
         if (result.status === 'success') {
+          console.log('✅ Payment validated successfully via HTTP');
           setStatus('success');
           queryClient.invalidateQueries({ queryKey: ['user'] });
           queryClient.invalidateQueries({ queryKey: ['subscription-status'] });
           queryClient.invalidateQueries({ queryKey: ['company'] });
-        } else {
+        } else if (result.status === 'pending') {
+          console.log('⏳ Payment still processing');
           setStatus('pending');
+        } else {
+          console.log('❌ Payment validation returned non-success status:', result.status);
+          setStatus('error');
         }
       } catch (error: any) {
-        console.error('❌ Payment validation failed:', error);
+        console.error('❌ HTTP payment validation failed:', error);
+        console.error('❌ Error details:', {
+          status: error?.response?.status,
+          data: error?.response?.data,
+          message: error?.message
+        });
+        
         setStatus('error');
         // Capture error details for better messaging
         if (error?.response?.data) {
