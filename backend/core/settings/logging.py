@@ -39,12 +39,22 @@ LOGGING = {
         'require_debug_false': {
             '()': 'django.utils.log.RequireDebugFalse',
         },
+        'filter_user_agent': {
+            '()': 'core.filters.FilterUserAgentFilter',
+        },
+        'request_log_filter': {
+            '()': 'core.filters.RequestLogFilter',
+        },
+        'sensitive_data_filter': {
+            '()': 'core.filters.SensitiveDataFilter',
+        },
     },
     'handlers': {
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
-            'formatter': 'simple'
+            'formatter': 'simple',
+            'filters': ['filter_user_agent', 'sensitive_data_filter']
         },
         'file': {
             'level': 'INFO',
@@ -53,6 +63,7 @@ LOGGING = {
             'maxBytes': 1024 * 1024 * 15,  # 15MB
             'backupCount': 10,
             'formatter': 'verbose',
+            'filters': ['filter_user_agent', 'sensitive_data_filter']
         },
         'error_file': {
             'level': 'ERROR',
