@@ -140,7 +140,7 @@ class CreateCheckoutSessionView(APIView):
 
 class ValidatePaymentView(APIView):
     """Validate payment after checkout completion"""
-    permission_classes = []  # Allow unauthenticated for valid paid sessions
+    permission_classes = [AllowAny]  # Allow unauthenticated for valid paid sessions
     
     def post(self, request):
         import stripe
