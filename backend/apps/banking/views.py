@@ -340,7 +340,7 @@ class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
                     logger.info(f"MFA response - Status changed: {old_status} -> {item.status}")
                     
                     # If status is now UPDATING, queue sync
-                    if item.status in ['UPDATING', 'UPDATED']:
+                    if item.status in ['UPDATING', 'UPDATED', 'PARTIAL_SUCCESS']:
                         try:
                             sync_bank_account.delay(str(item.id), force_update=True)
                             logger.info(f"Queued sync for item {item.id} after successful MFA")
@@ -1007,53 +1007,109 @@ class PluggyCallbackView(APIView):
                         }
                     )
                     
-                    # Get accounts
-                    accounts_data = client.get_accounts(item_id)
+                    # Get accounts - handle PARTIAL_SUCCESS gracefully
                     created_accounts = []
+                    accounts_fetch_error = None
                     
-                    for account_data in accounts_data:
-                        account, _ = BankAccount.objects.update_or_create(
-                            pluggy_account_id=account_data['id'],
-                            defaults={
-                                'item': item,
-                                'company': request.user.company,
-                                'type': account_data['type'],
-                                'subtype': account_data.get('subtype', ''),
-                                'number': account_data.get('number', ''),
-                                'name': account_data.get('name', ''),
-                                'marketing_name': account_data.get('marketingName', ''),
-                                'owner': account_data.get('owner', ''),
-                                'tax_number': account_data.get('taxNumber', ''),
-                                'balance': Decimal(str(account_data.get('balance', 0))),
-                                'currency_code': account_data.get('currencyCode', 'BRL'),
-                                'bank_data': account_data.get('bankData', {}),
-                                'credit_data': account_data.get('creditData', {}),
-                                'pluggy_created_at': account_data.get('createdAt'),
-                                'pluggy_updated_at': account_data.get('updatedAt')
-                            }
-                        )
-                        created_accounts.append(account)
+                    try:
+                        accounts_data = client.get_accounts(item_id)
+                        logger.info(f"Fetched {len(accounts_data)} accounts from Pluggy API for item {item_id}")
+                        
+                        for account_data in accounts_data:
+                            account, _ = BankAccount.objects.update_or_create(
+                                pluggy_account_id=account_data['id'],
+                                defaults={
+                                    'item': item,
+                                    'company': request.user.company,
+                                    'type': account_data['type'],
+                                    'subtype': account_data.get('subtype', ''),
+                                    'number': account_data.get('number', ''),
+                                    'name': account_data.get('name', ''),
+                                    'marketing_name': account_data.get('marketingName', ''),
+                                    'owner': account_data.get('owner', ''),
+                                    'tax_number': account_data.get('taxNumber', ''),
+                                    'balance': Decimal(str(account_data.get('balance', 0))),
+                                    'currency_code': account_data.get('currencyCode', 'BRL'),
+                                    'bank_data': account_data.get('bankData', {}),
+                                    'credit_data': account_data.get('creditData', {}),
+                                    'pluggy_created_at': account_data.get('createdAt'),
+                                    'pluggy_updated_at': account_data.get('updatedAt')
+                                }
+                            )
+                            created_accounts.append(account)
+                            
+                    except Exception as accounts_error:
+                        logger.warning(f"Failed to fetch accounts for item {item_id}: {accounts_error}")
+                        accounts_fetch_error = str(accounts_error)
+                        # Don't fail the entire callback - item is still connected
                     
-                    # Queue initial sync if item is ready
-                    if item.status in ['UPDATED', 'OUTDATED']:
+                    # Handle success cases with no accounts (common for Open Finance)
+                    connection_message = ""
+                    # Check both status and execution_status for success scenarios
+                    is_success = item.execution_status in ['SUCCESS', 'PARTIAL_SUCCESS']
+                    is_partial_success = item.execution_status == 'PARTIAL_SUCCESS'
+                    is_open_finance = item.connector.is_open_finance if item.connector else False
+                    is_connection_healthy = item.status == 'UPDATED'
+                    
+                    if len(created_accounts) == 0:
+                        # Handle successful connection but no accounts yet (common scenarios)
+                        if is_partial_success and is_open_finance and is_connection_healthy:
+                            connection_message = "Bank connected successfully! Account details are being processed and will appear shortly. This is normal for Open Finance connections."
+                            logger.info(f"Open Finance connection successful with PARTIAL_SUCCESS execution status for item {item_id} - accounts will be available later")
+                            
+                            # Schedule a retry task to check for accounts later
+                            try:
+                                from .tasks import retry_account_fetch
+                                retry_task = retry_account_fetch.apply_async(
+                                    args=[str(item.id)], 
+                                    countdown=300  # Retry in 5 minutes
+                                )
+                                logger.info(f"Scheduled account retry task: {retry_task.id}")
+                            except Exception as retry_error:
+                                logger.warning(f"Could not schedule retry task: {retry_error}")
+                                
+                        else:
+                            connection_message = f"Bank connected but no accounts found. Status: {item.status}/{item.execution_status}"
+                            if accounts_fetch_error:
+                                connection_message += f" Error: {accounts_fetch_error}"
+                    else:
+                        connection_message = f"Successfully connected {len(created_accounts)} account(s)"
+                    
+                    # Queue initial sync if item is ready and has accounts
+                    sync_queued = False
+                    if item.status in ['UPDATED', 'OUTDATED'] and len(created_accounts) > 0:
                         try:
-                            logger.info(f"Queuing initial sync for item {item.id} with status {item.status}")
+                            logger.info(f"Queuing initial sync for item {item.id} with {len(created_accounts)} accounts")
                             task = sync_bank_account.delay(str(item.id))
                             logger.info(f"Sync task queued with ID: {task.id}")
+                            sync_queued = True
                         except Exception as celery_error:
                             logger.warning(f"Could not queue sync task (Celery may not be running): {celery_error}")
-                            # Continue without sync - user can manually sync later
                     else:
-                        logger.warning(f"Item {item.id} not ready for sync, status: {item.status}")
+                        if len(created_accounts) == 0:
+                            logger.info(f"Skipping sync for item {item.id} - no accounts available yet")
+                        else:
+                            logger.warning(f"Item {item.id} not ready for sync, status: {item.status}")
                 
-                return Response({
+                # Build response with detailed status
+                response_data = {
                     'success': True,
                     'data': {
                         'item': PluggyItemSerializer(item).data,
                         'accounts': BankAccountSerializer(created_accounts, many=True).data,
-                        'message': f'Successfully connected {len(created_accounts)} account(s)'
+                        'message': connection_message,
+                        'status': {
+                            'is_partial_success': is_partial_success,
+                            'is_open_finance': is_open_finance,
+                            'accounts_available': len(created_accounts) > 0,
+                            'sync_queued': sync_queued,
+                            'retry_scheduled': is_partial_success and is_open_finance,
+                            'expected_delay': '5-15 minutes' if is_partial_success and is_open_finance else None
+                        }
                     }
-                })
+                }
+                
+                return Response(response_data)
                 
         except Exception as e:
             logger.error(f"Failed to process callback: {e}", exc_info=True)

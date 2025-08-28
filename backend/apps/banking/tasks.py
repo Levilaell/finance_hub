@@ -1,6 +1,10 @@
 """
 Celery tasks for banking app - Pluggy Integration
 Handles async processing of bank data synchronization
+
+Key concepts:
+- status: High-level connection health (UPDATED, UPDATING, LOGIN_ERROR, OUTDATED)
+- executionStatus: Detailed execution state (SUCCESS, PARTIAL_SUCCESS, USER_INPUT_TIMEOUT, etc.)
 """
 import logging
 from datetime import datetime, timedelta
@@ -20,6 +24,48 @@ from .models import (
 from .integrations.pluggy.client import PluggyClient, PluggyError
 
 logger = logging.getLogger(__name__)
+
+
+def _can_sync_with_item_status(status: str, execution_status: str) -> tuple[bool, str]:
+    """
+    Determine if synchronization can proceed based on Pluggy item status and executionStatus.
+    
+    Args:
+        status: High-level connection health (UPDATED, UPDATING, LOGIN_ERROR, OUTDATED)
+        execution_status: Detailed execution state (SUCCESS, PARTIAL_SUCCESS, etc.)
+    
+    Returns:
+        Tuple of (can_sync: bool, reason: str)
+    """
+    # Successful execution statuses that allow sync
+    successful_executions = ['SUCCESS', 'PARTIAL_SUCCESS']
+    
+    # Error execution statuses that prevent sync
+    error_executions = ['USER_INPUT_TIMEOUT', 'INVALID_CREDENTIALS', 'SITE_NOT_AVAILABLE', 
+                       'ERROR', 'CONNECTION_ERROR']
+    
+    # Check execution status first (more specific)
+    if execution_status in error_executions:
+        return False, f"Execution status prevents sync: {execution_status}"
+    
+    # Then check overall status
+    if status == 'LOGIN_ERROR':
+        return False, "Invalid credentials - reconnection required"
+    elif status == 'ERROR':
+        return False, "Item in error state - reconnection required"
+    elif status == 'UPDATING':
+        return True, "Item updating - sync allowed"
+    elif status == 'UPDATED':
+        return True, "Item updated - sync allowed"
+    elif status == 'OUTDATED':
+        # OUTDATED with successful execution might still work
+        if execution_status in successful_executions:
+            return True, f"Item outdated but execution successful ({execution_status})"
+        else:
+            return False, f"Item outdated with problematic execution: {execution_status}"
+    else:
+        # Unknown status - allow with warning
+        return True, f"Unknown status ({status}) - attempting sync"
 
 
 def _get_safe_description(trans_data: Dict) -> str:
@@ -202,10 +248,11 @@ def sync_bank_account(self, item_id: str, account_id: Optional[str] = None, forc
                         logger.info(f"Updated item status from API: {item.status}, execution: {item.execution_status}")
                     except Exception as e:
                         logger.warning(f"Failed to get latest status from API: {e}")
-                        # If we can't get from API but sync was successful, update to UPDATED
-                        if item.execution_status in ['SUCCESS', 'PARTIAL_SUCCESS']:
+                        # If we can't get from API but sync was successful, infer status from execution
+                        # Only update status if executionStatus indicates success and current status allows it
+                        if item.execution_status in ['SUCCESS', 'PARTIAL_SUCCESS'] and item.status in ['UPDATING', 'OUTDATED']:
                             item.status = 'UPDATED'
-                            logger.info(f"Updated item status to UPDATED based on successful sync")
+                            logger.info(f"Updated item status to UPDATED based on successful execution: {item.execution_status}")
                 
                 item.save()
             
@@ -257,7 +304,7 @@ def _sync_account(client: PluggyClient, account: BankAccount) -> Dict:
             account.item.error_code = error_code
             account.item.save()
             
-            # Check for timeout or errors that prevent sync
+            # Check for timeout error specifically (high priority error)
             if execution_status == 'USER_INPUT_TIMEOUT' or error_code == 'USER_INPUT_TIMEOUT':
                 logger.warning(f"Cannot sync account {account.pluggy_account_id} - item has USER_INPUT_TIMEOUT")
                 return {
@@ -268,14 +315,18 @@ def _sync_account(client: PluggyClient, account: BankAccount) -> Dict:
                     'reconnection_required': True
                 }
             
-            if item_status in ['LOGIN_ERROR', 'INVALID_CREDENTIALS', 'ERROR', 'OUTDATED']:
-                logger.warning(f"Cannot sync account {account.pluggy_account_id} - item status: {item_status}")
+            # Use helper function to determine sync readiness
+            can_sync, reason = _can_sync_with_item_status(item_status, execution_status)
+            if not can_sync:
+                logger.warning(f"Cannot sync account {account.pluggy_account_id} - {reason}")
                 return {
                     'success': False,
                     'account_id': str(account.id),
-                    'error': f'Item in error state: {item_status}',
-                    'reconnection_required': True
+                    'error': reason,
+                    'reconnection_required': 'reconnection required' in reason.lower()
                 }
+            else:
+                logger.info(f"Sync allowed for account {account.pluggy_account_id} - {reason}")
                 
         except Exception as e:
             logger.warning(f"Could not check item status: {e}")
@@ -1294,3 +1345,156 @@ def _check_and_send_usage_notifications(company):
             
     except Exception as e:
         logger.error(f"Error checking/sending usage notifications: {e}")
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=300)  # 5 minute delays
+def retry_account_fetch(self, item_id: str):
+    """
+    Retry fetching accounts for PARTIAL_SUCCESS Open Finance connections
+    
+    Args:
+        item_id: PluggyItem UUID to retry account fetching for
+    """
+    try:
+        logger.info(f"Retrying account fetch for item {item_id}")
+        
+        # Get the item
+        try:
+            item = PluggyItem.objects.get(id=item_id)
+        except PluggyItem.DoesNotExist:
+            logger.error(f"PluggyItem {item_id} not found for retry")
+            return {'status': 'error', 'message': 'Item not found'}
+        
+        # Check if accounts were already created (maybe webhook came through)
+        existing_accounts = item.accounts.count()
+        if existing_accounts > 0:
+            logger.info(f"Item {item_id} already has {existing_accounts} accounts - retry not needed")
+            return {'status': 'already_resolved', 'accounts_count': existing_accounts}
+        
+        # Fetch current status from Pluggy API
+        with PluggyClient() as client:
+            try:
+                # Get latest item status
+                item_data = client.get_item(item.pluggy_item_id)
+                current_status = item_data.get('status')
+                current_execution = item_data.get('executionStatus')
+                
+                logger.info(f"Item {item.pluggy_item_id} current status: {current_status}/{current_execution}")
+                
+                # Update local item status
+                item.status = current_status
+                item.execution_status = current_execution
+                item.pluggy_updated_at = item_data.get('updatedAt', item.pluggy_updated_at)
+                
+                # Handle error states
+                error_data = item_data.get('error')
+                if error_data:
+                    item.error_code = error_data.get('code', '')
+                    item.error_message = error_data.get('message', '')
+                
+                item.save()
+                
+                # Try to fetch accounts
+                accounts_data = client.get_accounts(item.pluggy_item_id)
+                logger.info(f"Account fetch retry returned {len(accounts_data)} accounts")
+                
+                if len(accounts_data) > 0:
+                    # Create accounts
+                    created_accounts = []
+                    
+                    with db_transaction.atomic():
+                        for account_data in accounts_data:
+                            account, created = BankAccount.objects.update_or_create(
+                                pluggy_account_id=account_data['id'],
+                                defaults={
+                                    'item': item,
+                                    'company': item.company,
+                                    'type': account_data['type'],
+                                    'subtype': account_data.get('subtype', ''),
+                                    'number': account_data.get('number', ''),
+                                    'name': account_data.get('name', ''),
+                                    'marketing_name': account_data.get('marketingName', ''),
+                                    'owner': account_data.get('owner', ''),
+                                    'tax_number': account_data.get('taxNumber', ''),
+                                    'balance': Decimal(str(account_data.get('balance', 0))),
+                                    'currency_code': account_data.get('currencyCode', 'BRL'),
+                                    'bank_data': account_data.get('bankData', {}),
+                                    'credit_data': account_data.get('creditData', {}),
+                                    'pluggy_created_at': account_data.get('createdAt'),
+                                    'pluggy_updated_at': account_data.get('updatedAt'),
+                                    'is_active': True  # Make sure accounts are active
+                                }
+                            )
+                            created_accounts.append(account)
+                            
+                            if created:
+                                logger.info(f"Created account: {account.display_name} ({account.type})")
+                            else:
+                                logger.info(f"Updated account: {account.display_name} ({account.type})")
+                    
+                    # Queue initial sync if we have accounts
+                    if len(created_accounts) > 0:
+                        try:
+                            sync_task = sync_bank_account.delay(str(item.id))
+                            logger.info(f"Queued sync task for item {item_id}: {sync_task.id}")
+                        except Exception as sync_error:
+                            logger.warning(f"Could not queue sync after account retry: {sync_error}")
+                    
+                    # Send success notification
+                    try:
+                        from apps.notifications.services import NotificationService
+                        NotificationService.create_from_event(
+                            user=item.company.owner,
+                            event='bank_accounts_ready',
+                            metadata={
+                                'connector_name': item.connector.name,
+                                'accounts_count': len(created_accounts),
+                                'item_id': str(item.id),
+                                'retry_attempt': self.request.retries + 1
+                            }
+                        )
+                    except Exception as notif_error:
+                        logger.warning(f"Could not send notification: {notif_error}")
+                    
+                    logger.info(f"✅ Retry successful! Created {len(created_accounts)} accounts for item {item_id}")
+                    return {
+                        'status': 'success', 
+                        'accounts_created': len(created_accounts),
+                        'retry_attempt': self.request.retries + 1
+                    }
+                
+                else:
+                    # Still no accounts - check if we should retry again
+                    if current_execution == 'PARTIAL_SUCCESS':
+                        # Still partial success, retry if we haven't hit max retries
+                        if self.request.retries < self.max_retries:
+                            logger.info(f"Still PARTIAL_SUCCESS, scheduling retry {self.request.retries + 1}/{self.max_retries}")
+                            raise self.retry(countdown=600)  # Wait 10 minutes before next retry
+                        else:
+                            logger.warning(f"Max retries reached for item {item_id}, giving up")
+                            return {'status': 'max_retries', 'message': 'Still no accounts after all retries'}
+                    
+                    elif current_status in ['ERROR', 'LOGIN_ERROR', 'INVALID_CREDENTIALS']:
+                        # Connection failed, don't retry
+                        logger.error(f"Item {item_id} has error status: {current_status}/{current_execution}")
+                        return {'status': 'error', 'message': f'Item status: {current_status}'}
+                    
+                    else:
+                        # Unknown state
+                        logger.warning(f"Unknown state for item {item_id}: {current_status}/{current_execution}")
+                        return {'status': 'unknown', 'message': 'Unexpected item status'}
+                        
+            except Exception as api_error:
+                logger.error(f"API error during retry for item {item_id}: {api_error}")
+                
+                # Check if this is a temporary API error that we should retry
+                if "timeout" in str(api_error).lower() or "connection" in str(api_error).lower():
+                    if self.request.retries < self.max_retries:
+                        logger.info(f"Temporary API error, scheduling retry {self.request.retries + 1}/{self.max_retries}")
+                        raise self.retry(countdown=300)  # 5 minutes for API errors
+                
+                return {'status': 'api_error', 'message': str(api_error)}
+                
+    except Exception as e:
+        logger.error(f"Unexpected error in retry_account_fetch for item {item_id}: {e}", exc_info=True)
+        return {'status': 'error', 'message': str(e)}
