@@ -530,7 +530,18 @@ class StripeWebhookView(APIView):
         payload = request.body
         sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
         
+        # DEBUG: Log webhook request details
+        logger.info(f"🔗 Webhook received:")
+        logger.info(f"   IP: {request.META.get('REMOTE_ADDR')}")
+        logger.info(f"   User-Agent: {request.META.get('HTTP_USER_AGENT')}")
+        logger.info(f"   Content-Type: {request.META.get('CONTENT_TYPE')}")
+        logger.info(f"   Payload Size: {len(payload)} bytes")
+        logger.info(f"   Signature Header: {'Present' if sig_header else 'Missing'}")
+        if sig_header:
+            logger.info(f"   Signature: {sig_header[:50]}...")
+        
         if not sig_header:
+            logger.error("❌ Missing Stripe signature header")
             # Log missing signature as security event
             PaymentAuditService.log_security_event(
                 event_type='webhook_missing_signature',
@@ -552,6 +563,7 @@ class StripeWebhookView(APIView):
         
         try:
             # Process webhook with security validation
+            logger.info(f"🔍 Starting webhook security validation...")
             security_result = secure_processor.process_webhook(
                 request=request,
                 payload=payload,
@@ -559,8 +571,13 @@ class StripeWebhookView(APIView):
                 gateway=gateway
             )
             
+            logger.info(f"🔍 Security validation result: {security_result.get('status')}")
+            if security_result.get('error'):
+                logger.error(f"❌ Security error: {security_result['error']}")
+            
             if security_result['status'] == 'error':
                 # Security validation failed
+                logger.error(f"❌ Webhook security validation failed: {security_result['message']}")
                 return Response(
                     {'error': security_result['message']},
                     status=status.HTTP_400_BAD_REQUEST
