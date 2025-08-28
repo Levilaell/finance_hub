@@ -8,28 +8,13 @@ from apps.companies.models import SubscriptionPlan
 from .services.subscription_service import SubscriptionService
 from .services.audit_service import PaymentAuditService
 from .exceptions import PaymentException, SubscriptionNotActiveException
+from apps.companies.utils import get_user_company
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def get_user_company(user):
-    """
-    Get the company for a user. 
-    
-    Note: This fixes the missing current_company property that was being used
-    throughout the payment views but doesn't exist in the User model.
-    """
-    try:
-        from apps.companies.models import Company
-        return Company.objects.get(owner=user)
-    except Company.DoesNotExist:
-        return None
-    except Company.MultipleObjectsReturned:
-        # If user owns multiple companies, get the first one
-        # TODO: Add proper current_company selection logic
-        from apps.companies.models import Company
-        return Company.objects.filter(owner=user).first()
+# Removed duplicate get_user_company - now using the correct one from apps.companies.utils
 
 
 class ChangePlanSerializer(serializers.Serializer):
