@@ -215,11 +215,6 @@ class Notification(models.Model):
         # Generate unique event key for deduplication
         event_key = f"{event_name}:{event_id or 'none'}:{user.id}:{company.id}"
         
-        # Check if notification already exists
-        if cls.objects.filter(event_key=event_key).exists():
-            logger.info(f"Notification already exists for event key: {event_key}")
-            return None
-        
         # Get default title/message if not provided
         if not title or not message:
             default_title, default_message = DEFAULT_MESSAGES.get(
@@ -229,20 +224,29 @@ class Notification(models.Model):
             title = title or default_title
             message = message or default_message
         
-        # Create notification with deduplication
+        # Atomic get_or_create to prevent race condition constraint violations
         try:
-            notification = cls.objects.create(
-                company=company,
-                user=user,
-                event=event_name,
+            notification, created = cls.objects.get_or_create(
                 event_key=event_key,
-                is_critical=event_name in CRITICAL_EVENTS,
-                title=str(title),
-                message=str(message),
-                metadata=metadata or {},
-                action_url=action_url or '',
+                defaults={
+                    'company': company,
+                    'user': user,
+                    'event': event_name,
+                    'is_critical': event_name in CRITICAL_EVENTS,
+                    'title': str(title),
+                    'message': str(message),
+                    'metadata': metadata or {},
+                    'action_url': action_url or '',
+                }
             )
-            return notification
+            
+            if created:
+                logger.info(f"Notification created for event key: {event_key}")
+                return notification
+            else:
+                logger.info(f"Notification already exists for event key: {event_key}")
+                return None
+                
         except Exception as e:
             logger.error(f"Failed to create notification: {e}")
             return None
