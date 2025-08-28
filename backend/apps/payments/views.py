@@ -8,7 +8,10 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.conf import settings
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 import time
+
+User = get_user_model()
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from core.cache import cache_api_response
@@ -137,13 +140,19 @@ class CreateCheckoutSessionView(APIView):
 
 class ValidatePaymentView(APIView):
     """Validate payment after checkout completion"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = []  # Allow unauthenticated for valid paid sessions
     
     def post(self, request):
         import stripe
         from django.conf import settings
         
-        logger.info(f"🔍 Payment validation started for user: {request.user.email}")
+        # Handle both authenticated and unauthenticated validation
+        if request.user.is_authenticated:
+            logger.info(f"🔍 Payment validation started for authenticated user: {request.user.email}")
+            user = request.user
+        else:
+            logger.info(f"🔍 Payment validation started for unauthenticated user - will identify from session")
+            user = None
         
         serializer = ValidatePaymentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -151,26 +160,36 @@ class ValidatePaymentView(APIView):
         session_id = serializer.validated_data['session_id']
         logger.info(f"📋 Session ID to validate: {session_id}")
         
-        company = get_user_company(request.user)
+        # Get session from Stripe first to identify user if needed
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        session = stripe.checkout.Session.retrieve(session_id)
+        logger.info(f"✅ Session retrieved - Status: {session.payment_status}, Amount: {session.amount_total}")
+        
+        # If user not authenticated, identify from Stripe customer
+        if not user:
+            try:
+                customer = stripe.Customer.retrieve(session.customer)
+                user_email = customer.email
+                user = User.objects.get(email=user_email)
+                logger.info(f"👤 Identified user from Stripe customer: {user_email}")
+            except Exception as e:
+                logger.error(f"❌ Could not identify user from session: {e}")
+                raise PaymentException(
+                    message='Could not identify user from payment session',
+                    details={'session_id': session_id}
+                )
+        
+        company = get_user_company(user)
         if not company:
-            logger.error(f"❌ No company found for user: {request.user.email}")
+            logger.error(f"❌ No company found for user: {user.email}")
             raise PaymentException(
                 message='No active company found',
-                details={'user_id': request.user.id}
+                details={'user_id': user.id}
             )
         
         logger.info(f"🏢 User company: {company.id} - {company.name}")
         
         try:
-            # Validate session with Stripe
-            stripe.api_key = settings.STRIPE_SECRET_KEY
-            stripe_mode = "TEST" if settings.STRIPE_SECRET_KEY.startswith('sk_test_') else "LIVE"
-            logger.info(f"🔑 Stripe mode: {stripe_mode}")
-            logger.info(f"🌐 Retrieving session from Stripe: {session_id}")
-            
-            session = stripe.checkout.Session.retrieve(session_id)
-            logger.info(f"✅ Session retrieved - Status: {session.payment_status}, Amount: {session.amount_total}")
-            
             # Check if session belongs to this company
             metadata = session.get('metadata', {})
             if not metadata.get('company_id'):
