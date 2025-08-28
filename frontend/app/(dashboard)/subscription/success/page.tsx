@@ -49,6 +49,9 @@ export default function PaymentSuccessPage() {
   
   console.log('🚀 PaymentSuccessPage loaded with session ID:', sessionId);
   console.log('🔍 Full URL for debugging:', typeof window !== 'undefined' ? window.location.href : 'N/A');
+  console.log('🔍 Search params object:', Object.fromEntries(searchParams.entries()));
+  console.log('🔍 Window search string:', typeof window !== 'undefined' ? window.location.search : 'N/A');
+  console.log('🔍 Window hash:', typeof window !== 'undefined' ? window.location.hash : 'N/A');
   
   // Use WebSocket for real-time checkout status
   const { status: wsStatus } = useCheckoutWebSocket(sessionId);
@@ -93,6 +96,8 @@ export default function PaymentSuccessPage() {
       try {
         console.log('🔍 Attempting HTTP payment validation for session:', sessionId);
         console.log('🔍 Current WebSocket status:', wsStatus);
+        console.log('🔍 About to call validatePayment.mutateAsync with sessionId:', sessionId);
+        console.log('🔍 validatePayment object:', validatePayment);
         
         const result = await validatePayment.mutateAsync(sessionId);
         

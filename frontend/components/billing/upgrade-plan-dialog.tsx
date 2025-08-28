@@ -47,7 +47,7 @@ export function UpgradePlanDialog({
       subscriptionService.createCheckoutSession({
         plan_id: plans?.find(p => p.slug === data.plan_slug)?.id || 0,
         billing_period: data.billing_cycle,
-        success_url: `${window.location.origin}/subscription/success`,
+        success_url: `${window.location.origin}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${window.location.origin}/subscription`
       }),
     onSuccess: (response) => {

@@ -173,9 +173,26 @@ class UnifiedSubscriptionService {
    * Validate payment after checkout
    */
   async validatePayment(sessionId: string): Promise<{ status: string; message?: string; subscription?: any }> {
-    return await apiClient.post<{ status: string; message?: string; subscription?: any }>('/api/payments/checkout/validate/', {
-      session_id: sessionId
-    });
+    console.log('🔍 SubscriptionService.validatePayment called with sessionId:', sessionId);
+    console.log('🔍 About to make API call to /api/payments/checkout/validate/');
+    
+    try {
+      const result = await apiClient.post<{ status: string; message?: string; subscription?: any }>('/api/payments/checkout/validate/', {
+        session_id: sessionId
+      });
+      
+      console.log('✅ SubscriptionService.validatePayment success:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ SubscriptionService.validatePayment error:', error);
+      console.error('❌ Error details:', {
+        status: (error as any)?.response?.status,
+        data: (error as any)?.response?.data,
+        message: (error as any)?.message,
+        stack: (error as any)?.stack
+      });
+      throw error;
+    }
   }
 
   /**
