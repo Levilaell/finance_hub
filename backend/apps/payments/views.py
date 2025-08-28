@@ -143,6 +143,11 @@ class ValidatePaymentView(APIView):
     permission_classes = [AllowAny]  # Allow unauthenticated for valid paid sessions
     
     def post(self, request):
+        logger.info(f"🚀 VALIDATION ENDPOINT CALLED - Raw request data: {request.data}")
+        logger.info(f"🚀 Request method: {request.method}")
+        logger.info(f"🚀 Request headers: {dict(request.headers)}")
+        logger.info(f"🚀 Request user: {request.user}")
+        logger.info(f"🚀 User authenticated: {request.user.is_authenticated}")
         import stripe
         from django.conf import settings
         
@@ -159,11 +164,23 @@ class ValidatePaymentView(APIView):
         
         session_id = serializer.validated_data['session_id']
         logger.info(f"📋 Session ID to validate: {session_id}")
+        logger.info(f"📋 Session ID type: {type(session_id)}")
+        logger.info(f"📋 Session ID length: {len(session_id) if session_id else 'None'}")
         
         # Get session from Stripe first to identify user if needed
         stripe.api_key = settings.STRIPE_SECRET_KEY
-        session = stripe.checkout.Session.retrieve(session_id)
-        logger.info(f"✅ Session retrieved - Status: {session.payment_status}, Amount: {session.amount_total}")
+        
+        try:
+            logger.info(f"🔍 About to retrieve session from Stripe API: {session_id}")
+            session = stripe.checkout.Session.retrieve(session_id)
+            logger.info(f"✅ Session retrieved - Status: {session.payment_status}, Amount: {session.amount_total}")
+            logger.info(f"✅ Session details - ID: {session.id}, Customer: {session.customer}, Metadata: {session.metadata}")
+        except Exception as stripe_error:
+            logger.error(f"❌ Failed to retrieve session from Stripe: {stripe_error}")
+            raise PaymentException(
+                message='Could not retrieve payment session',
+                details={'session_id': session_id, 'stripe_error': str(stripe_error)}
+            )
         
         # If user not authenticated, identify from Stripe customer
         if not user:
@@ -366,11 +383,22 @@ class ValidatePaymentView(APIView):
                 }
             }, status=400)
         except stripe.error.StripeError as e:
-            logger.error(f"Stripe error during payment validation: {e}")
+            logger.error(f"❌ Stripe error during payment validation: {e}")
+            logger.error(f"❌ Stripe error type: {type(e).__name__}")
             return Response({
                 'status': 'error',
                 'message': 'Unable to validate payment. Please contact support.',
                 'code': 'STRIPE_ERROR'
+            }, status=500)
+        except Exception as e:
+            logger.error(f"❌ Unexpected error during payment validation: {e}")
+            logger.error(f"❌ Error type: {type(e).__name__}")
+            logger.error(f"❌ Session ID: {session_id}")
+            logger.error(f"❌ User: {request.user}")
+            return Response({
+                'status': 'error',
+                'message': 'An unexpected error occurred. Please contact support.',
+                'code': 'INTERNAL_ERROR'
             }, status=500)
 
 
