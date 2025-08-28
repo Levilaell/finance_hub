@@ -8,6 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.conf import settings
 from django.utils import timezone
+import time
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from core.cache import cache_api_response
@@ -273,6 +274,65 @@ class ValidatePaymentView(APIView):
                     
             except Subscription.DoesNotExist:
                 # Payment completed but webhook not processed yet
+                # FALLBACK: Create subscription directly to break infinite retry loop
+                logger.warning(f"🔧 Webhook not processed, creating subscription manually for session: {session_id}")
+                
+                try:
+                    from .services.webhook_handler import WebhookHandler
+                    from .services.payment_gateway import StripeGateway
+                    
+                    # Create fake webhook event to trigger subscription creation
+                    fake_webhook_event = {
+                        'type': 'checkout.session.completed',
+                        'id': f'evt_manual_{session_id}',
+                        'created': int(time.time()),
+                        'data': {
+                            'object': {
+                                'id': session_id,
+                                'metadata': metadata,
+                                'subscription': session.get('subscription'),
+                                'customer': session.get('customer'),
+                                'amount_total': session.amount_total,
+                                'currency': session.currency,
+                                'payment_intent': session.get('payment_intent'),
+                                'payment_status': session.payment_status,
+                                'status': session.status
+                            }
+                        }
+                    }
+                    
+                    # Process webhook manually
+                    gateway = StripeGateway()
+                    webhook_handler = WebhookHandler(gateway)
+                    result = webhook_handler._handle_checkout_completed(fake_webhook_event)
+                    
+                    if result.get('status') == 'success':
+                        # Subscription created successfully, fetch it
+                        subscription = company.subscription
+                        logger.info(f"✅ Manual subscription creation successful: {subscription.id}")
+                        
+                        PaymentAuditService.log_payment_validated(
+                            company=company,
+                            user=request.user,
+                            metadata={
+                                'session_id': session_id,
+                                'subscription_id': subscription.id,
+                                'validation_status': 'success_manual_fallback'
+                            }
+                        )
+                        
+                        return Response({
+                            'status': 'success',
+                            'message': 'Payment validated successfully',
+                            'subscription': SubscriptionSerializer(subscription).data
+                        })
+                    else:
+                        logger.error(f"❌ Manual subscription creation failed: {result}")
+                        
+                except Exception as fallback_error:
+                    logger.error(f"❌ Fallback subscription creation failed: {fallback_error}")
+                
+                # If fallback fails, return processing status
                 return Response({
                     'status': 'processing',
                     'message': 'Payment completed. Setting up subscription...',
