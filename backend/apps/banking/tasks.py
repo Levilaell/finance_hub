@@ -967,9 +967,142 @@ def _handle_consent_revoked(data: Dict):
 
 
 def _handle_item_created(data: Dict):
-    """Handle item created event"""
-    logger.info(f"Item created event for {data.get('id')}")
-    # Usually we create items through our API, so this is just for logging
+    """Handle item created event - Create PluggyItem if it doesn't exist"""
+    item_id = data.get('id')
+    logger.info(f"Item created event for {item_id}")
+    
+    if not item_id:
+        logger.error(f"No item ID in webhook data: {data}")
+        return
+    
+    # Check if item already exists
+    existing_item = PluggyItem.objects.filter(pluggy_item_id=item_id).first()
+    if existing_item:
+        logger.info(f"Item {item_id} already exists in database")
+        return
+    
+    # Try to create the item by fetching from Pluggy API
+    try:
+        with PluggyClient() as client:
+            # Get item details from Pluggy API
+            item_data = client.get_item(item_id)
+            logger.info(f"Retrieved item data from Pluggy API: {item_data.get('connector', {}).get('name')}")
+            
+            # Try to determine company from client_user_id
+            client_user_id = item_data.get('clientUserId')
+            company = None
+            
+            if client_user_id:
+                try:
+                    from django.contrib.auth.models import User
+                    user = User.objects.get(id=int(client_user_id))
+                    if hasattr(user, 'company') and user.company:
+                        company = user.company
+                        logger.info(f"Found company {company.name} for user {user.email}")
+                except (User.DoesNotExist, ValueError, AttributeError) as e:
+                    logger.warning(f"Could not find user/company for clientUserId {client_user_id}: {e}")
+            
+            if not company:
+                # Try to find most recent company that has Pluggy tokens
+                from apps.companies.models import Company
+                recent_companies = Company.objects.filter(
+                    pluggy_client_id__isnull=False,
+                    pluggy_client_secret__isnull=False
+                ).order_by('-created_at')[:5]  # Check last 5 companies
+                
+                for comp in recent_companies:
+                    # Check if this company has recent activity
+                    recent_items = PluggyItem.objects.filter(
+                        company=comp, 
+                        created_at__gte=timezone.now() - timezone.timedelta(hours=1)
+                    ).exists()
+                    
+                    if recent_items or not PluggyItem.objects.filter(company=comp).exists():
+                        company = comp
+                        logger.info(f"Assigned item to company {company.name} based on recent activity")
+                        break
+            
+            if not company:
+                logger.error(f"Could not determine company for item {item_id}. Webhook data: {data}")
+                return
+            
+            # Get or create connector
+            connector_id = item_data['connector']['id']
+            connector, connector_created = PluggyConnector.objects.get_or_create(
+                pluggy_id=connector_id,
+                defaults={
+                    'name': item_data['connector'].get('name', f'Connector {connector_id}'),
+                    'country': 'BR',
+                    'type': 'UNKNOWN'
+                }
+            )
+            
+            if connector_created:
+                logger.info(f"Created new connector: {connector.name}")
+            
+            # Create the PluggyItem
+            item = PluggyItem.objects.create(
+                pluggy_item_id=item_id,
+                company=company,
+                connector=connector,
+                client_user_id=client_user_id or str(company.owner.id if company.owner else ''),
+                status=item_data['status'],
+                execution_status=item_data.get('executionStatus', ''),
+                pluggy_created_at=item_data['createdAt'],
+                pluggy_updated_at=item_data['updatedAt'],
+                status_detail=item_data.get('statusDetail', {}),
+                error_code=item_data.get('error', {}).get('code', '') if item_data.get('error') else '',
+                error_message=item_data.get('error', {}).get('message', '') if item_data.get('error') else ''
+            )
+            
+            logger.info(f"Created PluggyItem {item.id} for company {company.name} from webhook")
+            
+            # Try to create accounts if item status allows
+            if item.status in ['UPDATED', 'OUTDATED']:
+                try:
+                    accounts_data = client.get_accounts(item_id)
+                    created_accounts = []
+                    
+                    for account_data in accounts_data:
+                        account, account_created = BankAccount.objects.update_or_create(
+                            pluggy_account_id=account_data['id'],
+                            defaults={
+                                'item': item,
+                                'company': company,
+                                'type': account_data['type'],
+                                'subtype': account_data.get('subtype', ''),
+                                'number': account_data.get('number', ''),
+                                'name': account_data.get('name', ''),
+                                'marketing_name': account_data.get('marketingName', ''),
+                                'owner': account_data.get('owner', ''),
+                                'tax_number': account_data.get('taxNumber', ''),
+                                'balance': Decimal(str(account_data.get('balance', 0))),
+                                'currency_code': account_data.get('currencyCode', 'BRL'),
+                                'bank_data': account_data.get('bankData', {}),
+                                'credit_data': account_data.get('creditData', {}),
+                                'pluggy_created_at': account_data.get('createdAt'),
+                                'pluggy_updated_at': account_data.get('updatedAt')
+                            }
+                        )
+                        
+                        if account_created:
+                            created_accounts.append(account)
+                    
+                    logger.info(f"Created {len(created_accounts)} accounts for item {item_id}")
+                    
+                    # Queue initial sync
+                    try:
+                        sync_bank_account.delay(str(item.id))
+                        logger.info(f"Queued sync task for item {item_id}")
+                    except Exception as celery_error:
+                        logger.warning(f"Could not queue sync task: {celery_error}")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to create accounts for item {item_id}: {e}")
+            
+    except Exception as e:
+        logger.error(f"Failed to handle item created event for {item_id}: {e}", exc_info=True)
+        # Don't raise - we want to continue processing other webhooks
 
 
 def _handle_item_login_succeeded(data: Dict):
