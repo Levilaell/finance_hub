@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Shield, AlertCircle, CheckCircle } from 'lucide-react';
+import Image from 'next/image';
 import { bankingService } from '@/services/banking.service';
 import { toast } from 'sonner';
 
@@ -45,13 +46,7 @@ export default function MFAPage() {
   const [mfaValue, setMfaValue] = useState('');
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (itemId) {
-      fetchMFAStatus();
-    }
-  }, [itemId]);
-
-  const fetchMFAStatus = async () => {
+  const fetchMFAStatus = useCallback(async () => {
     try {
       setLoading(true);
       const response = await bankingService.getMFAStatus(itemId);
@@ -68,7 +63,13 @@ export default function MFAPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [itemId, router]);
+
+  useEffect(() => {
+    if (itemId) {
+      fetchMFAStatus();
+    }
+  }, [itemId, fetchMFAStatus]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,10 +162,12 @@ export default function MFAPage() {
           {mfaStatus.connector && (
             <div className="flex items-center justify-center gap-2 mt-4">
               {mfaStatus.connector.image_url && (
-                <img 
+                <Image 
                   src={mfaStatus.connector.image_url} 
                   alt={mfaStatus.connector.name}
-                  className="h-8 w-8 object-contain"
+                  width={32}
+                  height={32}
+                  className="object-contain"
                 />
               )}
               <span className="text-lg font-medium">{mfaStatus.connector.name}</span>

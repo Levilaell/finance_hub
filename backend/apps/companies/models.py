@@ -433,17 +433,18 @@ class Company(models.Model):
         return True, f"Usage incremented: {new_value}/{limit}"
     
     def _send_usage_warning(self, percentage, usage_type, current, limit):
-        """Send usage warning notification"""
+        """Send usage warning notification with deduplication"""
         try:
             from apps.notifications.models import Notification
-            Notification.objects.create(
+            
+            # Use deduplication-aware method to prevent constraint violations
+            notification = Notification.create_from_event(
+                event_name='low_balance',  # Use existing event from notifications
+                company=self,
                 user=self.owner,
-                company=self,  # Add company field
-                event='usage_warning',
-                event_key=f'usage_{percentage}_{usage_type}',
                 title=f'{percentage}% of {usage_type} limit reached',
                 message=f'You have used {current} of {limit} {usage_type} ({percentage}%)',
-                is_critical=percentage >= 90,
+                event_id=f'{usage_type}_{percentage}_{self.id}',  # Unique per company/type/threshold
                 metadata={
                     'usage_type': usage_type,
                     'percentage': percentage,
@@ -451,10 +452,21 @@ class Company(models.Model):
                     'limit': limit
                 }
             )
+            
+            if notification:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"Usage warning notification created: {percentage}% for {usage_type}")
+            else:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"Usage warning notification already exists: {percentage}% for {usage_type}")
+                
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to create usage warning notification: {e}")
+            # DO NOT RE-RAISE - Let transaction continue
     
     @transaction.atomic
     def increment_usage(self, usage_type):

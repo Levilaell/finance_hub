@@ -653,3 +653,55 @@ railway run python validate_early_access_migration.py
 2. **Monitoramento**: Alertas para migrações pendentes
 3. **Checklist**: Verificar `showmigrations` antes de cada deploy
 4. **Staging**: Sempre testar migrações em ambiente de staging primeiro
+
+### 15. Erro Crítico de Sincronização - Constraint Violation ✅ RESOLVIDO
+
+#### Problema
+- **Sintoma**: Sincronização bancária falhava com erro 500, transações não eram salvas
+- **Erro Principal**: `duplicate key value violates unique constraint "unique_notification_event_key"`
+- **Erro Secundário**: `An error occurred in the current transaction. You can't execute queries until the end of the 'atomic' block`
+- **Erro de Infraestrutura**: `[Errno 111] Connection refused` (Redis/Celery)
+- **Endpoint**: `/api/banking/accounts/{id}/sync/`
+- **Causa Raiz**: Race condition na criação de notificações causando corrupção de transações atômicas
+
+#### Análise Detalhada - Cascade de Falhas
+1. **Race Condition**: Múltiplas transações atingindo 80% do limite simultaneamente
+2. **Notification Constraint**: Tentativa de criar notificação com `event_key` duplicada
+3. **Transaction Corruption**: Erro na notificação corrompe todo o bloco atômico
+4. **Data Loss**: Transações criadas (1998→2000) são revertidas pelo rollback
+5. **Silent Failure**: API retorna "success" mas nenhum dado é persistido
+
+#### Soluções Aplicadas
+
+**Correção 1: Deduplicação de Notificações**
+- **Arquivo**: `backend/apps/companies/models.py` (linha 435-470)
+- **Mudança**: Substituído `Notification.objects.create()` por `Notification.create_from_event()`
+- **Benefício**: Prevenção automática de duplicatas com verificação `event_key`
+
+**Correção 2: Isolamento de Notificações**
+- **Arquivo**: `backend/apps/banking/tasks.py` (linha 406-447)
+- **Mudança**: Movido processamento de notificações para fora do bloco `atomic()`
+- **Benefício**: Erros de notificação não corrompem mais a criação de transações
+
+**Correção 3: Limpeza de Banco**
+- **Script**: `backend/clean_duplicate_notifications.py`
+- **Ação**: Reset de flags de notificação para permitir novas notificações
+- **Status**: Executado com sucesso - 0 duplicatas encontradas
+
+#### Validação Realizada
+- ✅ **Deduplication Test**: Notificações duplicadas são corretamente rejeitadas
+- ✅ **Transaction Processing**: Processamento sem falhas de constraint
+- ✅ **Atomic Resilience**: Transações não são corrompidas por erros de notificação
+- ✅ **All Tests Passed**: 3/3 testes passaram sem erros
+
+#### Comportamento Pós-Correção
+- **Transações**: Sempre salvas no banco, independente de falhas de notificação
+- **Notificações**: Deduplicação automática previne constraints duplicadas  
+- **Logs**: Warnings informativos sobre duplicatas, mas sync continua
+- **Performance**: Melhoria na atomicidade e isolamento de erros
+
+#### Arquivos Modificados
+- `backend/apps/companies/models.py` - Método `_send_usage_warning()` com deduplicação
+- `backend/apps/banking/tasks.py` - Isolamento de notificações do bloco atômico
+- `backend/clean_duplicate_notifications.py` - Script de limpeza (criado)
+- `backend/test_sync_fix.py` - Testes de validação (criado)

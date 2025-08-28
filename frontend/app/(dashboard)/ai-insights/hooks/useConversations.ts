@@ -162,7 +162,7 @@ export function useConversations(options: UseConversationsOptions = {}) {
       
       fetchConversations();
     }
-  }, [options.status, options.search]); // Não incluir fetchConversations para evitar loop
+  }, [options.status, options.search, fetchConversations]); // Incluir fetchConversations
 
   return {
     conversations,

@@ -403,6 +403,8 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
                 break
             
             # Process transactions
+            transactions_to_notify = []
+            
             with db_transaction.atomic():
                 for trans_data in transactions:
                     # Check limit before each transaction creation
@@ -426,14 +428,23 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
                             total_synced += 1
                             logger.info(f"Created new transaction: {trans_data.get('description', 'No description')} - {trans_data.get('amount', 0)} - ID: {trans_data.get('id')}")
                             
-                            # Check for usage notifications (80% and 90%)
-                            _check_and_send_usage_notifications(company)
+                            # Collect transactions for notification processing outside atomic block
+                            transactions_to_notify.append(transaction)
                         else:
                             logger.info(f"Updated existing transaction: {trans_data.get('id')}")
                     except Exception as e:
                         logger.error(f"Error processing transaction {trans_data.get('id')}: {e}", exc_info=True)
                         logger.error(f"Transaction data: {trans_data}")
                         raise
+            
+            # Process notifications OUTSIDE atomic block to prevent constraint violations
+            # from corrupting the entire transaction sync
+            for transaction in transactions_to_notify:
+                try:
+                    _check_and_send_usage_notifications(transaction.company)
+                except Exception as notification_error:
+                    logger.error(f"Notification failed for transaction {transaction.id}: {notification_error}")
+                    # Continue - don't fail sync for notification errors
             
             # Check if more pages
             if page >= result.get('totalPages', 1):
