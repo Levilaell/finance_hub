@@ -12,7 +12,18 @@ class PaymentNotificationService:
     """Service for sending payment-related notifications through WebSocket"""
     
     def __init__(self):
-        self.channel_layer = get_channel_layer()
+        try:
+            self.channel_layer = get_channel_layer()
+            self._redis_available = self.channel_layer is not None
+            if self._redis_available:
+                # Test Redis connection with a simple operation
+                async_to_sync(self.channel_layer.group_add)('test_connection', 'test_channel')
+                async_to_sync(self.channel_layer.group_discard)('test_connection', 'test_channel')
+                logger.info("✅ Redis channel layer available for notifications")
+        except Exception as e:
+            logger.warning(f"⚠️ Redis not available for notifications: {e}")
+            self.channel_layer = None
+            self._redis_available = False
     
     def notify_payment_success(self, company_id: int, payment_data: Dict[str, Any]):
         """Notify about successful payment"""
@@ -204,33 +215,55 @@ class PaymentNotificationService:
         """Notify specific checkout session about completion"""
         group_name = f'checkout_{session_id}'
         
-        async_to_sync(self.channel_layer.group_send)(
-            group_name,
-            {
-                'type': 'checkout_completed',
-                'session_id': session_id,
-                'subscription_id': checkout_data.get('subscription_id'),
-                'timestamp': timezone.now().isoformat()
-            }
-        )
+        if not self._redis_available or not self.channel_layer:
+            logger.info(f"📢 Would send checkout completion notification for session {session_id} (Redis unavailable)")
+            return
+        
+        try:
+            async_to_sync(self.channel_layer.group_send)(
+                group_name,
+                {
+                    'type': 'checkout_completed',
+                    'session_id': session_id,
+                    'subscription_id': checkout_data.get('subscription_id'),
+                    'timestamp': timezone.now().isoformat()
+                }
+            )
+            logger.info(f"✅ Sent checkout completion notification for session {session_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to send checkout notification for session {session_id}: {e}")
+            # Don't re-raise - this is optional functionality
     
     def notify_checkout_failed(self, session_id: str, reason: str):
         """Notify specific checkout session about failure"""
         group_name = f'checkout_{session_id}'
         
-        async_to_sync(self.channel_layer.group_send)(
-            group_name,
-            {
-                'type': 'checkout_failed',
-                'session_id': session_id,
-                'reason': reason,
-                'timestamp': timezone.now().isoformat()
-            }
-        )
+        if not self._redis_available or not self.channel_layer:
+            logger.info(f"📢 Would send checkout failure notification for session {session_id} (Redis unavailable)")
+            return
+        
+        try:
+            async_to_sync(self.channel_layer.group_send)(
+                group_name,
+                {
+                    'type': 'checkout_failed',
+                    'session_id': session_id,
+                    'reason': reason,
+                    'timestamp': timezone.now().isoformat()
+                }
+            )
+            logger.info(f"✅ Sent checkout failure notification for session {session_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to send checkout failure notification for session {session_id}: {e}")
+            # Don't re-raise - this is optional functionality
     
     def _send_to_company_group(self, company_id: int, message: Dict[str, Any]):
         """Send message to company's payment group"""
         group_name = f'payment_updates_{company_id}'
+        
+        if not self._redis_available or not self.channel_layer:
+            logger.info(f"📢 Would send {message['type']} notification to company {company_id} (Redis unavailable)")
+            return
         
         try:
             async_to_sync(self.channel_layer.group_send)(
@@ -238,12 +271,13 @@ class PaymentNotificationService:
                 message
             )
             logger.info(
-                f"Sent {message['type']} notification to company {company_id}"
+                f"✅ Sent {message['type']} notification to company {company_id}"
             )
         except Exception as e:
-            logger.error(
-                f"Failed to send notification to company {company_id}: {e}"
+            logger.warning(
+                f"⚠️ Failed to send notification to company {company_id}: {e}. Payment processing will continue."
             )
+            # Don't re-raise - notifications are optional for core payment functionality
 
 
 # Singleton instance

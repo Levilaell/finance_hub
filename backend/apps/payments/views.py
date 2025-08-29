@@ -351,13 +351,62 @@ class ValidatePaymentView(APIView):
                         logger.error(f"❌ Manual subscription creation failed: {result}")
                         
                 except Exception as fallback_error:
-                    logger.error(f"❌ Fallback subscription creation failed: {fallback_error}")
+                    logger.error(f"❌ Webhook fallback subscription creation failed: {fallback_error}")
+                    
+                    # ULTIMATE FALLBACK: Use Redis-independent subscription service
+                    logger.info(f"🔧 Attempting Redis-independent subscription creation for session: {session_id}")
+                    
+                    try:
+                        from .services.independent_subscription_service import create_subscription_from_session
+                        
+                        result = create_subscription_from_session(session_id, user)
+                        
+                        if result.get('status') == 'success':
+                            # Subscription created successfully via independent service
+                            subscription = company.subscription
+                            logger.info(f"✅ Independent subscription creation successful: {subscription.id}")
+                            
+                            PaymentAuditService.log_payment_validated(
+                                company=company,
+                                user=user,
+                                metadata={
+                                    'session_id': session_id,
+                                    'subscription_id': subscription.id,
+                                    'validation_status': 'success_independent_fallback',
+                                    'redis_unavailable': True
+                                }
+                            )
+                            
+                            return Response({
+                                'status': 'success',
+                                'message': 'Payment validated and subscription activated successfully',
+                                'subscription': SubscriptionSerializer(subscription).data
+                            })
+                        else:
+                            logger.error(f"❌ Independent subscription creation failed: {result.get('message')}")
+                            
+                            if result.get('status') == 'warning':
+                                # Subscription already exists
+                                subscription = company.subscription
+                                return Response({
+                                    'status': 'success',
+                                    'message': 'Payment validated successfully',
+                                    'subscription': SubscriptionSerializer(subscription).data
+                                })
+                    
+                    except Exception as independent_error:
+                        logger.error(f"❌ Independent subscription creation failed: {independent_error}")
                 
-                # If fallback fails, return processing status
+                # If all fallbacks fail, return processing status
                 return Response({
                     'status': 'processing',
                     'message': 'Payment completed. Setting up subscription...',
-                    'retry_after': 10  # Suggest retry after 10 seconds
+                    'retry_after': 10,  # Suggest retry after 10 seconds
+                    'details': {
+                        'payment_processed': True,
+                        'session_id': session_id,
+                        'help': 'If this persists, please contact support with this session ID.'
+                    }
                 })
                 
         except stripe.error.InvalidRequestError as e:
