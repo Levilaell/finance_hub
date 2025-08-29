@@ -105,6 +105,12 @@ except Exception: pass
 # Run migrations
 python manage.py migrate --no-input 2>/dev/null
 
+# Fix foreign key constraint issue
+echo "🔧 Fixing foreign key constraints..."
+python fix_production_fk_constraint.py 2>/dev/null || {
+    echo "⚠️ FK constraint fix failed - may need manual intervention"
+}
+
 # Ensure email_verifications table exists
 python -c "
 import django
