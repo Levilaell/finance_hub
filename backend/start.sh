@@ -236,13 +236,13 @@ except Exception as e:
     print(f'❌ JWT key loading failed: {e}')
     print('⚠️ System will fallback to HS256 with temporary key')
 
-# Test authentication classes
+# Test simplified JWT authentication
 try:
-    from apps.authentication.jwt_cookie_authentication import JWTCookieAuthentication
-    auth_instance = JWTCookieAuthentication()
-    print('✅ JWT Cookie Authentication class loaded')
+    from rest_framework_simplejwt.authentication import JWTAuthentication
+    auth_instance = JWTAuthentication()
+    print('✅ Simplified JWT Authentication ready')
 except Exception as e:
-    print(f'❌ JWT Cookie Authentication failed to load: {e}')
+    print(f'❌ JWT Authentication failed to load: {e}')
 
 print('=== END AUTHENTICATION CONFIG ===')
 " 2>&1 | {
