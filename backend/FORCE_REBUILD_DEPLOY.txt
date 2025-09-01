@@ -1,0 +1,9 @@
+Force rebuild deploy to remove jwt_cookie_authentication.py from production
+
+This file forces Railway to do a complete rebuild and ensures:
+- jwt_cookie_authentication.py is completely removed from production
+- No cached build artifacts remain
+- Clean deployment with only simplified JWT authentication
+
+Deploy timestamp: 2025-09-01T11:30:00Z
+Commit: Force rebuild to fix authentication crisis

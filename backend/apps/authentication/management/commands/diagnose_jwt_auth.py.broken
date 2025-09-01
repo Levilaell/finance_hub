@@ -23,8 +23,9 @@ from rest_framework.test import APIRequestFactory
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
-from apps.authentication.jwt_cookie_authentication import JWTCookieAuthentication
-from apps.authentication.cookie_middleware import set_jwt_cookies, clear_jwt_cookies
+# JWT cookie authentication removed - using simplified auth only
+# from apps.authentication.jwt_cookie_authentication import JWTCookieAuthentication
+# from apps.authentication.cookie_middleware import set_jwt_cookies, clear_jwt_cookies
 from apps.authentication.security_logging import log_security_event, SecurityEvent
 
 User = get_user_model()
