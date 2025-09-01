@@ -3,6 +3,7 @@ Production settings for CaixaHub - SIMPLIFIED VERSION
 """
 import os
 from urllib.parse import urlparse
+from django.core.exceptions import ImproperlyConfigured
 from .base import *
 
 # Security
@@ -24,6 +25,8 @@ ALLOWED_HOSTS = [
     'financehub-production.up.railway.app',
     'caixahub.com.br',
     'www.caixahub.com.br',
+    'healthcheck.railway.app',  # Railway health check
+    '*.railway.app',  # Any Railway subdomain
 ]
 
 # CORS - SIMPLIFIED
@@ -43,20 +46,8 @@ SESSION_COOKIE_SECURE = True      # Required when SameSite=None
 CSRF_COOKIE_SAMESITE = 'None'     # Consistent with session
 CSRF_COOKIE_SECURE = True         # Consistent with session
 
-# JWT FORCED HS256 - COMPLETELY IGNORE RSA KEYS FROM ENVIRONMENT
-# CRITICAL: Override any RSA key configuration that might be in environment variables
-# Railway cache invalidation timestamp: 2025-09-01T12:30:00Z
+# JWT Configuration - SIMPLIFIED (HS256 only for maximum compatibility)
 from datetime import timedelta
-
-# POISON PILL: Ensure no RSA keys are used even if present in environment
-_jwt_private_key = os.environ.get('JWT_PRIVATE_KEY_B64', '')
-_jwt_public_key = os.environ.get('JWT_PUBLIC_KEY_B64', '')
-if _jwt_private_key or _jwt_public_key:
-    import sys
-    print("🚨 CRITICAL ERROR: RSA keys detected in environment!")
-    print(f"JWT_PRIVATE_KEY_B64: {'PRESENT' if _jwt_private_key else 'ABSENT'}")
-    print(f"JWT_PUBLIC_KEY_B64: {'PRESENT' if _jwt_public_key else 'ABSENT'}")
-    print("FORCING HS256 ONLY - RSA keys will be ignored!")
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
@@ -64,15 +55,12 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
-    'ALGORITHM': 'HS256',  # FORCED - Never use RS256
-    'SIGNING_KEY': os.environ.get('JWT_SECRET_KEY', SECRET_KEY),  # Use HS256 key only
+    'ALGORITHM': 'HS256',  # Simple and reliable
+    'SIGNING_KEY': os.environ.get('JWT_SECRET_KEY', SECRET_KEY),
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
-    # EXPLICITLY DISABLE RSA KEYS
-    'VERIFYING_KEY': None,  # Disable RS256 verifying key
-    'SIGNING_KEY': os.environ.get('JWT_SECRET_KEY', SECRET_KEY),  # Override any RSA key
 }
 
 # Static files
@@ -114,13 +102,36 @@ SECURE_HSTS_PRELOAD = True
 SECURE_SSL_REDIRECT = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-# Email (if needed)
-if os.environ.get('EMAIL_HOST'):
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# Email Configuration - Support multiple backends
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+
+# Resend Email Backend Configuration
+if 'ResendEmailBackend' in EMAIL_BACKEND:
+    RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@caixahub.com.br')
+    SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', 'suporte@caixahub.com.br')
+    print("✅ Using Resend Email Backend")
+
+# SMTP Email Backend Configuration (fallback)
+elif EMAIL_BACKEND == 'django.core.mail.backends.smtp.EmailBackend':
     EMAIL_HOST = os.environ.get('EMAIL_HOST')
     EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
     EMAIL_USE_TLS = True
     EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
     EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+    print("✅ Using SMTP Email Backend")
+
+# Console Backend (development fallback)
 else:
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    print("✅ Using Console Email Backend")
+
+# Open Banking - Pluggy API Configuration
+PLUGGY_BASE_URL = os.environ.get('PLUGGY_BASE_URL', 'https://api.pluggy.ai')
+PLUGGY_CLIENT_ID = os.environ.get('PLUGGY_CLIENT_ID', '')
+PLUGGY_CLIENT_SECRET = os.environ.get('PLUGGY_CLIENT_SECRET', '')
+PLUGGY_USE_SANDBOX = os.environ.get('PLUGGY_USE_SANDBOX', 'false').lower() == 'true'
+PLUGGY_CONNECT_URL = os.environ.get('PLUGGY_CONNECT_URL', 'https://connect.pluggy.ai')
+
+# Webhook settings for Pluggy
+PLUGGY_WEBHOOK_SECRET = os.environ.get('PLUGGY_WEBHOOK_SECRET', '')
+PLUGGY_WEBHOOK_URL = os.environ.get('PLUGGY_WEBHOOK_URL', 'https://your-backend.railway.app/api/banking/webhooks/pluggy/')
