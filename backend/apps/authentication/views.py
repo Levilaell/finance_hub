@@ -22,7 +22,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import EmailVerification, PasswordReset
-from .cookie_middleware import set_jwt_cookies, clear_jwt_cookies, get_client_ip
+from .cookie_middleware import get_client_ip
 from .security_logging import log_security_event, SecurityEvent, LoginAttemptTracker, SessionManager
 from .serializers import (
     ChangePasswordSerializer,
@@ -142,12 +142,6 @@ class RegisterView(generics.CreateAPIView):
             },
             'message': 'Cadastro realizado com sucesso. Por favor, verifique seu e-mail para confirmar sua conta.'
         }, status=status.HTTP_201_CREATED)
-        
-        # Set httpOnly cookies with user object for accurate logging
-        set_jwt_cookies(response, {
-            'access': str(refresh.access_token),
-            'refresh': str(refresh)
-        }, request, user)
         
         return response
 
@@ -277,25 +271,14 @@ class LoginView(APIView):
             extra_data={'session_count': SessionManager.get_active_session_count(user)}
         )
         
-        # Response includes both user data AND tokens for cross-origin compatibility
+        # Standard JWT response with tokens
         response_data = {
-            'user': UserSerializer(user).data,
-            'tokens': {
-                'access': str(refresh.access_token),
-                'refresh': str(refresh)
-            }
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': UserSerializer(user).data
         }
         
-        response = Response(response_data)
-        
-        # Set JWT cookies
-        logger.info(f"LoginView: Setting JWT cookies for user ID={user.id}, email={user.email}")
-        set_jwt_cookies(response, {
-            'access': str(refresh.access_token),
-            'refresh': str(refresh)
-        }, request, user)
-        
-        return response
+        return Response(response_data)
 
 
 class LogoutView(APIView):
@@ -326,12 +309,7 @@ class LogoutView(APIView):
                 request=request
             )
             
-            response = Response({'message': 'Logout realizado com sucesso'}, status=status.HTTP_200_OK)
-            
-            # Clear httpOnly cookies
-            clear_jwt_cookies(response)
-            
-            return response
+            return Response({'message': 'Logout realizado com sucesso'}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -389,12 +367,6 @@ class ChangePasswordView(generics.UpdateAPIView):
                 'access': str(refresh.access_token),
             }
         })
-        
-        # Set new tokens as cookies with user object for accurate logging
-        set_jwt_cookies(response, {
-            'access': str(refresh.access_token),
-            'refresh': str(refresh)
-        }, request, user)
         
         return response
 
@@ -610,13 +582,6 @@ class CustomTokenRefreshView(APIView):
                 'access': str(access_token),
                 'refresh': str(refresh),
             })
-            
-            # Set cookies with user object for accurate logging  
-            # Use standard JWT cookies (now mobile-compatible via settings)
-            set_jwt_cookies(response, {
-                'access': str(access_token),
-                'refresh': str(refresh)
-            }, request, user)
             
             return response
             
@@ -879,11 +844,5 @@ class EarlyAccessRegisterView(generics.CreateAPIView):
             'message': 'Acesso antecipado ativado com sucesso! Você tem acesso completo até ' + 
                       invite.expires_at.strftime('%d/%m/%Y') + '. Verifique seu e-mail para confirmar sua conta.'
         }, status=status.HTTP_201_CREATED)
-        
-        # Set httpOnly cookies with user object for accurate logging
-        set_jwt_cookies(response, {
-            'access': str(refresh.access_token),
-            'refresh': str(refresh)
-        }, request, user)
         
         return response

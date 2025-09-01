@@ -1,5 +1,5 @@
 """
-Base settings for CaixaHub project
+Base settings for CaixaHub project - SIMPLIFIED VERSION
 """
 import os
 from datetime import timedelta
@@ -47,27 +47,18 @@ LOCAL_APPS = [
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
+# SIMPLIFIED MIDDLEWARE - Only essentials
 MIDDLEWARE = [
-    'core.health_middleware.HealthCheckSSLBypassMiddleware',  # Must be first to bypass SSL redirect for health checks
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'core.security.SecurityHeadersMiddleware',  # Enhanced security headers
-    'core.security.RequestIDMiddleware',  # Request tracking
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'apps.authentication.middleware.SecurityMiddleware',
-    'apps.authentication.cookie_middleware.JWTCookieMiddleware',
-    'core.security.RateLimitMiddleware',  # Enhanced rate limiting
-    'core.audit_logging.AuditLogMiddleware',  # Comprehensive audit logging
-    'apps.companies.middleware.TrialExpirationMiddleware',
-    'apps.payments.middleware.PaymentErrorHandlerMiddleware',
-    'apps.payments.middleware.PaymentSecurityMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'core.error_handlers.SecurityErrorMiddleware',  # Security error handling
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -88,16 +79,22 @@ TEMPLATES = [
     },
 ]
 
-# Password validation
+# Database - will be set in environment-specific settings
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
+
+# Password validation - SIMPLIFIED
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
     },
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-        'OPTIONS': {
-            'min_length': 8,
-        }
+        'OPTIONS': {'min_length': 8},
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -124,12 +121,11 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# REST Framework
+# REST Framework - SIMPLIFIED
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'apps.authentication.jwt_cookie_authentication.JWTCookieAuthentication',
+    'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
@@ -143,59 +139,34 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
-    # Use ISO 8601 format for dates (default)
-    # 'DATETIME_FORMAT': '%d/%m/%Y %H:%M:%S',
-    # 'DATE_FORMAT': '%d/%m/%Y',
-    'DEFAULT_THROTTLE_CLASSES': [
-        'core.rate_limiting.APIEndpointThrottle',
-        'core.rate_limiting.BurstAPIThrottle',
-    ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/hour',
         'user': '1000/hour',
-        'api': '1000/hour',
-        'burst': '60/minute',
         'login': '10/hour',
-        'registration': '5/hour',
-        'report_generation': '10/hour',
-        'bank_sync': '20/hour',
-        'ai_requests': '100/month',
-        'password_reset': '3/hour',
-        'token_refresh': '30/minute',  # New rate limit for token refresh
-        '2fa_attempt': '5/minute',  # New rate limit for 2FA attempts
-        'email_verification': '3/hour',  # New rate limit for email verification
-        'account_deletion': '1/hour',  # New rate limit for account deletion
-        'report_generation': '10/hour',
-        'ai_requests': '10/minute',
-        'bank_sync': '20/hour',
-        'payment_operations': '30/hour',
-        'webhook': '200/hour'
+        'token_refresh': '30/minute',
     },
-    'EXCEPTION_HANDLER': 'core.error_handlers.custom_exception_handler'
 }
 
-# JWT Settings - Enhanced Security
+# JWT Settings - SIMPLIFIED (HS256 instead of RS256)
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),  # Reduced for security
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=3),     # Reduced for security
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=3),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
-    'ALGORITHM': 'RS256',  # Enhanced security with asymmetric keys
+    'ALGORITHM': 'HS256',  # SIMPLIFIED - Use symmetric key
+    'SIGNING_KEY': os.environ.get('JWT_SECRET_KEY', get_random_secret_key()),  # Simple secret key
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
-    'TOKEN_OBTAIN_SERIALIZER': 'apps.authentication.serializers.CustomTokenObtainSerializer',
-    'TOKEN_REFRESH_SERIALIZER': 'apps.authentication.serializers.CustomTokenRefreshSerializer',
 }
 
-# Celery Configuration
+# Celery Configuration - BASIC
 CELERY_TIMEZONE = 'America/Sao_Paulo'
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60
 CELERY_RESULT_BACKEND = 'django-db'
-CELERY_CACHE_BACKEND = 'django-cache'
 CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -203,37 +174,33 @@ CELERY_RESULT_SERIALIZER = 'json'
 # Channels Configuration
 ASGI_APPLICATION = 'core.asgi.application'
 
-# Enhanced Security Settings
-# DEBUG will be set in environment-specific settings
+# SINGLE SESSION CONFIGURATION - NO DUPLICATES
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_CACHE_ALIAS = 'default'
+SESSION_COOKIE_AGE = 86400  # 24 hours
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'
-SESSION_COOKIE_AGE = 3600  # 1 hour
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Allow persistent sessions
+# SESSION_COOKIE_SAMESITE and SESSION_COOKIE_SECURE will be set in environment files
 
+# CSRF Configuration
 CSRF_COOKIE_HTTPONLY = True
-CSRF_COOKIE_SAMESITE = 'Strict'
-CSRF_USE_SESSIONS = False  # Changed to False - not needed with JWT authentication
-# CSRF_COOKIE_SECURE will be set in environment-specific settings
-CSRF_TRUSTED_ORIGINS = []  # Will be set in environment-specific settings
+CSRF_USE_SESSIONS = False
+# CSRF_COOKIE_SAMESITE and CSRF_COOKIE_SECURE will be set in environment files
 
-# CORS Configuration - Restrictive by default
+# CORS Configuration - BASIC
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = []  # Will be set in environment-specific settings
-CORS_ALLOWED_ORIGIN_REGEXES = []  # For dynamic subdomains in production
-CORS_ALLOW_ALL_ORIGINS = False  # Never allow all origins
+CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_HEADERS = [
     'accept',
     'accept-encoding',
     'authorization',
-    'cache-control',  # Required for frontend API client
     'content-type',
     'dnt',
     'origin',
-    'pragma',  # Additional header for cache control
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
-    'x-request-id',
 ]
 CORS_ALLOWED_METHODS = [
     'DELETE',
@@ -243,36 +210,12 @@ CORS_ALLOWED_METHODS = [
     'POST',
     'PUT',
 ]
-CORS_EXPOSE_HEADERS = [
-    'x-request-id',
-    'x-rate-limit-remaining',
-    'x-rate-limit-limit',
-    'x-content-type-options',
-    'x-frame-options',
-    'content-security-policy',
-]
-CORS_MAX_AGE = 86400  # 24 hours
-CORS_PREFLIGHT_MAX_AGE = 86400
 
+# Security Headers - BASIC
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 X_FRAME_OPTIONS = 'DENY'
-
-# JWT Cookie Configuration
-JWT_ACCESS_COOKIE_NAME = 'access_token'
-JWT_REFRESH_COOKIE_NAME = 'refresh_token'
-JWT_COOKIE_HTTPONLY = True
-JWT_COOKIE_SAMESITE = 'Lax'
-JWT_COOKIE_PATH = '/'
-JWT_COOKIE_DOMAIN = os.environ.get('JWT_COOKIE_DOMAIN', None)
-
-# Request Signing
-REQUEST_SIGNING_KEY = os.environ.get('REQUEST_SIGNING_KEY', get_random_secret_key())
-
-# File Upload Settings
-FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 
 # Redis Cache Configuration
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
@@ -283,96 +226,24 @@ CACHES = {
         'LOCATION': REDIS_URL,
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'PARSER_CLASS': 'redis.connection.HiredisParser',
-            'CONNECTION_POOL_CLASS': 'redis.BlockingConnectionPool',
-            'CONNECTION_POOL_CLASS_KWARGS': {
-                'max_connections': 50,
-                'retry_on_timeout': True,
-                'socket_keepalive': True,
-                'socket_keepalive_options': {},
-            },
-            'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',
             'IGNORE_EXCEPTIONS': True,
         },
         'KEY_PREFIX': 'finance_hub',
-        'TIMEOUT': 300,  # 5 minutes default
+        'TIMEOUT': 300,
     }
 }
-
-# Cache key TTLs
-CACHE_TTL = {
-    'short': 60,  # 1 minute
-    'medium': 300,  # 5 minutes
-    'long': 900,  # 15 minutes
-    'hour': 3600,  # 1 hour
-    'day': 86400,  # 24 hours
-}
-
-# Session Cache
-SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
-SESSION_CACHE_ALIAS = 'default'
 
 # Import logging configuration
 from .logging import LOGGING
 
-# JWT Key Configuration
-try:
-    from core.security import get_jwt_private_key, get_jwt_public_key
-    SIMPLE_JWT.update({
-        'SIGNING_KEY': get_jwt_private_key(),
-        'VERIFYING_KEY': get_jwt_public_key(),
-    })
-except Exception as e:
-    # Fallback to environment variable during development
-    import os
-    jwt_secret = os.environ.get('JWT_SECRET_KEY')
-    if not jwt_secret:
-        # Generate a temporary secret for development
-        jwt_secret = get_random_secret_key()
-        print(f"Warning: Using temporary JWT secret. Set JWT_SECRET_KEY environment variable.")
-    
-    SIMPLE_JWT.update({
-        'ALGORITHM': 'HS256',  # Fallback to symmetric key
-        'SIGNING_KEY': jwt_secret,
-    })
-
-# Authentication Backends
+# Authentication Backends - BASIC
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
 
-# Session Security
-SESSION_COOKIE_AGE = 86400  # 24 hours
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Strict'
-
-# Enhanced Password Validation
-AUTH_PASSWORD_VALIDATORS.extend([
-    {
-        'NAME': 'apps.authentication.validators.ComprehensivePasswordValidator',
-    },
-])
-
-# Rate Limiting Configuration
-RATELIMIT_CACHE_BACKEND = 'default'
-RATELIMIT_ENABLE = True
-
-# Security Headers
-SECURE_BROWSER_XSS_FILTER = True
-SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
-SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
-
-# Enhanced Authentication Settings
-AUTH_MAX_LOGIN_ATTEMPTS = 3
-AUTH_LOCKOUT_DURATION = 3600  # 1 hour
-AUTH_ATTEMPT_RESET_PERIOD = 86400  # 24 hours
-MAX_SESSIONS_PER_USER = 3
-VALIDATE_SESSION_IP = False  # Set to True in production if needed
-SESSION_TIMEOUT = 3600  # 1 hour
-SESSION_ABSOLUTE_TIMEOUT = 86400  # 24 hours
-REMEMBER_ME_LIFETIME = 2592000  # 30 days
+# File Upload Settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 
 # Feature Flags
 FEATURE_FLAGS = {

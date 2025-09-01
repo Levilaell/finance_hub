@@ -21,7 +21,6 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'testserver']
 # Security settings that depend on DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
-JWT_COOKIE_SECURE = not DEBUG
 
 # Database with connection pooling
 DATABASES = {
@@ -135,15 +134,7 @@ SUPPORT_EMAIL = config('SUPPORT_EMAIL', default='suporte@caixahub.com.br')
 # Frontend URL
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 
-# JWT Cookie Settings for Development
-JWT_COOKIE_SECURE = False  # Allow cookies over HTTP in development
-JWT_COOKIE_SAMESITE = 'Lax'  # Changed from None to Lax for better compatibility
-JWT_COOKIE_DOMAIN = None  # Let the browser handle the domain
-JWT_ACCESS_COOKIE_NAME = 'access_token'
-JWT_REFRESH_COOKIE_NAME = 'refresh_token'
-
-# Note: SameSite=None requires Secure=True in production, but Chrome allows
-# Secure=False with SameSite=None on localhost for development
+# JWT simplified - using standard Bearer tokens only
 
 # OpenAI API
 OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
