@@ -43,21 +43,36 @@ SESSION_COOKIE_SECURE = True      # Required when SameSite=None
 CSRF_COOKIE_SAMESITE = 'None'     # Consistent with session
 CSRF_COOKIE_SECURE = True         # Consistent with session
 
-# JWT FORCED HS256 - IGNORE RSA KEYS FROM ENVIRONMENT
-# Override any RSA key configuration that might be in environment variables
+# JWT FORCED HS256 - COMPLETELY IGNORE RSA KEYS FROM ENVIRONMENT
+# CRITICAL: Override any RSA key configuration that might be in environment variables
+# Railway cache invalidation timestamp: 2025-09-01T12:30:00Z
 from datetime import timedelta
+
+# POISON PILL: Ensure no RSA keys are used even if present in environment
+_jwt_private_key = os.environ.get('JWT_PRIVATE_KEY_B64', '')
+_jwt_public_key = os.environ.get('JWT_PUBLIC_KEY_B64', '')
+if _jwt_private_key or _jwt_public_key:
+    import sys
+    print("🚨 CRITICAL ERROR: RSA keys detected in environment!")
+    print(f"JWT_PRIVATE_KEY_B64: {'PRESENT' if _jwt_private_key else 'ABSENT'}")
+    print(f"JWT_PUBLIC_KEY_B64: {'PRESENT' if _jwt_public_key else 'ABSENT'}")
+    print("FORCING HS256 ONLY - RSA keys will be ignored!")
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=3),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
-    'ALGORITHM': 'HS256',  # FORCED - Ignore any RSA keys
-    'SIGNING_KEY': os.environ.get('JWT_SECRET_KEY', SECRET_KEY),  # Use HS256 key
+    'ALGORITHM': 'HS256',  # FORCED - Never use RS256
+    'SIGNING_KEY': os.environ.get('JWT_SECRET_KEY', SECRET_KEY),  # Use HS256 key only
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
+    # EXPLICITLY DISABLE RSA KEYS
+    'VERIFYING_KEY': None,  # Disable RS256 verifying key
+    'SIGNING_KEY': os.environ.get('JWT_SECRET_KEY', SECRET_KEY),  # Override any RSA key
 }
 
 # Static files
