@@ -43,7 +43,22 @@ SESSION_COOKIE_SECURE = True      # Required when SameSite=None
 CSRF_COOKIE_SAMESITE = 'None'     # Consistent with session
 CSRF_COOKIE_SECURE = True         # Consistent with session
 
-# JWT simplified - using standard Bearer tokens only
+# JWT FORCED HS256 - IGNORE RSA KEYS FROM ENVIRONMENT
+# Override any RSA key configuration that might be in environment variables
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=3),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+    'ALGORITHM': 'HS256',  # FORCED - Ignore any RSA keys
+    'SIGNING_KEY': os.environ.get('JWT_SECRET_KEY', SECRET_KEY),  # Use HS256 key
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+}
 
 # Static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
