@@ -5,7 +5,7 @@ import { tokenManager } from "./token-manager";
 import { requestManager, createRequestKey } from "./request-manager";
 import { retryManager } from "./retry-manager";
 import { authStorage } from "./auth-storage";
-import { requiresLocalStorageAuth } from "./browser-detection";
+// Removed browser-detection - using standard Bearer tokens for all clients
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -37,33 +37,25 @@ class ApiClient {
       headers: {
         "Content-Type": "application/json",
       },
-      withCredentials: true,
-      // Ensure cookies are sent on all requests
-      xsrfCookieName: 'csrftoken',
-      xsrfHeaderName: 'X-CSRFToken',
+      withCredentials: false, // Simplified - using only Bearer tokens
     });
 
     this.setupInterceptors();
   }
 
   private setupInterceptors() {
-    // Request interceptor with enhanced security
+    // Request interceptor - Always use Bearer tokens
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        // Mobile Safari requires Authorization header instead of cookies
-        if (requiresLocalStorageAuth()) {
-          const accessToken = authStorage.getAccessToken();
-          if (accessToken) {
-            config.headers.Authorization = `Bearer ${accessToken}`;
-            debugLog('[API Client] Using Authorization header for mobile Safari');
-          }
-          // Don't send credentials for localStorage auth to avoid CORS issues
-          config.withCredentials = false;
-        } else {
-          // Use httpOnly cookies for other browsers
-          config.withCredentials = true;
-          debugLog('[API Client] Using cookie authentication');
+        // Always use Authorization header with Bearer token
+        const accessToken = authStorage.getAccessToken();
+        if (accessToken) {
+          config.headers.Authorization = `Bearer ${accessToken}`;
+          debugLog('[API Client] Using Bearer token authentication');
         }
+        
+        // Never use credentials (cookies) - simplified authentication
+        config.withCredentials = false;
         
         // Add security headers
         config.headers['X-Requested-With'] = 'XMLHttpRequest'; // CSRF protection
@@ -237,14 +229,13 @@ class ApiClient {
     
     const response = await this.client.post("/api/auth/login/", loginData);
     
-    // Handle token storage based on browser capabilities
-    if (requiresLocalStorageAuth() && response.data.tokens) {
-      debugLog('[API Client] Storing tokens in localStorage for mobile Safari');
-      authStorage.setTokens(response.data.tokens);
-    } else {
-      debugLog('[API Client] Using cookie authentication, tokens handled by backend');
-      // Clear any legacy localStorage tokens
-      authStorage.clearTokens();
+    // Always store tokens in localStorage - simplified approach
+    if (response.data.access && response.data.refresh) {
+      debugLog('[API Client] Storing tokens in localStorage');
+      authStorage.setTokens({
+        access: response.data.access,
+        refresh: response.data.refresh
+      });
     }
     
     return response.data;
@@ -252,18 +243,13 @@ class ApiClient {
 
   async logout() {
     try {
-      // Send refresh token if using localStorage auth
-      if (requiresLocalStorageAuth()) {
-        const refreshToken = authStorage.getRefreshToken();
-        await this.client.post("/api/auth/logout/", { 
-          refresh: refreshToken 
-        });
-      } else {
-        // Cookie-based logout (refresh token in httpOnly cookie)
-        await this.client.post("/api/auth/logout/", {});
-      }
+      // Always send refresh token in body - simplified approach
+      const refreshToken = authStorage.getRefreshToken();
+      await this.client.post("/api/auth/logout/", { 
+        refresh: refreshToken 
+      });
     } finally {
-      // Clear tokens using appropriate method
+      // Always clear tokens from localStorage
       authStorage.clearTokens();
     }
   }
