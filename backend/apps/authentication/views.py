@@ -537,11 +537,8 @@ class CustomTokenRefreshView(APIView):
     throttle_classes = [TokenRefreshRateThrottle]
     
     def post(self, request):
-        # Try to get refresh token from cookie first, then from request body
-        refresh_token = request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
-        
-        if not refresh_token:
-            refresh_token = request.data.get('refresh')
+        # Get refresh token from request body only (Bearer token approach)
+        refresh_token = request.data.get('refresh')
         
         if not refresh_token:
             log_security_event(
@@ -581,36 +578,11 @@ class CustomTokenRefreshView(APIView):
                 request=request
             )
             
-            # Create response
-            response = Response({
+            # Return tokens as JSON only (no cookies)
+            return Response({
                 'access': str(access_token),
                 'refresh': str(refresh),
             })
-            
-            # Set JWT cookies for authentication
-            response.set_cookie(
-                settings.JWT_ACCESS_COOKIE_NAME,
-                str(access_token),
-                max_age=settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds(),
-                secure=settings.JWT_COOKIE_SECURE,
-                httponly=settings.JWT_COOKIE_HTTPONLY,
-                samesite=settings.JWT_COOKIE_SAMESITE,
-                domain=settings.JWT_COOKIE_DOMAIN,
-                path=settings.JWT_COOKIE_PATH
-            )
-            
-            response.set_cookie(
-                settings.JWT_REFRESH_COOKIE_NAME,
-                str(refresh),
-                max_age=settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds(),
-                secure=settings.JWT_COOKIE_SECURE,
-                httponly=settings.JWT_COOKIE_HTTPONLY,
-                samesite=settings.JWT_COOKIE_SAMESITE,
-                domain=settings.JWT_COOKIE_DOMAIN,
-                path=settings.JWT_COOKIE_PATH
-            )
-            
-            return response
             
         except Exception as e:
             log_security_event(
