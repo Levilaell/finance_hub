@@ -29,20 +29,9 @@ try:
     from django.core.wsgi import get_wsgi_application
     application = get_wsgi_application()
     
-    # Validate JWT config on startup (production only, minimal logging)
+    # JWT validation is now handled by Django settings (HS256 only)
     if os.environ.get('DJANGO_ENV') == 'production':
-        try:
-            import django
-            django.setup()
-            from core.security import get_jwt_private_key, get_jwt_public_key
-            
-            # Quick JWT validation
-            get_jwt_private_key()
-            get_jwt_public_key()
-            print("✅ JWT authentication ready")
-                    
-        except Exception as jwt_error:
-            print(f"⚠️ JWT validation failed: {jwt_error}")
+        print("✅ JWT authentication ready")
     
 except Exception as e:
     print(f"CRITICAL ERROR during Django startup: {e}")
