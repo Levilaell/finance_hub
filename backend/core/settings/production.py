@@ -125,6 +125,11 @@ elif EMAIL_BACKEND == 'django.core.mail.backends.smtp.EmailBackend':
 else:
     print("✅ Using Console Email Backend")
 
+# Rate Limiting Configuration - PRODUCTION FIX
+# Disable django_ratelimit in production (too aggressive: 10/min)
+# Use DRF throttling instead (10/hour, Redis-backed)
+RATELIMIT_ENABLE = False
+
 # Open Banking - Pluggy API Configuration
 PLUGGY_BASE_URL = os.environ.get('PLUGGY_BASE_URL', 'https://api.pluggy.ai')
 PLUGGY_CLIENT_ID = os.environ.get('PLUGGY_CLIENT_ID', '')
