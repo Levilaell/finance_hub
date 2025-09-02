@@ -101,17 +101,11 @@ except Exception as e:
     print(f'⚠️ Could not create superuser: {e}')
 " 2>/dev/null
 
-# Reset rate limiting on startup (production fix for login 403 errors)
-echo "🔄 Resetting rate limiting counters..."
-python manage.py reset_login_rate_limit 2>/dev/null || {
-    echo "⚠️ Could not reset rate limits - continuing..."
-}
-
-# Clear corrupted sessions on startup (fixes login/logout loops)
-echo "🧹 Clearing corrupted sessions..."
-python manage.py clear_corrupted_sessions 2>/dev/null || {
-    echo "⚠️ Could not clear sessions - continuing..."
-}
+# Note: Rate limiting and session clearing disabled in production
+# - django_ratelimit disabled (RATELIMIT_ENABLE = False)
+# - Sessions use dummy backend (no Redis dependency)
+# - DRF throttling handles rate limiting via dummy cache
+echo "🔧 Production authentication: JWT-only (no sessions, no Redis)"
 
 # Check authentication configuration
 echo "🔐 Validating authentication configuration..."

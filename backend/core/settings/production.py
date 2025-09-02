@@ -139,6 +139,36 @@ else:
 # Use DRF throttling instead (10/hour, Redis-backed)
 RATELIMIT_ENABLE = False
 
+# Cache Configuration - PRODUCTION FIX (No Redis in Railway)
+# Override base.py Redis cache with dummy cache to eliminate connection errors
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+    }
+}
+
+# Session Configuration - PRODUCTION FIX (JWT-only authentication)
+# Disable Django sessions to avoid corruption issues and Redis dependencies
+# Use only JWT tokens for authentication (stateless)
+SESSION_ENGINE = 'django.contrib.sessions.backends.dummy'
+SESSION_SAVE_EVERY_REQUEST = False
+
+# Middleware Configuration - PRODUCTION FIX (Remove session dependencies)
+# Override base.py middleware to remove session and message middleware
+# Keep only essential middleware for JWT-based authentication
+MIDDLEWARE = [
+    'core.health_middleware.HealthCheckSSLBypassMiddleware',  # Health checks
+    'django.middleware.security.SecurityMiddleware',          # Security headers
+    'whitenoise.middleware.WhiteNoiseMiddleware',            # Static files
+    'corsheaders.middleware.CorsMiddleware',                 # CORS headers
+    'django.middleware.common.CommonMiddleware',             # Common functionality
+    'django.middleware.csrf.CsrfViewMiddleware',             # CSRF protection
+    'django.contrib.auth.middleware.AuthenticationMiddleware', # DRF authentication
+    'apps.authentication.middleware.SecurityMiddleware',     # Custom security
+    'django.middleware.clickjacking.XFrameOptionsMiddleware', # Clickjacking protection
+    # Removed: SessionMiddleware, MessageMiddleware (causes Redis dependency)
+]
+
 # Open Banking - Pluggy API Configuration
 PLUGGY_BASE_URL = os.environ.get('PLUGGY_BASE_URL', 'https://api.pluggy.ai')
 PLUGGY_CLIENT_ID = os.environ.get('PLUGGY_CLIENT_ID', '')
