@@ -148,10 +148,11 @@ CACHES = {
 }
 
 # Session Configuration - PRODUCTION FIX (JWT-only authentication)
-# Disable Django sessions to avoid corruption issues and Redis dependencies
-# Use only JWT tokens for authentication (stateless)
-SESSION_ENGINE = 'django.contrib.sessions.backends.dummy'
+# Use signed_cookies session backend (no external dependencies, no Redis)
+# Lightweight sessions stored in browser cookies, no server-side persistence
+SESSION_ENGINE = 'django.contrib.sessions.backends.signed_cookies'
 SESSION_SAVE_EVERY_REQUEST = False
+SESSION_COOKIE_AGE = 300  # 5 minutes (short-lived since JWT is primary auth)
 
 # Middleware Configuration - PRODUCTION FIX (Keep required middleware with dummy backends)
 # Django's AuthenticationMiddleware REQUIRES SessionMiddleware to function

@@ -33,11 +33,16 @@ try:
     if os.environ.get('DJANGO_ENV') == 'production':
         print("✅ JWT authentication ready")
     
-except Exception as e:
-    print(f"CRITICAL ERROR during Django startup: {e}")
-    print(f"Error type: {type(e).__name__}")
+except Exception as startup_error:
+    print(f"CRITICAL ERROR during Django startup: {startup_error}")
+    print(f"Error type: {type(startup_error).__name__}")
     import traceback
     traceback.print_exc()
+    
+    # Capture error details for closure
+    error_message = str(startup_error)
+    error_type = type(startup_error).__name__
+    error_traceback = traceback.format_exc()
     
     # Create a minimal WSGI application that returns error info
     def application(environ, start_response):
@@ -49,8 +54,8 @@ except Exception as e:
             status = '500 Internal Server Error'
             response_data = {
                 "status": "initialization_failed",
-                "error": str(e),
-                "error_type": type(e).__name__,
+                "error": error_message,
+                "error_type": error_type,
                 "message": "Django failed to initialize during WSGI startup",
                 "environment": {
                     "DJANGO_SETTINGS_MODULE": os.environ.get('DJANGO_SETTINGS_MODULE', 'not set'),
@@ -59,7 +64,7 @@ except Exception as e:
                     "OPENAI_API_KEY": "configured" if os.environ.get('OPENAI_API_KEY') else "missing",
                     "DJANGO_ENV": os.environ.get('DJANGO_ENV', 'not set')
                 },
-                "traceback": traceback.format_exc()[-1500:]  # Last 1500 chars of traceback
+                "traceback": error_traceback[-1500:]  # Last 1500 chars of traceback
             }
             
             response_body = json.dumps(response_data, indent=2).encode('utf-8')
@@ -78,7 +83,7 @@ except Exception as e:
 <head><title>Internal Server Error</title></head>
 <body>
 <h1><p>Internal Server Error</p></h1>
-<p>Django initialization failed: {str(e)}</p>
+<p>Django initialization failed: {error_message}</p>
 </body>
 </html>"""
             return [error_html.encode('utf-8')]
