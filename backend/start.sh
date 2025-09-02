@@ -107,6 +107,12 @@ python manage.py reset_login_rate_limit 2>/dev/null || {
     echo "⚠️ Could not reset rate limits - continuing..."
 }
 
+# Clear corrupted sessions on startup (fixes login/logout loops)
+echo "🧹 Clearing corrupted sessions..."
+python manage.py clear_corrupted_sessions 2>/dev/null || {
+    echo "⚠️ Could not clear sessions - continuing..."
+}
+
 # Check authentication configuration
 echo "🔐 Validating authentication configuration..."
 python -c "

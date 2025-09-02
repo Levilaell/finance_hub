@@ -63,6 +63,15 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
+# JWT Cookie Configuration - FIX for refresh token functionality
+JWT_ACCESS_COOKIE_NAME = 'access_token'
+JWT_REFRESH_COOKIE_NAME = 'refresh_token'
+JWT_COOKIE_SECURE = True      # HTTPS only
+JWT_COOKIE_HTTPONLY = True    # Prevent XSS
+JWT_COOKIE_SAMESITE = 'None'  # Mobile Safari cross-origin support
+JWT_COOKIE_DOMAIN = None      # Browser manages domain
+JWT_COOKIE_PATH = '/'         # Available site-wide
+
 # Static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
