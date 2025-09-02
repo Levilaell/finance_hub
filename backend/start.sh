@@ -101,6 +101,12 @@ except Exception as e:
     print(f'⚠️ Could not create superuser: {e}')
 " 2>/dev/null
 
+# Reset rate limiting on startup (production fix for login 403 errors)
+echo "🔄 Resetting rate limiting counters..."
+python manage.py reset_login_rate_limit 2>/dev/null || {
+    echo "⚠️ Could not reset rate limits - continuing..."
+}
+
 # Check authentication configuration
 echo "🔐 Validating authentication configuration..."
 python -c "
