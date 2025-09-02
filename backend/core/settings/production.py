@@ -153,20 +153,22 @@ CACHES = {
 SESSION_ENGINE = 'django.contrib.sessions.backends.dummy'
 SESSION_SAVE_EVERY_REQUEST = False
 
-# Middleware Configuration - PRODUCTION FIX (Remove session dependencies)
-# Override base.py middleware to remove session and message middleware
-# Keep only essential middleware for JWT-based authentication
+# Middleware Configuration - PRODUCTION FIX (Keep required middleware with dummy backends)
+# Django's AuthenticationMiddleware REQUIRES SessionMiddleware to function
+# Admin app REQUIRES both SessionMiddleware and MessageMiddleware
+# Solution: Keep middleware but use dummy backends (no persistence, no Redis)
 MIDDLEWARE = [
     'core.health_middleware.HealthCheckSSLBypassMiddleware',  # Health checks
     'django.middleware.security.SecurityMiddleware',          # Security headers
     'whitenoise.middleware.WhiteNoiseMiddleware',            # Static files
     'corsheaders.middleware.CorsMiddleware',                 # CORS headers
+    'django.contrib.sessions.middleware.SessionMiddleware',  # REQUIRED by AuthenticationMiddleware
     'django.middleware.common.CommonMiddleware',             # Common functionality
     'django.middleware.csrf.CsrfViewMiddleware',             # CSRF protection
     'django.contrib.auth.middleware.AuthenticationMiddleware', # DRF authentication
     'apps.authentication.middleware.SecurityMiddleware',     # Custom security
+    'django.contrib.messages.middleware.MessageMiddleware',  # REQUIRED by admin
     'django.middleware.clickjacking.XFrameOptionsMiddleware', # Clickjacking protection
-    # Removed: SessionMiddleware, MessageMiddleware (causes Redis dependency)
 ]
 
 # Open Banking - Pluggy API Configuration
