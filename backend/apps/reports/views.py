@@ -799,8 +799,9 @@ class CashFlowDataView(APIView):
             return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, 
                           status=status.HTTP_400_BAD_REQUEST)
         
-        # Create cache key
-        cache_key = f"cashflow_data_{company.id}_{start_date}_{end_date}"
+        # Create cache key (safe for memcached)
+        from .cache_utils import make_date_cache_key
+        cache_key = make_date_cache_key("cashflow_data", company.id, start_date, end_date)
         cached_data = cache.get(cache_key)
         
         if cached_data:
@@ -887,8 +888,9 @@ class CategorySpendingView(APIView):
             return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, 
                           status=status.HTTP_400_BAD_REQUEST)
         
-        # Cache key
-        cache_key = f"category_spending_{company.id}_{start_date}_{end_date}_{category_type}"
+        # Cache key (safe for memcached)
+        from .cache_utils import make_date_cache_key
+        cache_key = make_date_cache_key("category_spending", company.id, start_date, end_date, category_type)
         cached_data = cache.get(cache_key)
         
         if cached_data:
