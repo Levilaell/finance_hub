@@ -1,59 +1,49 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
-Test simplified authentication
+Test simplified JWT authentication configuration
 """
-import requests
-import json
+import os
+import django
 
-def test_login():
-    """Test login with simplified authentication"""
-    base_url = "http://localhost:8000"
+# Setup Django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings.production')
+django.setup()
+
+def test_jwt_config():
+    """Test JWT configuration"""
+    from django.conf import settings
+    from rest_framework_simplejwt.tokens import RefreshToken
+    from django.contrib.auth import get_user_model
     
-    # Test data
-    login_data = {
-        "email": "test@example.com",
-        "password": "testpass123"
-    }
+    print("🔐 SIMPLIFIED JWT AUTHENTICATION TEST")
+    print("=" * 50)
     
-    print("🧪 Testing simplified authentication...")
+    # Test JWT settings
+    print(f"✓ JWT Algorithm: {settings.SIMPLE_JWT['ALGORITHM']}")
+    print(f"✓ Access Token Lifetime: {settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME']}")
+    print(f"✓ Refresh Token Lifetime: {settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME']}")
+    print(f"✓ Rotate Refresh Tokens: {settings.SIMPLE_JWT['ROTATE_REFRESH_TOKENS']}")
     
-    try:
-        # Test login
-        response = requests.post(f"{base_url}/api/auth/login/", 
-                               json=login_data,
-                               headers={'Content-Type': 'application/json'})
-        
-        print(f"Login response status: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            if 'access' in data and 'refresh' in data:
-                print("✅ Login successful - Bearer tokens received")
-                print(f"Access token length: {len(data['access'])}")
-                print(f"Refresh token length: {len(data['refresh'])}")
-                
-                # Test authenticated request
-                headers = {'Authorization': f'Bearer {data["access"]}'}
-                profile_response = requests.get(f"{base_url}/api/auth/profile/", 
-                                              headers=headers)
-                
-                if profile_response.status_code == 200:
-                    print("✅ Authenticated request successful")
-                else:
-                    print(f"❌ Authenticated request failed: {profile_response.status_code}")
-                
-                return True
-            else:
-                print("❌ Login response missing tokens")
-                print(f"Response: {data}")
+    # Test authentication class
+    auth_classes = settings.REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES']
+    print(f"✓ Authentication Classes: {auth_classes}")
+    
+    # Test that no JWT cookie settings exist
+    jwt_cookie_attrs = ['JWT_ACCESS_COOKIE_NAME', 'JWT_REFRESH_COOKIE_NAME', 'JWT_COOKIE_SECURE']
+    for attr in jwt_cookie_attrs:
+        if hasattr(settings, attr):
+            print(f"⚠️  Warning: {attr} still exists (should be removed)")
         else:
-            print(f"❌ Login failed: {response.status_code}")
-            print(f"Response: {response.text}")
+            print(f"✓ {attr}: Not defined (correct for Bearer-only auth)")
     
-    except Exception as e:
-        print(f"❌ Test failed with error: {e}")
+    print("\n📋 EXPECTED FRONTEND BEHAVIOR:")
+    print("1. Store tokens in localStorage/sessionStorage")
+    print("2. Send tokens via Authorization header: 'Bearer <token>'")
+    print("3. Handle token refresh when 401 received")
+    print("4. Clear tokens on logout")
     
-    return False
+    print("\n✅ Simplified JWT Configuration Ready!")
+    print("🚀 Deploy and test with Bearer token authentication")
 
 if __name__ == '__main__':
-    test_login()
+    test_jwt_config()

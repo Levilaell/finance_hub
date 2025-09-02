@@ -39,12 +39,11 @@ CORS_ALLOWED_ORIGINS = [
 CORS_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS.copy()
 CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS.copy()
 
-# MOBILE SAFARI COMPATIBLE COOKIES - SIMPLE AND CONSISTENT
-# All cookies use the same policy for consistency
-SESSION_COOKIE_SAMESITE = 'None'  # Required for mobile Safari cross-origin
-SESSION_COOKIE_SECURE = True      # Required when SameSite=None
-CSRF_COOKIE_SAMESITE = 'None'     # Consistent with session
-CSRF_COOKIE_SECURE = True         # Consistent with session
+# SESSION/CSRF COOKIES - SIMPLIFIED (not used for JWT auth)
+SESSION_COOKIE_SAMESITE = 'Lax'   # Standard same-origin policy
+SESSION_COOKIE_SECURE = True      # HTTPS only
+CSRF_COOKIE_SAMESITE = 'Lax'      # Standard same-origin policy  
+CSRF_COOKIE_SECURE = True         # HTTPS only
 
 # JWT Configuration - SIMPLIFIED (HS256 only for maximum compatibility)
 from datetime import timedelta
@@ -63,14 +62,8 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
-# JWT Cookie Configuration - FIX for refresh token functionality
-JWT_ACCESS_COOKIE_NAME = 'access_token'
-JWT_REFRESH_COOKIE_NAME = 'refresh_token'
-JWT_COOKIE_SECURE = True      # HTTPS only
-JWT_COOKIE_HTTPONLY = True    # Prevent XSS
-JWT_COOKIE_SAMESITE = 'None'  # Mobile Safari cross-origin support
-JWT_COOKIE_DOMAIN = None      # Browser manages domain
-JWT_COOKIE_PATH = '/'         # Available site-wide
+# JWT Authentication - Bearer tokens only (no cookies for simplicity)
+# Frontend should store tokens and send them via Authorization header
 
 # Static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'

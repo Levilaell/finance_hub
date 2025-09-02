@@ -1,9 +1,7 @@
 /**
- * Authentication Storage Manager
- * Handles tokens via localStorage (mobile Safari) or cookies (other browsers)
+ * Authentication Storage Manager - SIMPLIFIED
+ * Always uses localStorage with Bearer tokens (no cookies)
  */
-
-import { getAuthMethod, logBrowserInfo } from './browser-detection';
 
 interface TokenData {
   access: string;
@@ -11,62 +9,41 @@ interface TokenData {
 }
 
 class AuthStorage {
-  private authMethod: 'cookies' | 'localStorage' = 'cookies';
-
   constructor() {
     if (typeof window !== 'undefined') {
-      this.authMethod = getAuthMethod();
-      logBrowserInfo();
-      console.log(`[Auth Storage] Using method: ${this.authMethod}`);
+      console.log(`[Auth Storage] Using simplified Bearer token authentication`);
     }
   }
 
   /**
-   * Store authentication tokens using appropriate method
+   * Store authentication tokens in localStorage
    */
   setTokens(tokens: TokenData): void {
-    if (this.authMethod === 'localStorage') {
-      this.setTokensInLocalStorage(tokens);
-    }
-    // For cookies, backend handles storage automatically
-    console.log(`[Auth Storage] Tokens stored using ${this.authMethod}`);
+    this.setTokensInLocalStorage(tokens);
+    console.log(`[Auth Storage] Tokens stored in localStorage`);
   }
 
   /**
    * Get access token for Authorization header
    */
   getAccessToken(): string | null {
-    if (this.authMethod === 'localStorage') {
-      return this.getTokenFromLocalStorage('access_token');
-    }
-    
-    // For cookie method, return null as cookies are sent automatically
-    return null;
+    return this.getTokenFromLocalStorage('access_token');
   }
 
   /**
    * Get refresh token for refresh requests
    */
   getRefreshToken(): string | null {
-    if (this.authMethod === 'localStorage') {
-      return this.getTokenFromLocalStorage('refresh_token');
-    }
-    
-    // For cookie method, return null as cookies are sent automatically
-    return null;
+    return this.getTokenFromLocalStorage('refresh_token');
   }
 
   /**
    * Clear all stored tokens
    */
   clearTokens(): void {
-    if (this.authMethod === 'localStorage') {
-      this.clearTokensFromLocalStorage();
-    }
-    
+    this.clearTokensFromLocalStorage();
     // Also clear any legacy cookies
     this.clearLegacyCookies();
-    
     console.log(`[Auth Storage] Tokens cleared`);
   }
 
@@ -74,20 +51,7 @@ class AuthStorage {
    * Check if tokens are stored
    */
   hasTokens(): boolean {
-    if (this.authMethod === 'localStorage') {
-      return !!this.getTokenFromLocalStorage('access_token');
-    }
-    
-    // For cookies, assume tokens exist if method is cookies
-    // Backend will handle token validation
-    return false; // Let backend handle validation
-  }
-
-  /**
-   * Get current authentication method
-   */
-  getMethod(): 'cookies' | 'localStorage' {
-    return this.authMethod;
+    return !!this.getTokenFromLocalStorage('access_token');
   }
 
   // Private methods
@@ -196,7 +160,7 @@ class AuthStorage {
    */
   getDebugInfo() {
     return {
-      method: this.authMethod,
+      method: 'localStorage',
       hasAccessToken: !!this.getAccessToken(),
       hasRefreshToken: !!this.getRefreshToken(),
       isAccessTokenExpired: this.isAccessTokenExpired(),

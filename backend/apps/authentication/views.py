@@ -278,33 +278,8 @@ class LoginView(APIView):
             'user': UserSerializer(user).data
         }
         
-        # Create response and set JWT cookies
-        response = Response(response_data)
-        
-        # Set JWT cookies for authentication
-        response.set_cookie(
-            settings.JWT_ACCESS_COOKIE_NAME,
-            str(refresh.access_token),
-            max_age=settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds(),
-            secure=settings.JWT_COOKIE_SECURE,
-            httponly=settings.JWT_COOKIE_HTTPONLY,
-            samesite=settings.JWT_COOKIE_SAMESITE,
-            domain=settings.JWT_COOKIE_DOMAIN,
-            path=settings.JWT_COOKIE_PATH
-        )
-        
-        response.set_cookie(
-            settings.JWT_REFRESH_COOKIE_NAME,
-            str(refresh),
-            max_age=settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds(),
-            secure=settings.JWT_COOKIE_SECURE,
-            httponly=settings.JWT_COOKIE_HTTPONLY,
-            samesite=settings.JWT_COOKIE_SAMESITE,
-            domain=settings.JWT_COOKIE_DOMAIN,
-            path=settings.JWT_COOKIE_PATH
-        )
-        
-        return response
+        # Return simple Bearer token response (no cookies)
+        return Response(response_data)
 
 
 class LogoutView(APIView):
@@ -335,21 +310,8 @@ class LogoutView(APIView):
                 request=request
             )
             
-            # Create response and delete JWT cookies
+            # Simple logout response (no cookies to delete)
             response = Response({'message': 'Logout realizado com sucesso'}, status=status.HTTP_200_OK)
-            
-            # Delete JWT cookies
-            response.delete_cookie(
-                settings.JWT_ACCESS_COOKIE_NAME,
-                domain=settings.JWT_COOKIE_DOMAIN,
-                path=settings.JWT_COOKIE_PATH
-            )
-            
-            response.delete_cookie(
-                settings.JWT_REFRESH_COOKIE_NAME,
-                domain=settings.JWT_COOKIE_DOMAIN,
-                path=settings.JWT_COOKIE_PATH
-            )
             
             return response
         except Exception as e:

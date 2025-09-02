@@ -120,8 +120,11 @@ class ApiClient {
               // Use token manager for coordinated refresh
               await tokenManager.refreshToken();
 
-              // Retry the original request with credentials
-              originalRequest.withCredentials = true;
+              // Retry the original request with new Bearer token
+              const newAccessToken = authStorage.getAccessToken();
+              if (newAccessToken) {
+                originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+              }
               return this.client(originalRequest);
             } catch (refreshError) {
               debugError('Token refresh failed during retry:', refreshError);
