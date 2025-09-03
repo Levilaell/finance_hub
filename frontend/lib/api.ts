@@ -2,6 +2,8 @@
 
 import axios from 'axios';
 import { toast } from 'sonner';
+import { tokenManager } from './token-manager';
+import { authStorage } from './auth-storage';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -43,31 +45,33 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       
-      try {
-        // Try to refresh token
-        const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
-        
-        if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/api/auth/refresh/`, {
-            refresh: refreshToken
-          });
+      // Don't try to refresh if we're on auth endpoints
+      const isAuthEndpoint = originalRequest.url?.includes('/auth/login') || 
+                            originalRequest.url?.includes('/auth/register') ||
+                            originalRequest.url?.includes('/auth/refresh');
+      
+      if (!isAuthEndpoint && !tokenManager.isSessionExpiredFlag()) {
+        try {
+          // Use coordinated token manager instead of independent refresh
+          await tokenManager.refreshToken();
           
-          const { access } = response.data;
-          
-          // Save new token
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('access_token', access);
+          // Get the new access token from storage
+          const newAccessToken = authStorage.getAccessToken();
+          if (newAccessToken) {
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+            return api(originalRequest);
           }
-          
-          // Retry original request with new token
-          originalRequest.headers.Authorization = `Bearer ${access}`;
-          return api(originalRequest);
+        } catch (refreshError) {
+          // Refresh failed, clear tokens and redirect to login
+          authStorage.clearTokens();
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+          }
         }
-      } catch (refreshError) {
-        // Refresh failed, redirect to login
+      } else if (tokenManager.isSessionExpiredFlag()) {
+        // Session is expired, don't attempt refresh
+        authStorage.clearTokens();
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
           window.location.href = '/login';
         }
       }
