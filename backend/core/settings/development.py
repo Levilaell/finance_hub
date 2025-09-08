@@ -344,3 +344,53 @@ LOGGING['loggers']['apps.authentication'] = {
     'level': 'DEBUG',
     'propagate': False,
 }
+# ===== APLICAR CORREÇÕES DE AUTENTICAÇÃO MVP =====
+# Configurações JWT simplificadas para resolver erro de token inválido
+from datetime import timedelta
+
+# Sobrescrever configuração JWT existente
+SIMPLE_JWT = {
+    # Tokens mais longos para reduzir problemas de refresh
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),  # 2 horas ao invés de 30min
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),  # 7 dias ao invés de 3
+    
+    # Simplificar rotação de tokens - desabilitar para MVP
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
+    
+    # Algoritmo mais simples e confiável
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': str(SECRET_KEY),  # Garantir que seja string
+    
+    # Headers mais simples
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    
+    # Remover complexidades desnecessárias
+    'UPDATE_LAST_LOGIN': False,
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+}
+
+# Aplicar throttles mais permissivos para MVP
+REST_FRAMEWORK.update({
+    'DEFAULT_THROTTLE_RATES': {
+        'login': '50/hour',        # Mais permissivo
+        'api': '2000/hour',        # Menos restritivo
+        'burst': '100/minute',     # Permitir mais requisições
+        'anon': '10000/hour',
+        'user': '10000/hour',
+        'report_generation': '100/hour',
+        'bank_sync': '200/hour',
+        'ai_requests': '1000/month',
+        'password_reset': '30/hour',
+        'token_refresh': '300/minute',
+        '2fa_attempt': '50/minute',
+        'email_verification': '30/hour',
+        'account_deletion': '10/hour',
+        'payment_operations': '300/hour',
+        'webhook': '2000/hour'
+    }
+})
+
+print("✅ Aplicadas correções de autenticação MVP (JWT simplificado)")
