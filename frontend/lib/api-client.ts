@@ -48,10 +48,18 @@ class ApiClient {
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         // Always use Authorization header with Bearer token
-        const accessToken = authStorage.getAccessToken();
-        if (accessToken) {
-          config.headers.Authorization = `Bearer ${accessToken}`;
-          debugLog('[API Client] Using Bearer token authentication');
+        const isAuthEndpoint = config.url?.includes('/auth/login') || 
+                      config.url?.includes('/auth/register') ||
+                      config.url?.includes('/auth/refresh');
+
+        if (!isAuthEndpoint) {
+          const accessToken = authStorage.getAccessToken();
+          if (accessToken) {
+            config.headers.Authorization = `Bearer ${accessToken}`;
+            debugLog('[API Client] Using Bearer token authentication');
+          }
+        } else {
+          debugLog('[API Client] Skipping auth header for auth endpoint');
         }
         
         // Never use credentials (cookies) - simplified authentication
