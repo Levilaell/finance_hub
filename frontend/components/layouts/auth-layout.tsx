@@ -11,7 +11,7 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-background">
+    <div className="min-h-screen flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 bg-background overflow-x-hidden">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link href="/" className="flex justify-center">
           <h1 className="text-3xl font-bold text-primary">CaixaHub</h1>
@@ -28,7 +28,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
         )}
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+      <div className="mt-8 mx-auto w-full max-w-md px-4 sm:px-0">
         <div className="bg-card py-8 px-4 shadow sm:rounded-lg sm:px-10">
           {children}
         </div>
