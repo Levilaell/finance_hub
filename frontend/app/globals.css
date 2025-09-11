@@ -63,6 +63,21 @@
   html {
     overflow-x: hidden;
   }
+  
+  /* Ensure responsive behavior on mobile */
+  * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  
+  /* Prevent layout breaks on mobile */
+  .grid {
+    min-width: 0;
+  }
+  
+  .grid > * {
+    min-width: 0;
+  }
 }
 
 @layer utilities {

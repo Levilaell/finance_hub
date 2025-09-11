@@ -231,7 +231,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Top header */}
-        <header className="sticky top-0 z-40 flex h-16 items-center border-b bg-background px-4 sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-40 flex h-16 items-center border-b bg-background px-4 sm:px-6 lg:px-8 xl:px-10">
           <Button
             variant="ghost"
             size="icon"
@@ -283,11 +283,11 @@ export function MainLayout({ children }: MainLayoutProps) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-6 sm:p-8 lg:p-10">{children}</main>
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 xl:p-10">{children}</main>
         
         {/* Footer */}
         <footer className="border-t mt-auto">
-          <div className="px-6 py-4 sm:px-8 lg:px-10">
+          <div className="px-4 py-4 sm:px-6 lg:px-8 xl:px-10">
             <div className="flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
               <div className="text-sm text-muted-foreground">
                 © 2025 CaixaHub. Todos os direitos reservados.

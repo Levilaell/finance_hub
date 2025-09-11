@@ -244,7 +244,7 @@ export default function DashboardPage() {
         </div>
 
       {/* Main Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Saldo Total</CardTitle>
@@ -365,9 +365,9 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Recent Transactions */}
-        <Card className="lg:col-span-2">
+        <Card className="xl:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Transações Recentes</CardTitle>
             <Link href="/transactions">
@@ -441,7 +441,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <Link href="/accounts">
           <Card className="hover:shadow-lg transition-shadow cursor-pointer">
             <CardHeader>
