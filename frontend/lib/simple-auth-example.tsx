@@ -25,7 +25,7 @@ export function LoginPage() {
       // Redirecionamento será feito automaticamente
       window.location.href = '/dashboard';
     } catch (err) {
-      setError(err.message || 'Erro no login');
+      setError(err instanceof Error ? err.message : 'Erro no login');
     } finally {
       setLoading(false);
     }
