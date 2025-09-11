@@ -5,6 +5,9 @@
  * Foco em confiabilidade e simplicidade.
  */
 
+import { useState, useEffect } from 'react';
+import type { User } from '@/types';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // Storage super simples - sem interceptors complexos
@@ -178,7 +181,7 @@ export const simpleAuth = new SimpleAuthAPI();
 // Hook simples para React
 export function useSimpleAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     setIsAuthenticated(simpleAuth.isAuthenticated());
