@@ -19,11 +19,11 @@ from django.db import transaction as db_transaction
 from django.views.decorators.cache import cache_page
 from django.core.cache import cache
 from django.utils.decorators import method_decorator
-from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.throttling import UserRateThrottle
+from rest_framework import permissions, status, viewsets # type: ignore
+from rest_framework.decorators import action # type: ignore
+from rest_framework.response import Response # type: ignore
+from rest_framework.views import APIView # type: ignore
+from rest_framework.throttling import UserRateThrottle # type: ignore
 
 
 def parse_date_to_timezone_aware(date_str: str) -> datetime:
