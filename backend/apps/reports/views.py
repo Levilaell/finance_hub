@@ -113,27 +113,30 @@ class ReportViewSet(viewsets.ModelViewSet):
                 'error': 'report_type, period_start, and period_end are required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Date validation (handle multiple formats)
+        # Date validation (handle multiple formats) - FIXED
         try:
-            # Try ISO format first (from frontend)
+            # Standardize to always work with date objects
             if 'T' in period_start:
                 start_date = datetime.fromisoformat(period_start.replace('Z', '+00:00')).date()
             else:
-                start_date = parse_date_to_timezone_aware(period_start)
+                start_date = datetime.strptime(period_start, '%Y-%m-%d').date()
                 
             if 'T' in period_end:
                 end_date = datetime.fromisoformat(period_end.replace('Z', '+00:00')).date()
             else:
-                end_date = parse_end_date_to_timezone_aware(period_end)
+                end_date = datetime.strptime(period_end, '%Y-%m-%d').date()
+                
         except (ValueError, TypeError) as e:
+            logger.error(f"Date parsing error: {str(e)} - start: {period_start}, end: {period_end}")
             raise InvalidReportPeriodError(f'Invalid date format: {str(e)}')
-        
+
+        # Validation with consistent date objects
         if start_date > end_date:
             raise InvalidReportPeriodError('Start date must be before end date')
-        
+
         if (end_date - start_date).days > 365:
             raise InvalidReportPeriodError('Report period cannot exceed 365 days')
-        
+
         if end_date > timezone.now().date():
             raise InvalidReportPeriodError('End date cannot be in the future')
         
