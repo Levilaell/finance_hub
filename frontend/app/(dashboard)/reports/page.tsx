@@ -236,12 +236,20 @@ function ReportsPageContent() {
     mutationFn: (params: { type: string; parameters: ReportParameters; format: 'pdf' | 'xlsx' | 'csv' | 'json' }) =>
       reportsService.generateReport(params.type, params.parameters, params.format),
     onSuccess: (data: Report) => {
+      console.log('✅ Report generated successfully:', data);
       toast.success('Relatório gerado com sucesso! Fazendo download...');
       refetchReports();
       
-      // Fazer download automaticamente após gerar
-      if (data.id && data.is_generated) {
+      // Verificar se data existe e tem as propriedades necessárias
+      if (data && data.id && data.is_generated) {
+        console.log('🚀 Starting automatic download for report:', data.id);
         downloadReportMutation.mutate(data.id);
+      } else if (data && data.id && !data.is_generated) {
+        console.log('⏳ Report generated but not ready yet, skipping auto-download');
+        toast.info('Relatório criado! Clique em "Baixar" quando estiver pronto.');
+      } else {
+        console.error('❌ Invalid report data received:', data);
+        toast.error('Relatório gerado mas houve problema ao iniciar download');
       }
     },
     onError: (error: any) => {
