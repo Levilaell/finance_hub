@@ -262,10 +262,11 @@ function ReportsPageContent() {
 
   const downloadReportMutation = useMutation({
     mutationFn: (reportId: string) => reportsService.downloadReport(reportId),
-    onSuccess: (data, reportId) => {
+    onSuccess: (blob: Blob, reportId: string) => {
       const report = reports?.results?.find((r: Report) => r.id === reportId);
       if (typeof window !== 'undefined') {
-        const url = window.URL.createObjectURL(new Blob([data]));
+        // blob já é um Blob, não precisa de verificação
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         link.setAttribute('download', `${report?.title || 'report'}_${new Date().toISOString().split('T')[0]}.${report?.file_format || 'pdf'}`);
@@ -278,16 +279,11 @@ function ReportsPageContent() {
     },
     onError: (error: any) => {
       console.error('❌ Erro no download de relatório:', error);
-      console.error('📊 Response data:', error.response?.data);
-      console.error('📈 Status:', error.response?.status);
-      
       const errorMessage = 
         error.response?.data?.error ||
         error.response?.data?.detail ||
-        error.response?.data?.message ||
         error.message ||
         'Falha ao baixar relatório';
-        
       toast.error(errorMessage);
     },
   });

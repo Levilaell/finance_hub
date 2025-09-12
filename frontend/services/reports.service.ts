@@ -1,6 +1,7 @@
 // frontend/services/reports.service.ts
 
 import apiClient from '@/lib/api-client';
+import { authStorage } from '@/lib/auth-storage';
 import { 
   Report, 
   ReportParameters, 
@@ -114,17 +115,40 @@ export const reportsService = {
     return response.data;
   },
 
-  // Download report file with signed URL
-  async downloadReport(reportId: string) {
-    // First get the signed download URL
-    const response = await apiClient.get<any>(`/api/reports/reports/${reportId}/download/`);
-    const { download_url } = response.data;
-    
-    // Then download using the signed URL
-    const downloadResponse = await apiClient.get<any>(download_url, {
-      responseType: 'blob',
-    });
-    return downloadResponse.data;
+  // Download report file directly
+  async downloadReport(reportId: string): Promise<Blob> {
+    try {
+      // Usar fetch diretamente para downloads de arquivo
+      const token = authStorage.getAccessToken();
+      
+      if (!token) {
+        throw new Error('Token de autenticação não encontrado');
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports/reports/${reportId}/download/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorData}`);
+      }
+
+      const blob = await response.blob();
+      console.log('✅ [PROD-DEBUG] Download blob recebido:', {
+        size: blob.size,
+        type: blob.type,
+        reportId
+      });
+
+      return blob;
+    } catch (error: any) {
+      console.error('❌ Download error:', error);
+      throw error;
+    }
   },
   
   // Regenerate a failed or completed report

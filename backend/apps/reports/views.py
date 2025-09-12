@@ -4,7 +4,7 @@ Financial reporting and analytics with performance improvements
 """
 import logging
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Dict, Any, List
 import mimetypes
 import hashlib
@@ -160,8 +160,8 @@ class ReportViewSet(viewsets.ModelViewSet):
                 report_type=report_type,
                 title=request.data.get('title', f'{report_type} Report - {period_start} to {period_end}'),
                 description=request.data.get('description', ''),
-                period_start=start_date,
-                period_end=end_date,
+                period_start=start_date if isinstance(start_date, date) else start_date.date(),
+                period_end=end_date if isinstance(end_date, date) else end_date.date(),
                 file_format=file_format,
                 parameters=request.data.get('parameters', {}),
                 filters=request.data.get('filters', {}),
@@ -212,7 +212,7 @@ class ReportViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['get'])
     def download(self, request, pk=None):
-        """Download report with signed URL validation"""
+        """Direct download of report file"""
         report = self.get_object()
         
         if not report.is_generated:
@@ -225,15 +225,32 @@ class ReportViewSet(viewsets.ModelViewSet):
                 'error': 'Report file not found'
             }, status=status.HTTP_404_NOT_FOUND)
         
-        # Generate signed download URL
-        signer = TimestampSigner()
-        signed_id = signer.sign(str(report.id))
-        
-        # Return signed URL for secure download
-        return Response({
-            'download_url': f'/api/reports/secure-download/{signed_id}/',
-            'expires_in': 3600  # 1 hour
-        })
+        try:
+            # Direct file download
+            file_handle = report.file.open('rb')
+            
+            # Set correct content type based on file format
+            content_type = 'application/pdf' if report.file_format == 'pdf' else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            
+            response = HttpResponse(
+                file_handle,
+                content_type=content_type
+            )
+            
+            # Set download filename
+            filename = f"{report.title}_{report.id}.{report.file_format}".replace(' ', '_')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            response['Content-Length'] = report.file.size
+            
+            # Log successful download
+            logger.info(f"Direct download initiated for report {report.id} by user {request.user.id}")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Download error for report {pk}: {str(e)}", exc_info=True)
+            return Response({
+                'error': 'Error downloading file'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=False, methods=['get'])
     def summary(self, request):
