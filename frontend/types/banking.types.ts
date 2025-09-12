@@ -20,6 +20,12 @@ export interface PluggyConnector {
   credentials: PluggyCredential[];
 }
 
+export interface DisconnectItemResponse {
+  success: boolean;
+  message: string;
+  deleted_transactions?: number;
+}
+
 export interface PluggyCredential {
   name: string;
   type: string;
@@ -396,6 +402,12 @@ export interface SyncError {
   errorCode?: string;
   message: string;
   requiresReconnect: boolean;
+}
+
+export interface DisconnectItemResponse {
+  success: boolean;
+  message: string;
+  deleted_transactions?: number;
 }
 
 // ===== Store State Types =====

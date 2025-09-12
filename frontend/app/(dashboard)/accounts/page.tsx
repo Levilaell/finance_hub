@@ -444,17 +444,30 @@ export default function AccountsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remover Conta</DialogTitle>
-            <DialogDescription>
-              Tem certeza que deseja remover {selectedAccount?.display_name}?
-              Isso desconectará a conta mas preservará todo o histórico de transações.
+            <DialogTitle>⚠️ Remover Conta Permanentemente</DialogTitle>
+            <DialogDescription className="space-y-2">
+              <p className="font-semibold text-red-600">
+                ATENÇÃO: Esta ação é irreversível!
+              </p>
+              <p>
+                Ao remover a conta {selectedAccount?.display_name}, serão excluídos permanentemente:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>A conexão com o banco</li>
+                <li>Todas as transações desta conta</li>
+                <li>Todo o histórico de sincronização</li>
+                <li>Categorias e análises relacionadas</li>
+              </ul>
+              <p className="text-sm text-muted-foreground mt-2">
+                💡 Dica: Se você deseja apenas pausar a sincronização mas manter o histórico, 
+                considere desativar temporariamente a conta ao invés de removê-la.
+              </p>
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button 
               variant="outline" 
               onClick={() => setSelectedAccount(null)}
-              className="hover:bg-accent hover:text-accent-foreground transition-all duration-200"
             >
               Cancelar
             </Button>
@@ -463,26 +476,33 @@ export default function AccountsPage() {
               onClick={async () => {
                 if (selectedAccount) {
                   try {
-                    // Find the item for this account
                     const itemId = selectedAccount.item?.id;
                     if (!itemId) {
                       toast.error('Não foi possível encontrar informações da conexão');
                       return;
                     }
                     
-                    // Disconnect the item
-                    await bankingService.disconnectItem(itemId);
+                    // Mostrar loading
+                    toast.loading('Removendo conta e dados...', { id: 'delete-account' });
                     
-                    toast.success('Conta desconectada com sucesso');
+                    // Disconnect the item (agora retorna DisconnectItemResponse)
+                    const response = await bankingService.disconnectItem(itemId);
+                    
+                    // Agora TypeScript reconhece deleted_transactions
+                    toast.success(
+                      `Conta removida! ${response.deleted_transactions || 0} transações excluídas.`,
+                      { id: 'delete-account' }
+                    );
+                    
                     setSelectedAccount(null);
                     await fetchAccounts();
                   } catch (error: any) {
-                    toast.error(error.message || 'Falha ao desconectar conta');
+                    toast.error(error.message || 'Falha ao remover conta', { id: 'delete-account' });
                   }
                 }
               }}
             >
-              Remover Conta
+              Sim, remover permanentemente
             </Button>
           </DialogFooter>
         </DialogContent>

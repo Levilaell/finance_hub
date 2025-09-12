@@ -21,6 +21,7 @@ import {
   BulkCategorizeRequest,
   BulkCategorizeResponse,
   DashboardData,
+  DisconnectItemResponse,
 } from '@/types/banking.types';
 
 class BankingService {
@@ -82,8 +83,8 @@ class BankingService {
     return apiClient.post(`/api/banking/items/${id}/sync/`);
   }
   
-  async disconnectItem(id: string): Promise<void> {
-    return apiClient.delete(`/api/banking/items/${id}/disconnect/`);
+  async disconnectItem(id: string): Promise<DisconnectItemResponse> {
+    return apiClient.delete<DisconnectItemResponse>(`/api/banking/items/${id}/disconnect/`);
   }
   
   async getMFAStatus(id: string): Promise<{

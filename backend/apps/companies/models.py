@@ -20,6 +20,10 @@ from django.db import models, transaction
 from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 User = get_user_model()
 
@@ -300,6 +304,34 @@ class Company(models.Model):
         current_count = self.bank_accounts.filter(is_active=True).count()
         return current_count < self.subscription_plan.max_bank_accounts
     
+
+    def reset_transaction_usage(self, count):
+        """
+        Reset transaction usage counter by reducing the count
+        
+        Args:
+            count: Number of transactions to subtract from current usage
+        """
+        from django.db import transaction as db_transaction
+        from django.db.models import F
+        
+        with db_transaction.atomic():
+            # Usar select_for_update para evitar race conditions
+            company = Company.objects.select_for_update().get(pk=self.pk)
+            
+            # Reduzir o contador
+            new_count = max(0, company.current_month_transactions - count)
+            company.current_month_transactions = new_count
+            company.save(update_fields=['current_month_transactions'])
+            
+            logger.info(
+                f"Reset transaction usage for company {self.id}: "
+                f"reduced by {count}, new total: {new_count}"
+            )
+            
+            return new_count
+
+
     def can_use_ai_insight(self):
         """Check if company can use AI insights"""
         if not self.subscription_plan:

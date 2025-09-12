@@ -14,12 +14,12 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator  # Still needed for csrf_exempt
 
-from rest_framework import status, viewsets, permissions
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.exceptions import PermissionDenied
+from rest_framework import status, viewsets, permissions # type: ignore
+from rest_framework.decorators import action # type: ignore
+from rest_framework.response import Response # type: ignore
+from rest_framework.views import APIView # type: ignore
+from rest_framework.pagination import PageNumberPagination # type: ignore
+from rest_framework.exceptions import PermissionDenied # type: ignore
 
 from .models import (
     PluggyConnector, PluggyItem, BankAccount,
@@ -359,8 +359,9 @@ class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
     
     @action(detail=True, methods=['delete'])
     def disconnect(self, request, pk=None):
-        """Disconnect item (delete from Pluggy and locally)"""
+        """Disconnect item (delete from Pluggy and locally with all related data)"""
         item = self.get_object()
+        company = item.company
         
         try:
             with PluggyClient() as client:
@@ -371,28 +372,59 @@ class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
                         client.revoke_consent(item.pluggy_item_id)
                     except PluggyError as e:
                         logger.warning(f"Failed to revoke consent: {e}")
-                        # Continue with deletion even if consent revocation fails
                 
                 # Delete from Pluggy
                 logger.info(f"Deleting item {item.pluggy_item_id} from Pluggy")
-                client.delete_item(item.pluggy_item_id)
+                try:
+                    client.delete_item(item.pluggy_item_id)
+                except PluggyError as e:
+                    logger.warning(f"Failed to delete from Pluggy (may already be deleted): {e}")
                 
-                # Soft delete accounts to preserve transaction history
-                item.accounts.update(is_active=False)
+                # Use atomic transaction for database operations
+                from django.db import transaction as db_transaction
                 
-                # Mark item as deleted but keep in database for history
-                item.status = 'DELETED'
-                item.save()
-                
-                logger.info(f"Successfully disconnected item {item.pluggy_item_id}")
+                with db_transaction.atomic():
+                    # Count transactions to be deleted for usage reset
+                    transactions_count = Transaction.objects.filter(
+                        account__item=item,
+                        company=company
+                    ).count()
+                    
+                    logger.info(f"Will delete {transactions_count} transactions for item {item.pluggy_item_id}")
+                    
+                    # Delete all transactions (this will cascade delete related data)
+                    Transaction.objects.filter(
+                        account__item=item,
+                        company=company
+                    ).delete()
+                    
+                    # Delete all accounts
+                    BankAccount.objects.filter(
+                        item=item,
+                        company=company
+                    ).delete()
+                    
+                    # Delete webhooks
+                    ItemWebhook.objects.filter(item=item).delete()
+                    
+                    # Delete the item itself
+                    item.delete()
+                    
+                    # Reset transaction counter in company usage
+                    if transactions_count > 0 and hasattr(company, 'reset_transaction_usage'):
+                        company.reset_transaction_usage(transactions_count)
+                        logger.info(f"Reset {transactions_count} transactions from company usage counter")
+                    
+                logger.info(f"Successfully disconnected and deleted item {item.pluggy_item_id}")
                 
                 return Response({
                     'success': True,
-                    'message': 'Account disconnected successfully. Transaction history has been preserved.'
+                    'message': 'Account disconnected and all data deleted successfully.',
+                    'deleted_transactions': transactions_count
                 }, status=status.HTTP_200_OK)
                 
         except Exception as e:
-            return _handle_pluggy_error(e, "item disconnection", item.pluggy_item_id)
+            return _handle_pluggy_error(e, "item disconnection and deletion", item.pluggy_item_id)
 
 
 
@@ -1334,10 +1366,10 @@ class CeleryHealthCheckView(APIView):
     
     def get(self, request):
         """Check Celery and Redis status"""
-        from celery import current_app
+        from celery import current_app # type: ignore
         from django.core.cache import cache
         from django.conf import settings
-        import redis
+        import redis # type: ignore
         
         health_status = {
             'celery': {
