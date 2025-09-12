@@ -48,12 +48,12 @@ const CashFlowChart = memo(({ data, isLoading = false, height = 320 }: CashFlowC
       <AreaChart data={data}>
         <defs>
           <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#d946ef" stopOpacity={0.8} />
-            <stop offset="95%" stopColor="#d946ef" stopOpacity={0} />
+            <stop offset="5%" stopColor="#21C55D" stopOpacity={0.8} />
+            <stop offset="95%" stopColor="#21C55D" stopOpacity={0} />
           </linearGradient>
           <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#9333ea" stopOpacity={0.8} />
-            <stop offset="95%" stopColor="#9333ea" stopOpacity={0} />
+            <stop offset="5%" stopColor="#EF4444" stopOpacity={0.8} />
+            <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" />
@@ -88,7 +88,7 @@ const CashFlowChart = memo(({ data, isLoading = false, height = 320 }: CashFlowC
         <Area
           type="monotone"
           dataKey="income"
-          stroke="#d946ef"
+          stroke="#21C55D"
           fillOpacity={1}
           fill="url(#colorIncome)"
           name="Receitas"
@@ -96,7 +96,7 @@ const CashFlowChart = memo(({ data, isLoading = false, height = 320 }: CashFlowC
         <Area
           type="monotone"
           dataKey="expenses"
-          stroke="#9333ea"
+          stroke="#EF4444"
           fillOpacity={1}
           fill="url(#colorExpenses)"
           name="Despesas"
