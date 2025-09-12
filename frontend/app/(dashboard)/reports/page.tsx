@@ -497,27 +497,31 @@ function ReportsPageContent() {
                 <div className="grid gap-4 md:grid-cols-3">
                   <div>
                     <Label>Período Inicial</Label>
-                    <DatePicker
-                      date={selectedPeriod?.start_date ? new Date(selectedPeriod.start_date) : undefined}
-                      onDateChange={(date) =>
+                    <input
+                      type="date"
+                      value={selectedPeriod?.start_date || ''}
+                      onChange={(e) =>
                         setSelectedPeriod({ 
-                          start_date: date?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+                          start_date: e.target.value,
                           end_date: selectedPeriod?.end_date || new Date().toISOString().split('T')[0]
                         })
                       }
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       {...testId(TEST_IDS.reports.startDatePicker)}
                     />
                   </div>
                   <div>
                     <Label>Período Final</Label>
-                    <DatePicker
-                      date={selectedPeriod?.end_date ? new Date(selectedPeriod.end_date) : undefined}
-                      onDateChange={(date) =>
+                    <input
+                      type="date"
+                      value={selectedPeriod?.end_date || ''}
+                      onChange={(e) =>
                         setSelectedPeriod({ 
                           start_date: selectedPeriod?.start_date || new Date().toISOString().split('T')[0],
-                          end_date: date?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
+                          end_date: e.target.value
                         })
                       }
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       {...testId(TEST_IDS.reports.endDatePicker)}
                     />
                   </div>
