@@ -13,7 +13,6 @@ import { useUsageLimits } from '@/hooks/useUsageLimits';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { subscriptionService, CreatePaymentMethodRequest } from '@/services/unified-subscription.service';
 import { SubscriptionCard } from '@/components/payment/SubscriptionCard';
-import { StripePaymentForm } from '@/components/payment/StripePaymentForm';
 import { UsageIndicator } from '@/components/payment/UsageIndicator';
 import PaymentErrorBoundary, { usePaymentErrorHandler } from '@/components/error-boundaries/PaymentErrorBoundary';
 import { CreditCard, Receipt, AlertCircle, Plus, Trash2, Check } from 'lucide-react';
@@ -364,10 +363,7 @@ export default function SubscriptionPage() {
               Add a new payment method for automatic billing
             </DialogDescription>
           </DialogHeader>
-          <StripePaymentForm
-            onSubmit={(data) => addPaymentMethod.mutate(data)}
-            loading={addPaymentMethod.isPending}
-          />
+
         </DialogContent>
       </Dialog>
       </div>

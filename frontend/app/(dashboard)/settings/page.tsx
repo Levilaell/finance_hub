@@ -42,8 +42,6 @@ import {
   shouldShowUpgradePrompt 
 } from '@/utils/billing.utils';
 import { UpgradePlanDialog } from '@/components/billing/upgrade-plan-dialog';
-import { BillingHistoryDialog } from '@/components/billing/billing-history-dialog';
-import { PaymentMethodsDialog } from '@/components/billing/payment-methods-dialog';
 import { UsageLimitsCard } from '@/components/billing/usage-limits';
 import { useSubscriptionCheck } from '@/hooks/use-subscription-check';
 import { subscriptionService } from '@/services/unified-subscription.service';
@@ -287,7 +285,7 @@ export default function SettingsPage() {
           <TabsTrigger value="profile" className="text-xs sm:text-sm">Perfil</TabsTrigger>
           <TabsTrigger value="security" className="text-xs sm:text-sm">Segurança</TabsTrigger>
           <TabsTrigger value="status" className="text-xs sm:text-sm">Status & Limites</TabsTrigger>
-          <TabsTrigger value="billing" className="text-xs sm:text-sm">Faturamento</TabsTrigger>
+          <TabsTrigger value="billing" className="text-xs sm:text-sm">Assinatura</TabsTrigger>
         </TabsList>
 
         {/* Profile Settings */}
@@ -816,171 +814,17 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                {/* Cancelled subscription message */}
-                {isCancelledOrExpired && (
-                  <div className="bg-orange-500/10 border border-orange-500/20 p-4 rounded-lg">
-                    <h3 className="font-medium text-orange-800 mb-2">
-                      {user?.company?.subscription_status === 'cancelling' ? 'Cancelamento em Processo' : 'Assinatura Cancelada'}
-                    </h3>
-                    <p className="text-sm text-orange-700">
-                      {user?.company?.subscription_status === 'cancelling' 
-                        ? 'Sua assinatura está sendo cancelada. As cobranças futuras foram interrompidas.'
-                        : 'Sua assinatura foi cancelada. Você pode reativar a qualquer momento.'
-                      }
-                    </p>
-                    <div className="mt-3">
-                      <Button 
-                        size="sm"
-                        onClick={() => setUpgradePlanDialogOpen(true)}
-                        className="bg-orange-600 hover:bg-orange-700"
-                      >
-                        Reativar Assinatura
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Plan Limits */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-white/5 p-4 rounded-lg">
-                        <p className="text-sm text-gray-600">Limite de Transações</p>
-                        <p className="font-medium">
-                          {!user?.company?.subscription_plan?.max_transactions || 
-                           user?.company?.subscription_plan?.max_transactions >= 100000 
-                            ? 'Ilimitado' 
-                            : `${user?.company?.subscription_plan?.max_transactions?.toLocaleString()}/mês`}
-                        </p>
-                      </div>
-                      <div className="bg-white/5 p-4 rounded-lg">
-                        <p className="text-sm text-gray-600">Limite de Contas Bancárias</p>
-                        <p className="font-medium">
-                          {!user?.company?.subscription_plan?.max_bank_accounts ||
-                           user?.company?.subscription_plan?.max_bank_accounts >= 100 
-                            ? 'Ilimitado' 
-                            : user?.company?.subscription_plan?.max_bank_accounts}
-                        </p>
-                      </div>
-                      {user?.company?.subscription_plan?.enable_ai_insights && (
-                        <div className="bg-white/5 p-4 rounded-lg">
-                          <p className="text-sm text-gray-600">Limite de IA</p>
-                          <p className="font-medium">
-                            {!user?.company?.subscription_plan?.max_ai_requests_per_month ||
-                             user?.company?.subscription_plan?.max_ai_requests_per_month >= 100000 
-                              ? 'Ilimitado' 
-                              : `${user?.company?.subscription_plan?.max_ai_requests_per_month}/mês`}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                {/* Plan Features */}
-                {user?.company?.subscription_plan && (
-                  <div>
-                    <h3 className="font-medium mb-3">Recursos do Plano</h3>
-                    <div className="bg-white/5 p-4 rounded-lg">
-                      <ul className="space-y-2">
-                        <li className="flex items-center text-sm text-gray-700">
-                          <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          {!user.company.subscription_plan.max_transactions || 
-                           user.company.subscription_plan.max_transactions >= 100000
-                            ? 'Transações ilimitadas'
-                            : `Até ${user.company.subscription_plan.max_transactions.toLocaleString()} transações/mês`}
-                        </li>
-                        <li className="flex items-center text-sm text-gray-700">
-                          <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          {!user.company.subscription_plan.max_bank_accounts ||
-                           user.company.subscription_plan.max_bank_accounts >= 100
-                            ? 'Contas bancárias ilimitadas'
-                            : `${user.company.subscription_plan.max_bank_accounts} contas bancárias`}
-                        </li>
-
-                        {user.company.subscription_plan.has_ai_categorization && (
-                          <li className="flex items-center text-sm text-gray-700">
-                            <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            Categorização automática com IA
-                          </li>
-                        )}
-                        {user.company.subscription_plan.has_advanced_reports && (
-                          <li className="flex items-center text-sm text-gray-700">
-                            <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            Relatórios avançados
-                          </li>
-                        )}
-                        {user.company.subscription_plan.has_api_access && (
-                          <li className="flex items-center text-sm text-gray-700">
-                            <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            Acesso à API
-                          </li>
-                        )}
-                        {user.company.subscription_plan.has_accountant_access && (
-                          <li className="flex items-center text-sm text-gray-700">
-                            <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            Acesso para contador
-                          </li>
-                        )}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-
-                {/* Upgrade Prompt */}
-                {showUpgradePrompt && (
-                  <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 p-4 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-blue-900">Hora de fazer upgrade!</p>
-                        <p className="text-sm text-blue-700">
-                          Seu período de teste {trialInfo.isExpired ? 'expirou' : 'está expirando'}. 
-                          Escolha um plano para continuar aproveitando todos os recursos.
-                        </p>
-                      </div>
-                      <Button 
-                        size="sm"
-                        onClick={() => setUpgradePlanDialogOpen(true)}
-                      >
-                        Fazer Upgrade
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-2">
-                  {/* Only show upgrade button if not on enterprise plan */}
-                  {user?.company?.subscription_plan?.plan_type !== 'enterprise' && (
-                    <Button 
-                      className="w-full sm:w-auto"
-                      onClick={() => setUpgradePlanDialogOpen(true)}
-                    >
-                      Fazer Upgrade
-                    </Button>
-                  )}
+
                   <Button 
                     variant="outline" 
                     className="w-full sm:w-auto"
                     onClick={() => setBillingHistoryDialogOpen(true)}
                   >
-                    Histórico de Cobrança
+                    Torne-se Pro
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full sm:w-auto"
-                    onClick={() => setPaymentMethodsDialogOpen(true)}
-                  >
-                    Gerenciar Pagamentos
-                  </Button>
+
                   {/* Show cancel button only for active paid subscriptions */}
                   {isActiveSubscription && (
                     <Button 
@@ -1014,16 +858,6 @@ export default function SettingsPage() {
         open={upgradePlanDialogOpen}
         onOpenChange={setUpgradePlanDialogOpen}
         currentPlan={undefined}
-      />
-
-      <BillingHistoryDialog
-        open={billingHistoryDialogOpen}
-        onOpenChange={setBillingHistoryDialogOpen}
-      />
-
-      <PaymentMethodsDialog
-        open={paymentMethodsDialogOpen}
-        onOpenChange={setPaymentMethodsDialogOpen}
       />
 
       {/* Cancel Subscription Dialog */}

@@ -10,7 +10,6 @@ from django.db import transaction
 from django.conf import settings
 from .stripe_service import StripeService
 from .audit_service import PaymentAuditService
-from .notification_service import notification_service
 from ..models import Payment, Subscription, PaymentRetry
 
 logger = logging.getLogger(__name__)

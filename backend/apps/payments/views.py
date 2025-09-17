@@ -13,14 +13,12 @@ import time
 
 User = get_user_model()
 from django.views.decorators.cache import cache_page
-from django.utils.decorators import method_decorator
 from core.cache import cache_api_response
 from .models import Subscription, PaymentMethod, Payment, UsageRecord
 from apps.companies.models import SubscriptionPlan
 from .serializers import (
-    SubscriptionPlanSerializer, SubscriptionSerializer,
-    PaymentMethodSerializer, CreatePaymentMethodSerializer,
-    PaymentSerializer, CreateCheckoutSessionSerializer,
+    SubscriptionSerializer,
+    CreateCheckoutSessionSerializer,
     ValidatePaymentSerializer, CompanySubscriptionSerializer
 )
 from .services.payment_gateway import PaymentService, StripeGateway
@@ -28,10 +26,8 @@ from .services.webhook_handler import WebhookHandler
 from .services.retry_service import RetryService
 from .services.audit_service import PaymentAuditService
 from .services.webhook_security import SecureWebhookProcessor
-from .services.customer_portal_service import CustomerPortalService
 from .services.error_handler import ErrorHandler, payment_error_handler
-from .services.health_check import get_health_status
-from .services.monitoring_service import MonitoringService
+
 
 
 # Removed duplicate get_user_company - now using the correct one from apps.companies.utils
