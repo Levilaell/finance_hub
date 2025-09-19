@@ -14,8 +14,7 @@ class SubscriptionPlanSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'slug',
             'price_monthly', 'price_yearly', 'yearly_discount',
-            'max_transactions', 'max_bank_accounts', 'max_ai_requests_per_month',
-            'enable_ai_insights', 'has_advanced_reports'
+            'max_bank_accounts'
         ]
     
     def get_yearly_discount(self, obj):
@@ -41,12 +40,12 @@ class CompanySerializer(serializers.ModelSerializer):
             'subscription_plan', 'subscription_status',
             'billing_cycle', 'trial_ends_at',
             'is_trial_active', 'days_until_trial_ends',
-            'current_month_transactions', 'current_month_ai_requests',
+            'current_month_transactions',
             'created_at'
         ]
         read_only_fields = [
             'owner_email', 'subscription_status', 'trial_ends_at',
-            'current_month_transactions', 'current_month_ai_requests'
+            'current_month_transactions'
         ]
 
 
@@ -54,7 +53,6 @@ class UsageLimitsSerializer(serializers.Serializer):
     """Usage limits response serializer"""
     transactions = serializers.DictField()
     bank_accounts = serializers.DictField()
-    ai_requests = serializers.DictField()
 
 
 class SubscriptionStatusSerializer(serializers.Serializer):

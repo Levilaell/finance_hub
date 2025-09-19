@@ -18,7 +18,6 @@ import {
 import { bankingService } from '@/services/banking.service';
 import { TransactionFilters } from '@/types/banking.types';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { testId, TEST_IDS, testIdWithIndex } from '@/utils/test-helpers';
 import { 
   BanknotesIcon,
   FunnelIcon,
@@ -224,7 +223,6 @@ export default function TransactionsPage() {
             onClick={handleExport}
             disabled={isExporting || !transactions?.results?.length}
             className="bg-white/10 hover:bg-white/20 border-white/20 transition-all duration-300"
-            {...testId(TEST_IDS.banking.exportButton)}
           >
             {isExporting ? (
               <>
@@ -326,7 +324,6 @@ export default function TransactionsPage() {
               variant="outline"
               onClick={() => setShowFilters(!showFilters)}
               className="bg-white/10 hover:bg-white/20 border-white/20 transition-all duration-300"
-              {...testId(TEST_IDS.banking.filterCategory)}
             >
               <FunnelIcon className="h-4 w-4 mr-2" />
               Filtros
@@ -447,7 +444,7 @@ export default function TransactionsPage() {
       <Card className="shadow-md">
         <CardContent className="p-0">
           {transactions?.results && transactions.results.length > 0 ? (
-            <div className="overflow-x-auto" {...testId(TEST_IDS.banking.transactionList)}>
+            <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-white/10 border-b border-white/20">
                   <tr>
@@ -470,7 +467,7 @@ export default function TransactionsPage() {
                 </thead>
                 <tbody className="divide-y divide-white/10">
                   {transactions.results.map((transaction, index) => (
-                    <tr key={transaction.id} className="hover:bg-white/5 transition-all duration-200" {...testIdWithIndex(TEST_IDS.banking.transactionItem, index)}>
+                    <tr key={transaction.id} className="hover:bg-white/5 transition-all duration-200">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                         {formatDate(transaction.date)}
                       </td>

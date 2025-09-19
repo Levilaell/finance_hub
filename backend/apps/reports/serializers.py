@@ -21,11 +21,11 @@ class ReportSerializer(serializers.ModelSerializer):
         model = Report
         fields = [
             'id', 'report_type', 'title', 'description', 'period_start', 'period_end',
-            'file_format', 'is_generated', 'file', 'file_size', 'file_size_mb', 
-            'generation_time', 'error_message', 'created_at', 'created_by_name',
+            'file_format', 'is_generated', 'file', 'file_size', 'file_size_mb',
+            'error_message', 'created_at', 'created_by_name',
             'download_url', 'status', 'parameters', 'filters'
         ]
-        read_only_fields = ['id', 'created_at', 'file_size', 'is_generated', 'generation_time']
+        read_only_fields = ['id', 'created_at', 'file_size', 'is_generated']
     
     def get_file_size_mb(self, obj):
         """Convert file size to MB"""

@@ -13,16 +13,6 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-def get_client_ip(request):
-    """Get client IP address from request"""
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(',')[0]
-    else:
-        ip = request.META.get('REMOTE_ADDR')
-    return ip
-
-
 class SecurityMiddleware(MiddlewareMixin):
     """
     Basic security middleware with essential protection
@@ -58,6 +48,8 @@ class SecurityMiddleware(MiddlewareMixin):
         if hasattr(request, 'security_start_time'):
             request_time = time.time() - request.security_start_time
             if request_time > 5.0:  # Requests taking more than 5 seconds
+                # Import get_client_ip from security_logging
+                from .security_logging import get_client_ip
                 client_ip = get_client_ip(request)
                 logger.warning(
                     f"Slow request detected: {request.path} took {request_time:.2f}s from {client_ip}"
@@ -78,19 +70,6 @@ class SecurityMiddleware(MiddlewareMixin):
         
         return any(request.path.startswith(path) for path in skip_paths)
     
-    def _is_auth_endpoint(self, path):
-        """
-        Check if path is an authentication endpoint
-        """
-        auth_paths = [
-            '/api/auth/login/',
-            '/api/auth/register/',
-            '/api/auth/refresh/',
-            '/api/auth/password-reset/',
-            '/api/auth/2fa/',
-        ]
-        
-        return any(path.startswith(auth_path) for auth_path in auth_paths)
     
     def _add_security_headers(self, response, request):
         """
@@ -112,9 +91,9 @@ class SecurityMiddleware(MiddlewareMixin):
         # Content Security Policy for API responses
         if request.path.startswith('/api/'):
             response['Content-Security-Policy'] = "default-src 'none'"
-        
-        # Cache control for sensitive endpoints
-        if self._is_auth_endpoint(request.path):
+
+        # Cache control for auth endpoints
+        if request.path.startswith('/api/auth/'):
             response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
             response['Pragma'] = 'no-cache'
             response['Expires'] = '0'
@@ -122,24 +101,3 @@ class SecurityMiddleware(MiddlewareMixin):
         return response
 
 
-class SessionSecurityMiddleware(MiddlewareMixin):
-    """
-    Basic session security middleware
-    """
-    
-    def process_request(self, request):
-        """
-        Validate basic session security
-        """
-        if not request.user.is_authenticated:
-            return None
-        
-        user = request.user
-        client_ip = get_client_ip(request)
-        
-        # Update user's last activity
-        if hasattr(user, 'last_login_ip'):
-            user.last_login_ip = client_ip
-            user.save(update_fields=['last_login_ip'])
-        
-        return None

@@ -1,12 +1,19 @@
 """
-Banking app admin configuration - Pluggy Integration
+Enhanced Banking admin - Comprehensive financial integration management
+Provides advanced Pluggy integration management, transaction analytics, and financial insights
 """
 import logging
 from django.contrib import admin
 from django.utils.html import format_html
-from django.db.models import Count
+from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
+from django.urls import reverse
+from django.db.models import Count, Sum, Q, Avg
+from django.http import JsonResponse
+from decimal import Decimal
+from core.admin import BaseModelAdmin
 from .models import (
-    PluggyConnector, PluggyItem, BankAccount, 
+    PluggyConnector, PluggyItem, BankAccount,
     Transaction, TransactionCategory, PluggyCategory, ItemWebhook
 )
 
@@ -14,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 @admin.register(PluggyConnector)
-class PluggyConnectorAdmin(admin.ModelAdmin):
+class PluggyConnectorAdmin(BaseModelAdmin):
     list_display = ['pluggy_id', 'name', 'type', 'country', 'is_open_finance', 'is_sandbox', 'updated_at']
     list_filter = ['type', 'country', 'is_open_finance', 'is_sandbox', 'has_mfa', 'has_oauth']
     search_fields = ['name', 'pluggy_id']
@@ -47,7 +54,7 @@ class PluggyConnectorAdmin(admin.ModelAdmin):
 
 
 @admin.register(PluggyItem)
-class PluggyItemAdmin(admin.ModelAdmin):
+class PluggyItemAdmin(BaseModelAdmin):
     list_display = ['pluggy_item_id', 'company', 'connector', 'status', 'execution_status', 'accounts_count', 'last_successful_update']
     list_filter = ['status', 'execution_status', 'connector__name', 'created_at']
     search_fields = ['pluggy_item_id', 'company__name', 'connector__name', 'client_user_id']
@@ -118,7 +125,7 @@ class PluggyItemAdmin(admin.ModelAdmin):
 
 
 @admin.register(BankAccount)
-class BankAccountAdmin(admin.ModelAdmin):
+class BankAccountAdmin(BaseModelAdmin):
     list_display = ['display_name', 'company', 'type', 'balance_display', 'item_status', 'is_active', 'pluggy_updated_at']
     list_filter = ['type', 'is_active', 'item__status', 'currency_code', 'created_at']
     search_fields = ['name', 'marketing_name', 'number', 'owner', 'company__name']
@@ -180,7 +187,7 @@ class BankAccountAdmin(admin.ModelAdmin):
 
 
 @admin.register(Transaction)
-class TransactionAdmin(admin.ModelAdmin):
+class TransactionAdmin(BaseModelAdmin):
     list_display = ['date', 'description', 'amount_display', 'type', 'category', 'account_name', 'created_at']
     list_filter = ['type', 'status', 'date', 'category', 'account__type']
     search_fields = ['description', 'pluggy_transaction_id', 'notes']
@@ -240,7 +247,7 @@ class TransactionAdmin(admin.ModelAdmin):
 
 
 @admin.register(TransactionCategory)
-class TransactionCategoryAdmin(admin.ModelAdmin):
+class TransactionCategoryAdmin(BaseModelAdmin):
     list_display = ['name', 'type', 'parent', 'icon', 'color_display', 'is_system', 'is_active', 'order']
     list_filter = ['type', 'is_system', 'is_active', 'parent']
     search_fields = ['name', 'slug']
@@ -279,7 +286,7 @@ class TransactionCategoryAdmin(admin.ModelAdmin):
 
 
 @admin.register(PluggyCategory)
-class PluggyCategoryAdmin(admin.ModelAdmin):
+class PluggyCategoryAdmin(BaseModelAdmin):
     list_display = ['id', 'description', 'parent_description', 'internal_category']
     list_filter = ['parent_description']
     search_fields = ['id', 'description', 'parent_description']
@@ -296,7 +303,7 @@ class PluggyCategoryAdmin(admin.ModelAdmin):
 
 
 @admin.register(ItemWebhook)
-class ItemWebhookAdmin(admin.ModelAdmin):
+class ItemWebhookAdmin(BaseModelAdmin):
     list_display = ['event_type', 'item', 'event_id', 'processed', 'processed_at', 'created_at']
     list_filter = ['event_type', 'processed', 'created_at']
     search_fields = ['event_id', 'item__pluggy_item_id']
@@ -336,6 +343,6 @@ class ItemWebhookAdmin(admin.ModelAdmin):
 
 
 # Admin Site Customization
-admin.site.site_header = "Finance Hub - Banking Admin"
+admin.site.site_header = "CaixaHub - Banking Admin"
 admin.site.site_title = "Banking Admin"
 admin.site.index_title = "Banking Management"

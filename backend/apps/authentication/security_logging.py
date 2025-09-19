@@ -188,37 +188,6 @@ class SessionManager:
                 }
             )
     
-    @staticmethod
-    def invalidate_other_sessions(user, current_session_key=None):
-        """
-        Invalidate all sessions except the current one
-        """
-        from django.contrib.sessions.models import Session
-        from django.utils import timezone
-        
-        sessions = Session.objects.filter(expire_date__gte=timezone.now())
-        invalidated_count = 0
-        
-        for session in sessions:
-            # Skip current session
-            if current_session_key and session.session_key == current_session_key:
-                continue
-                
-            session_data = session.get_decoded()
-            if session_data.get('_auth_user_id') == str(user.id):
-                session.delete()
-                invalidated_count += 1
-        
-        log_security_event(
-            SecurityEvent.SESSION_INVALIDATED,
-            user=user,
-            extra_data={
-                'reason': 'other_sessions_invalidated',
-                'sessions_invalidated': invalidated_count
-            }
-        )
-        
-        return invalidated_count
     
     @staticmethod
     def get_active_session_count(user):
@@ -236,56 +205,4 @@ class SessionManager:
         
         return count
     
-    @staticmethod
-    def invalidate_user_tokens(user):
-        """
-        Invalidate all JWT tokens for a user by blacklisting them
-        """
-        try:
-            from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
-            
-            outstanding_tokens = OutstandingToken.objects.filter(user=user)
-            blacklisted_count = 0
-            
-            for token in outstanding_tokens:
-                _, created = BlacklistedToken.objects.get_or_create(token=token)
-                if created:
-                    blacklisted_count += 1
-            
-            log_security_event(
-                SecurityEvent.SESSION_INVALIDATED,
-                user=user,
-                extra_data={
-                    'reason': 'jwt_tokens_blacklisted',
-                    'tokens_blacklisted': blacklisted_count
-                }
-            )
-            
-            return blacklisted_count
-            
-        except ImportError:
-            # Token blacklist not available
-            logger.warning("JWT token blacklist not available, cannot invalidate tokens")
-            return 0
     
-    @staticmethod
-    def force_logout_user(user, reason='security_event'):
-        """
-        Force logout a user by invalidating all sessions and tokens
-        """
-        # Invalidate Django sessions
-        session_count = SessionManager.get_active_session_count(user)
-        SessionManager.invalidate_all_sessions(user)
-        
-        # Invalidate JWT tokens
-        token_count = SessionManager.invalidate_user_tokens(user)
-        
-        log_security_event(
-            SecurityEvent.SESSION_INVALIDATED,
-            user=user,
-            extra_data={
-                'reason': f'force_logout_{reason}',
-                'sessions_invalidated': session_count,
-                'tokens_invalidated': token_count
-            }
-        )

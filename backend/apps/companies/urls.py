@@ -3,7 +3,6 @@ Simplified Companies URLs - Essential endpoints only
 """
 from django.urls import path
 from .views import (
-    PublicSubscriptionPlansView,
     SubscriptionPlansView,
     CompanyDetailView,
     UsageLimitsView,
@@ -13,11 +12,11 @@ from .views import (
 app_name = 'companies'
 
 urlpatterns = [
-    # Public endpoints
-    path('public/plans/', PublicSubscriptionPlansView.as_view(), name='public-plans'),
-    
-    # Authenticated endpoints
+    # Subscription plans (works for both public and authenticated)
+    path('public/plans/', SubscriptionPlansView.as_view(), name='public-plans'),
     path('plans/', SubscriptionPlansView.as_view(), name='plans'),
+
+    # Authenticated endpoints
     path('detail/', CompanyDetailView.as_view(), name='detail'),
     path('usage-limits/', UsageLimitsView.as_view(), name='usage-limits'),
     path('subscription-status/', SubscriptionStatusView.as_view(), name='subscription-status'),

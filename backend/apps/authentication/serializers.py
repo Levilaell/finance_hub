@@ -22,11 +22,9 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             'id', 'username', 'email', 'first_name', 'last_name',
-            'full_name', 'initials', 'phone', 'avatar',
-            'is_phone_verified',
-            'preferred_language', 'timezone', 'date_of_birth', 'company'
+            'full_name', 'initials', 'phone', 'timezone', 'company'
         )
-        read_only_fields = ('id', 'username', 'is_phone_verified', 'company')
+        read_only_fields = ('id', 'username', 'company')
     
     def get_company(self, obj):
         """Get user's company data"""
@@ -266,16 +264,7 @@ class RegisterSerializer(serializers.ModelSerializer):
                     plan_type='starter',
                     price_monthly=49,
                     price_yearly=490,
-                    max_transactions=500,
                     max_bank_accounts=2,
-                    has_ai_categorization=False,
-                    enable_ai_insights=False,
-                    enable_ai_reports=False,
-                    max_ai_requests_per_month=0,
-                    has_advanced_reports=True,
-                    has_api_access=False,
-                    has_accountant_access=False,
-                    has_priority_support=True,
                     display_order=1
                 )
         
@@ -330,16 +319,6 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError('Deve incluir "email" e "senha".')
 
 
-class TokenSerializer(serializers.Serializer):
-    """JWT token response serializer"""
-    access = serializers.CharField()
-    refresh = serializers.CharField()
-    user = UserSerializer()
-
-
-class RefreshTokenSerializer(serializers.Serializer):
-    """Refresh token serializer"""
-    refresh = serializers.CharField(required=True)
 
 
 class PasswordResetRequestSerializer(serializers.Serializer):
@@ -368,17 +347,12 @@ class ChangePasswordSerializer(serializers.Serializer):
     """Change password serializer"""
     old_password = serializers.CharField(required=True)
     new_password = serializers.CharField(required=True, validators=[validate_password])
-    
+
     def validate_old_password(self, value):
         user = self.context['request'].user
         if not user.check_password(value):
             raise serializers.ValidationError("Senha atual está incorreta.")
         return value
-
-
-class EmailVerificationSerializer(serializers.Serializer):
-    """Email verification serializer"""
-    token = serializers.CharField(required=True)
 
 
 class DeleteAccountSerializer(serializers.Serializer):

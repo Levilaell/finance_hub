@@ -22,7 +22,6 @@ export interface Report {
   file?: string;
   file_size?: number;
   file_size_mb?: number;
-  generation_time?: number;
   error_message?: string;
   company?: string;
   parameters?: Record<string, any>;

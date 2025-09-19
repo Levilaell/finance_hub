@@ -374,29 +374,9 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
     logger.info(f"Current balance: {account.balance}")
     logger.info(f"Account Django ID: {account.id}, Company: {account.company.id}")
     
-    # Check if company has reached transaction limit
+    # Transaction limits have been removed in the simplified model
     company = account.company
-    limit_reached, usage_info = company.check_limit('transactions')
-    if limit_reached:
-        logger.warning(
-            f"Transaction limit reached for company {company.id} ({company.name}). "
-            f"Usage: {usage_info}. Skipping transaction sync."
-        )
-        
-        # Send notification about limit reached
-        try:
-            from apps.notifications.email_service import EmailService
-            EmailService.send_usage_limit_reached(
-                email=company.owner.email,
-                company_name=company.name,
-                limit_type='transactions',
-                usage_info=usage_info
-            )
-        except Exception as e:
-            logger.error(f"Failed to send limit notification: {e}")
-        
-        # Return 0 to indicate no transactions were synced
-        return 0
+    # No longer checking or enforcing transaction limits
     
     # Determine sync period
     last_transaction = account.transactions.order_by('-date').first()
@@ -458,16 +438,8 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
             
             with db_transaction.atomic():
                 for trans_data in transactions:
-                    # Check limit before each transaction creation
-                    limit_reached, usage_info = company.check_limit('transactions')
-                    if limit_reached:
-                        logger.warning(
-                            f"Transaction limit reached during sync. "
-                            f"Processed {total_synced} transactions before hitting limit. "
-                            f"Usage: {usage_info}"
-                        )
-                        # Exit the loop, don't process more transactions
-                        break
+                    # Transaction limits have been removed in the simplified model
+                    # No longer checking limits before transaction creation
                     
                     try:
                         transaction, created = _process_transaction(account, trans_data)
@@ -488,14 +460,8 @@ def _sync_transactions(client: PluggyClient, account: BankAccount) -> int:
                         logger.error(f"Transaction data: {trans_data}")
                         raise
             
-            # Process notifications OUTSIDE atomic block to prevent constraint violations
-            # from corrupting the entire transaction sync
-            for transaction in transactions_to_notify:
-                try:
-                    _check_and_send_usage_notifications(transaction.company)
-                except Exception as notification_error:
-                    logger.error(f"Notification failed for transaction {transaction.id}: {notification_error}")
-                    # Continue - don't fail sync for notification errors
+            # Usage notifications have been removed from the simplified model
+            # No longer tracking transaction limits or sending notifications
             
             # Check if more pages
             if page >= result.get('totalPages', 1):
@@ -887,24 +853,8 @@ def _handle_item_error(data: Dict):
         item.save()
         logger.error(f"Item {item.pluggy_item_id} error: {item.error_code} - {item.error_message}")
         
-        # Notify user about the error
-        try:
-            from apps.notifications.services import NotificationService
-            NotificationService.create_notification(
-                event_type='sync_error',
-                event_data={
-                    'id': str(item.id),
-                    'connector_name': item.connector.name if hasattr(item, 'connector') else 'Financial Institution',
-                    'status': item.status,
-                    'error_message': item.error_message or 'Connection error',
-                    'action_url': f'/accounts/reconnect/{item.id}',
-                },
-                company=item.company,
-                user=None,
-                broadcast=True
-            )
-        except Exception as e:
-            logger.error(f"Failed to send error notification: {e}")
+        # Error notification removed - notifications app not available
+        logger.info(f"Item {item.id} has error status: {item.status}")
         
     except PluggyItem.DoesNotExist:
         logger.warning(f"Item {data['id']} not found for error event")
@@ -956,29 +906,8 @@ def _handle_item_waiting_input(data: Dict):
         item.save()
         
         # Send notification to user with detailed MFA info
-        try:
-            from apps.notifications.services import NotificationService
-            
-            parameter_type = item.parameter.get('name', 'token')
-            parameter_label = item.parameter.get('label', 'Código de verificação')
-            
-            NotificationService.create_notification(
-                event_type='mfa_required',
-                event_data={
-                    'id': str(item.id),
-                    'connector_name': item.connector.name if hasattr(item, 'connector') else 'Financial Institution',
-                    'action_url': f'/accounts/mfa/{item.id}',
-                    'parameter_type': parameter_type,
-                    'parameter_label': parameter_label,
-                    'message': f'{item.connector.name if hasattr(item, "connector") else "Banco"} está solicitando: {parameter_label}'
-                },
-                company=item.company,
-                user=None,
-                broadcast=True
-            )
-            logger.info(f"MFA notification sent for item {item.id}")
-        except Exception as e:
-            logger.error(f"Failed to send MFA notification: {e}")
+        # MFA notification removed - notifications app not available
+        logger.info(f"MFA required for item {item.id} - user needs to provide verification code")
         
     except PluggyItem.DoesNotExist:
         logger.warning(f"Item {data['id']} not found for waiting input event")
@@ -1296,55 +1225,7 @@ def check_items_health():
     logger.info(f"Queued sync for {stale_items.count()} stale items")
 
 
-def _check_and_send_usage_notifications(company):
-    """Check usage percentage and send notifications at 80% and 90%"""
-    try:
-        usage_percentage = company.get_usage_percentage('transactions')
-        
-        # Get the notification flags from ResourceUsage
-        from ..companies.models import ResourceUsage
-        current_month = timezone.now().replace(day=1).date()
-        usage_record, _ = ResourceUsage.objects.get_or_create(
-            company=company,
-            month=current_month,
-            defaults={
-                'transactions_count': company.current_month_transactions,
-                'ai_requests_count': company.current_month_ai_requests
-            }
-        )
-        
-        # Check 90% threshold
-        if usage_percentage >= 90 and not usage_record.notified_90_percent:
-            from apps.notifications.email_service import EmailService
-            EmailService.send_usage_limit_warning(
-                email=company.owner.email,
-                company_name=company.name,
-                limit_type='transações',
-                percentage=90,
-                current=company.current_month_transactions,
-                limit=company.subscription_plan.max_transactions if company.subscription_plan else 100
-            )
-            usage_record.notified_90_percent = True
-            usage_record.save(update_fields=['notified_90_percent'])
-            logger.info(f"Sent 90% usage notification for company {company.id}")
-            
-        # Check 80% threshold
-        elif usage_percentage >= 80 and not usage_record.notified_80_percent:
-            from apps.notifications.email_service import EmailService
-            EmailService.send_usage_limit_warning(
-                email=company.owner.email,
-                company_name=company.name,
-                limit_type='transações',
-                percentage=80,
-                current=company.current_month_transactions,
-                limit=company.subscription_plan.max_transactions if company.subscription_plan else 100
-            )
-            usage_record.notified_80_percent = True
-            usage_record.save(update_fields=['notified_80_percent'])
-            logger.info(f"Sent 80% usage notification for company {company.id}")
-            
-    except Exception as e:
-        logger.error(f"Error checking/sending usage notifications: {e}")
+# Usage notifications function has been removed - no longer tracking transaction limits
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)  # 5 minute delays
@@ -1440,21 +1321,8 @@ def retry_account_fetch(self, item_id: str):
                         except Exception as sync_error:
                             logger.warning(f"Could not queue sync after account retry: {sync_error}")
                     
-                    # Send success notification
-                    try:
-                        from apps.notifications.services import NotificationService
-                        NotificationService.create_from_event(
-                            user=item.company.owner,
-                            event='bank_accounts_ready',
-                            metadata={
-                                'connector_name': item.connector.name,
-                                'accounts_count': len(created_accounts),
-                                'item_id': str(item.id),
-                                'retry_attempt': self.request.retries + 1
-                            }
-                        )
-                    except Exception as notif_error:
-                        logger.warning(f"Could not send notification: {notif_error}")
+                    # Success notification removed - notifications app not available
+                    logger.info(f"Bank accounts ready for item {item.id} - {len(created_accounts)} accounts created")
                     
                     logger.info(f"✅ Retry successful! Created {len(created_accounts)} accounts for item {item_id}")
                     return {

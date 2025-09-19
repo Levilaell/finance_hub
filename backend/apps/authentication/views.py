@@ -21,47 +21,22 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import EmailVerification, PasswordReset
-from .cookie_middleware import get_client_ip
-from .security_logging import log_security_event, SecurityEvent, LoginAttemptTracker, SessionManager
+from .models import PasswordReset
+from .security_logging import log_security_event, SecurityEvent, LoginAttemptTracker, SessionManager, get_client_ip
 from .serializers import (
     ChangePasswordSerializer,
     DeleteAccountSerializer,
-    EmailVerificationSerializer,
     LoginSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     RegisterSerializer,
     UserSerializer,
 )
-from .utils import (
-    generate_2fa_secret,
-    generate_backup_codes,
-    hash_backup_codes,
-    get_totp_uri,
-    generate_qr_code,
-    verify_totp_token,
-    verify_backup_code,
-)
 
 User = get_user_model()
 
 
-# Enhanced throttle classes with IP + User tracking
-class LoginRateThrottle(AnonRateThrottle):
-    scope = 'login'
-    
-    def get_cache_key(self, request, view):
-        # Combine IP and email for more precise rate limiting
-        ident = self.get_ident(request)
-        email = request.data.get('email', 'unknown')
-        return self.cache_format % {
-            'scope': self.scope,
-            'ident': f"{ident}:{email}"
-        }
-
-class RegisterRateThrottle(AnonRateThrottle):
-    scope = 'register'
+# Local throttle classes for specific features
 
 class PasswordResetRateThrottle(AnonRateThrottle):
     scope = 'password_reset'
@@ -69,11 +44,6 @@ class PasswordResetRateThrottle(AnonRateThrottle):
 class TokenRefreshRateThrottle(AnonRateThrottle):
     scope = 'token_refresh'
 
-class TwoFactorRateThrottle(AnonRateThrottle):
-    scope = '2fa_attempt'
-
-class EmailVerificationRateThrottle(AnonRateThrottle):
-    scope = 'email_verification'
 
 class AccountDeletionRateThrottle(AnonRateThrottle):
     scope = 'account_deletion'
@@ -107,25 +77,13 @@ class RegisterView(generics.CreateAPIView):
         # Generate tokens
         refresh = RefreshToken.for_user(user)
         
-        # Create email verification token
-        verification_token = secrets.token_urlsafe(32)
-        EmailVerification.objects.create(
-            user=user,
-            token=verification_token,
-            expires_at=timezone.now() + timedelta(days=7)
-        )
         
         # Send verification email
         from django.conf import settings
         import logging
         logger = logging.getLogger(__name__)
         
-        verification_url = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
-        try:
-            send_verification_email_task.delay(user.id, verification_url)
-        except Exception as e:
-            logger.warning(f"Could not queue verification email task: {e}")
-        
+
         # Log account creation
         log_security_event(
             SecurityEvent.ACCOUNT_CREATED,
@@ -233,28 +191,6 @@ class LoginView(APIView):
         user.last_login_ip = client_ip
         user.save(update_fields=['last_login', 'last_login_ip'])
         
-        # Check if 2FA is enabled
-        if user.is_two_factor_enabled:
-            # Require 2FA code
-            two_fa_code = request.data.get('two_fa_code')
-            if not two_fa_code:
-                return Response({
-                    'requires_2fa': True,
-                    'message': 'Código de autenticação de dois fatores necessário'
-                }, status=status.HTTP_200_OK)
-            
-            # Verify 2FA code
-            if not verify_totp_token(user.two_factor_secret, two_fa_code):
-                # Try backup code
-                if not verify_backup_code(user, two_fa_code):
-                    log_security_event(
-                        SecurityEvent.TWO_FA_FAILED,
-                        user=user,
-                        request=request
-                    )
-                    return Response({
-                        'error': 'Código de autenticação inválido'
-                    }, status=status.HTTP_400_BAD_REQUEST)
         
         # Reset login attempts on successful login
         LoginAttemptTracker.reset_attempts(email, client_ip)
@@ -433,70 +369,6 @@ class PasswordResetConfirmView(APIView):
         return Response({'message': 'Senha redefinida com sucesso.'})
 
 
-class EmailVerificationView(APIView):
-    """Verify email address"""
-    permission_classes = (AllowAny,)
-    serializer_class = EmailVerificationSerializer
-    throttle_classes = [EmailVerificationRateThrottle]
-    
-    def post(self, request):
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        token = serializer.validated_data['token']
-        
-        # Find valid verification token
-        verification = EmailVerification.objects.filter(
-            token=token,
-            is_used=False,
-            expires_at__gt=timezone.now()
-        ).first()
-        
-        if not verification:
-            return Response({
-                'error': 'Token de verificação inválido ou expirado.'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Email verification functionality temporarily disabled
-        # TODO: Re-implement when is_email_verified field is restored
-        user = verification.user
-        # user.is_email_verified = True  # Field removed in migration
-        # user.save()  # No need to save since no field is being modified
-        
-        # Mark token as used
-        verification.is_used = True
-        verification.save()
-        
-        return Response({'message': 'E-mail verificado com sucesso.'})
-
-
-class ResendVerificationView(APIView):
-    """Resend email verification"""
-    permission_classes = (IsAuthenticated,)
-    
-    def post(self, request):
-        user = request.user
-        
-        # Email verification functionality temporarily disabled
-        # TODO: Re-implement when is_email_verified field is restored
-        # if user.is_email_verified:  # Field removed in migration
-        #     return Response({
-        #         'message': 'E-mail já foi verificado.'
-        
-        # For now, always allow resend attempts
-        if False:  # Placeholder condition to maintain structure
-            return Response({
-                'message': 'E-mail já foi verificado.'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Create new verification token
-        verification_token = secrets.token_urlsafe(32)
-        EmailVerification.objects.create(
-            user=user,
-            token=verification_token,
-            expires_at=timezone.now() + timedelta(days=7)
-        )
-
 
 class CustomTokenRefreshView(APIView):
     """Custom token refresh view"""
@@ -561,99 +433,6 @@ class CustomTokenRefreshView(APIView):
                 {'error': 'Token de atualização inválido'}, 
                 status=status.HTTP_401_UNAUTHORIZED
             )
-
-
-@method_decorator(ratelimit(key='user', rate='5/h', method='GET'), name='dispatch')
-class Setup2FAView(APIView):
-    """Setup 2FA for user"""
-    permission_classes = [IsAuthenticated]
-    
-    def get(self, request):
-        user = request.user
-        
-        # Generate secret if not exists
-        if not user.two_factor_secret:
-            user.two_factor_secret = generate_2fa_secret()
-            user.save()
-        
-        # Generate QR code
-        uri = get_totp_uri(user, user.two_factor_secret)
-        qr_code = generate_qr_code(uri)
-        
-        return Response({
-            'qr_code': qr_code,
-            'backup_codes_count': len(user.backup_codes) if user.backup_codes else 0,
-            'setup_complete': False
-        })
-
-
-@method_decorator(ratelimit(key='user', rate='10/h', method='POST'), name='dispatch')
-class Enable2FAView(APIView):
-    """Enable 2FA after verification"""
-    permission_classes = [IsAuthenticated]
-    throttle_classes = [TwoFactorRateThrottle]
-    
-    def post(self, request):
-        user = request.user
-        token = request.data.get('token')
-        
-        if not token:
-            return Response({
-                'error': 'Token de verificação necessário'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        if not user.two_factor_secret:
-            return Response({
-                'error': 'Por favor, configure a 2FA primeiro'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Verify token
-        if not verify_totp_token(user.two_factor_secret, token):
-            return Response({
-                'error': 'Token de verificação inválido'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Enable 2FA and generate hashed backup codes
-        backup_codes = generate_backup_codes()
-        user.is_two_factor_enabled = True
-        user.backup_codes = hash_backup_codes(backup_codes)
-        user.save()
-        
-        # Return the plain text codes only once
-        return Response({
-            'message': '2FA ativada com sucesso',
-            'backup_codes': backup_codes  # Show plain codes only once
-        })
-        
-
-
-class Disable2FAView(APIView):
-    """Disable 2FA"""
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request):
-        user = request.user
-        password = request.data.get('password')
-        
-        if not password:
-            return Response({
-                'error': 'Senha necessária'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        if not user.check_password(password):
-            return Response({
-                'error': 'Senha inválida'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Disable 2FA
-        user.is_two_factor_enabled = False
-        user.two_factor_secret = ''
-        user.backup_codes = []
-        user.save()
-        
-        return Response({
-            'message': '2FA desativada com sucesso'
-        })
 
 
 @method_decorator(ratelimit(key='user', rate='3/h', method='POST'), name='dispatch')

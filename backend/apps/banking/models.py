@@ -72,28 +72,49 @@ class PluggyItem(models.Model):
     Maps to Pluggy's Item concept
     """
     ITEM_STATUS_CHOICES = [
-        ('LOGIN_IN_PROGRESS', 'Login in Progress'),
         ('WAITING_USER_INPUT', 'Waiting User Input'),
         ('UPDATING', 'Updating'),
         ('UPDATED', 'Updated'),
         ('LOGIN_ERROR', 'Login Error'),
         ('OUTDATED', 'Outdated'),
-        ('ERROR', 'Error'),
-        ('DELETED', 'Deleted'),
-        ('CONSENT_REVOKED', 'Consent Revoked'),
     ]
     
     EXECUTION_STATUS_CHOICES = [
+        # Transitive States
         ('CREATED', 'Created'),
+        ('LOGIN_IN_PROGRESS', 'Login In Progress'),
+        ('LOGIN_MFA_IN_PROGRESS', 'Login MFA In Progress'),
+        ('ACCOUNTS_IN_PROGRESS', 'Accounts In Progress'),
+        ('CREDITCARDS_IN_PROGRESS', 'Credit Cards In Progress'),
+        ('TRANSACTIONS_IN_PROGRESS', 'Transactions In Progress'),
+        ('INVESTMENT_TRANSACTIONS_IN_PROGRESS', 'Investment Transactions In Progress'),
+        ('PAYMENT_DATA_IN_PROGRESS', 'Payment Data In Progress'),
+        ('IDENTITY_IN_PROGRESS', 'Identity In Progress'),
+        ('MERGING', 'Merging'),
+
+        # Error States
+        ('ERROR', 'Error'),
+        ('MERGE_ERROR', 'Merge Error'),
+        ('INVALID_CREDENTIALS', 'Invalid Credentials'),
+        ('ALREADY_LOGGED_IN', 'Already Logged In'),
+        ('SITE_NOT_AVAILABLE', 'Site Not Available'),
+        ('INVALID_CREDENTIALS_MFA', 'Invalid Credentials MFA'),
+        ('USER_INPUT_TIMEOUT', 'User Input Timeout'),
+        ('ACCOUNT_LOCKED', 'Account Locked'),
+        ('ACCOUNT_NEEDS_ACTION', 'Account Needs Action'),
+        ('USER_NOT_SUPPORTED', 'User Not Supported'),
+        ('ACCOUNT_CREDENTIALS_RESET', 'Account Credentials Reset'),
+        ('CONNECTION_ERROR', 'Connection Error'),
+        ('USER_AUTHORIZATION_NOT_GRANTED', 'User Authorization Not Granted'),
+        ('USER_AUTHORIZATION_REVOKED', 'User Authorization Revoked'),
+
+        # Intermediate States
+        ('WAITING_USER_INPUT', 'Waiting User Input'),
+        ('USER_AUTHORIZATION_PENDING', 'User Authorization Pending'),
+
+        # Success States
         ('SUCCESS', 'Success'),
         ('PARTIAL_SUCCESS', 'Partial Success'),
-        ('LOGIN_ERROR', 'Login Error'),
-        ('INVALID_CREDENTIALS', 'Invalid Credentials'),
-        ('USER_INPUT_TIMEOUT', 'User Input Timeout'),
-        ('USER_AUTHORIZATION_PENDING', 'User Authorization Pending'),
-        ('USER_AUTHORIZATION_NOT_GRANTED', 'User Authorization Not Granted'),
-        ('SITE_NOT_AVAILABLE', 'Site Not Available'),
-        ('ERROR', 'Error'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -117,14 +138,10 @@ class PluggyItem(models.Model):
     # Webhook configuration
     webhook_url = models.URLField(_('webhook URL'), blank=True)
     
-    # Scheduling
-    next_auto_sync_at = models.DateTimeField(_('next auto sync at'), null=True, blank=True)
-    
     # Products enabled for this item
     products = models.JSONField(_('products'), default=list, blank=True)  # ['ACCOUNTS', 'TRANSACTIONS', etc]
     
     # MFA parameter for waiting user input
-    parameter = models.JSONField(_('parameter'), default=dict, blank=True)  # For MFA responses - DEPRECATED, use encrypted_parameter
     encrypted_parameter = models.TextField(_('encrypted parameter'), blank=True, default='')  # Encrypted MFA parameters
     
     # Status tracking
@@ -323,9 +340,6 @@ class BankAccount(models.Model):
     balance_in_account_currency = models.DecimalField(_('balance in account currency'), max_digits=15, decimal_places=2, null=True, blank=True)
     balance_date = models.DateTimeField(_('balance date'), blank=True, null=True)
     currency_code = models.CharField(_('currency code'), max_length=3, default='BRL')
-    
-    # Investment specific fields
-    investment_status = models.CharField(_('investment status'), max_length=50, blank=True)
     
     # Bank specific data (for BANK type)
     bank_data = models.JSONField(_('bank data'), default=dict, blank=True, null=True)
@@ -540,62 +554,44 @@ class Transaction(models.Model):
     @classmethod
     def create_safe(cls, company, **transaction_data):
         """
-        Safely create a transaction with plan limit verification.
-        Prevents race conditions and enforces limits atomically.
-        
+        Safely create a transaction.
+        Transaction limits have been removed in the simplified model.
+
         Args:
             company: Company instance
             **transaction_data: Transaction fields
-            
+
         Returns:
             Transaction instance if created successfully
-            
+
         Raises:
-            PlanLimitExceeded: If transaction limit is reached
             ValidationError: If data is invalid
         """
         from django.db import transaction as db_transaction
         from django.core.exceptions import ValidationError
         import logging
-        
+
         logger = logging.getLogger(__name__)
-        
+
         with db_transaction.atomic():
-            # Increment usage with safety check
-            success, message = company.increment_usage_safe('transactions')
-            
-            if not success:
-                # Log attempt to exceed limit
-                logger.warning(
-                    f"Transaction creation blocked for company {company.id}: {message}"
-                )
-                
-                # Create a custom exception for plan limits
-                from rest_framework.exceptions import PermissionDenied
-                raise PermissionDenied({
-                    'error': 'Transaction limit reached',
-                    'message': message,
-                    'limit_type': 'transactions',
-                    'current_usage': company.current_month_transactions,
-                    'limit': company.subscription_plan.max_transactions if company.subscription_plan else 0,
-                    'upgrade_required': True,
-                    'current_plan': company.subscription_plan.name if company.subscription_plan else 'None'
-                })
-            
+            # Simply track usage count without limits
+            company.current_month_transactions = models.F('current_month_transactions') + 1
+            company.save(update_fields=['current_month_transactions'])
+
             # Create the transaction
             try:
                 transaction = cls.objects.create(
                     company=company,
                     **transaction_data
                 )
-                
+
                 logger.info(
                     f"Transaction created for company {company.id}: "
                     f"ID={transaction.id}, amount={transaction.amount}"
                 )
-                
+
                 return transaction
-                
+
             except Exception as e:
                 # If transaction creation fails, the increment will be rolled back
                 # due to the atomic block

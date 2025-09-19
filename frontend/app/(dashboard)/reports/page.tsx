@@ -16,7 +16,6 @@ import { reportsService } from '@/services/reports.service';
 import { Report, ReportParameters, Category, BankAccount } from '@/types';
 import { DateRange } from '@/types/reports';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
-import { testId, TEST_IDS, testIdWithIndex } from '@/utils/test-helpers';
 import { 
   DocumentChartBarIcon,
   ArrowDownTrayIcon,
@@ -376,7 +375,6 @@ function ReportsPageContent() {
                     handleQuickPeriod(period.id);
                     toast.success(`Período selecionado: ${period.label}`);
                   }}
-                  {...testIdWithIndex(TEST_IDS.reports.quickPeriodButton, index)}
                 >
                   <Icon className="h-5 w-5 mr-3" />
                   <div className="text-left">
@@ -393,8 +391,8 @@ function ReportsPageContent() {
       {/* Main Content Tabs */}
       <Tabs defaultValue="visualizations" className="space-y-4">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="visualizations" {...testId(TEST_IDS.reports.visualizationsTab)}>Visualizações</TabsTrigger>
-          <TabsTrigger value="custom" {...testId(TEST_IDS.reports.customReportsTab)}>Relatórios Personalizados</TabsTrigger>
+          <TabsTrigger value="visualizations">Visualizações</TabsTrigger>
+          <TabsTrigger value="custom">Relatórios Personalizados</TabsTrigger>
         </TabsList>
 
         {/* Visualizations Tab */}
@@ -484,7 +482,6 @@ function ReportsPageContent() {
                             : "border-gray-200 hover:border-gray-300"
                         )}
                         onClick={() => setReportType(type.value)}
-                        {...testIdWithIndex(TEST_IDS.reports.reportTypeCard, index)}
                       >
                         <Icon className="h-8 w-8 mb-2 text-blue-600" />
                         <h4 className="font-medium">{type.label}</h4>
@@ -507,7 +504,6 @@ function ReportsPageContent() {
                         })
                       }
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      {...testId(TEST_IDS.reports.startDatePicker)}
                     />
                   </div>
                   <div>
@@ -522,13 +518,12 @@ function ReportsPageContent() {
                         })
                       }
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      {...testId(TEST_IDS.reports.endDatePicker)}
                     />
                   </div>
                   <div>
                     <Label>Formato de Exportação</Label>
                     <Select value={exportFormat} onValueChange={(value: 'pdf' | 'xlsx') => setExportFormat(value)}>
-                      <SelectTrigger {...testId(TEST_IDS.reports.formatSelect)}>
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -547,7 +542,7 @@ function ReportsPageContent() {
                       value={selectedAccounts[0] || "all"}
                       onValueChange={(value) => setSelectedAccounts(value === "all" ? [] : [value])}
                     >
-                      <SelectTrigger {...testId(TEST_IDS.reports.accountSelect)}>
+                      <SelectTrigger>
                         <SelectValue placeholder="Todas as contas" />
                       </SelectTrigger>
                       <SelectContent>
@@ -566,7 +561,7 @@ function ReportsPageContent() {
                       value={selectedCategories[0] || "all"}
                       onValueChange={(value) => setSelectedCategories(value === "all" ? [] : [value])}
                     >
-                      <SelectTrigger {...testId(TEST_IDS.reports.categorySelect)}>
+                      <SelectTrigger>
                         <SelectValue placeholder="Todas as categorias" />
                       </SelectTrigger>
                       <SelectContent>
@@ -587,7 +582,6 @@ function ReportsPageContent() {
                     onClick={handleGenerateReport}
                     disabled={generateReportMutation.isPending}
                     className="flex-1 bg-primary hover:bg-primary/90 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-                    {...testId(TEST_IDS.reports.generateReportButton)}
                   >
                     {generateReportMutation.isPending ? (
                       <LoadingSpinner />
@@ -612,12 +606,11 @@ function ReportsPageContent() {
             </CardHeader>
             <CardContent>
               {reports?.results && reports.results.length > 0 ? (
-                <div className="space-y-4" {...testId(TEST_IDS.reports.reportHistoryList)}>
+                <div className="space-y-4">
                   {reports.results.map((report: Report, index: number) => (
                     <div
                       key={report.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-gradient-to-r hover:from-blue-50/30 hover:to-purple-50/30 hover:border-blue-200 transition-all duration-200 hover:shadow-md"
-                      {...testIdWithIndex(TEST_IDS.reports.reportHistoryItem, index)}
                     >
                       <div className="flex items-center space-x-4">
                         <div className="p-2 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg">
@@ -663,7 +656,6 @@ function ReportsPageContent() {
                             size="sm"
                             onClick={() => downloadReportMutation.mutate(report.id)}
                             disabled={downloadReportMutation.isPending}
-                            {...testIdWithIndex(TEST_IDS.reports.downloadReportButton, index)}
                           >
                             <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
                             Baixar

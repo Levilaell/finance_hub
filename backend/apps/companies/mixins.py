@@ -38,7 +38,3 @@ class CompanyValidationMixin:
                        "Please contact support if you believe this is an error."},
             "status": status.HTTP_403_FORBIDDEN
         }
-
-
-# Alias for backward compatibility
-CompanyAccessMixin = CompanyValidationMixin

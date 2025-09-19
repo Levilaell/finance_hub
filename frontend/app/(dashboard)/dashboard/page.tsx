@@ -11,7 +11,6 @@ import { ErrorMessage } from '@/components/ui/error-message';
 import { HydrationBoundary } from '@/components/hydration-boundary';
 import Link from 'next/link';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { useSubscriptionUpdates } from '@/hooks/useSubscriptionUpdates';
 import { 
   ArrowUpIcon, 
   ArrowDownIcon,
@@ -23,7 +22,6 @@ import {
   ArrowTrendingDownIcon,
   ExclamationTriangleIcon as AlertCircle
 } from '@heroicons/react/24/outline';
-import { UsageIndicators } from '@/components/UsageIndicators';
 import { RefreshDataButton } from '@/components/RefreshDataButton';
 
 interface DashboardData {
@@ -136,9 +134,6 @@ export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Listen for subscription updates
-  useSubscriptionUpdates();
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -322,13 +317,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Usage Indicators */}
-      {user?.company && (
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold mb-4">Uso do Plano</h2>
-          <UsageIndicators />
-        </div>
-      )}
 
       {/* Alerts */}
       {dashboardData.alerts && dashboardData.alerts.length > 0 && (

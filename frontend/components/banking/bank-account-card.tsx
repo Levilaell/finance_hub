@@ -22,7 +22,6 @@ import {
 
 import { BankAccount, PluggyItemStatus } from '@/types/banking.types';
 import { bankingService } from '@/services/banking.service';
-import { testId, TEST_IDS } from '@/utils/test-helpers';
 
 interface BankAccountCardProps {
   account: BankAccount;
@@ -98,7 +97,7 @@ export function BankAccountCard({
   const needsReconnection = bankingService.needsReconnection(account);
   const statusInfo = getStatusBadge(account.item_status);
   return (
-    <Card className="hover:shadow-lg transition-all duration-300" {...testId(TEST_IDS.banking.accountCard)}>
+    <Card className="hover:shadow-lg transition-all duration-300">
       <CardContent className="p-6 space-y-4">
         {/* Header Row: Bank Icon, Name, and Actions */}
         <div className="flex items-start justify-between">
@@ -124,7 +123,7 @@ export function BankAccountCard({
                 {account.connector?.name || 'Banco'}
               </h3>
               {account.masked_number && (
-                <p className="text-sm text-muted-foreground mt-0.5" {...testId(TEST_IDS.banking.accountNumber)}>
+                <p className="text-sm text-muted-foreground mt-0.5">
                   {account.masked_number}
                 </p>
               )}
@@ -137,7 +136,6 @@ export function BankAccountCard({
             size="icon"
             onClick={() => onRemove(account)}
             className="h-8 w-8 text-red-600 hover:text-red-700"
-            {...testId(TEST_IDS.banking.deleteAccountButton)}
           >
             <TrashIcon className="h-4 w-4" />
           </Button>
@@ -152,7 +150,6 @@ export function BankAccountCard({
             <Badge 
               variant="secondary" 
               className={`${statusInfo.color}`}
-              {...testId(TEST_IDS.banking.accountStatus)}
             >
               {statusInfo.label}
             </Badge>
@@ -162,7 +159,7 @@ export function BankAccountCard({
         {/* Balance */}
         <div className="py-2">
           <p className="text-sm text-muted-foreground mb-1">Saldo</p>
-          <p className="text-3xl font-bold" {...testId(TEST_IDS.banking.accountBalance)}>
+          <p className="text-3xl font-bold">
             {bankingService.formatCurrency(account.balance)}
           </p>
         </div>
@@ -177,7 +174,6 @@ export function BankAccountCard({
             size="sm"
             onClick={() => onSync(account.id)}
             disabled={isSyncing || needsReconnection}
-            {...testId(TEST_IDS.banking.syncButton)}
           >
             <ArrowPathIcon className={`h-4 w-4 mr-1.5 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? 'Sincronizando' : 'Sincronizar'}

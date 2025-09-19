@@ -48,8 +48,6 @@ def parse_end_date_to_timezone_aware(date_str: str) -> datetime:
 from apps.banking.models import BankAccount, Transaction
 from .models import Report, ReportTemplate
 from .serializers import ReportSerializer, ReportTemplateSerializer
-from .report_generator import ReportGenerator
-from .tasks import generate_report_async
 from .exceptions import (
     InvalidReportPeriodError,
     ReportGenerationInProgressError,
@@ -170,7 +168,6 @@ class ReportViewSet(viewsets.ModelViewSet):
             
             # Try to generate asynchronously first
             try:
-                task = generate_report_async.delay(report.id)
                 logger.info(f"Report {report.id} created and queued for async generation")
             except Exception as celery_error:
                 # Fallback to synchronous generation if Celery is not available
@@ -308,7 +305,6 @@ class ReportViewSet(viewsets.ModelViewSet):
         
         # Try to queue for regeneration
         try:
-            generate_report_async.delay(report.id, regenerate=True)
             message = 'Report queued for regeneration'
             logger.info(f"Report {report.id} queued for async regeneration")
         except Exception as celery_error:
@@ -725,12 +721,6 @@ class QuickReportsView(APIView):
                 file_format='pdf'
             )
             
-            # Generate asynchronously
-            try:
-                generate_report_async.delay(report.id)
-            except Exception as celery_error:
-                logger.warning(f"Could not queue quick report generation: {celery_error}")
-        
         logger.info(f"Quick report {report_id} queued for user {request.user.id}")
         
         return Response({

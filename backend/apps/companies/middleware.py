@@ -3,7 +3,6 @@ Middleware para verificar status de trial e assinatura
 """
 from django.utils import timezone
 from django.http import JsonResponse
-from django.urls import resolve
 from django.core.cache import cache
 from rest_framework import status
 import logging
@@ -113,24 +112,16 @@ class TrialExpirationMiddleware:
         
         # Check usage limits for active subscriptions
         if company.subscription_status in ['trial', 'active'] and company.subscription_plan:
-            # Check transaction limit
-            if path.startswith('/api/transactions/') and request.method == 'POST':
-                if company.current_month_transactions >= company.subscription_plan.max_transactions:
-                    return JsonResponse({
-                        'error': 'limit_reached',
-                        'message': f'Você atingiu o limite de {company.subscription_plan.max_transactions} transações mensais. Faça upgrade do plano para continuar.',
-                        'limit_type': 'transactions',
-                        'current': company.current_month_transactions,
-                        'limit': company.subscription_plan.max_transactions,
-                        'redirect': '/dashboard/subscription/upgrade'
-                    }, status=status.HTTP_402_PAYMENT_REQUIRED)
+            # Transaction limits removed in simplified model
+            # Transactions are now tracked for statistics only
             
-            # Check AI request limit
+            # AI request limits removed in simplified model
+            # Only rate limiting remains for API protection
             if ('ai' in path.lower() or 'insight' in path.lower() or 'categorize' in path.lower()) and request.method == 'POST':
-                # Rate limiting check first
+                # Rate limiting check for API protection
                 rate_limit_key = f"rate_limit:{request.user.id}:ai_request"
                 rate_limit_count = cache.get(rate_limit_key, 0)
-                
+
                 # Allow max 10 AI requests per minute
                 if rate_limit_count >= 10:
                     return JsonResponse({
@@ -138,21 +129,9 @@ class TrialExpirationMiddleware:
                         'message': 'Muitas requisições. Por favor, aguarde um momento.',
                         'retry_after': 60
                     }, status=429)
-                
+
                 # Increment rate limit counter
                 cache.set(rate_limit_key, rate_limit_count + 1, 60)
-                
-                # Check monthly limit
-                if company.subscription_plan.max_ai_requests > 0:
-                    if company.current_month_ai_requests >= company.subscription_plan.max_ai_requests:
-                        return JsonResponse({
-                            'error': 'limit_reached',
-                            'message': f'Você atingiu o limite de {company.subscription_plan.max_ai_requests} requisições de IA mensais.',
-                            'limit_type': 'ai_requests',
-                            'current': company.current_month_ai_requests,
-                            'limit': company.subscription_plan.max_ai_requests,
-                            'redirect': '/dashboard/subscription/upgrade'
-                        }, status=status.HTTP_402_PAYMENT_REQUIRED)
         
         response = self.get_response(request)
         return response
@@ -169,20 +148,15 @@ class PlanLimitsMiddleware:
         if request.user.is_authenticated and hasattr(request.user, 'company'):
             company = request.user.company
             
-            # Reset monthly usage if needed
-            if self._should_reset_monthly_usage(company):
-                company.reset_monthly_usage()
-                logger.info(f"Reset monthly usage for company {company.id} - {company.name}")
+            # Monthly usage reset has been removed in simplified model
+            # Usage is now tracked for statistics only, not for limits
             
-            # Add plan limits to request
+            # Add plan limits to request (simplified after field removal)
             request.plan_limits = {
                 'subscription_status': company.subscription_status,
                 'plan_type': company.subscription_plan.slug if company.subscription_plan else None,
-                'can_use_ai': company.subscription_plan.has_ai_insights if company.subscription_plan else False,
-                'remaining_transactions': (company.subscription_plan.max_transactions - company.current_month_transactions) if company.subscription_plan else 0,
+                'current_transactions': company.current_month_transactions,
                 'can_add_bank_account': company.can_add_bank_account(),
-                'can_generate_reports': company.subscription_plan.has_advanced_reports if company.subscription_plan else False,
-                'usage_summary': company.get_usage_summary(),
             }
             
             # Add trial info if applicable
@@ -192,10 +166,3 @@ class PlanLimitsMiddleware:
         
         response = self.get_response(request)
         return response
-    
-    def _should_reset_monthly_usage(self, company):
-        """Check if monthly usage should be reset"""
-        # Check if it's a new month
-        # Simplified - reset happens via management command
-        
-        return False

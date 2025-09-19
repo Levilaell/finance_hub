@@ -17,8 +17,7 @@ export interface User {
   is_two_factor_enabled: boolean;
   two_factor_secret?: string;
   backup_codes: string[];
-  payment_customer_id?: string;
-  payment_gateway?: 'stripe'; // MercadoPago removed - Stripe only
+  payment_gateway?: 'stripe'; 
   created_at: string;
   updated_at: string;
   
@@ -78,16 +77,7 @@ export interface Company {
   // Contact information
   email?: string;
   phone?: string;
-  website?: string;
   
-  // Address
-  address_street?: string;
-  address_number?: string;
-  address_complement?: string;
-  address_neighborhood?: string;
-  address_city?: string;
-  address_state?: string;
-  address_zipcode?: string;
   
   // Business metrics
   monthly_revenue?: number;
@@ -105,22 +95,11 @@ export interface Company {
   
   // Usage counters
   current_month_transactions: number;
-  current_month_ai_requests: number;
   last_usage_reset: string;
-  notified_80_percent: boolean;
-  notified_90_percent: boolean;
   
   // Company settings
   logo?: string;
   primary_color: string;
-  currency: string;
-  fiscal_year_start: string;
-  
-  // AI and automation preferences
-  enable_ai_categorization: boolean;
-  auto_categorize_threshold: number;
-  enable_notifications: boolean;
-  enable_email_reports: boolean;
   
   // Metadata
   created_at: string;
@@ -147,16 +126,7 @@ export interface SubscriptionPlan {
   // mercadopago_plan_id?: string; - Removed with MercadoPago integration
   price_monthly: number | string; // Django DecimalField serializes as string
   price_yearly: number | string;   // Django DecimalField serializes as string
-  max_transactions: number;
   max_bank_accounts: number;
-  has_ai_categorization: boolean;
-  enable_ai_insights: boolean;
-  enable_ai_reports: boolean;
-  max_ai_requests_per_month: number;
-  has_advanced_reports: boolean;
-  has_api_access: boolean;
-  has_accountant_access: boolean;
-  has_priority_support: boolean;
   display_order: number;
   is_active: boolean;
   created_at: string;
@@ -173,11 +143,6 @@ export interface UsageLimits {
     percentage: number;
   };
   bank_accounts: {
-    used: number;
-    limit: number;
-    percentage: number;
-  };
-  ai_requests: {
     used: number;
     limit: number;
     percentage: number;
@@ -247,7 +212,6 @@ export interface BankAccount {
   balance_in_account_currency?: number;
   balance_date?: string;
   currency_code: string;
-  investment_status?: string;
   bank_data?: Record<string, any>;
   credit_data?: Record<string, any>;
   is_active: boolean;
@@ -429,7 +393,6 @@ export interface ResourceUsage {
   company: string; // Company ID
   month: string; // First day of month
   transactions_count: number;
-  ai_requests_count: number;
   reports_generated: number;
   created_at: string;
   updated_at: string;
@@ -548,7 +511,6 @@ export interface Report {
   file?: string;
   file_size: number;
   is_generated: boolean;
-  generation_time: number;
   error_message?: string;
   created_at: string;
   created_by: string; // User ID

@@ -32,11 +32,3 @@ export function useAuth(requireAuth: boolean = true) {
     isLoading: isLoading || !_hasHydrated, // Show loading until hydrated
   };
 }
-
-export function useRequireAuth() {
-  return useAuth(true);
-}
-
-export function useOptionalAuth() {
-  return useAuth(false);
-}

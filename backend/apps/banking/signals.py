@@ -15,12 +15,6 @@ from .models import PluggyItem, BankAccount, Transaction
 logger = logging.getLogger(__name__)
 
 
-@receiver(post_save, sender=PluggyItem)
-def handle_item_status_change(sender, instance, created, **kwargs):
-    """
-    Handle item status changes and trigger notifications
-    """
-
 @receiver(pre_delete, sender=BankAccount)
 def cleanup_account_data(sender, instance, **kwargs):
     """

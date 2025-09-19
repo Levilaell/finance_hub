@@ -24,7 +24,6 @@ class Report(models.Model):
         ('cash_flow', 'Fluxo de Caixa'),
         ('profit_loss', 'DRE - Demonstração de Resultados'),
         ('category_analysis', 'Análise por Categoria'),
-        ('tax_report', 'Relatório Fiscal'),
         ('custom', 'Personalizado'),
     ]
     
@@ -32,7 +31,6 @@ class Report(models.Model):
         ('pdf', 'PDF'),
         ('xlsx', 'Excel'),
         ('csv', 'CSV'),
-        ('json', 'JSON'),
     ]
     
     # Report identification
@@ -60,7 +58,6 @@ class Report(models.Model):
     
     # Status
     is_generated = models.BooleanField(_('is generated'), default=False)
-    generation_time = models.IntegerField(_('generation time (seconds)'), default=0)
     error_message = models.TextField(_('error message'), blank=True)
     
     # Metadata
@@ -110,11 +107,6 @@ class Report(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
     
-    def get_file_url(self):
-        """Get the file URL if available"""
-        if self.file:
-            return self.file.url
-        return None
     
     @property
     def duration_days(self):

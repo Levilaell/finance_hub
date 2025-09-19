@@ -36,7 +36,7 @@ from .serializers import (
 from .integrations.pluggy.client import PluggyClient, PluggyError
 from .tasks import sync_bank_account, process_webhook_event
 from .utils.encryption import banking_encryption
-from apps.companies.mixins import CompanyAccessMixin
+from apps.companies.mixins import CompanyValidationMixin
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +169,7 @@ class PluggyConnectorViewSet(viewsets.ReadOnlyModelViewSet):
             return _handle_pluggy_error(e, "connectors synchronization")
 
 
-class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
+class PluggyItemViewSet(CompanyValidationMixin, viewsets.ModelViewSet):
     """
     ViewSet for Pluggy items (connections)
     """
@@ -409,12 +409,9 @@ class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
                     
                     # Delete the item itself
                     item.delete()
-                    
-                    # Reset transaction counter in company usage
-                    if transactions_count > 0 and hasattr(company, 'reset_transaction_usage'):
-                        company.reset_transaction_usage(transactions_count)
-                        logger.info(f"Reset {transactions_count} transactions from company usage counter")
-                    
+
+                    # Transaction counter reset has been removed in simplified model
+
                 logger.info(f"Successfully disconnected and deleted item {item.pluggy_item_id}")
                 
                 return Response({
@@ -428,7 +425,7 @@ class PluggyItemViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
 
 
 
-class BankAccountViewSet(CompanyAccessMixin, viewsets.ReadOnlyModelViewSet):
+class BankAccountViewSet(CompanyValidationMixin, viewsets.ReadOnlyModelViewSet):
     """
     ViewSet for bank accounts
     """
@@ -626,7 +623,7 @@ class BankAccountViewSet(CompanyAccessMixin, viewsets.ReadOnlyModelViewSet):
         })
 
 
-class TransactionViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
+class TransactionViewSet(CompanyValidationMixin, viewsets.ModelViewSet):
     """
     ViewSet for transactions
     """
@@ -845,7 +842,7 @@ class TransactionViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
         return response
 
 
-class TransactionCategoryViewSet(CompanyAccessMixin, viewsets.ModelViewSet):
+class TransactionCategoryViewSet(CompanyValidationMixin, viewsets.ModelViewSet):
     """
     ViewSet for transaction categories
     """

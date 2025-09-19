@@ -62,7 +62,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
         model = BankAccount
         fields = [
             'id', 'item_id', 'item_pluggy_id', 'type', 'subtype', 'number', 'name',
-            'marketing_name', 'owner', 'balance', 'balance_date',
+            'owner', 'balance', 'balance_date',
             'currency_code', 'bank_data', 'credit_data', 'is_active',
             'pluggy_created_at', 'pluggy_updated_at', 'connector', 'item_status',
             'display_name', 'masked_number', 'item',
@@ -292,28 +292,3 @@ class DashboardDataSerializer(serializers.Serializer):
     accounts_summary = serializers.ListField(
         child=serializers.DictField()
     )
-
-
-class MFASerializer(serializers.Serializer):
-    """Serializer for MFA parameters"""
-    # Campos genéricos para diferentes tipos de MFA
-    token = serializers.CharField(required=False)
-    code = serializers.CharField(required=False)
-    sms = serializers.CharField(required=False)
-    value = serializers.CharField(required=False)
-    mfa = serializers.CharField(required=False)
-    
-    # Para seleção (conta conjunta, etc)
-    selectedOwner = serializers.CharField(required=False)
-    operatorNumber = serializers.CharField(required=False)
-    selectedAccount = serializers.CharField(required=False)
-    selectedCompany = serializers.CharField(required=False)
-    phone = serializers.CharField(required=False)
-    
-    def validate(self, attrs):
-        """Pelo menos um campo deve ser fornecido"""
-        if not any(attrs.values()):
-            raise serializers.ValidationError(
-                'At least one MFA parameter must be provided'
-            )
-        return attrs

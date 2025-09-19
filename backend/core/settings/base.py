@@ -217,18 +217,7 @@ X_FRAME_OPTIONS = 'DENY'
 # Redis Cache Configuration
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': REDIS_URL,
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'IGNORE_EXCEPTIONS': True,
-        },
-        'KEY_PREFIX': 'finance_hub',
-        'TIMEOUT': 300,
-    }
-}
+
 
 # Import logging configuration
 from .logging import LOGGING

@@ -22,7 +22,6 @@ import {
   Lock,
 } from "lucide-react";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
-import { testId, TEST_IDS } from "@/utils/test-helpers";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 
 interface MainLayoutProps {
@@ -30,13 +29,13 @@ interface MainLayoutProps {
 }
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, testId: TEST_IDS.navigation.dashboardLink },
-  { name: "Transações", href: "/transactions", icon: Receipt, testId: "transactions-link" },
-  { name: "Contas", href: "/accounts", icon: Wallet, testId: TEST_IDS.navigation.bankingLink },
-  { name: "Categorias", href: "/categories", icon: Tags, testId: "categories-link" },
-  { name: "Insights com IA", href: "/ai-insights", icon: Sparkles, testId: TEST_IDS.navigation.aiInsightsLink, comingSoon: true },
-  { name: "Relatórios", href: "/reports", icon: FileText, testId: TEST_IDS.navigation.reportsLink },
-  { name: "Configurações", href: "/settings", icon: Settings, testId: TEST_IDS.navigation.settingsLink },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Transações", href: "/transactions", icon: Receipt },
+  { name: "Contas", href: "/accounts", icon: Wallet },
+  { name: "Categorias", href: "/categories", icon: Tags },
+  { name: "Insights com IA", href: "/ai-insights", icon: Sparkles, comingSoon: true },
+  { name: "Relatórios", href: "/reports", icon: FileText },
+  { name: "Configurações", href: "/settings", icon: Settings },
 ];
 
 export function MainLayout({ children }: MainLayoutProps) {
@@ -115,7 +114,6 @@ export function MainLayout({ children }: MainLayoutProps) {
                     item.comingSoon && "opacity-75"
                   )}
                   onClick={() => setSidebarOpen(false)}
-                  {...testId(item.testId)}
                 >
                   <item.icon className="h-5 w-5" />
                   <span>{item.name}</span>
@@ -149,7 +147,6 @@ export function MainLayout({ children }: MainLayoutProps) {
               variant="ghost"
               className="mt-4 w-full justify-start hover:bg-destructive/10 hover:text-destructive transition-all duration-300"
               onClick={handleLogout}
-              {...testId(TEST_IDS.auth.logoutButton)}
             >
               <LogOut className="mr-2 h-4 w-4" />
               Sair
@@ -185,7 +182,6 @@ export function MainLayout({ children }: MainLayoutProps) {
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
                     item.comingSoon && "opacity-75"
                   )}
-                  {...testId(item.testId)}
                 >
                   <item.icon className="h-5 w-5" />
                   <span>{item.name}</span>
@@ -219,7 +215,6 @@ export function MainLayout({ children }: MainLayoutProps) {
               variant="ghost"
               className="mt-4 w-full justify-start hover:bg-destructive/10 hover:text-destructive transition-all duration-300"
               onClick={handleLogout}
-              {...testId(TEST_IDS.auth.logoutButton)}
             >
               <LogOut className="mr-2 h-4 w-4" />
               Sair
@@ -250,7 +245,6 @@ export function MainLayout({ children }: MainLayoutProps) {
                 size="sm"
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center space-x-2"
-                {...testId(TEST_IDS.auth.userMenu)}
               >
                 <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center shadow-sm">
                   <span className="text-sm font-medium text-blue-800">

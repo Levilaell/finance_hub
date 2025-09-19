@@ -6,6 +6,10 @@ class AuthService {
     return apiClient.login(credentials.email, credentials.password);
   }
 
+  async loginWith2FA(email: string, password: string, twoFactorCode: string): Promise<LoginResponse> {
+    return apiClient.login(email, password, twoFactorCode);
+  }
+
   async register(data: RegisterData) {
     return apiClient.register(data);
   }
@@ -30,22 +34,6 @@ class AuthService {
       old_password: data.current_password,
       new_password: data.new_password
     });
-  }
-
-  async setup2FA() {
-    return apiClient.get<{ qr_code: string; backup_codes_count: number; setup_complete: boolean }>("/api/auth/2fa/setup/");
-  }
-
-  async enable2FA(token: string) {
-    return apiClient.post<{ message: string; backup_codes: string[] }>("/api/auth/2fa/enable/", { token });
-  }
-
-  async disable2FA(data: { password: string }) {
-    return apiClient.post("/api/auth/2fa/disable/", data);
-  }
-
-  async loginWith2FA(email: string, password: string, two_fa_code: string): Promise<LoginResponse> {
-    return apiClient.login(email, password, two_fa_code);
   }
 
   async requestPasswordReset(email: string) {

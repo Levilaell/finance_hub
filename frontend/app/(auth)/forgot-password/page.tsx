@@ -13,7 +13,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { authService } from '@/services/auth.service';
 import { ArrowLeftIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
-import { testId, TEST_IDS } from '@/utils/test-helpers';
 
 interface ForgotPasswordForm {
   email: string;
@@ -108,7 +107,6 @@ export default function ForgotPasswordPage() {
                 id="email"
                 type="email"
                 placeholder="nome@exemplo.com"
-                {...testId(TEST_IDS.auth.emailInput)}
                 {...register('email', {
                   required: 'E-mail é obrigatório',
                   pattern: {
@@ -120,7 +118,7 @@ export default function ForgotPasswordPage() {
                 autoFocus
               />
               {errors.email && (
-                <p className="text-sm text-red-500 mt-1" {...testId('email-error')}>
+                <p className="text-sm text-red-500 mt-1">
                   {errors.email.message}
                 </p>
               )}
@@ -132,7 +130,6 @@ export default function ForgotPasswordPage() {
             type="submit"
             className="w-full bg-white hover:bg-white/90 text-black font-medium"
             disabled={forgotPasswordMutation.isPending}
-            {...testId(TEST_IDS.auth.forgotPasswordSubmit)}
           >
             {forgotPasswordMutation.isPending ? (
               <LoadingSpinner />

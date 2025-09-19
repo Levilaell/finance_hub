@@ -3,8 +3,8 @@ Validation service for report generation
 Comprehensive input validation and sanitization
 """
 import re
-from datetime import datetime, date, timedelta
-from typing import Dict, Any, Optional, List, Tuple
+from datetime import datetime, date
+from typing import Dict, Any, Optional, Tuple
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -14,7 +14,6 @@ from apps.reports.exceptions import (
     InvalidReportPeriodError,
     ReportDataInsufficientError
 )
-from apps.reports.models import Report
 
 
 def parse_date_to_timezone_aware(date_str: str) -> datetime:

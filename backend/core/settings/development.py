@@ -34,11 +34,12 @@ DATABASES = {
         'CONN_MAX_AGE': 600,  # Connection pooling - keep connections alive for 10 minutes
         'OPTIONS': {
             'connect_timeout': 10,
-            'options': '-c default_transaction_isolation=read\ committed',
+            'options': '-c default_transaction_isolation=read_committed',
             'keepalives': 1,
             'keepalives_idle': 30,
             'keepalives_interval': 10,
             'keepalives_count': 5,
+            'client_encoding': 'UTF8',
         },
         'ATOMIC_REQUESTS': True,  # Wrap each request in a transaction
     }
@@ -46,38 +47,12 @@ DATABASES = {
 
 # Cache
 REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': REDIS_URL,
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-        }
-    }
-}
+
 
 # Celery
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default=REDIS_URL)
 CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=REDIS_URL)
 CELERY_TASK_ALWAYS_EAGER = config('CELERY_TASK_ALWAYS_EAGER', default=False, cast=bool)
-
-# Celery Beat Schedule for development
-from celery.schedules import crontab
-
-CELERY_BEAT_SCHEDULE = {
-    'check-trial-expirations': {
-        'task': 'apps.companies.tasks.check_trial_expirations',
-        'schedule': crontab(hour=9, minute=0),  # 9 AM daily
-    },
-    'reset-monthly-usage': {
-        'task': 'apps.companies.tasks.reset_monthly_usage_counters',
-        'schedule': crontab(day_of_month=1, hour=0, minute=0),  # First day of month
-    },
-    'check-usage-limits': {
-        'task': 'apps.companies.tasks.check_usage_limits',
-        'schedule': crontab(minute=0, hour='*/6'),  # Every 6 hours
-    },
-}
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
@@ -162,7 +137,6 @@ CHANNEL_LAYERS = {
 
 # Debug Toolbar
 if DEBUG:
-    INSTALLED_APPS += ['debug_toolbar']
     MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
     INTERNAL_IPS = ['127.0.0.1']
 

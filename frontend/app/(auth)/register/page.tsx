@@ -18,7 +18,6 @@ import { useAuthStore } from '@/store/auth-store';
 import { RegisterData } from '@/types';
 import { EyeIcon, EyeSlashIcon, CheckIcon, ExclamationCircleIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 import { validateCNPJ, validatePhone, cnpjMask, phoneMask } from '@/utils/validation';
-import { testId, TEST_IDS } from '@/utils/test-helpers';
 
 interface RegisterFormData extends RegisterData {
   selected_plan?: string;
@@ -196,14 +195,13 @@ function RegisterContent() {
                   id="firstName"
                   type="text"
                   placeholder="João"
-                  {...testId(TEST_IDS.auth.firstNameInput)}
                   {...register('first_name', {
                     required: 'Nome é obrigatório',
                   })}
                   autoComplete="given-name"
                 />
                 {errors.first_name && (
-                  <p className="text-sm text-red-500 mt-1" {...testId('first-name-error')}>
+                  <p className="text-sm text-red-500 mt-1">
                     {errors.first_name.message}
                   </p>
                 )}
@@ -214,14 +212,13 @@ function RegisterContent() {
                   id="lastName"
                   type="text"
                   placeholder="Silva"
-                  {...testId(TEST_IDS.auth.lastNameInput)}
                   {...register('last_name', {
                     required: 'Sobrenome é obrigatório',
                   })}
                   autoComplete="family-name"
                 />
                 {errors.last_name && (
-                  <p className="text-sm text-red-500 mt-1" {...testId('last-name-error')}>
+                  <p className="text-sm text-red-500 mt-1">
                     {errors.last_name.message}
                   </p>
                 )}
@@ -233,7 +230,6 @@ function RegisterContent() {
                 id="email"
                 type="email"
                 placeholder="nome@exemplo.com"
-                {...testId(TEST_IDS.auth.emailInput)}
                 {...register('email', {
                   required: 'E-mail é obrigatório',
                   pattern: {
@@ -244,7 +240,7 @@ function RegisterContent() {
                 autoComplete="email"
               />
               {errors.email && (
-                <p className="text-sm text-red-500 mt-1" {...testId('email-error')}>
+                <p className="text-sm text-red-500 mt-1">
                   {errors.email.message}
                 </p>
               )}
@@ -255,7 +251,6 @@ function RegisterContent() {
                 id="companyName"
                 type="text"
                 placeholder="Minha Empresa Ltda"
-                {...testId(TEST_IDS.auth.companyNameInput)}
                 {...register('company_name', {
                   required: 'Nome da empresa é obrigatório',
                 })}
@@ -275,7 +270,6 @@ function RegisterContent() {
                   type="text"
                   placeholder="00.000.000/0000-00"
                   value={cnpjValue}
-                  {...testId(TEST_IDS.auth.companyCnpjInput)}
                   {...register('company_cnpj', {
                     required: 'CNPJ é obrigatório',
                     validate: (value) => validateCNPJ(value) || 'CNPJ inválido',
@@ -300,7 +294,6 @@ function RegisterContent() {
                   type="tel"
                   placeholder="(11) 99999-9999"
                   value={phoneValue}
-                  {...testId(TEST_IDS.auth.phoneInput)}
                   {...register('phone', {
                     required: 'Telefone é obrigatório',
                     validate: (value) => validatePhone(value) || 'Telefone inválido',
@@ -325,7 +318,6 @@ function RegisterContent() {
                 <Label htmlFor="companyType">Tipo de Empresa</Label>
                 <select
                   id="companyType"
-                  {...testId(TEST_IDS.auth.companyTypeSelect)}
                   {...register('company_type', {
                     required: 'Tipo de empresa é obrigatório',
                   })}
@@ -349,7 +341,6 @@ function RegisterContent() {
                 <Label htmlFor="businessSector">Setor de Atividade</Label>
                 <select
                   id="businessSector"
-                  {...testId(TEST_IDS.auth.businessSectorInput)}
                   {...register('business_sector', {
                     required: 'Setor de atividade é obrigatório',
                   })}
@@ -382,7 +373,6 @@ function RegisterContent() {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Crie uma senha forte"
-                  {...testId(TEST_IDS.auth.passwordInput)}
                   {...register('password', {
                     required: 'Senha é obrigatória',
                     validate: (value) => {
@@ -412,7 +402,7 @@ function RegisterContent() {
                 </button>
               </div>
               {errors.password && (
-                <p className="text-sm text-red-500 mt-1" {...testId('password-error')}>
+                <p className="text-sm text-red-500 mt-1">
                   {errors.password.message}
                 </p>
               )}
@@ -445,7 +435,6 @@ function RegisterContent() {
                   id="password2"
                   type={showConfirmPassword ? 'text' : 'password'}
                   placeholder="Confirme sua senha"
-                  {...testId(TEST_IDS.auth.password2Input)}
                   {...register('password2', {
                     required: 'Por favor, confirme sua senha',
                     validate: (value) =>
@@ -466,7 +455,7 @@ function RegisterContent() {
                 </button>
               </div>
               {errors.password2 && (
-                <p className="text-sm text-red-500 mt-1" {...testId('password2-error')}>
+                <p className="text-sm text-red-500 mt-1">
                   {errors.password2.message}
                 </p>
               )}
@@ -478,7 +467,6 @@ function RegisterContent() {
             type="submit"
             className="w-full bg-white hover:bg-white/90 text-black font-medium"
             disabled={registerMutation.isPending}
-            {...testId(TEST_IDS.auth.registerSubmit)}
           >
             {registerMutation.isPending ? (
               <LoadingSpinner />
@@ -498,7 +486,7 @@ function RegisterContent() {
           </p>
           <p className="text-sm text-center text-muted-foreground">
             Já tem uma conta?{' '}
-            <Link href="/login" className="text-white hover:text-white/80 hover:underline transition-colors font-medium" {...testId(TEST_IDS.auth.loginLink)}>
+            <Link href="/login" className="text-white hover:text-white/80 hover:underline transition-colors font-medium">
               Entrar
             </Link>
           </p>

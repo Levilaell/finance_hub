@@ -2,13 +2,11 @@
 from functools import wraps
 from rest_framework.response import Response
 from rest_framework import status
-import logging
-
-logger = logging.getLogger(__name__)
 
 def requires_plan_feature(feature_name):
     """
-    Decorator to check plan features and limits before executing view methods
+    Simplified decorator to check plan features
+    Most limit checking has been removed from the models
     """
     def decorator(view_func):
         @wraps(view_func)
@@ -21,92 +19,47 @@ def requires_plan_feature(feature_name):
                 return Response({
                     'error': 'Usuário não está associado a nenhuma empresa'
                 }, status=status.HTTP_403_FORBIDDEN)
-            
-            # Verificações específicas por feature
+
+            # Verificações simplificadas por feature
             if feature_name == 'create_transaction':
-                limit_reached, usage_info = company.check_plan_limits('transactions')
-                if limit_reached:
-                    # Determinar plano sugerido
-                    suggested_plan = None
-                    if company.subscription_plan:
-                        if company.subscription_plan.plan_type == 'starter':
-                            suggested_plan = 'professional'
-                        elif company.subscription_plan.plan_type == 'professional':
-                            suggested_plan = 'enterprise'
-                    
+                # Transactions are now unlimited in the simplified model
+                # Just check if company has a plan
+                if not company.subscription_plan:
                     return Response({
-                        'error': 'Limite de transações atingido para este mês',
-                        'usage_info': usage_info,
-                        'current_usage': company.current_month_transactions,
-                        'limit': company.subscription_plan.max_transactions if company.subscription_plan else 0,
+                        'error': 'Plano de assinatura necessário',
                         'upgrade_required': True,
-                        'current_plan': company.subscription_plan.name if company.subscription_plan else 'Nenhum',
-                        'suggested_plan': suggested_plan
-                    }, status=status.HTTP_429_TOO_MANY_REQUESTS)
-            
+                        'current_plan': 'Nenhum'
+                    }, status=status.HTTP_403_FORBIDDEN)
+
             elif feature_name == 'create_bank_account' or feature_name == 'add_bank_account':
-                if not company.can_add_bank_account():
+                # Check simplified bank account limit
+                if company.subscription_plan:
                     current_count = company.bank_accounts.filter(is_active=True).count()
-                    limit = company.subscription_plan.max_bank_accounts if company.subscription_plan else 0
-                    
+                    limit = company.subscription_plan.max_bank_accounts
+
+                    if current_count >= limit:
+                        return Response({
+                            'error': f'Limite de contas bancárias atingido ({current_count}/{limit})',
+                            'limit_type': 'bank_accounts',
+                            'current': current_count,
+                            'limit': limit,
+                            'upgrade_required': True,
+                            'current_plan': company.subscription_plan.name if company.subscription_plan else 'Nenhum',
+                            'suggested_plan': 'professional' if company.subscription_plan.plan_type == 'starter' else 'enterprise',
+                            'redirect': '/dashboard/subscription/upgrade'
+                        }, status=status.HTTP_403_FORBIDDEN)
+                else:
                     return Response({
-                        'error': f'Limite de contas bancárias atingido ({current_count}/{limit})',
-                        'limit_type': 'bank_accounts',
-                        'current': current_count,
-                        'limit': limit,
-                        'upgrade_required': True,
-                        'current_plan': company.subscription_plan.name if company.subscription_plan else 'Nenhum',
-                        'suggested_plan': 'professional' if company.subscription_plan and company.subscription_plan.plan_type == 'starter' else 'enterprise',
-                        'redirect': '/dashboard/subscription/upgrade'
+                        'error': 'Plano de assinatura necessário',
+                        'upgrade_required': True
                     }, status=status.HTTP_403_FORBIDDEN)
-            
-            elif feature_name == 'ai_insights' or feature_name == 'use_ai':
-                can_use_ai, message = company.can_use_ai_insight()
-                if not can_use_ai:
-                    # Incrementar contador mesmo quando bloqueado (para tracking)
-                    if company.subscription_plan and company.subscription_plan.max_ai_requests_per_month > 0:
-                        usage_info = {
-                            'current': company.current_month_ai_requests,
-                            'limit': company.subscription_plan.max_ai_requests_per_month,
-                            'remaining': max(0, company.subscription_plan.max_ai_requests_per_month - company.current_month_ai_requests)
-                        }
-                    else:
-                        usage_info = None
-                    
-                    return Response({
-                        'error': message,
-                        'limit_type': 'ai_requests',
-                        'usage_info': usage_info,
-                        'upgrade_required': True,
-                        'current_plan': company.subscription_plan.name if company.subscription_plan else 'Nenhum',
-                        'suggested_plan': 'professional' if company.subscription_plan and company.subscription_plan.plan_type == 'starter' else 'enterprise',
-                        'feature_required': 'AI Insights'
-                    }, status=status.HTTP_403_FORBIDDEN)
-            
-            elif feature_name == 'advanced_reports':
-                if not company.subscription_plan or not company.subscription_plan.has_advanced_reports:
-                    return Response({
-                        'error': 'Relatórios avançados não disponíveis no seu plano',
-                        'upgrade_required': True,
-                        'current_plan': company.subscription_plan.name if company.subscription_plan else 'Nenhum'
-                    }, status=status.HTTP_403_FORBIDDEN)
-            
-            elif feature_name == 'api_access':
-                if not company.subscription_plan or not company.subscription_plan.has_api_access:
-                    return Response({
-                        'error': 'Acesso à API disponível apenas no plano Enterprise',
-                        'upgrade_required': True,
-                        'current_plan': company.subscription_plan.name if company.subscription_plan else 'Nenhum'
-                    }, status=status.HTTP_403_FORBIDDEN)
-            
-            # Verificação de notificações de uso
-            if feature_name == 'create_transaction':
-                self._check_and_send_usage_notifications(company)
-            
+
+            # AI insights and advanced reports features have been removed
+            # API access checks have been removed
+
             # Executar a view original
             return view_func(self, request, *args, **kwargs)
-          
-        wrapped_view._check_and_send_usage_notifications = _check_and_send_usage_notifications
+
         return wrapped_view
-    
+
     return decorator

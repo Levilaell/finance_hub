@@ -102,7 +102,6 @@ export interface BankAccount {
   balance_in_account_currency?: number;
   balance_date?: string;
   currency_code: string;
-  investment_status?: string;
   bank_data?: BankData;
   credit_data?: CreditData;
   is_active: boolean;

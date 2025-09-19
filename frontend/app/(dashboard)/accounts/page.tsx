@@ -35,7 +35,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { BankAccountCard } from '@/components/banking/bank-account-card';
 import { MFATimeoutAlert } from '@/components/banking/MFATimeoutAlert';
-import { testId, TEST_IDS } from '@/utils/test-helpers';
 
 import {
   BankAccount,
@@ -296,7 +295,7 @@ export default function AccountsPage() {
   }
 
   return (
-    <div className="space-y-6" {...testId('accounts-page')}>
+    <div className="space-y-6">
       {/* MFA Timeout Alert */}
       <MFATimeoutAlert />
       
@@ -340,7 +339,6 @@ export default function AccountsPage() {
             onClick={() => router.push('/reports')}
             variant="outline"
             className="w-full sm:w-auto border-white/20 text-white hover:bg-white/10 transition-all duration-300" 
-            {...testId('reports-generator-button')}
           >
             <DocumentChartBarIcon className="h-4 w-4 mr-2" />
             Gerar Relatórios
@@ -348,7 +346,6 @@ export default function AccountsPage() {
           <Button 
             onClick={handleConnectBank} 
             className="w-full sm:w-auto bg-white text-black hover:bg-white/90 transition-all duration-300" 
-            {...testId(TEST_IDS.banking.connectBankButton)}
           >
             <LinkIcon className="h-4 w-4 mr-2" />
             Conectar Banco
@@ -358,7 +355,7 @@ export default function AccountsPage() {
 
       {/* Accounts Grid */}
       {accounts.length > 0 ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" {...testId(TEST_IDS.banking.accountsList)}>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {accounts.map((account) => {
             const isSyncing = syncingAccountId === account.id;
 
@@ -380,12 +377,11 @@ export default function AccountsPage() {
           title="No accounts connected"
           description="Connect your first bank account to start tracking your finances"
           action={
-            <Button onClick={handleConnectBank} {...testId(TEST_IDS.banking.connectBankButton)}>
+            <Button onClick={handleConnectBank}>
               <LinkIcon className="h-4 w-4 mr-2" />
               Conectar Banco
             </Button>
           }
-          {...testId(TEST_IDS.banking.noAccountsMessage)}
         />
       )}
 

@@ -15,7 +15,6 @@ import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/auth-store';
 import type { LoginCredentials, LoginResponse } from '@/types';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
-import { testId, TEST_IDS } from '@/utils/test-helpers';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -168,7 +167,6 @@ export default function LoginPage() {
                 id="email"
                 type="email"
                 placeholder="nome@exemplo.com"
-                {...testId(TEST_IDS.auth.emailInput)}
                 {...register('email', {
                   required: 'E-mail é obrigatório',
                   pattern: {
@@ -179,7 +177,7 @@ export default function LoginPage() {
                 autoComplete="email"
               />
               {errors.email && (
-                <p className="text-sm text-red-500 mt-1" {...testId('email-error')}>
+                <p className="text-sm text-red-500 mt-1">
                   {errors.email.message}
                 </p>
               )}
@@ -191,7 +189,6 @@ export default function LoginPage() {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Digite sua senha"
-                  {...testId(TEST_IDS.auth.passwordInput)}
                   {...register('password', {
                     required: 'Senha é obrigatória',
                     minLength: {
@@ -214,7 +211,7 @@ export default function LoginPage() {
                 </button>
               </div>
               {errors.password && (
-                <p className="text-sm text-red-500 mt-1" {...testId('password-error')}>
+                <p className="text-sm text-red-500 mt-1">
                   {errors.password.message}
                 </p>
               )}
@@ -223,7 +220,6 @@ export default function LoginPage() {
               <Link
                 href="/forgot-password"
                 className="text-sm text-white hover:text-white/80 hover:underline transition-colors"
-                {...testId(TEST_IDS.auth.forgotPasswordLink)}
               >
                 Esqueceu a senha?
               </Link>
@@ -235,7 +231,6 @@ export default function LoginPage() {
             type="submit"
             className="w-full hover-glow bg-primary hover:bg-primary/90 text-primary-foreground"
             disabled={loginMutation.isPending}
-            {...testId(TEST_IDS.auth.loginSubmit)}
           >
             {loginMutation.isPending ? <LoadingSpinner /> : 'Entrar'}
           </Button>
@@ -244,7 +239,6 @@ export default function LoginPage() {
             <Link 
               href="/register" 
               className="text-white hover:text-white/80 hover:underline transition-colors font-medium"
-              {...testId(TEST_IDS.auth.registerLink)}
             >
               Cadastre-se
             </Link>

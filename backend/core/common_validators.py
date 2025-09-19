@@ -106,55 +106,7 @@ def validate_phone(value):
     return phone
 
 
-def validate_cpf(cpf: str) -> bool:
-    """
-    Validate Brazilian CPF
-    """
-    # Remove non-digits
-    cpf = ''.join(filter(str.isdigit, cpf))
-    
-    # CPF must have 11 digits
-    if len(cpf) != 11:
-        return False
-    
-    # Check for known invalid CPFs
-    if cpf in ['00000000000', '11111111111', '22222222222',
-               '33333333333', '44444444444', '55555555555',
-               '66666666666', '77777777777', '88888888888',
-               '99999999999']:
-        return False
-    
-    # Calculate first check digit
-    sum_digit = sum(int(cpf[i]) * (10 - i) for i in range(9))
-    first_digit = (sum_digit * 10) % 11
-    if first_digit == 10:
-        first_digit = 0
-    
-    if int(cpf[9]) != first_digit:
-        return False
-    
-    # Calculate second check digit
-    sum_digit = sum(int(cpf[i]) * (11 - i) for i in range(10))
-    second_digit = (sum_digit * 10) % 11
-    if second_digit == 10:
-        second_digit = 0
-    
-    return int(cpf[10]) == second_digit
-
-
-def validate_email_unique(email, exclude_user=None):
-    """
-    Validates email uniqueness
-    """
-    User = get_user_model()
-    query = User.objects.filter(email__iexact=email)
-    if exclude_user:
-        query = query.exclude(id=exclude_user.id)
-    
-    if query.exists():
-        raise ValidationError(_('Este email já está em uso.'))
-    
-    return email
+# CPF and email validators removed - not used in current implementation
 
 
 def format_cnpj(cnpj):
@@ -179,11 +131,4 @@ def format_phone(phone):
     return phone
 
 
-def format_cpf(cpf):
-    """
-    Format CPF to display format: XXX.XXX.XXX-XX
-    """
-    cpf = ''.join(filter(str.isdigit, str(cpf)))
-    if len(cpf) != 11:
-        return cpf
-    return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
+# format_cpf removed - not used in current implementation

@@ -18,7 +18,6 @@ from .views import (
     CeleryHealthCheckView
 )
 from .webhooks import pluggy_webhook
-from .webhook_simple import simple_webhook
 
 app_name = 'banking'
 
@@ -47,7 +46,6 @@ urlpatterns = [
     
     # Webhooks
     path('webhooks/pluggy/', pluggy_webhook, name='pluggy-webhook'),
-    path('webhooks/debug/', simple_webhook, name='simple-webhook'),
     
     # Health check
     path('health/celery/', CeleryHealthCheckView.as_view(), name='celery-health'),
