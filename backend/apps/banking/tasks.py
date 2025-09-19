@@ -9,7 +9,7 @@ Key concepts:
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Optional, List, Dict
+from typing import Optional, Dict
 
 from celery import shared_task
 from django.db import transaction as db_transaction
@@ -19,7 +19,7 @@ from rest_framework.exceptions import PermissionDenied
 
 from .models import (
     PluggyItem, BankAccount, Transaction,
-    TransactionCategory, ItemWebhook, PluggyCategory
+    TransactionCategory, ItemWebhook
 )
 from .integrations.pluggy.client import PluggyClient, PluggyError
 

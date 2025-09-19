@@ -6,7 +6,6 @@ import json
 import logging
 import re
 from typing import Any, Dict, Optional, Tuple
-from apps.ai_insights.services.encryption_service import EncryptionService
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,6 @@ class BankingEncryption:
     
     def __init__(self):
         """Initialize with the shared encryption service"""
-        self.encryption_service = EncryptionService()
     
     def encrypt_mfa_parameter(self, parameter: Optional[Dict]) -> Optional[str]:
         """

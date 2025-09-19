@@ -83,7 +83,6 @@ whitenoise==6.6.0
 reportlab==4.0.4
 xlsxwriter==3.1.2
 stripe==7.10.0
-# mercadopago==2.2.1  # Removed - Stripe-only integration
 numpy==1.26.4
 pandas==2.2.0
 scikit-learn==1.4.0

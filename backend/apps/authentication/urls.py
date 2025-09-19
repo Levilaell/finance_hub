@@ -4,7 +4,6 @@ from .views import (
     ChangePasswordView,
     CustomTokenRefreshView,
     DeleteAccountView,
-    EarlyAccessRegisterView,
     # EmailVerificationView,  # Will be implemented in the future
     LoginView,
     LogoutView,

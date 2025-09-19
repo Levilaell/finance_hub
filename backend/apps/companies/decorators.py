@@ -105,40 +105,7 @@ def requires_plan_feature(feature_name):
             
             # Executar a view original
             return view_func(self, request, *args, **kwargs)
-        
-        def _check_and_send_usage_notifications(company):
-            """Verifica e envia notificações de uso"""
-            usage_percentage = company.get_usage_percentage('transactions')
-            
-            try:
-                if usage_percentage >= 90 and not company.notified_90_percent:
-                    from apps.notifications.email_service import EmailService
-                    EmailService.send_usage_limit_warning(
-                        email=company.owner.email,
-                        company_name=company.name,
-                        limit_type='transações',
-                        percentage=90,
-                        current=company.current_month_transactions,
-                        limit=company.subscription_plan.max_transactions
-                    )
-                    company.notified_90_percent = True
-                    company.save(update_fields=['notified_90_percent'])
-                    
-                elif usage_percentage >= 80 and not company.notified_80_percent:
-                    from apps.notifications.email_service import EmailService
-                    EmailService.send_usage_limit_warning(
-                        email=company.owner.email,
-                        company_name=company.name,
-                        limit_type='transações',
-                        percentage=80,
-                        current=company.current_month_transactions,
-                        limit=company.subscription_plan.max_transactions
-                    )
-                    company.notified_80_percent = True
-                    company.save(update_fields=['notified_80_percent'])
-            except Exception as e:
-                logger.error(f"Erro ao enviar notificação de uso: {e}")
-        
+          
         wrapped_view._check_and_send_usage_notifications = _check_and_send_usage_notifications
         return wrapped_view
     

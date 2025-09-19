@@ -26,7 +26,7 @@ CSRF_COOKIE_SECURE = not DEBUG
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='finance_db'),
+        'NAME': config('DB_NAME', default='caixahub_db'),
         'USER': config('DB_USER', default='postgres'),
         'PASSWORD': config('DB_PASSWORD', default='postgres'),
         'HOST': config('DB_HOST', default='localhost'),
@@ -212,21 +212,8 @@ warn_stripe_configuration()
 # MERCADOPAGO_PUBLIC_KEY = config('MERCADOPAGO_PUBLIC_KEY', default='')
 # MERCADOPAGO_WEBHOOK_SECRET = config('MERCADOPAGO_WEBHOOK_SECRET', default='')
 
-# Trial Period Settings
-TRIAL_PERIOD_DAYS = config('TRIAL_PERIOD_DAYS', default=14, cast=int)
-
 # Security - Admin endpoints
 SEED_PLANS_SECRET = config('SEED_PLANS_SECRET', default='')
-
-# Billing Configuration
-ENABLE_AUTO_RENEWAL = config('ENABLE_AUTO_RENEWAL', default=True, cast=bool)
-PAYMENT_RETRY_ATTEMPTS = config('PAYMENT_RETRY_ATTEMPTS', default=3, cast=int)
-PAYMENT_RETRY_INTERVAL_HOURS = config('PAYMENT_RETRY_INTERVAL_HOURS', default=24, cast=int)
-
-# Email notifications
-SEND_PAYMENT_RECEIPTS = config('SEND_PAYMENT_RECEIPTS', default=True, cast=bool)
-SEND_TRIAL_EXPIRATION_WARNINGS = config('SEND_TRIAL_EXPIRATION_WARNINGS', default=True, cast=bool)
-TRIAL_WARNING_DAYS = [int(x) for x in config('TRIAL_WARNING_DAYS', default='3,7').split(',')]
 
 # Currency Settings
 DEFAULT_CURRENCY = config('DEFAULT_CURRENCY', default='BRL')
@@ -288,21 +275,7 @@ LOGGING = {
     },
 }
 
-# Feature Flags
-ENABLE_AI_INSIGHTS = config('NEXT_PUBLIC_ENABLE_AI_INSIGHTS', default=True, cast=bool)
-ENABLE_OPEN_BANKING = config('NEXT_PUBLIC_ENABLE_OPEN_BANKING', default=True, cast=bool)
-
-# AI Insights Encryption Configuration
-if ENABLE_AI_INSIGHTS:
-    try:
-        from apps.ai_insights.encryption_settings import configure_ai_insights_encryption
-        configure_ai_insights_encryption(locals())
-    except ImportError:
-        # Handle case where AI insights app is not available
-        AI_INSIGHTS_ENCRYPTION_KEY = config('AI_INSIGHTS_ENCRYPTION_KEY', default='')
-
 # Site Configuration
-SITE_NAME = config('SITE_NAME', default='CaixaHub')
 LANGUAGE_CODE = config('LANGUAGE_CODE', default='pt-br')
 TIME_ZONE = config('TIME_ZONE', default='America/Sao_Paulo')
 
@@ -393,4 +366,3 @@ REST_FRAMEWORK.update({
     }
 })
 
-print("✅ Aplicadas correções de autenticação MVP (JWT simplificado)")

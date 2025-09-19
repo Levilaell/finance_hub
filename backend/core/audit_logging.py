@@ -10,7 +10,6 @@ from django.utils import timezone
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.http import HttpRequest
-from apps.audit.models import AuditLog
 
 User = get_user_model()
 logger = logging.getLogger('audit')

@@ -141,11 +141,6 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': False,
         },
-        'apps.payments': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
         'celery': {
             'handlers': ['console', 'file'],
             'level': 'INFO',

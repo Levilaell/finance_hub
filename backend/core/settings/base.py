@@ -38,11 +38,7 @@ LOCAL_APPS = [
     'apps.authentication',
     'apps.companies',
     'apps.banking',
-    'apps.payments',
     'apps.reports',
-    'apps.notifications',
-    'apps.ai_insights',
-    'apps.audit',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
