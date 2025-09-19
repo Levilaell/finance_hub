@@ -25,18 +25,6 @@ class User(AbstractUser):
         default='America/Sao_Paulo'
     )
 
-    payment_gateway = models.CharField(
-        _('payment gateway'),
-        max_length=50,
-        choices=[
-            ('stripe', 'Stripe'),
-            ('mercadopago', 'MercadoPago'),
-        ],
-        blank=True,
-        null=True,
-        help_text='Gateway de pagamento utilizado'
-    )
-
     class Meta:
         db_table = 'users'
         verbose_name = _('User')

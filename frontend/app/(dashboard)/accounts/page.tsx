@@ -34,7 +34,6 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { BankAccountCard } from '@/components/banking/bank-account-card';
-import { MFATimeoutAlert } from '@/components/banking/MFATimeoutAlert';
 
 import {
   BankAccount,
@@ -296,8 +295,7 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-6">
-      {/* MFA Timeout Alert */}
-      <MFATimeoutAlert />
+
       
       {/* Banking Stability Warning Banner */}
       <div className="bg-amber-50/10 border border-amber-500/20 rounded-lg p-3">

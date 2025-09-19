@@ -4,8 +4,6 @@ import { useAuthStore } from '@/store/auth-store';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { MainLayout } from '@/components/layouts/main-layout';
-import { PaymentSetupBanner } from '@/components/payment/payment-setup-banner';
-import { useSubscriptionCheck } from '@/hooks/use-subscription-check';
 
 export default function DashboardLayout({
   children,
@@ -15,8 +13,6 @@ export default function DashboardLayout({
   const { isAuthenticated, isLoading, _hasHydrated, user } = useAuthStore();
   const router = useRouter();
   
-  // Use subscription check hook - but only when authenticated and user exists
-  const { subscriptionStatus, isTrialExpired, isLoading: isLoadingSubscription } = useSubscriptionCheck();
 
 
   useEffect(() => {

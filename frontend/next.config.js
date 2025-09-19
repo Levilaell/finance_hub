@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Enable standalone output for Docker
   output: 'standalone',
   
   async rewrites() {
@@ -13,27 +12,19 @@ const nextConfig = {
       },
     ]
   },
+
   async headers() {
     return [
       {
-        source: '/flutter_service_worker.js',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-cache, no-store, must-revalidate',
-          },
-        ],
-      },
-      {
-        // Aplicar CSP mais permissiva para páginas que usam Pluggy
+        // ✅ Source específico para todas as páginas
         source: '/(.*)',
         headers: [
           {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.pluggy.ai https://*.pluggy.ai",
-              "style-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai",
+              "script-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai",
+              "style-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai", 
               "img-src 'self' data: blob: https://*.pluggy.ai https://*.pluggycdn.com",
               "font-src 'self' data:",
               "connect-src 'self' http://localhost:8000 https://*.pluggy.ai https://api.pluggy.ai https://financehub-production.up.railway.app",

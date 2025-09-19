@@ -31,17 +31,6 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default='postgres'),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='5432'),
-        'CONN_MAX_AGE': 600,  # Connection pooling - keep connections alive for 10 minutes
-        'OPTIONS': {
-            'connect_timeout': 10,
-            'options': '-c default_transaction_isolation=read_committed',
-            'keepalives': 1,
-            'keepalives_idle': 30,
-            'keepalives_interval': 10,
-            'keepalives_count': 5,
-            'client_encoding': 'UTF8',
-        },
-        'ATOMIC_REQUESTS': True,  # Wrap each request in a transaction
     }
 }
 
@@ -137,7 +126,6 @@ CHANNEL_LAYERS = {
 
 # Debug Toolbar
 if DEBUG:
-    MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
     INTERNAL_IPS = ['127.0.0.1']
 
 # ===== PAYMENT GATEWAY SETTINGS =====

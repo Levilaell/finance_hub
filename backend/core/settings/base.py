@@ -26,9 +26,6 @@ THIRD_PARTY_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-    'django_filters',
-    'drf_yasg',
-    'storages',
     'django_celery_beat',
     'django_celery_results',
     'channels',
@@ -231,7 +228,3 @@ AUTHENTICATION_BACKENDS = [
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 
-# Feature Flags
-FEATURE_FLAGS = {
-    'AI_INSIGHTS_ENABLED': os.environ.get('AI_INSIGHTS_ENABLED', 'false').lower() == 'true',
-}

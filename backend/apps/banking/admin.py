@@ -1,348 +1,447 @@
 """
-Enhanced Banking admin - Comprehensive financial integration management
-Provides advanced Pluggy integration management, transaction analytics, and financial insights
+Django Admin configuration for banking and financial transaction models
+Pluggy Integration management interface
 """
-import logging
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-from django.utils import timezone
-from django.urls import reverse
-from django.db.models import Count, Sum, Q, Avg
-from django.http import JsonResponse
-from decimal import Decimal
-from core.admin import BaseModelAdmin
 from .models import (
-    PluggyConnector, PluggyItem, BankAccount,
-    Transaction, TransactionCategory, PluggyCategory, ItemWebhook
+    PluggyConnector,
+    PluggyItem,
+    BankAccount,
+    PluggyCategory,
+    Transaction,
+    TransactionCategory,
+    ItemWebhook
 )
-
-logger = logging.getLogger(__name__)
 
 
 @admin.register(PluggyConnector)
-class PluggyConnectorAdmin(BaseModelAdmin):
-    list_display = ['pluggy_id', 'name', 'type', 'country', 'is_open_finance', 'is_sandbox', 'updated_at']
-    list_filter = ['type', 'country', 'is_open_finance', 'is_sandbox', 'has_mfa', 'has_oauth']
-    search_fields = ['name', 'pluggy_id']
-    readonly_fields = ['pluggy_id', 'created_at', 'updated_at']
+class PluggyConnectorAdmin(admin.ModelAdmin):
+    """Admin interface for Pluggy Connectors"""
+    list_display = (
+        'name',
+        'pluggy_id',
+        'type',
+        'country',
+        'is_open_finance',
+        'is_sandbox',
+        'has_mfa',
+        'created_at'
+    )
+    list_filter = (
+        'type',
+        'country',
+        'is_open_finance',
+        'is_sandbox',
+        'has_mfa',
+        'has_oauth'
+    )
+    search_fields = ('name', 'pluggy_id', 'institution_url')
+    readonly_fields = ('id', 'created_at', 'updated_at')
+    ordering = ['name']
     
     fieldsets = (
-        ('Basic Information', {
+        (_('Basic Information'), {
             'fields': ('pluggy_id', 'name', 'institution_url', 'image_url', 'primary_color')
         }),
-        ('Classification', {
-            'fields': ('type', 'country', 'is_sandbox')
+        (_('Classification'), {
+            'fields': ('type', 'country')
         }),
-        ('Features', {
-            'fields': ('has_mfa', 'has_oauth', 'is_open_finance', 'products')
+        (_('Features'), {
+            'fields': ('has_mfa', 'has_oauth', 'is_open_finance', 'is_sandbox')
         }),
-        ('Technical', {
-            'fields': ('credentials',)
+        (_('Products & Credentials'), {
+            'fields': ('products', 'credentials'),
+            'classes': ('collapse',)
         }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at')
+        (_('System Info'), {
+            'fields': ('id', 'created_at', 'updated_at'),
         }),
     )
-    
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.annotate(
-            items_count=Count('items'),
-            accounts_count=Count('items__accounts')
-        )
 
 
 @admin.register(PluggyItem)
-class PluggyItemAdmin(BaseModelAdmin):
-    list_display = ['pluggy_item_id', 'company', 'connector', 'status', 'execution_status', 'accounts_count', 'last_successful_update']
-    list_filter = ['status', 'execution_status', 'connector__name', 'created_at']
-    search_fields = ['pluggy_item_id', 'company__name', 'connector__name', 'client_user_id']
-    readonly_fields = ['id', 'pluggy_item_id', 'encrypted_parameter', 'pluggy_created_at', 'pluggy_updated_at', 'last_successful_update', 'created_at', 'updated_at']
-    raw_id_fields = ['company', 'connector']
+class PluggyItemAdmin(admin.ModelAdmin):
+    """Admin interface for Pluggy Items (connections)"""
+    list_display = (
+        'display_name',
+        'company',
+        'connector',
+        'status',
+        'execution_status',
+        'last_successful_update',
+        'created_at'
+    )
+    list_filter = (
+        'status',
+        'execution_status',
+        'connector',
+        'created_at',
+        'last_successful_update'
+    )
+    search_fields = (
+        'pluggy_item_id',
+        'company__name',
+        'connector__name',
+        'client_user_id'
+    )
+    readonly_fields = (
+        'id',
+        'pluggy_item_id',
+        'pluggy_created_at',
+        'pluggy_updated_at',
+        'created_at',
+        'updated_at'
+    )
+    raw_id_fields = ('company', 'connector')
+    date_hierarchy = 'created_at'
     
     fieldsets = (
-        ('Basic Information', {
-            'fields': ('id', 'pluggy_item_id', 'company', 'connector', 'client_user_id')
+        (_('Connection Info'), {
+            'fields': ('pluggy_item_id', 'company', 'connector', 'client_user_id')
         }),
-        ('Status', {
+        (_('Status'), {
             'fields': ('status', 'execution_status', 'last_successful_update')
         }),
-        ('Parameters', {
-            'fields': ('parameter', 'encrypted_parameter'),
-            'classes': ('collapse',),
-            'description': 'MFA parameters - handle with care'
+        (_('Configuration'), {
+            'fields': ('products', 'webhook_url')
         }),
-        ('Error Information', {
-            'fields': ('error_code', 'error_message', 'status_detail'),
+        (_('Error Tracking'), {
+            'fields': ('error_code', 'error_message'),
             'classes': ('collapse',)
         }),
-        ('Open Finance', {
+        (_('Open Finance Consent'), {
             'fields': ('consent_id', 'consent_expires_at'),
             'classes': ('collapse',)
         }),
-        ('Metadata', {
-            'fields': ('metadata',),
+        (_('Metadata'), {
+            'fields': ('status_detail', 'metadata'),
             'classes': ('collapse',)
         }),
-        ('Timestamps', {
-            'fields': ('pluggy_created_at', 'pluggy_updated_at', 'created_at', 'updated_at')
+        (_('System Info'), {
+            'fields': ('id', 'pluggy_created_at', 'pluggy_updated_at', 'created_at', 'updated_at'),
         }),
     )
     
-    def accounts_count(self, obj):
-        try:
-            return obj.accounts.count()
-        except Exception as e:
-            logger.error(f"Error getting accounts count for PluggyItem {obj.id}: {e}")
-            return "Error"
-    accounts_count.short_description = 'Accounts'
-    
-    actions = ['sync_items']
-    
-    def sync_items(self, request, queryset):
-        try:
-            from .tasks import sync_bank_account
-        except ImportError as e:
-            self.message_user(request, f'Could not import sync task: {e}', level='ERROR')
-            return
-        
-        count = 0
-        error_count = 0
-        for item in queryset:
-            try:
-                sync_bank_account.delay(str(item.id))
-                count += 1
-            except Exception as e:
-                logger.error(f"Could not queue sync for item {item.id}: {e}")
-                error_count += 1
-        
-        if count > 0:
-            self.message_user(request, f'{count} items queued for synchronization')
-        if error_count > 0:
-            self.message_user(request, f'{error_count} items failed to queue (check logs)', level='WARNING')
-    sync_items.short_description = 'Queue sync for selected items'
+    def display_name(self, obj):
+        return str(obj)
+    display_name.short_description = _('Item')
 
 
 @admin.register(BankAccount)
-class BankAccountAdmin(BaseModelAdmin):
-    list_display = ['display_name', 'company', 'type', 'balance_display', 'item_status', 'is_active', 'pluggy_updated_at']
-    list_filter = ['type', 'is_active', 'item__status', 'currency_code', 'created_at']
-    search_fields = ['name', 'marketing_name', 'number', 'owner', 'company__name']
-    readonly_fields = ['id', 'pluggy_account_id', 'masked_number', 'pluggy_created_at', 'pluggy_updated_at', 'created_at', 'updated_at']
-    raw_id_fields = ['item', 'company']
+class BankAccountAdmin(admin.ModelAdmin):
+    """Admin interface for Bank Accounts"""
+    list_display = (
+        'display_name',
+        'company',
+        'type',
+        'subtype',
+        'balance_formatted',
+        'currency_code',
+        'is_active',
+        'balance_date'
+    )
+    list_filter = (
+        'type',
+        'subtype',
+        'is_active',
+        'currency_code',
+        'created_at'
+    )
+    search_fields = (
+        'name',
+        'marketing_name',
+        'number',
+        'owner',
+        'company__name',
+        'pluggy_account_id'
+    )
+    readonly_fields = (
+        'id',
+        'pluggy_account_id',
+        'masked_number',
+        'pluggy_created_at',
+        'pluggy_updated_at',
+        'created_at',
+        'updated_at'
+    )
+    raw_id_fields = ('item', 'company')
+    date_hierarchy = 'created_at'
     
     fieldsets = (
-        ('Basic Information', {
-            'fields': ('id', 'pluggy_account_id', 'item', 'company')
+        (_('Account Information'), {
+            'fields': (
+                'pluggy_account_id',
+                'item',
+                'company',
+                'type',
+                'subtype',
+                'name',
+                'marketing_name',
+                'number',
+                'masked_number'
+            )
         }),
-        ('Account Details', {
-            'fields': ('type', 'subtype', 'number', 'masked_number', 'name', 'marketing_name')
-        }),
-        ('Owner Information', {
+        (_('Owner Information'), {
             'fields': ('owner', 'tax_number')
         }),
-        ('Balance', {
-            'fields': ('balance', 'balance_date', 'currency_code')
+        (_('Balance'), {
+            'fields': (
+                'balance',
+                'balance_in_account_currency',
+                'currency_code',
+                'balance_date'
+            )
         }),
-        ('Additional Data', {
+        (_('Additional Data'), {
             'fields': ('bank_data', 'credit_data'),
             'classes': ('collapse',)
         }),
-        ('Status', {
+        (_('Status'), {
             'fields': ('is_active',)
         }),
-        ('Timestamps', {
-            'fields': ('pluggy_created_at', 'pluggy_updated_at', 'created_at', 'updated_at')
+        (_('System Info'), {
+            'fields': ('id', 'pluggy_created_at', 'pluggy_updated_at', 'created_at', 'updated_at'),
         }),
     )
     
-    def balance_display(self, obj):
-        if obj.balance is not None:
-            return f'{obj.currency_code} {obj.balance:,.2f}'
-        return f'{obj.currency_code} -'
-    balance_display.short_description = 'Balance'
-    
-    def item_status(self, obj):
-        status = obj.item.status
-        colors = {
-            'UPDATED': 'green',
-            'LOGIN_ERROR': 'red',
-            'OUTDATED': 'orange',
-            'ERROR': 'red',
-            'UPDATING': 'blue',
-            'WAITING_USER_INPUT': 'orange'
-        }
-        color = colors.get(status, 'gray')
-        return format_html(
-            '<span style="color: {}; font-weight: bold;">{}</span>',
-            color,
-            status
-        )
-    item_status.short_description = 'Item Status'
-    
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.select_related('item', 'company', 'item__connector')
-
-
-@admin.register(Transaction)
-class TransactionAdmin(BaseModelAdmin):
-    list_display = ['date', 'description', 'amount_display', 'type', 'category', 'account_name', 'created_at']
-    list_filter = ['type', 'status', 'date', 'category', 'account__type']
-    search_fields = ['description', 'pluggy_transaction_id', 'notes']
-    readonly_fields = ['id', 'pluggy_transaction_id', 'pluggy_created_at', 'pluggy_updated_at', 'created_at', 'updated_at']
-    raw_id_fields = ['account', 'category']
-    date_hierarchy = 'date'
-    
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('id', 'pluggy_transaction_id', 'account', 'company')
-        }),
-        ('Transaction Details', {
-            'fields': ('type', 'status', 'description', 'amount', 'currency_code', 'date')
-        }),
-        ('Categorization', {
-            'fields': ('pluggy_category_id', 'pluggy_category_description', 'category')
-        }),
-        ('Additional Information', {
-            'fields': ('merchant', 'payment_data', 'operation_type', 'payment_method'),
-            'classes': ('collapse',)
-        }),
-        ('Credit Card', {
-            'fields': ('credit_card_metadata',),
-            'classes': ('collapse',)
-        }),
-        ('User Data', {
-            'fields': ('notes', 'tags')
-        }),
-        ('Metadata', {
-            'fields': ('metadata',),
-            'classes': ('collapse',)
-        }),
-        ('Timestamps', {
-            'fields': ('pluggy_created_at', 'pluggy_updated_at', 'created_at', 'updated_at')
-        }),
-    )
-    
-    def amount_display(self, obj):
-        color = 'green' if obj.type == 'CREDIT' else 'red'
-        sign = '+' if obj.type == 'CREDIT' else '-'
-        return format_html(
-            '<span style="color: {};">{}{} {}</span>',
-            color,
-            sign,
-            obj.currency_code,
-            '{:.2f}'.format(abs(float(obj.amount)))
-        )
-    amount_display.short_description = 'Amount'
-    
-    def account_name(self, obj):
-        return obj.account.display_name
-    account_name.short_description = 'Account'
-    
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.select_related('account', 'category', 'account__item__connector')
-
-
-@admin.register(TransactionCategory)
-class TransactionCategoryAdmin(BaseModelAdmin):
-    list_display = ['name', 'type', 'parent', 'icon', 'color_display', 'is_system', 'is_active', 'order']
-    list_filter = ['type', 'is_system', 'is_active', 'parent']
-    search_fields = ['name', 'slug']
-    readonly_fields = ['id', 'slug', 'created_at', 'updated_at']
-    raw_id_fields = ['company', 'parent']
-    
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('id', 'name', 'slug', 'type', 'company')
-        }),
-        ('Hierarchy', {
-            'fields': ('parent',)
-        }),
-        ('Visual', {
-            'fields': ('icon', 'color')
-        }),
-        ('Settings', {
-            'fields': ('is_system', 'is_active', 'order')
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at')
-        }),
-    )
-    
-    def color_display(self, obj):
-        return format_html(
-            '<span style="background-color: {}; padding: 2px 10px; color: white; border-radius: 3px;">{}</span>',
-            obj.color,
-            obj.color
-        )
-    color_display.short_description = 'Color'
-    
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.select_related('parent', 'company')
+    def balance_formatted(self, obj):
+        return f"{obj.currency_code} {obj.balance:,.2f}"
+    balance_formatted.short_description = _('Balance')
 
 
 @admin.register(PluggyCategory)
-class PluggyCategoryAdmin(BaseModelAdmin):
-    list_display = ['id', 'description', 'parent_description', 'internal_category']
-    list_filter = ['parent_description']
-    search_fields = ['id', 'description', 'parent_description']
-    raw_id_fields = ['internal_category']
+class PluggyCategoryAdmin(admin.ModelAdmin):
+    """Admin interface for Pluggy Categories"""
+    list_display = ('id', 'description', 'parent_description', 'internal_category')
+    list_filter = ('parent_description',)
+    search_fields = ('id', 'description', 'parent_description')
+    raw_id_fields = ('internal_category',)
+    ordering = ['parent_description', 'description']
+
+
+@admin.register(Transaction)
+class TransactionAdmin(admin.ModelAdmin):
+    """Admin interface for Transactions"""
+    list_display = (
+        'description_truncated',
+        'company',
+        'type',
+        'amount_formatted',
+        'date',
+        'status',
+        'category',
+        'is_deleted'
+    )
+    list_filter = (
+        'type',
+        'status',
+        'is_deleted',
+        'date',
+        'category',
+        'account__type'
+    )
+    search_fields = (
+        'description',
+        'pluggy_transaction_id',
+        'company__name',
+        'merchant'
+    )
+    readonly_fields = (
+        'id',
+        'pluggy_transaction_id',
+        'pluggy_created_at',
+        'pluggy_updated_at',
+        'created_at',
+        'updated_at'
+    )
+    raw_id_fields = ('account', 'company', 'category')
+    date_hierarchy = 'date'
+    ordering = ['-date', '-created_at']
     
     fieldsets = (
-        ('Pluggy Category', {
-            'fields': ('id', 'description', 'parent_id', 'parent_description')
+        (_('Transaction Info'), {
+            'fields': (
+                'pluggy_transaction_id',
+                'account',
+                'company',
+                'type',
+                'status',
+                'date'
+            )
         }),
-        ('Mapping', {
-            'fields': ('internal_category',)
+        (_('Description'), {
+            'fields': ('description', 'description_raw')
+        }),
+        (_('Amount'), {
+            'fields': (
+                'amount',
+                'amount_in_account_currency',
+                'currency_code',
+                'balance'
+            )
+        }),
+        (_('Categorization'), {
+            'fields': (
+                'pluggy_category_id',
+                'pluggy_category_description',
+                'category'
+            )
+        }),
+        (_('Additional Info'), {
+            'fields': (
+                'provider_code',
+                'provider_id',
+                'operation_type',
+                'payment_method',
+                'merchant',
+                'payment_data',
+                'credit_card_metadata'
+            ),
+            'classes': ('collapse',)
+        }),
+        (_('User Data'), {
+            'fields': ('notes', 'tags'),
+            'classes': ('collapse',)
+        }),
+        (_('Deletion'), {
+            'fields': ('is_deleted', 'deleted_at'),
+            'classes': ('collapse',)
+        }),
+        (_('System Info'), {
+            'fields': (
+                'id',
+                'metadata',
+                'pluggy_created_at',
+                'pluggy_updated_at',
+                'created_at',
+                'updated_at'
+            ),
+            'classes': ('collapse',)
         }),
     )
+    
+    def description_truncated(self, obj):
+        return obj.description[:50] + '...' if len(obj.description) > 50 else obj.description
+    description_truncated.short_description = _('Description')
+    
+    def amount_formatted(self, obj):
+        return obj.get_amount_display()
+    amount_formatted.short_description = _('Amount')
+    
+    def get_queryset(self, request):
+        """Show all transactions including deleted ones in admin"""
+        return self.model.objects.all()
+
+
+@admin.register(TransactionCategory)
+class TransactionCategoryAdmin(admin.ModelAdmin):
+    """Admin interface for Transaction Categories"""
+    list_display = (
+        'display_name',
+        'type',
+        'company',
+        'parent',
+        'icon',
+        'color_display',
+        'is_system',
+        'is_active',
+        'order'
+    )
+    list_filter = (
+        'type',
+        'is_system',
+        'is_active',
+        'created_at'
+    )
+    search_fields = ('name', 'slug', 'company__name')
+    prepopulated_fields = {'slug': ('name',)}
+    raw_id_fields = ('company', 'parent')
+    ordering = ['type', 'order', 'name']
+    
+    fieldsets = (
+        (_('Basic Info'), {
+            'fields': ('name', 'slug', 'type', 'company')
+        }),
+        (_('Hierarchy'), {
+            'fields': ('parent', 'order')
+        }),
+        (_('Visual'), {
+            'fields': ('icon', 'color')
+        }),
+        (_('Settings'), {
+            'fields': ('is_system', 'is_active')
+        }),
+        (_('Timestamps'), {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    readonly_fields = ('created_at', 'updated_at')
+    
+    def display_name(self, obj):
+        return str(obj)
+    display_name.short_description = _('Category')
+    
+    def color_display(self, obj):
+        return format_html(
+            '<div style="width: 20px; height: 20px; background-color: {}; '
+            'border: 1px solid #ccc; border-radius: 2px;"></div>',
+            obj.color
+        )
+    color_display.short_description = _('Color')
 
 
 @admin.register(ItemWebhook)
-class ItemWebhookAdmin(BaseModelAdmin):
-    list_display = ['event_type', 'item', 'event_id', 'processed', 'processed_at', 'created_at']
-    list_filter = ['event_type', 'processed', 'created_at']
-    search_fields = ['event_id', 'item__pluggy_item_id']
-    readonly_fields = ['id', 'event_id', 'payload', 'created_at']
-    raw_id_fields = ['item']
+class ItemWebhookAdmin(admin.ModelAdmin):
+    """Admin interface for Item Webhooks"""
+    list_display = (
+        'event_id',
+        'item',
+        'event_type',
+        'processed',
+        'triggered_by',
+        'processed_at',
+        'created_at'
+    )
+    list_filter = (
+        'event_type',
+        'processed',
+        'triggered_by',
+        'created_at'
+    )
+    search_fields = ('event_id', 'item__pluggy_item_id', 'error')
+    readonly_fields = ('id', 'event_id', 'created_at', 'payload')
+    raw_id_fields = ('item',)
+    date_hierarchy = 'created_at'
+    ordering = ['-created_at']
     
     fieldsets = (
-        ('Event Information', {
-            'fields': ('id', 'event_id', 'event_type', 'item')
+        (_('Event Info'), {
+            'fields': ('event_id', 'item', 'event_type', 'triggered_by')
         }),
-        ('Processing', {
+        (_('Processing'), {
             'fields': ('processed', 'processed_at', 'error')
         }),
-        ('Payload', {
+        (_('Data'), {
             'fields': ('payload',),
             'classes': ('collapse',)
         }),
-        ('Timestamps', {
-            'fields': ('created_at',)
+        (_('System Info'), {
+            'fields': ('id', 'created_at'),
         }),
     )
     
-    actions = ['process_webhooks']
+    actions = ['mark_as_processed', 'mark_as_unprocessed']
     
-    def process_webhooks(self, request, queryset):
-        from .tasks import process_webhook_event
-        count = 0
-        for webhook in queryset.filter(processed=False):
-            process_webhook_event.delay(webhook.event_type, webhook.payload)
-            count += 1
-        self.message_user(request, f'{count} webhooks queued for processing')
-    process_webhooks.short_description = 'Process selected webhooks'
+    def mark_as_processed(self, request, queryset):
+        from django.utils import timezone
+        updated = queryset.update(processed=True, processed_at=timezone.now())
+        self.message_user(request, f'{updated} webhook(s) marked as processed.')
+    mark_as_processed.short_description = _('Mark selected as processed')
     
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.select_related('item', 'item__connector')
-
-
-# Admin Site Customization
-admin.site.site_header = "CaixaHub - Banking Admin"
-admin.site.site_title = "Banking Admin"
-admin.site.index_title = "Banking Management"
+    def mark_as_unprocessed(self, request, queryset):
+        updated = queryset.update(processed=False, processed_at=None)
+        self.message_user(request, f'{updated} webhook(s) marked as unprocessed.')
+    mark_as_unprocessed.short_description = _('Mark selected as unprocessed')
