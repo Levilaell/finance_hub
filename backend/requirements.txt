@@ -1,0 +1,44 @@
+# Django Core
+Django==4.2.11
+django-cors-headers==4.3.1
+django-filter==24.1
+
+# Database
+psycopg2-binary==2.9.9
+dj-database-url==2.1.0
+
+# REST Framework & Authentication
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.1
+PyJWT==2.8.0
+
+# Server & Deployment
+gunicorn==21.2.0
+whitenoise==6.6.0
+
+# Security & Encryption
+cryptography==42.0.5
+bleach==6.1.0
+pyotp==2.9.0
+qrcode==7.4.2
+
+# Task Queue & Caching
+celery==5.3.6
+redis==5.0.1
+django-celery-beat==2.5.0
+django-celery-results==2.5.1
+
+# Rate Limiting
+django-ratelimit==4.1.0
+
+# External API Clients
+requests==2.31.0
+
+# PDF & Excel Generation
+reportlab==4.1.0
+xlsxwriter==3.2.0
+Pillow==10.4.0
+
+# Environment Configuration
+python-decouple==3.8
+
