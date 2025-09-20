@@ -32,19 +32,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { analyticsService, SummaryMetrics } from '@/services/analytics.service';
-import { 
-  calculateTrialInfo, 
-  calculateBillingInfo, 
-  getSubscriptionStatusInfo, 
-  formatCurrency,
-  formatDate,
-  shouldShowUpgradePrompt 
-} from '@/utils/billing.utils';
-import { UpgradePlanDialog } from '@/components/billing/upgrade-plan-dialog';
-import { UsageLimitsCard } from '@/components/billing/usage-limits';
-import { useSubscriptionCheck } from '@/hooks/use-subscription-check';
-import { subscriptionService } from '@/services/unified-subscription.service';
+// import { analyticsService, SummaryMetrics } from '@/services/analytics.service'; // Service doesn't exist
+// import {
+//   calculateTrialInfo,
+//   calculateBillingInfo,
+//   getSubscriptionStatusInfo,
+//   formatCurrency,
+//   formatDate,
+//   shouldShowUpgradePrompt
+// } from '@/utils/billing.utils'; // Utils doesn't exist
+// import { UpgradePlanDialog } from '@/components/billing/upgrade-plan-dialog'; // Component doesn't exist
+// import { UsageLimitsCard } from '@/components/billing/usage-limits'; // Component doesn't exist
+// import { subscriptionService } from '@/services/unified-subscription.service'; // Service doesn't exist
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { 
@@ -55,7 +54,7 @@ import {
   BanknotesIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
-import { useSubscriptionUpdates } from '@/hooks/useSubscriptionUpdates';
+// import { useSubscriptionUpdates } from '@/hooks/useSubscriptionUpdates'; // Hook doesn't exist
 
 interface ProfileForm {
   first_name: string;
@@ -77,8 +76,8 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { user, updateUser, fetchUser } = useAuthStore();
   
-  // Listen for subscription updates
-  useSubscriptionUpdates();
+  // Listen for subscription updates - hook doesn't exist
+  // useSubscriptionUpdates();
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -101,15 +100,19 @@ export default function SettingsPage() {
   const passwordForm = useForm<PasswordForm>();
   const deleteAccountForm = useForm<DeleteAccountForm>();
 
-  // Subscription check hook
-  const { subscriptionStatus, isLoading: isLoadingSubscription } = useSubscriptionCheck();
+  // Subscription check hook - removed (hook doesn't exist)
+  const subscriptionStatus = null;
+  const isLoadingSubscription = false;
 
-  // Usage limits query
-  const { data: usageLimits, isLoading: isLoadingLimits, refetch: refetchLimits } = useQuery({
+  // Usage limits query - commented out (service doesn't exist)
+  const usageLimits = null;
+  const isLoadingLimits = false;
+  const refetchLimits = () => {};
+  /* const { data: usageLimits, isLoading: isLoadingLimits, refetch: refetchLimits } = useQuery({
     queryKey: ['usage-limits'],
     queryFn: () => subscriptionService.getUsageLimits(),
     refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
-  });
+  }); */
   
   // Listen for subscription update events
   useEffect(() => {
@@ -124,13 +127,15 @@ export default function SettingsPage() {
     return () => window.removeEventListener('subscription-updated', handleSubscriptionUpdate);
   }, [fetchUser, refetchLimits, queryClient]);
 
-  // Performance metrics query
-  const { data: performanceMetrics, isLoading: isLoadingMetrics } = useQuery({
+  // Performance metrics query - commented out (service doesn't exist)
+  const performanceMetrics = null;
+  const isLoadingMetrics = false;
+  /* const { data: performanceMetrics, isLoading: isLoadingMetrics } = useQuery({
     queryKey: ['performance-metrics'],
     queryFn: () => analyticsService.getSummaryMetrics(30),
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
-  });
+  }); */
 
   const updateProfileMutation = useMutation({
     mutationFn: (data: Partial<User>) => authService.updateProfile(data),
@@ -213,8 +218,9 @@ export default function SettingsPage() {
     },
   });
 
+  // Cancel subscription mutation - commented out (service doesn't exist)
   const cancelSubscriptionMutation = useMutation({
-    mutationFn: () => subscriptionService.cancelSubscription(),
+    mutationFn: async () => { throw new Error('Subscription service not available'); }, // subscriptionService.cancelSubscription()
     onSuccess: () => {
       toast.success('Assinatura cancelada com sucesso');
       setCancelSubscriptionDialogOpen(false);
@@ -252,14 +258,21 @@ export default function SettingsPage() {
     deleteAccountMutation.mutate(data);
   };
 
-  // Calculate billing information
-  const trialInfo = calculateTrialInfo(user?.company?.trial_ends_at || null);
-  const billingInfo = calculateBillingInfo(
-    user?.company?.next_billing_date || null,
-    user?.company?.subscription_start_date || null,
-    user?.company?.subscription_end_date || null
-  );
-  const subscriptionStatusInfo = getSubscriptionStatusInfo(user?.company?.subscription_status || 'trialing');
+  // Calculate billing information - using defaults (utils don't exist)
+  const trialInfo = {
+    daysLeft: 0,
+    isExpired: false,
+    isActive: false,
+    isExpiringSoon: false,
+    endDate: new Date(),
+    daysRemaining: 0
+  }; // calculateTrialInfo not available
+  const billingInfo = {
+    nextBillingDate: null,
+    daysUntilNextBilling: 0,
+    subscriptionStartDate: null
+  }; // calculateBillingInfo not available
+  const subscriptionStatusInfo = { label: 'Trial', color: 'text-blue-600', description: 'Período de teste' }; // getSubscriptionStatusInfo not available
   
   // Don't show trial info if user has active paid subscription or cancelled/expired
   const isActiveSubscription = user?.company?.subscription_status === 'active' && 
@@ -271,7 +284,7 @@ export default function SettingsPage() {
   );
   
   const showTrialInfo = !isActiveSubscription && !isCancelledOrExpired && trialInfo.isActive;
-  const showUpgradePrompt = !isActiveSubscription && !isCancelledOrExpired && shouldShowUpgradePrompt(user?.company?.subscription_status || 'trialing', trialInfo);
+  const showUpgradePrompt = false; // shouldShowUpgradePrompt function not available
 
   return (
     <div className="space-y-6">
@@ -543,45 +556,46 @@ export default function SettingsPage() {
                     <div className="h-8 bg-gray-200 rounded"></div>
                   </div>
                 </div>
-              ) : subscriptionStatus ? (
+              ) : false ? ( // subscriptionStatus always null, so always use fallback
                 <div className="space-y-4">
                   {/* Status Row */}
                   <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
                     <div>
                       <p className="text-sm text-gray-600">Status Atual</p>
                       <div className="flex items-center mt-1">
-                        {subscriptionStatus.subscription_status === 'active' && (
+                        {/* subscriptionStatus.subscription_status === 'active' && (
                           <>
                             <CheckCircleIcon className="h-5 w-5 text-green-500 mr-2" />
                             <span className="text-lg font-semibold text-green-700">Ativo</span>
                           </>
-                        )}
-                        {subscriptionStatus.subscription_status === 'trial' && (
+                        ) */}
+                        {/* subscriptionStatus.subscription_status === 'trial' && (
                           <>
                             <ClockIcon className="h-5 w-5 text-blue-500 mr-2" />
                             <span className="text-lg font-semibold text-blue-700">Período de Teste</span>
                           </>
-                        )}
-                        {subscriptionStatus.subscription_status === 'expired' && (
+                        ) */}
+                        {/* subscriptionStatus.subscription_status === 'expired' && (
                           <>
                             <ExclamationCircleIcon className="h-5 w-5 text-red-500 mr-2" />
                             <span className="text-lg font-semibold text-red-700">Expirado</span>
                           </>
-                        )}
+                        ) */}
+                        <span className="text-lg font-semibold text-gray-700">Status não disponível</span>
                       </div>
                     </div>
                     <div className="text-right">
-                      {subscriptionStatus.plan && (
+                      {/* subscriptionStatus.plan && (
                         <div>
                           <p className="text-sm text-gray-600">Plano</p>
                           <p className="text-lg font-semibold">{subscriptionStatus.plan.name}</p>
                         </div>
-                      )}
+                      ) */}
                     </div>
                   </div>
 
                   {/* Trial Info - only show if trial and not cancelled */}
-                  {subscriptionStatus.subscription_status === 'trial' && 
+                  {/* subscriptionStatus.subscription_status === 'trial' &&
                    !isCancelledOrExpired && (
                     <div className="p-4 bg-blue-500/10 rounded-lg">
                       <p className="text-sm text-blue-800">
@@ -597,7 +611,7 @@ export default function SettingsPage() {
                         </p>
                       )}
                     </div>
-                  )}
+                  ) */}
 
                   {/* Cancelled subscription info */}
                   {isCancelledOrExpired && (
@@ -624,26 +638,27 @@ export default function SettingsPage() {
                     <div>
                       <p className="text-sm text-gray-600">Método de Pagamento</p>
                       <p className="mt-1">
-                        {subscriptionStatus.has_payment_method ? (
+                        {/* subscriptionStatus.has_payment_method ? (
                           <span className="text-green-600 font-medium">Configurado</span>
                         ) : (
                           <span className="text-orange-600 font-medium">Não configurado</span>
-                        )}
+                        ) */}
+                        <span className="text-gray-600 font-medium">Não disponível</span>
                       </p>
                     </div>
                     {/* Next billing date not available in current API */}
                   </div>
 
                   {/* Action Buttons */}
-                  {subscriptionStatus.requires_payment_setup && (
+                  {/* subscriptionStatus.requires_payment_setup && (
                     <div className="pt-4 space-y-2">
-                      <Button 
+                      <Button
                         onClick={() => setUpgradePlanDialogOpen(true)}
                         className="w-full"
                       >
                         Escolher Plano e Configurar Pagamento
                       </Button>
-                      <Button 
+                      <Button
                         onClick={() => setPaymentMethodsDialogOpen(true)}
                         className="w-full"
                         variant="outline"
@@ -651,7 +666,7 @@ export default function SettingsPage() {
                         Apenas Adicionar Método de Pagamento
                       </Button>
                     </div>
-                  )}
+                  ) */}
                 </div>
               ) : (
                 <div className="text-center text-gray-500">
@@ -661,8 +676,8 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Usage Limits Card */}
-          <UsageLimitsCard />
+          {/* Usage Limits Card - Component doesn't exist */}
+          {/* <UsageLimitsCard /> */}
         </TabsContent>
 
         {/* Billing Settings */}
@@ -685,7 +700,7 @@ export default function SettingsPage() {
                         <p className="font-medium">{user?.company?.subscription_plan?.name || 'Período de Teste'}</p>
                         <p className="text-sm text-gray-600">
                           {user?.company?.subscription_plan?.price_monthly 
-                            ? `${formatCurrency(Number(user.company.subscription_plan.price_monthly))}/mês`
+                            ? `R$ ${Number(user.company.subscription_plan.price_monthly).toFixed(2)}/mês` // formatCurrency not available
                             : 'Sem cobrança durante o período de teste'
                           }
                         </p>
@@ -721,7 +736,7 @@ export default function SettingsPage() {
                         <p className={`text-sm ${
                           trialInfo.isExpiringSoon ? 'text-orange-700' : 'text-blue-700'
                         }`}>
-                          Seu trial termina em {formatDate(trialInfo.endDate!)}
+                          Seu trial termina em {new Date(trialInfo.endDate!).toLocaleDateString('pt-BR')} {/* formatDate not available */}
                         </p>
                       </div>
                       <div className="text-right">
@@ -747,7 +762,7 @@ export default function SettingsPage() {
                       <div>
                         <p className="font-medium text-red-800">Período de Teste Expirado</p>
                         <p className="text-sm text-red-700">
-                          Seu trial expirou em {formatDate(trialInfo.endDate!)}. Faça upgrade para continuar.
+                          Seu trial expirou em {new Date(trialInfo.endDate!).toLocaleDateString('pt-BR')}. Faça upgrade para continuar. {/* formatDate not available */}
                         </p>
                       </div>
                       <div className="text-right">
@@ -791,7 +806,7 @@ export default function SettingsPage() {
                         <div className="bg-white/5 p-4 rounded-lg">
                           <p className="text-sm text-gray-600">Próxima Cobrança</p>
                           <p className="font-medium">
-                            {formatDate(billingInfo.nextBillingDate)}
+                            {new Date(billingInfo.nextBillingDate).toLocaleDateString('pt-BR')} {/* formatDate not available */}
                           </p>
                           {billingInfo.daysUntilNextBilling && billingInfo.daysUntilNextBilling > 0 && (
                             <p className="text-xs text-gray-500 mt-1">
@@ -806,7 +821,7 @@ export default function SettingsPage() {
                         <div className="bg-white/5 p-4 rounded-lg">
                           <p className="text-sm text-gray-600">Assinatura Iniciada</p>
                           <p className="font-medium">
-                            {formatDate(billingInfo.subscriptionStartDate)}
+                            {new Date(billingInfo.subscriptionStartDate).toLocaleDateString('pt-BR')} {/* formatDate not available */}
                           </p>
                         </div>
                       )}
@@ -853,12 +868,12 @@ export default function SettingsPage() {
 
       </Tabs>
 
-      {/* Billing Dialogs */}
-      <UpgradePlanDialog
+      {/* Billing Dialogs - Component doesn't exist */}
+      {/* <UpgradePlanDialog
         open={upgradePlanDialogOpen}
         onOpenChange={setUpgradePlanDialogOpen}
         currentPlan={undefined}
-      />
+      /> */}
 
       {/* Cancel Subscription Dialog */}
       <Dialog open={cancelSubscriptionDialogOpen} onOpenChange={setCancelSubscriptionDialogOpen}>

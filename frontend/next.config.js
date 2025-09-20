@@ -16,14 +16,16 @@ const nextConfig = {
   async headers() {
     return [
       {
-        // ✅ Source específico para todas as páginas
         source: '/(.*)',
         headers: [
           {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai",
+              // CORRIGIDO: Adicionado 'unsafe-eval' para desenvolvimento
+              process.env.NODE_ENV === 'development' 
+                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.pluggy.ai https://*.pluggy.ai"
+                : "script-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai",
               "style-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai", 
               "img-src 'self' data: blob: https://*.pluggy.ai https://*.pluggycdn.com",
               "font-src 'self' data:",

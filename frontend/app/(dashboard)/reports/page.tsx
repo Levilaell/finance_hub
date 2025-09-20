@@ -41,7 +41,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { CashFlowChart, CategoryPieChart, IncomeExpenseChart } from '@/components/charts';
 import { bankingService } from '@/services/banking.service';

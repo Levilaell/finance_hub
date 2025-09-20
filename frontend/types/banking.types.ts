@@ -403,12 +403,6 @@ export interface SyncError {
   requiresReconnect: boolean;
 }
 
-export interface DisconnectItemResponse {
-  success: boolean;
-  message: string;
-  deleted_transactions?: number;
-}
-
 // ===== Store State Types =====
 
 export interface BankingStoreState {
@@ -447,49 +441,4 @@ export interface BankingStoreState {
   };
 }
 
-// Pluggy Category
-export interface PluggyCategory {
-  id: string;
-  description: string;
-  parent_id?: string;
-  parent_description?: string;
-  internal_category?: string;
-}
-
-
-
-export interface PluggyConnectOptions {
-  connectToken: string;
-  includeSandbox?: boolean;
-  connectorTypes?: string[];
-  connectorIds?: number[];
-  products?: string[];
-  clientUserId?: string;
-  webhookUrl?: string;
-  language?: 'en' | 'es' | 'pt';
-  updateMode?: 'add' | 'replace';
-  skipSelectConnector?: boolean;
-  skipSuccessScreen?: boolean;
-  onSuccess: (itemData: PluggyConnectSuccessData) => void;
-  onError: (error: PluggyConnectError) => void;
-  onOpen?: () => void;
-  onClose?: () => void;
-  onEvent?: (eventName: string, metadata: any) => void;
-}
-
-export interface PluggyConnectSuccessData {
-  item: {
-    id: string;
-    connector: {
-      id: number;
-      name: string;
-    };
-  };
-}
-
-export interface PluggyConnectError {
-  type: string;
-  code?: string;
-  message: string;
-}
-
+// Removed unused types: PluggyCategory, PluggyConnectOptions, PluggyConnectSuccessData, PluggyConnectError

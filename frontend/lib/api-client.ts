@@ -9,14 +9,9 @@ import { authStorage } from "./auth-storage";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-// Helper para logs condicionais - TEMPORARIAMENTE HABILITADO EM PRODUÇÃO PARA DEBUG
-const debugLog = (...args: any[]) => {
-  // Temporariamente logando em produção para diagnosticar o problema dos relatórios
-  console.log('[DEBUG]', ...args);
-};
+const debugLog = (...args: any[]) => {};
 
 const debugWarn = (...args: any[]) => {
-  // Temporariamente logando em produção para diagnosticar o problema dos relatórios
   console.warn('[WARN]', ...args);
 };
 

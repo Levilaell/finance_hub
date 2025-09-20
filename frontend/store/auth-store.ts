@@ -1,26 +1,23 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import apiClient from "@/lib/api-client";
-import { User, LoginCredentials, RegisterData } from "@/types";
+import { User } from "@/types";
 import { authStorage } from "@/lib/auth-storage";
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  error: string | null;
   _hasHydrated: boolean;
-  
+
   // Actions
-  login: (credentials: LoginCredentials) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
+  setAuth: (user: User, tokens: { access: string; refresh: string }) => void;
   logout: () => Promise<void>;
   fetchUser: () => Promise<void>;
-  clearError: () => void;
   updateUser: (user: Partial<User>) => void;
   checkAuth: () => Promise<void>;
   setHasHydrated: (state: boolean) => void;
-  setAuth: (user: User, tokens: { access: string; refresh: string }) => void;
+  validateAndSync: () => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -29,80 +26,59 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       isLoading: false,
-      error: null,
       _hasHydrated: false,
 
-      login: async (credentials) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await apiClient.login(credentials.email, credentials.password);
-          // Use setAuth to properly set cookies and tokens
-          if (response.tokens && response.user) {
-            get().setAuth(response.user, response.tokens);
-          } else {
-            // If user is not in response, fetch it
-            await get().fetchUser();
-            set({ isAuthenticated: true, isLoading: false });
-          }
-        } catch (error: any) {
-          set({
-            error: error.response?.data?.detail || "Login failed",
-            isLoading: false,
-          });
-          throw error;
+      setAuth: (user, tokens) => {
+        // Store tokens first
+        if (tokens) {
+          authStorage.setTokens(tokens);
         }
-      },
 
-      register: async (data) => {
-        set({ isLoading: true, error: null });
-        try {
-          await apiClient.register(data);
-          // After registration, log the user in
-          await get().login({ email: data.email, password: data.password });
-        } catch (error: any) {
-          set({
-            error: error.response?.data?.detail || "Registration failed",
-            isLoading: false,
-          });
-          throw error;
-        }
+        // Then update state
+        set({
+          user,
+          isAuthenticated: true,
+          isLoading: false,
+        });
       },
 
       logout: async () => {
         set({ isLoading: true });
+        
         try {
           await apiClient.logout();
+        } catch (error) {
+          console.warn('Logout API call failed:', error);
         } finally {
-          // Clear tokens using appropriate method
+          // Always clear tokens and state
           authStorage.clearTokens();
-          
           set({
             user: null,
             isAuthenticated: false,
             isLoading: false,
-            error: null,
           });
         }
       },
 
       fetchUser: async () => {
         set({ isLoading: true });
+        
         try {
           const user = await apiClient.get<User>("/api/auth/profile/");
           set({
             user,
             isAuthenticated: true,
             isLoading: false,
-            error: null,
           });
-          
-          // Force update of all related data after subscription change
+
+          // Trigger subscription update event
           if (typeof window !== 'undefined') {
-            // Invalidate any cached data
             const event = new CustomEvent('subscription-updated', { detail: { user } });
             window.dispatchEvent(event);
           }
         } catch (error) {
+          // If fetch fails, clear everything
+          authStorage.clearTokens();
           set({
             user: null,
             isAuthenticated: false,
@@ -111,20 +87,6 @@ export const useAuthStore = create<AuthState>()(
           throw error;
         }
       },
-
-      checkAuth: async () => {
-        const { isAuthenticated, user } = get();
-        if (isAuthenticated && !user) {
-          try {
-            await get().fetchUser();
-          } catch (error) {
-            // Silently handle auth check errors
-            set({ isAuthenticated: false, user: null });
-          }
-        }
-      },
-
-      clearError: () => set({ error: null }),
 
       updateUser: (userData) => {
         const currentUser = get().user;
@@ -133,35 +95,85 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      setAuth: (user, tokens) => {
-        // Store tokens using appropriate method (localStorage for mobile Safari, cookies for others)
-        if (tokens) {
-          authStorage.setTokens(tokens);
+      checkAuth: async () => {
+        const { isAuthenticated, user, validateAndSync } = get();
+        
+        // First validate tokens
+        if (!validateAndSync()) {
+          return;
         }
         
-        set({
-          user,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-        });
+        // If authenticated but no user data, fetch it
+        if (isAuthenticated && !user) {
+          try {
+            await get().fetchUser();
+          } catch (error) {
+            console.warn('Failed to fetch user during auth check');
+          }
+        }
+      },
+
+      validateAndSync: () => {
+        const { isAuthenticated } = get();
+        
+        // Check if we have valid tokens
+        const hasValidTokens = authStorage.hasTokens() && 
+                              authStorage.validateTokens() && 
+                              !authStorage.isAccessTokenExpired();
+        
+        // Case 1: Store says authenticated but no valid tokens
+        if (isAuthenticated && !hasValidTokens) {
+          console.log('[Auth] Invalid tokens detected, clearing auth state');
+          authStorage.clearTokens();
+          set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
+          return false;
+        }
+        
+        // Case 2: Valid tokens but store says not authenticated
+        if (!isAuthenticated && hasValidTokens) {
+          console.log('[Auth] Valid tokens found, updating auth state');
+          set({ isAuthenticated: true });
+          // Don't set user here - let fetchUser handle it
+          return true;
+        }
+        
+        // Case 3: Both aligned
+        return isAuthenticated && hasValidTokens;
       },
 
       setHasHydrated: (state) => {
-        set({
-          _hasHydrated: state,
-        });
+        set({ _hasHydrated: state });
+        
+        // Validate and sync after hydration
+        if (state) {
+          // Use setTimeout to avoid hydration conflicts
+          setTimeout(() => {
+            const isValid = get().validateAndSync();
+            
+            // If we have valid tokens but no user, fetch user
+            if (isValid && get().isAuthenticated && !get().user) {
+              get().fetchUser().catch(() => {
+                console.warn('Failed to fetch user after hydration');
+              });
+            }
+          }, 0);
+        }
       },
     }),
     {
       name: "auth-storage",
-      storage: createJSONStorage(() => 
+      storage: createJSONStorage(() =>
         typeof window !== "undefined" ? localStorage : {
           getItem: () => null,
           setItem: () => {},
           removeItem: () => {},
         }
       ),
+      // Only persist essential data
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,

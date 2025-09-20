@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { formatCurrency } from '@/lib/utils';
-import { ThemeSwitcher } from '@/components/theme-switcher';
 
 interface PricingPlan {
   id: string;

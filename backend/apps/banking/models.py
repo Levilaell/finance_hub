@@ -142,7 +142,6 @@ class PluggyItem(models.Model):
     products = models.JSONField(_('products'), default=list, blank=True)  # ['ACCOUNTS', 'TRANSACTIONS', etc]
     
     # MFA parameter for waiting user input
-    encrypted_parameter = models.TextField(_('encrypted parameter'), blank=True, default='')  # Encrypted MFA parameters
     
     # Status tracking
     status = models.CharField(
@@ -201,88 +200,30 @@ class PluggyItem(models.Model):
     
     def get_mfa_parameter(self):
         """
-        Get decrypted MFA parameter
-        Returns the decrypted parameter or falls back to unencrypted if needed
+        Get MFA parameter data (deprecated - no longer stored)
+        Returns empty dict
         """
-        try:
-            from apps.banking.utils.encryption import banking_encryption
-            
-            # First try encrypted parameter
-            if self.encrypted_parameter:
-                try:
-                    return banking_encryption.decrypt_mfa_parameter(self.encrypted_parameter)
-                except Exception as e:
-                    logger.error(f"Failed to decrypt parameter for item {self.pluggy_item_id}: {e}")
-            
-            # Fall back to unencrypted parameter for backward compatibility
-            if self.parameter:
-                return self.parameter
-            
-            return {}
-        except ImportError as e:
-            logger.error(f"Failed to import encryption service for item {self.pluggy_item_id}: {e}")
-            # Fallback to unencrypted parameter if encryption service unavailable
-            return self.parameter if self.parameter else {}
-        except Exception as e:
-            logger.error(f"Unexpected error in get_mfa_parameter for item {self.pluggy_item_id}: {e}")
-            return {}
+        return {}
     
     def set_mfa_parameter(self, parameter_data):
         """
-        Set and encrypt MFA parameter
-        
+        Set MFA parameter (deprecated - no longer stored)
+
         Args:
             parameter_data: Dictionary with MFA parameter information
         """
-        if not parameter_data:
-            self.encrypted_parameter = ''
-            self.parameter = {}
-            return
-        
-        try:
-            from apps.banking.utils.encryption import banking_encryption
-            
-            try:
-                # Encrypt the parameter
-                self.encrypted_parameter = banking_encryption.encrypt_mfa_parameter(parameter_data)
-                # Clear the unencrypted field for security
-                self.parameter = {}
-            except Exception as e:
-                logger.error(f"Failed to encrypt parameter for item {self.pluggy_item_id}: {e}")
-                # Fallback to unencrypted (not recommended but prevents breaking)
-                self.parameter = parameter_data
-                self.encrypted_parameter = ''
-        except ImportError as e:
-            logger.error(f"Failed to import encryption service for item {self.pluggy_item_id}: {e}")
-            # Fallback to unencrypted if encryption service unavailable
-            self.parameter = parameter_data
-            self.encrypted_parameter = ''
-        except Exception as e:
-            logger.error(f"Unexpected error in set_mfa_parameter for item {self.pluggy_item_id}: {e}")
-            # Fallback to unencrypted
-            self.parameter = parameter_data
-            self.encrypted_parameter = ''
+        # MFA parameters no longer stored locally
+        pass
     
     def clear_mfa_parameter(self):
-        """Clear both encrypted and unencrypted MFA parameters"""
-        self.encrypted_parameter = ''
-        self.parameter = {}
+        """Clear MFA parameters (deprecated - no longer stored)"""
+        # MFA parameters no longer stored locally
+        pass
     
     def save(self, *args, **kwargs):
         """Override save to handle parameter migration"""
         # Migrate unencrypted parameters to encrypted on save
-        if self.parameter and not self.encrypted_parameter:
-            try:
-                from apps.banking.utils.encryption import banking_encryption
-                try:
-                    self.encrypted_parameter = banking_encryption.encrypt_mfa_parameter(self.parameter)
-                    self.parameter = {}  # Clear unencrypted after successful encryption
-                except Exception as e:
-                    logger.warning(f"Could not migrate parameter to encrypted format: {e}")
-            except ImportError as e:
-                logger.warning(f"Encryption service not available for parameter migration: {e}")
-            except Exception as e:
-                logger.warning(f"Unexpected error during parameter migration: {e}")
+        # MFA parameter migration removed - no longer stored locally
         
         super().save(*args, **kwargs)
 

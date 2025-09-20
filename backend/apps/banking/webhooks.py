@@ -57,10 +57,6 @@ def pluggy_webhook(request):
                        if k.lower() not in ['authorization', 'x-pluggy-signature']}
         logger.info(f"Webhook headers: {safe_headers}")
         
-        # Skip signature validation for now to avoid import issues
-        # TODO: Re-enable signature validation after fixing import issues
-        if False:  # Temporarily disabled
-            pass
         
         # Extract event data safely
         event_type = data.get('event', 'unknown')

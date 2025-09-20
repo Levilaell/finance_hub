@@ -35,7 +35,6 @@ from .serializers import (
 )
 from .integrations.pluggy.client import PluggyClient, PluggyError
 from .tasks import sync_bank_account, process_webhook_event
-from .utils.encryption import banking_encryption
 from apps.companies.mixins import CompanyValidationMixin
 
 logger = logging.getLogger(__name__)
@@ -240,123 +239,6 @@ class PluggyItemViewSet(CompanyValidationMixin, viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    @action(detail=True, methods=['get'])
-    def mfa_status(self, request, pk=None):
-        """Get MFA requirements for an item"""
-        item = self.get_object()
-        
-        # Check if item requires MFA
-        if item.status != 'WAITING_USER_INPUT':
-            return Response({
-                'requires_mfa': False,
-                'status': item.status,
-                'message': 'Item does not require MFA input'
-            })
-        
-        # Get parameter details from item (decrypted)
-        parameter_info = item.get_mfa_parameter()
-        
-        return Response({
-            'requires_mfa': True,
-            'status': item.status,
-            'parameter': {
-                'name': parameter_info.get('name', 'token'),
-                'type': parameter_info.get('type', 'text'),
-                'label': parameter_info.get('label', 'Código de verificação'),
-                'placeholder': parameter_info.get('placeholder', 'Digite o código'),
-                'validation': parameter_info.get('validation', {}),
-                'assistiveText': parameter_info.get('assistiveText', 'Verifique seu aplicativo bancário'),
-                'optional': parameter_info.get('optional', False)
-            },
-            'connector': {
-                'id': item.connector.id,
-                'name': item.connector.name,
-                'image_url': item.connector.image_url
-            },
-            'message': 'Autorização necessária para continuar'
-        })
-    
-    @action(detail=True, methods=['post'])
-    def send_mfa(self, request, pk=None):
-        """Send MFA parameter for 2-step authentication"""
-        item = self.get_object()
-        
-        # Validate if the item is waiting for MFA
-        if item.status != 'WAITING_USER_INPUT':
-            return Response(
-                {'error': 'Item is not waiting for user input'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Extract MFA value from request
-        mfa_value = request.data.get('value') or request.data.get('token') or request.data.get('code')
-        if not mfa_value:
-            return Response(
-                {'error': 'MFA value is required (use "value", "token" or "code" field)'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Get parameter name from item (decrypted)
-        parameter_name = 'token'  # default
-        parameter_info = item.get_mfa_parameter()
-        if parameter_info and 'name' in parameter_info:
-            parameter_name = parameter_info['name']
-        
-        # Validate MFA value format and security
-        is_valid, error_message = banking_encryption.validate_mfa_value(mfa_value, parameter_name)
-        if not is_valid:
-            logger.warning(f"Invalid MFA value for item {item.pluggy_item_id}: {error_message}")
-            return Response(
-                {'error': f'Invalid {parameter_name}: {error_message}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        try:
-            with PluggyClient() as client:
-                # Build parameters based on Pluggy documentation
-                mfa_params = {parameter_name: str(mfa_value)}
-                
-                logger.info(f"Sending MFA for item {item.pluggy_item_id}: {parameter_name}=***")
-                
-                # Send MFA parameters according to documentation
-                response = client.update_item_mfa(
-                    item.pluggy_item_id, 
-                    mfa_params
-                )
-                
-                # Update item status from response
-                if response:
-                    old_status = item.status
-                    item.status = response.get('status', item.status)
-                    item.execution_status = response.get('executionStatus', '')
-                    item.pluggy_updated_at = response.get('updatedAt', item.pluggy_updated_at)
-                    
-                    # Clear parameter if MFA was accepted
-                    if item.status != 'WAITING_USER_INPUT':
-                        item.clear_mfa_parameter()
-                    
-                    item.save()
-                    
-                    logger.info(f"MFA response - Status changed: {old_status} -> {item.status}")
-                    
-                    # If status is now UPDATING, queue sync
-                    if item.status in ['UPDATING', 'UPDATED', 'PARTIAL_SUCCESS']:
-                        try:
-                            sync_bank_account.delay(str(item.id), force_update=True)
-                            logger.info(f"Queued sync for item {item.id} after successful MFA")
-                        except Exception as e:
-                            logger.warning(f"Could not queue sync after MFA: {e}")
-                
-                return Response({
-                    'success': True,
-                    'message': 'MFA sent successfully',
-                    'item_status': item.status,
-                    'execution_status': item.execution_status,
-                    'requires_additional_mfa': item.status == 'WAITING_USER_INPUT'
-                })
-        except Exception as e:
-            return _handle_pluggy_error(e, "MFA submission", item.pluggy_item_id)
-    
     @action(detail=True, methods=['delete'])
     def disconnect(self, request, pk=None):
         """Disconnect item (delete from Pluggy and locally with all related data)"""

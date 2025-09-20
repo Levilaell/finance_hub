@@ -31,18 +31,27 @@ class UserSerializer(serializers.ModelSerializer):
         try:
             # Import here to avoid circular import
             from apps.companies.serializers import CompanySerializer
-            
+
             # First try to get company if user is owner
             if hasattr(obj, 'company'):
                 return CompanySerializer(obj.company).data
-            
+
             # Team member functionality has been simplified
             # Only company owners are supported in current architecture
-                
+
         except (AttributeError, Company.DoesNotExist):
             pass
-        
+
         return None
+
+    def get_initials(self, obj):
+        """Get user initials from first and last name"""
+        initials = ''
+        if obj.first_name:
+            initials += obj.first_name[0].upper()
+        if obj.last_name:
+            initials += obj.last_name[0].upper()
+        return initials if initials else obj.email[0].upper()
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -185,7 +194,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         """Validação customizada para senha com mensagens em português"""
         from django.contrib.auth.password_validation import (
             MinimumLengthValidator,
-            UserAttributeSimilarityValidator,
             CommonPasswordValidator,
             NumericPasswordValidator
         )
@@ -298,7 +306,6 @@ class LoginSerializer(serializers.Serializer):
     """Login serializer"""
     email = serializers.EmailField(required=True)
     password = serializers.CharField(required=True, write_only=True)
-    two_fa_code = serializers.CharField(required=False, allow_blank=True)
     
     def validate(self, attrs):
         email = attrs.get('email')

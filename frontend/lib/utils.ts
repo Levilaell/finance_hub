@@ -92,40 +92,6 @@ export function formatDate(date: string | Date): string {
   }).format(d);
 }
 
-export function formatDateTime(date: string | Date): string {
-  const d = new Date(date);
-  if (isNaN(d.getTime())) {
-    return "Data inválida";
-  }
-  return new Intl.DateTimeFormat("pt-BR", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
-}
-
-export function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
-
-export function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func(...args), wait);
-  };
-}
-
 /**
  * Format phone to (XX) XXXXX-XXXX or (XX) XXXX-XXXX
  */

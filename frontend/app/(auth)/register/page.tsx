@@ -20,36 +20,31 @@ import { EyeIcon, EyeSlashIcon, CheckIcon, ExclamationCircleIcon, CreditCardIcon
 import { validateCNPJ, validatePhone, cnpjMask, phoneMask } from '@/utils/validation';
 
 interface RegisterFormData extends RegisterData {
-  selected_plan?: string;
+  password2: string;
 }
-
-const planInfo: Record<string, { name: string; price: string; badge?: string }> = {
-  starter: { name: 'Starter', price: 'R$ 49/mês' },
-  professional: { name: 'Profissional', price: 'R$ 149/mês', badge: 'Mais Popular' },
-  enterprise: { name: 'Empresarial', price: 'R$ 449/mês' },
-};
 
 function RegisterContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { setAuth, user } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<string>('starter');
   const [cnpjValue, setCnpjValue] = useState('');
   const [phoneValue, setPhoneValue] = useState('');
 
   useEffect(() => {
-    const plan = searchParams.get('plan');
-    if (plan && planInfo[plan]) {
-      setSelectedPlan(plan);
+    // Wait for hydration
+    if (!useAuthStore.getState()._hasHydrated) {
+      return;
     }
+
+    // Validate auth state
+    const isAuthValid = useAuthStore.getState().validateAndSync();
     
-    // If user is already authenticated, redirect to dashboard
-    if (user) {
+    // If valid auth, redirect to dashboard
+    if (isAuthValid && user) {
       router.push('/dashboard');
     }
-  }, [searchParams, user, router]);
+  }, [user, router]);
 
   const {
     register,
@@ -72,7 +67,6 @@ function RegisterContent() {
       // Save info that payment needs to be configured
       if (typeof window !== 'undefined') {
         localStorage.setItem('pending_payment_setup', 'true');
-        localStorage.setItem('selected_plan', selectedPlan);
         localStorage.setItem('trial_start_date', new Date().toISOString());
       }
       
@@ -127,7 +121,6 @@ function RegisterContent() {
   const onSubmit = (data: RegisterFormData) => {
     registerMutation.mutate({
       ...data,
-      selected_plan: selectedPlan,
     });
   };
 
@@ -147,40 +140,12 @@ function RegisterContent() {
           Inicie seu período de teste gratuito de 14 dias
         </CardDescription>
         
-        {/* Selected Plan Display */}
-        <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground font-medium">Plano selecionado:</p>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="font-semibold text-white">{planInfo[selectedPlan].name}</span>
-                {planInfo[selectedPlan].badge && (
-                  <Badge variant="secondary" className="text-xs">
-                    {planInfo[selectedPlan].badge}
-                  </Badge>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                {planInfo[selectedPlan].price} após o período de teste
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/pricing?from=register')}
-              className="text-white hover:text-white/80 transition-colors"
-            >
-              Mudar plano
-            </Button>
-          </div>
-        </div>
 
         {/* Trial Notice */}
         <Alert className="mt-4">
           <CreditCardIcon className="h-4 w-4" />
           <AlertDescription>
-            <strong>14 dias grátis:</strong> Teste todos os recursos do plano {planInfo[selectedPlan].name} sem compromisso. 
+            <strong>14 dias grátis:</strong> Teste todos os recursos sem compromisso.
             Não é necessário cartão de crédito para começar.
           </AlertDescription>
         </Alert>

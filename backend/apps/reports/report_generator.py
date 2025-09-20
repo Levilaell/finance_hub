@@ -36,11 +36,7 @@ logger = logging.getLogger(__name__)
 
 class ReportGenerator:
     """Service for generating financial reports"""
-    
-    # Transaction type constants for consistency
-    INCOME_TYPES = ['credit', 'transfer_in', 'pix_in', 'interest', 'CREDIT', 'INCOME']
-    EXPENSE_TYPES = ['debit', 'transfer_out', 'pix_out', 'fee', 'DEBIT', 'EXPENSE']
-    
+
     def __init__(self, company):
         self.company = company
         self.styles = getSampleStyleSheet()

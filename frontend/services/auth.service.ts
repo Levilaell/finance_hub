@@ -14,14 +14,6 @@ class AuthService {
     return apiClient.register(data);
   }
 
-  async logout() {
-    return apiClient.logout();
-  }
-
-  async getCurrentUser(): Promise<User> {
-    return apiClient.get<User>("/api/auth/profile/");
-  }
-
   async updateProfile(data: Partial<User>): Promise<User> {
     return apiClient.patch<User>("/api/auth/profile/", data);
   }
@@ -40,23 +32,9 @@ class AuthService {
     return apiClient.post("/api/auth/password-reset/", { email });
   }
 
-  async resetPassword(data: {
-    token: string;
-    new_password: string;
-  }) {
-    return apiClient.post("/api/auth/password-reset/confirm/", data);
-  }
 
   async deleteAccount(data: { password: string; confirmation: string }) {
     return apiClient.post("/api/auth/delete-account/", data);
-  }
-
-  async verifyEmail(token: string) {
-    return apiClient.post("/api/auth/verify-email/", { token });
-  }
-
-  async resendVerificationEmail() {
-    return apiClient.post("/api/auth/resend-verification/");
   }
 }
 

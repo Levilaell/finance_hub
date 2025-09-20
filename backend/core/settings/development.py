@@ -13,6 +13,9 @@ import os
 if not os.environ.get('JWT_SECRET_KEY'):
     os.environ['JWT_SECRET_KEY'] = 'dev-jwt-secret-key-for-development-only-change-in-production'
 
+os.environ['PGCLIENTENCODING'] = 'UTF8'
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -22,17 +25,23 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'testserver']
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 
-# Database with connection pooling
+# Database with connection pooling and encoding fix
+# Use environment variable to switch between PostgreSQL and SQLite for development
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': config('DB_NAME', default='caixahub_db'),
         'USER': config('DB_USER', default='postgres'),
         'PASSWORD': config('DB_PASSWORD', default='postgres'),
-        'HOST': config('DB_HOST', default='localhost'),
+        'HOST': config('DB_HOST', default='127.0.0.1'),
         'PORT': config('DB_PORT', default='5432'),
+        'OPTIONS': {
+            'options': '-c client_encoding=UTF8',
+        },
     }
 }
+
 
 # Cache
 REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
@@ -113,16 +122,6 @@ PLUGGY_CONNECT_URL = config('PLUGGY_CONNECT_URL', default='https://connect.plugg
 # Webhook settings
 PLUGGY_WEBHOOK_SECRET = config('PLUGGY_WEBHOOK_SECRET', default='')
 PLUGGY_WEBHOOK_URL = config('PLUGGY_WEBHOOK_URL', default='http://localhost:8000/api/banking/webhooks/pluggy/')
-
-# Channels
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [REDIS_URL],
-        },
-    },
-}
 
 # Debug Toolbar
 if DEBUG:

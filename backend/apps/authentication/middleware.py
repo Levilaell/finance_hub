@@ -20,7 +20,6 @@ class SecurityMiddleware(MiddlewareMixin):
     
     def __init__(self, get_response):
         super().__init__(get_response)
-        self.start_time = time.time()
     
     def process_request(self, request):
         """

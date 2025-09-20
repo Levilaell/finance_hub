@@ -36,17 +36,14 @@ from .serializers import (
 User = get_user_model()
 
 
-# Local throttle classes for specific features
-
-class PasswordResetRateThrottle(AnonRateThrottle):
-    scope = 'password_reset'
-
+# Local throttle classes for features not in core.rate_limiting
 class TokenRefreshRateThrottle(AnonRateThrottle):
     scope = 'token_refresh'
-
+    rate = '30/hour'  # Allow 30 token refreshes per hour
 
 class AccountDeletionRateThrottle(AnonRateThrottle):
     scope = 'account_deletion'
+    rate = '3/hour'  # Allow only 3 deletion attempts per hour
 
 
 @method_decorator(ratelimit(key='ip', rate='5/m', method='POST'), name='dispatch')
@@ -315,7 +312,7 @@ class PasswordResetRequestView(APIView):
     """Request password reset"""
     permission_classes = (AllowAny,)
     serializer_class = PasswordResetRequestSerializer
-    throttle_classes = [PasswordResetRateThrottle]
+    throttle_classes = [PasswordResetThrottle]  # Using core.rate_limiting class
     
     def post(self, request):
         serializer = self.serializer_class(data=request.data)

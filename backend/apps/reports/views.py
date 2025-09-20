@@ -10,7 +10,7 @@ import mimetypes
 import hashlib
 
 from django.core.files.base import ContentFile
-from django.db.models import Count, Q, Sum, Avg, F, Prefetch, Value, CharField
+from django.db.models import Count, Q, Sum, Avg, F, Value, CharField
 from django.http import HttpResponse, Http404
 from django.utils import timezone
 from django.core.signing import TimestampSigner, BadSignature
@@ -25,27 +25,8 @@ from rest_framework.response import Response # type: ignore
 from rest_framework.views import APIView # type: ignore
 from rest_framework.throttling import UserRateThrottle # type: ignore
 
-
-def parse_date_to_timezone_aware(date_str: str) -> datetime:
-    """
-    Convert date string to timezone-aware datetime
-    This prevents timezone warnings when filtering DateTimeField with date objects
-    """
-    date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-    # Convert to timezone-aware datetime at start of day
-    return timezone.make_aware(date_obj.replace(hour=0, minute=0, second=0, microsecond=0))
-
-
-def parse_end_date_to_timezone_aware(date_str: str) -> datetime:
-    """
-    Convert end date string to timezone-aware datetime at end of day
-    This ensures we capture all transactions for the end date
-    """
-    date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-    # Convert to timezone-aware datetime at end of day
-    return timezone.make_aware(date_obj.replace(hour=23, minute=59, second=59, microsecond=999999))
-
 from apps.banking.models import BankAccount, Transaction
+from .services.validation_service import parse_date_to_timezone_aware, parse_end_date_to_timezone_aware
 from .models import Report, ReportTemplate
 from .serializers import ReportSerializer, ReportTemplateSerializer
 from .exceptions import (

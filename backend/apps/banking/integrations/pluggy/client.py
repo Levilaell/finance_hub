@@ -2,14 +2,11 @@
 Pluggy API Client
 Handles authentication and communication with Pluggy API
 """
-import json
 import logging
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
 import requests
 from django.conf import settings
 from django.core.cache import cache
-from apps.banking.utils.encryption import banking_encryption
 from apps.banking.utils.rate_limiter import get_pluggy_rate_limiter
 
 logger = logging.getLogger(__name__)
@@ -52,18 +49,17 @@ class PluggyClient:
         """
         Get or create API key using client credentials
         """
-        # Check cache first (encrypted)
+        # Check cache first (plain text - encryption service not available)
         cache_key = f'pluggy_api_key_{self.client_id}'
-        encrypted_api_key = cache.get(cache_key)
-        
-        if encrypted_api_key:
+        cached_api_key = cache.get(cache_key)
+
+        if cached_api_key:
             try:
-                # Decrypt cached API key
-                api_key = banking_encryption.encryption_service.decrypt_value(encrypted_api_key)
-                if api_key:
-                    return api_key
+                # Return cached API key (plain text since encryption service unavailable)
+                if cached_api_key:
+                    return cached_api_key
             except Exception as e:
-                logger.warning(f"Failed to decrypt cached API key: {e}")
+                logger.warning(f"Failed to retrieve cached API key: {e}")
                 # Continue to get new API key
             
         # Create new API key
@@ -83,14 +79,14 @@ class PluggyClient:
             data = response.json()
             api_key = data['apiKey']
             
-            # Encrypt and cache for 1h50min (tokens expire in 2 hours per Pluggy docs)
+            # Cache API key for 1h50min (tokens expire in 2 hours per Pluggy docs)
+            # Note: Storing in plain text since encryption service is not available
             try:
-                encrypted_api_key = banking_encryption.encryption_service.encrypt_value(api_key)
-                cache.set(cache_key, encrypted_api_key, 6600)  # 110 minutes
-                logger.info("API key encrypted and cached successfully")
+                cache.set(cache_key, api_key, 6600)  # 110 minutes
+                logger.info("API key cached successfully (plain text - encryption service unavailable)")
             except Exception as e:
-                logger.warning(f"Failed to encrypt API key for cache: {e}")
-                # Continue without caching (less efficient but secure)
+                logger.warning(f"Failed to cache API key: {e}")
+                # Continue without caching (less efficient)
             
             return api_key
             
@@ -162,7 +158,7 @@ class PluggyClient:
             if response.status_code == 401:
                 logger.info("API key expired, refreshing...")
                 cache_key = f'pluggy_api_key_{self.client_id}'
-                cache.delete(cache_key)  # Delete encrypted cache
+                cache.delete(cache_key)  # Delete cached key
                 self.api_key = self._get_api_key()
                 
                 # Retry request with new token

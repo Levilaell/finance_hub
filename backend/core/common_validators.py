@@ -4,7 +4,6 @@ Consolidates validation logic to avoid duplication
 """
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from django.contrib.auth import get_user_model
 
 
 def validate_cnpj(value):
@@ -106,9 +105,6 @@ def validate_phone(value):
     return phone
 
 
-# CPF and email validators removed - not used in current implementation
-
-
 def format_cnpj(cnpj):
     """
     Format CNPJ to display format: XX.XXX.XXX/XXXX-XX
@@ -129,6 +125,3 @@ def format_phone(phone):
     elif len(phone) == 10:
         return f"({phone[:2]}) {phone[2:6]}-{phone[6:]}"
     return phone
-
-
-# format_cpf removed - not used in current implementation

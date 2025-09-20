@@ -46,10 +46,6 @@ class DashboardService {
       };
     }
   }
-
-  async getSimpleDashboard(): Promise<DashboardData> {
-    return this.getDashboardData();
-  }
 }
 
 export const dashboardService = new DashboardService();

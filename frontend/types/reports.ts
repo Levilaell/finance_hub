@@ -1,3 +1,5 @@
+// AI Types - Moved from index.ts to avoid circular dependency
+
 export interface DateRange {
   start_date: string;
   end_date: string;
@@ -81,86 +83,24 @@ export interface AIInsight {
   priority?: 'high' | 'medium' | 'low';
   actionable?: boolean;
   category?: string;
+  drill_down?: {
+    label: string;
+    url: string;
+  };
 }
 
 export interface AIRecommendation {
-  id: string;
+  type: 'cost_reduction' | 'revenue_growth' | 'risk_mitigation' | 'efficiency';
   title: string;
   description: string;
-  impact: 'high' | 'medium' | 'low';
-  effort: 'high' | 'medium' | 'low';
-  category: string;
-  actions?: string[];
-}
-
-export interface ReportTemplate {
-  id: string;
-  name: string;
-  description?: string;
-  report_type: string;
-  template_config: Record<string, any>;
-  charts?: ChartConfig[];
-  default_parameters?: Record<string, any>;
-  default_filters?: Record<string, any>;
-  is_public: boolean;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  created_by_name?: string;
-}
-
-export interface ChartConfig {
-  type: 'line' | 'bar' | 'pie' | 'area' | 'composed';
-  dataKey: string;
-  title: string;
-  config?: Record<string, any>;
-}
-
-export interface DashboardStats {
-  total_balance: number;
-  income_this_month: number;
-  expenses_this_month: number;
-  net_income: number;
-  pending_transactions: number;
-  accounts_count: number;
-}
-
-export interface AnalyticsData {
-  period: {
-    start_date: string;
-    end_date: string;
-    days: number;
+  potential_impact: string;
+  priority: 'high' | 'medium' | 'low';
+  time_to_implement: 'imediato' | 'curto_prazo' | 'medio_prazo';
+  difficulty?: 'easy' | 'medium' | 'hard';
+  action_button?: {
+    label: string;
+    url: string;
   };
-  summary: {
-    total_income: number;
-    total_expenses: number;
-    net_result: number;
-    transaction_count: number;
-    daily_avg_income: number;
-    daily_avg_expense: number;
-  };
-  top_income_sources: Array<{
-    counterpart_name: string;
-    total: number;
-    count: number;
-  }>;
-  top_expense_categories: Array<{
-    category__name: string;
-    category__icon?: string;
-    total: number;
-    count: number;
-    avg: number;
-  }>;
-  weekly_trend: Array<{
-    week_start: string;
-    week_end: string;
-    income: number;
-    expenses: number;
-    net: number;
-  }>;
-  insights: Array<{
-    type: string;
-    title: string;
-    message: string;
-  }>;
 }
+
+// Note: Removed unused types: ReportTemplate, ChartConfig, DashboardStats, AnalyticsData

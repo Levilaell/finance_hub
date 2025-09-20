@@ -5,10 +5,8 @@ Financial reporting and analytics
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from django.core.validators import MinValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-import datetime
 
 User = get_user_model()
 
@@ -106,33 +104,6 @@ class Report(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
-    
-    
-    @property
-    def duration_days(self):
-        """Get report period duration in days"""
-        if self.period_start and self.period_end:
-            return (self.period_end - self.period_start).days + 1
-        return 0
-    
-    @property
-    def is_monthly(self):
-        """Check if report covers exactly one month"""
-        if not self.period_start or not self.period_end:
-            return False
-        
-        # Check if start is first day of month and end is last day
-        if self.period_start.day != 1:
-            return False
-        
-        # Get last day of the month
-        if self.period_end.month == 12:
-            next_month = self.period_end.replace(year=self.period_end.year + 1, month=1, day=1)
-        else:
-            next_month = self.period_end.replace(month=self.period_end.month + 1, day=1)
-        
-        last_day = next_month - datetime.timedelta(days=1)
-        return self.period_end == last_day.date()
 
 
 class ReportTemplate(models.Model):

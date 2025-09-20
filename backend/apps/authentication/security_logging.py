@@ -2,7 +2,6 @@
 Security logging for authentication events
 """
 import logging
-import json
 from django.utils import timezone
 from django.conf import settings
 
@@ -16,17 +15,9 @@ class SecurityEvent:
     LOGIN_FAILED = 'login_failed'
     LOGOUT = 'logout'
     PASSWORD_CHANGED = 'password_changed'
-    PASSWORD_RESET_REQUESTED = 'password_reset_requested'
-    PASSWORD_RESET_COMPLETED = 'password_reset_completed'
     ACCOUNT_LOCKED = 'account_locked'
-    ACCOUNT_UNLOCKED = 'account_unlocked'
-    TWO_FA_ENABLED = '2fa_enabled'
-    TWO_FA_DISABLED = '2fa_disabled'
-    TWO_FA_FAILED = '2fa_failed'
-    EMAIL_VERIFIED = 'email_verified'
     TOKEN_REFRESHED = 'token_refreshed'
     TOKEN_REFRESH_FAILED = 'token_refresh_failed'
-    SUSPICIOUS_ACTIVITY = 'suspicious_activity'
     SESSION_INVALIDATED = 'session_invalidated'
     ACCOUNT_CREATED = 'account_created'
     ACCOUNT_DELETED = 'account_deleted'
@@ -56,8 +47,7 @@ def log_security_event(event_type, user=None, request=None, extra_data=None):
         event_data.update(extra_data)
     
     # Log based on event severity
-    if event_type in [SecurityEvent.LOGIN_FAILED, SecurityEvent.ACCOUNT_LOCKED, 
-                      SecurityEvent.TWO_FA_FAILED, SecurityEvent.SUSPICIOUS_ACTIVITY]:
+    if event_type in [SecurityEvent.LOGIN_FAILED, SecurityEvent.ACCOUNT_LOCKED]:
         security_logger.warning(f"Security Event: {event_type}", extra={'security_event': event_data})
     elif event_type in [SecurityEvent.PASSWORD_CHANGED, SecurityEvent.SESSION_INVALIDATED]:
         security_logger.info(f"Security Event: {event_type}", extra={'security_event': event_data})

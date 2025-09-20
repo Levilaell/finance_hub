@@ -2,8 +2,8 @@
  * Brazilian document validation utilities
  */
 
-// Re-export formatting and mask functions from lib/utils
-export { formatPhone, formatCNPJ, phoneMask, cnpjMask } from '@/lib/utils';
+// Re-export only the mask functions that are actually used from lib/utils
+export { phoneMask, cnpjMask } from '@/lib/utils';
 
 /**
  * Validate CNPJ (Brazilian company registration number)

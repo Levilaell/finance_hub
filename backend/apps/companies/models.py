@@ -66,6 +66,39 @@ class Company(models.Model):
     
     # Company Information
     name = models.CharField(_('company name'), max_length=200)
+
+    cnpj = models.CharField(_('CNPJ'), max_length=18, unique=True, default='default')
+    company_type = models.CharField(
+        _('company type'), 
+        max_length=20,
+        choices=[
+            ('mei', 'MEI'),
+            ('me', 'Microempresa'),
+            ('epp', 'Empresa de Pequeno Porte'),
+            ('ltda', 'Limitada'),
+            ('sa', 'Sociedade Anônima'),
+            ('other', 'Outros'),
+        ], 
+        default='default'
+    )
+    business_sector = models.CharField(
+        _('business sector'),
+        max_length=50,
+        choices=[
+            ('retail', 'Comércio'),
+            ('services', 'Serviços'),
+            ('industry', 'Indústria'),
+            ('technology', 'Tecnologia'),
+            ('healthcare', 'Saúde'),
+            ('education', 'Educação'),
+            ('food', 'Alimentação'),
+            ('construction', 'Construção'),
+            ('automotive', 'Automotivo'),
+            ('agriculture', 'Agricultura'),
+            ('other', 'Outros'),
+        ],
+        default='default'
+    )
     
     # Subscription
     subscription_plan = models.ForeignKey(

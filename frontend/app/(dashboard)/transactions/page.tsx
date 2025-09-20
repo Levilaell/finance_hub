@@ -239,59 +239,6 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="hover:shadow-lg transition-all duration-300 hover:scale-105">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Receitas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-foreground">
-              {formatCurrency(totals.income)}
-            </p>
-            <p className="text-xs text-success-subtle mt-1">
-              Total de {totals.filtered_count || 0} transações
-              {activeFiltersCount > 0 && ' (filtradas)'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-all duration-300 hover:scale-105">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Despesas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-foreground">
-              {formatCurrency(totals.expenses)}
-            </p>
-            <p className="text-xs text-error-subtle mt-1">
-              Total de {totals.filtered_count || 0} transações
-              {activeFiltersCount > 0 && ' (filtradas)'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-all duration-300 hover:scale-105">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Saldo
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className={`text-2xl font-bold ${totals.balance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {formatCurrency(totals.balance)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Balanço total {activeFiltersCount > 0 && '(filtrado)'}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Search and Filters */}
       <Card className="shadow-md">
         <CardContent className="pt-6">

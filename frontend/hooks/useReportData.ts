@@ -21,11 +21,9 @@ interface UseReportDataReturn {
   isLoading: boolean;
   isError: boolean;
   error: any;
-  refetch: () => void;
-  refetchAll: () => Promise<void>;
+  refetch: () => Promise<void>;
   selectedPeriod: DateRange | undefined;
   setSelectedPeriod: (period: DateRange) => void;
-  retryCount: number;
 }
 
 const DEFAULT_RETRY_ATTEMPTS = 3;
@@ -46,7 +44,6 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
 
   const queryClient = useQueryClient();
   const [selectedPeriod, setSelectedPeriod] = useState<DateRange | undefined>(initialPeriod);
-  const [retryCount, setRetryCount] = useState(0);
 
   // Ensure selectedPeriod is always defined with a default fallback
   const effectiveSelectedPeriod = selectedPeriod || initialPeriod;
@@ -57,10 +54,8 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
     gcTime,
     retry: (failureCount, error) => {
       if (failureCount < retryAttempts) {
-        setRetryCount(failureCount);
         // Exponential backoff
         const delay = Math.min(1000 * 2 ** failureCount, 30000);
-        console.log(`Retrying request (attempt ${failureCount + 1}/${retryAttempts}) after ${delay}ms`);
         return true;
       }
       return false;
@@ -87,8 +82,7 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
           timestamp: new Date().toISOString()
         });
         const data = await reportsService.getReports();
-        setRetryCount(0); // Reset retry count on success
-        
+
         console.log('📋 [PROD-DEBUG] useReportData: Dados recebidos:', {
           dataType: typeof data,
           isArray: Array.isArray(data),
@@ -100,13 +94,10 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
         
         // Ensure we return an array, handling both paginated and non-paginated responses
         if (Array.isArray(data)) {
-          console.log('📋 [PROD-DEBUG] useReportData: Retornando array direto', data.length, 'items');
           return data;
         } else if (data && data.results) {
-          console.log('📋 [PROD-DEBUG] useReportData: Retornando data.results', data.results.length, 'items');
           return data.results;
         }
-        console.log('📋 [PROD-DEBUG] useReportData: Retornando array vazio (fallback)');
         return [];
       } catch (error: any) {
         console.error('❌ [PROD-DEBUG] useReportData: Erro ao buscar relatórios:', {
@@ -120,7 +111,6 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
         // Check if we have cached data to fall back on
         const cachedData = queryClient.getQueryData(['reports']);
         if (cachedData) {
-          console.log('📋 useReportData: Usando dados em cache como fallback');
           toast.info('Usando dados em cache enquanto reconectamos...');
           return cachedData;
         }
@@ -192,7 +182,6 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
   // Refetch all data with proper error handling
   const refetchAll = useCallback(async () => {
     try {
-      setRetryCount(0);
       await Promise.all([
         refetchReports(),
         queryClient.invalidateQueries({ queryKey: ['accounts'] }),
@@ -215,7 +204,6 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
   useEffect(() => {
     const handleOnline = () => {
       if (isError) {
-        console.log('Network recovered, retrying failed queries...');
         toast.info('Conexão restaurada. Atualizando dados...');
         refetchAll();
       }
@@ -233,9 +221,7 @@ export function useReportData(options: UseReportDataOptions = {}): UseReportData
     isError,
     error,
     refetch: refetchAll,
-    refetchAll,
     selectedPeriod: effectiveSelectedPeriod,
-    setSelectedPeriod,
-    retryCount
+    setSelectedPeriod
   };
 }

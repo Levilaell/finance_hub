@@ -11,7 +11,6 @@ interface TokenData {
 class AuthStorage {
   constructor() {
     if (typeof window !== 'undefined') {
-      console.log(`[Auth Storage] Using simplified Bearer token authentication`);
     }
   }
 
@@ -20,7 +19,6 @@ class AuthStorage {
    */
   setTokens(tokens: TokenData): void {
     this.setTokensInLocalStorage(tokens);
-    console.log(`[Auth Storage] Tokens stored in localStorage`);
   }
 
   /**
@@ -44,7 +42,6 @@ class AuthStorage {
     this.clearTokensFromLocalStorage();
     // Also clear any legacy cookies
     this.clearLegacyCookies();
-    console.log(`[Auth Storage] Tokens cleared`);
   }
 
   /**

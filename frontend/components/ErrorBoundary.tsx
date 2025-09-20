@@ -178,36 +178,3 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
-
-/**
- * Hook to use with function components
- */
-export function useErrorHandler() {
-  const [error, setError] = React.useState<Error | null>(null);
-
-  React.useEffect(() => {
-    if (error) {
-      throw error;
-    }
-  }, [error]);
-
-  return setError;
-}
-
-/**
- * HOC to wrap components with error boundary
- */
-export function withErrorBoundary<P extends object>(
-  Component: React.ComponentType<P>,
-  fallback?: ReactNode
-) {
-  const WithErrorBoundaryComponent = (props: P) => (
-    <ErrorBoundary fallback={fallback}>
-      <Component {...props} />
-    </ErrorBoundary>
-  );
-  
-  WithErrorBoundaryComponent.displayName = `withErrorBoundary(${Component.displayName || Component.name || 'Component'})`;
-  
-  return WithErrorBoundaryComponent;
-}

@@ -39,42 +39,14 @@ class BankingService {
     return response;
   }
   
-  async syncConnectors(): Promise<{
-    success: boolean;
-    message: string;
-    created: number;
-    updated: number;
-  }> {
-    return apiClient.post('/api/banking/connectors/sync/');
-  }
-  
+
   // ===== Items (Connections) =====
   
   async getItems(): Promise<PaginatedResponse<PluggyItem>> {
     return apiClient.get<PaginatedResponse<PluggyItem>>('/api/banking/items/');
   }
   
-  async getWaitingItems(): Promise<{ success: boolean; data: PluggyItem[] }> {
-    try {
-      const response = await apiClient.get<PaginatedResponse<PluggyItem>>('/api/banking/items/', {
-        status: 'WAITING_USER_INPUT'
-      });
-      return {
-        success: true,
-        data: response.results || []
-      };
-    } catch (error) {
-      return {
-        success: false,
-        data: []
-      };
-    }
-  }
-  
-  async getItem(id: string): Promise<PluggyItem> {
-    return apiClient.get<PluggyItem>(`/api/banking/items/${id}/`);
-  }
-  
+
   async syncItem(id: string): Promise<{
     success: boolean;
     message: string;
@@ -87,73 +59,7 @@ class BankingService {
     return apiClient.delete<DisconnectItemResponse>(`/api/banking/items/${id}/disconnect/`);
   }
   
-  async getMFAStatus(id: string): Promise<{
-    data: {
-      requires_mfa: boolean;
-      status: string;
-      parameter?: {
-        name: string;
-        type: string;
-        label: string;
-        placeholder: string;
-        validation?: any;
-        assistiveText?: string;
-        optional?: boolean;
-      };
-      connector?: {
-        id: string;
-        name: string;
-        image_url: string;
-      };
-      message?: string;
-    };
-  }> {
-    const response = await apiClient.get<{
-      requires_mfa: boolean;
-      status: string;
-      parameter?: {
-        name: string;
-        type: string;
-        label: string;
-        placeholder: string;
-        validation?: any;
-        assistiveText?: string;
-        optional?: boolean;
-      };
-      connector?: {
-        id: string;
-        name: string;
-        image_url: string;
-      };
-      message?: string;
-    }>(`/api/banking/items/${id}/mfa_status/`);
-    return { data: response };
-  }
-  
-  async sendMFA(id: string, data: { 
-    value?: string;
-    token?: string;
-    code?: string;
-    [key: string]: any;
-  }): Promise<{
-    data: {
-      success: boolean;
-      message: string;
-      item_status: string;
-      execution_status?: string;
-      requires_additional_mfa?: boolean;
-    };
-  }> {
-    const response = await apiClient.post<{
-      success: boolean;
-      message: string;
-      item_status: string;
-      execution_status?: string;
-      requires_additional_mfa?: boolean;
-    }>(`/api/banking/items/${id}/send_mfa/`, data);
-    return { data: response };
-  }
-  
+
   // ===== Accounts =====
   
   async getAccounts(): Promise<BankAccount[]> {
@@ -161,23 +67,7 @@ class BankingService {
     return response;
   }
   
-  async getAccount(id: string): Promise<BankAccount> {
-    return apiClient.get<BankAccount>(`/api/banking/accounts/${id}/`);
-  }
-  
-  async getAccountsSummary(): Promise<{
-    total_balance: number;
-    total_accounts: number;
-    by_type: Array<{
-      type: string;
-      count: number;
-      total_balance: number;
-    }>;
-    last_update?: string;
-  }> {
-    return apiClient.get('/api/banking/accounts/summary/');
-  }
-  
+
   // ===== Transactions =====
   
   async getTransactions(
@@ -187,10 +77,6 @@ class BankingService {
       '/api/banking/transactions/',
       params
     );
-  }
-  
-  async getTransaction(id: string): Promise<Transaction> {
-    return apiClient.get<Transaction>(`/api/banking/transactions/${id}/`);
   }
   
   async createTransaction(data: {
@@ -242,10 +128,7 @@ class BankingService {
     return response;
   }
   
-  async getCategory(id: string): Promise<TransactionCategory> {
-    return apiClient.get<TransactionCategory>(`/api/banking/categories/${id}/`);
-  }
-  
+
   async createCategory(
     data: Partial<TransactionCategory>
   ): Promise<TransactionCategory> {
@@ -325,12 +208,7 @@ class BankingService {
     }
   }
   
-  // ===== Dashboard =====
-  
-  async getDashboard(): Promise<DashboardData> {
-    return apiClient.get<DashboardData>('/api/banking/dashboard/');
-  }
-  
+
   // ===== Utility Methods =====
   
   /**
@@ -354,49 +232,12 @@ class BankingService {
     return account.item_status ? errorStatuses.includes(account.item_status) : false;
   }
 
-  async sendItemMFA(
-    itemId: string,
-    mfaData: Record<string, string>
-  ): Promise<{
-    success: boolean;
-    message?: string;
-    item_status?: PluggyItemStatus;
-    error?: string;
-  }> {
-    try {
-      return await apiClient.post(`/api/banking/items/${itemId}/send_mfa/`, mfaData);
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.message || 'Failed to send MFA',
-      };
-    }
-  }
-  
+
   /**
    * Format currency value (delegates to shared utility)
    */
   formatCurrency(value: number, currency: string = 'BRL'): string {
     return formatCurrency(value, currency);
-  }
-  
-  /**
-   * Format date for display
-   */
-  formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (diffInDays === 0) {
-      return 'Hoje';
-    } else if (diffInDays === 1) {
-      return 'Ontem';
-    } else if (diffInDays < 7) {
-      return `${diffInDays} dias atrás`;
-    } else {
-      return date.toLocaleDateString('pt-BR');
-    }
   }
 }
 

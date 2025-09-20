@@ -42,7 +42,6 @@ class RetryManager {
       return status === 429 || status >= 500;
     },
     onRetry: (attempt, delay, error) => {
-      console.log(`Retry attempt ${attempt} after ${delay}ms delay`, error.message);
     }
   };
 

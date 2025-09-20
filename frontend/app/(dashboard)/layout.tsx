@@ -10,7 +10,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, isLoading, _hasHydrated, user } = useAuthStore();
+  const { isAuthenticated, isLoading, _hasHydrated } = useAuthStore();
   const router = useRouter();
   
 
@@ -21,37 +21,6 @@ export default function DashboardLayout({
     }
   }, [isAuthenticated, isLoading, _hasHydrated, router]);
 
-  // Handle subscription blocking - more strict approach
-  useEffect(() => {
-    // Only run after component has mounted to avoid hydration issues
-    if (typeof window !== 'undefined' && isAuthenticated && subscriptionStatus && !isLoadingSubscription) {
-      const currentPath = window.location.pathname;
-      
-      // Check if subscription is blocked
-      const isBlocked = subscriptionStatus.subscription_status === 'expired' ||
-                       subscriptionStatus.subscription_status === 'cancelled' ||
-                       subscriptionStatus.subscription_status === 'suspended' ||
-                       (subscriptionStatus.subscription_status === 'trial' && subscriptionStatus.trial_days_left <= 0);
-      
-      if (isBlocked) {
-        // Only allow access to subscription/billing pages and blocked page
-        const allowedPaths = [
-          '/dashboard/subscription',
-          '/dashboard/subscription-blocked',
-          '/settings'
-        ];
-        
-        const isOnAllowedPath = allowedPaths.some(path => 
-          currentPath.startsWith(path)
-        );
-        
-        // If not on allowed path, redirect to blocked page
-        if (!isOnAllowedPath) {
-          router.push('/dashboard/subscription-blocked');
-        }
-      }
-    }
-  }, [isAuthenticated, subscriptionStatus, isLoadingSubscription, router]);
 
   if (!_hasHydrated || isLoading) {
     return (
@@ -79,9 +48,6 @@ export default function DashboardLayout({
   return (
     <MainLayout>
       <div className="min-h-screen">
-        {/* Payment Setup Banner - Will only show when needed */}
-        {isAuthenticated && user && <PaymentSetupBanner />}
-        
         {/* Main content */}
         {children}
       </div>

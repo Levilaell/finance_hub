@@ -12,9 +12,6 @@ djangorestframework==3.14.0
 djangorestframework-simplejwt==5.3.1
 PyJWT==2.8.0
 
-# API Documentation
-drf-yasg==1.21.7
-
 # Server & Deployment
 gunicorn==21.2.0
 whitenoise==6.6.0
@@ -31,16 +28,8 @@ redis==5.0.1
 django-celery-beat==2.5.0
 django-celery-results==2.5.1
 
-# WebSockets
-channels==4.0.0
-channels-redis==4.2.0
-daphne==4.1.0
-
 # Rate Limiting
 django-ratelimit==4.1.0
-
-# File Storage
-django-storages==1.14.2
 
 # External API Clients
 requests==2.31.0

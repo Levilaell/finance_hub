@@ -136,33 +136,3 @@ class TrialExpirationMiddleware:
         response = self.get_response(request)
         return response
 
-
-class PlanLimitsMiddleware:
-    """
-    Middleware para adicionar informações de limites do plano ao request
-    """
-    def __init__(self, get_response):
-        self.get_response = get_response
-    
-    def __call__(self, request):
-        if request.user.is_authenticated and hasattr(request.user, 'company'):
-            company = request.user.company
-            
-            # Monthly usage reset has been removed in simplified model
-            # Usage is now tracked for statistics only, not for limits
-            
-            # Add plan limits to request (simplified after field removal)
-            request.plan_limits = {
-                'subscription_status': company.subscription_status,
-                'plan_type': company.subscription_plan.slug if company.subscription_plan else None,
-                'current_transactions': company.current_month_transactions,
-                'can_add_bank_account': company.can_add_bank_account(),
-            }
-            
-            # Add trial info if applicable
-            if company.subscription_status == 'trial':
-                request.plan_limits['trial_days_left'] = company.days_until_trial_ends
-                request.plan_limits['trial_ends_at'] = company.trial_ends_at
-        
-        response = self.get_response(request)
-        return response
