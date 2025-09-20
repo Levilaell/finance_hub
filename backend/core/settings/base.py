@@ -173,7 +173,6 @@ SESSION_CACHE_ALIAS = 'default'
 SESSION_COOKIE_AGE = 86400  # 24 hours
 SESSION_COOKIE_HTTPONLY = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Allow persistent sessions
-# SESSION_COOKIE_SAMESITE and SESSION_COOKIE_SECURE will be set in environment files
 
 # CSRF Configuration
 CSRF_COOKIE_HTTPONLY = True

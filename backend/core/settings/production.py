@@ -62,9 +62,6 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
-# JWT Authentication - Bearer tokens only (no cookies for simplicity)
-# Frontend should store tokens and send them via Authorization header
-
 # Static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
@@ -103,34 +100,6 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_SSL_REDIRECT = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-
-# Email Configuration - Support multiple backends
-EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
-
-# Resend Email Backend Configuration
-if 'ResendEmailBackend' in EMAIL_BACKEND:
-    RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
-    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@caixahub.com.br')
-    SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', 'suporte@caixahub.com.br')
-    print("✅ Using Resend Email Backend")
-
-# SMTP Email Backend Configuration (fallback)
-elif EMAIL_BACKEND == 'django.core.mail.backends.smtp.EmailBackend':
-    EMAIL_HOST = os.environ.get('EMAIL_HOST')
-    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
-    EMAIL_USE_TLS = True
-    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
-    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
-    print("✅ Using SMTP Email Backend")
-
-# Console Backend (development fallback)
-else:
-    print("✅ Using Console Email Backend")
-
-# Rate Limiting Configuration - PRODUCTION FIX
-# Disable django_ratelimit in production (too aggressive: 10/min)
-# Use DRF throttling instead (10/hour, Redis-backed)
-RATELIMIT_ENABLE = False
 
 # Cache Configuration - PRODUCTION FIX (No Redis in Railway)
 # Override base.py Redis cache with dummy cache to eliminate connection errors

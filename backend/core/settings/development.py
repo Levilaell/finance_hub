@@ -90,24 +90,8 @@ os.environ['CORS_ALLOW_ALL_HEADERS'] = 'True'
 # Add CSRF trusted origins for development
 CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
 
-# Email settings
-EMAIL_BACKEND = config(
-    'EMAIL_BACKEND',
-    default='django.core.mail.backends.console.EmailBackend'
-)
-EMAIL_HOST = config('EMAIL_HOST', default='localhost')
-EMAIL_PORT = config('EMAIL_PORT', default=1025, cast=int)
-EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=False, cast=bool)
-EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=False, cast=bool)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@caixahub.com.br')
-SUPPORT_EMAIL = config('SUPPORT_EMAIL', default='suporte@caixahub.com.br')
-
 # Frontend URL
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
-
-# JWT simplified - using standard Bearer tokens only
 
 # OpenAI API
 OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
@@ -122,13 +106,6 @@ PLUGGY_CONNECT_URL = config('PLUGGY_CONNECT_URL', default='https://connect.plugg
 # Webhook settings
 PLUGGY_WEBHOOK_SECRET = config('PLUGGY_WEBHOOK_SECRET', default='')
 PLUGGY_WEBHOOK_URL = config('PLUGGY_WEBHOOK_URL', default='http://localhost:8000/api/banking/webhooks/pluggy/')
-
-# Debug Toolbar
-if DEBUG:
-    INTERNAL_IPS = ['127.0.0.1']
-
-# ===== PAYMENT GATEWAY SETTINGS =====
-DEFAULT_PAYMENT_GATEWAY = config('DEFAULT_PAYMENT_GATEWAY', default='stripe')
 
 # Stripe Configuration
 STRIPE_PUBLIC_KEY = config('STRIPE_PUBLIC_KEY', default='')
@@ -168,29 +145,11 @@ def warn_stripe_configuration():
 # Show warning for missing Stripe config
 warn_stripe_configuration()
 
-# Payment Gateway - Stripe Only (MercadoPago removed for PCI DSS compliance)
-# MERCADOPAGO_ACCESS_TOKEN = config('MERCADOPAGO_ACCESS_TOKEN', default='')
-# MERCADOPAGO_PUBLIC_KEY = config('MERCADOPAGO_PUBLIC_KEY', default='')
-# MERCADOPAGO_WEBHOOK_SECRET = config('MERCADOPAGO_WEBHOOK_SECRET', default='')
-
-# Security - Admin endpoints
-SEED_PLANS_SECRET = config('SEED_PLANS_SECRET', default='')
-
-# Currency Settings
-DEFAULT_CURRENCY = config('DEFAULT_CURRENCY', default='BRL')
-
-# Tax settings
-APPLY_TAX = config('APPLY_TAX', default=False, cast=bool)
-TAX_RATE = config('TAX_RATE', default=0.0, cast=float)
-
 # ===== ADICIONAR MIDDLEWARE DE TRIAL =====
 # Adicione após o AuthenticationMiddleware
 MIDDLEWARE += [
     'apps.companies.middleware.TrialExpirationMiddleware',
 ]
-
-# Webhook Security
-WEBHOOK_IP_WHITELIST = config('WEBHOOK_IP_WHITELIST', default='').split(',')
 
 # Logging
 LOGGING = {
