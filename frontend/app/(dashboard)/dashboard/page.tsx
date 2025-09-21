@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { ErrorMessage } from '@/components/ui/error-message';
-import { HydrationBoundary } from '@/components/hydration-boundary';
 import Link from 'next/link';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { 
@@ -22,7 +21,6 @@ import {
   ArrowTrendingDownIcon,
   ExclamationTriangleIcon as AlertCircle
 } from '@heroicons/react/24/outline';
-import { RefreshDataButton } from '@/components/RefreshDataButton';
 
 interface DashboardData {
   current_balance: number;
@@ -129,7 +127,7 @@ interface Alert {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, isAuthenticated, _hasHydrated } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore(); // ✅ Removed _hasHydrated
   const { accounts, fetchAccounts } = useBankingStore();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -152,20 +150,18 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    // Wait for hydration before doing anything
-    if (!_hasHydrated) return;
-    
+    // ✅ Simplified auth check
     if (!isAuthenticated) {
       router.push('/login');
       return;
     }
 
-    // Only fetch data if we have a user and are authenticated
+    // ✅ Only fetch data if we have a user and are authenticated
     if (user && isAuthenticated) {
       fetchDashboardData();
       fetchAccounts();
     }
-  }, [isAuthenticated, user, _hasHydrated, fetchAccounts, router, fetchDashboardData]);
+  }, [isAuthenticated, user, fetchAccounts, router, fetchDashboardData]);
   
   // Refetch dashboard data when subscription is updated
   useEffect(() => {
@@ -200,8 +196,8 @@ export default function DashboardPage() {
     }
   };
 
-  // Show loading while hydrating or when loading data
-  if (!_hasHydrated || loading || !user) {
+  // ✅ Simplified loading check - removed _hasHydrated
+  if (loading || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <LoadingSpinner />
@@ -222,21 +218,22 @@ export default function DashboardPage() {
   }
 
   return (
-    <HydrationBoundary>
-      <div className="space-y-6">
-        {/* Welcome Section */}
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-white">
-              Olá, {user?.first_name || user?.email?.split('@')[0]}! 👋
-            </h1>
-            <p className="text-white/70 mt-1">
-              Aqui está o resumo da sua situação financeira
-            </p>
-          </div>
-          {/* Temporary refresh button */}
-          <RefreshDataButton />
+    <div className="space-y-6">
+      {/* Welcome Section */}
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold text-white">
+            Olá, {user?.first_name || user?.email?.split('@')[0]}! 👋
+          </h1>
+          <p className="text-white/70 mt-1">
+            Aqui está o resumo da sua situação financeira
+          </p>
         </div>
+        {/* ✅ Remove RefreshDataButton - implement simple refresh */}
+        <Button onClick={fetchDashboardData} disabled={loading} variant="outline">
+          {loading ? <LoadingSpinner /> : 'Atualizar'}
+        </Button>
+      </div>
 
       {/* Main Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -316,7 +313,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
 
       {/* Alerts */}
       {dashboardData.alerts && dashboardData.alerts.length > 0 && (
@@ -477,28 +473,26 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </Link>
-
       </div>
 
-        {/* Financial Insights */}
-        {dashboardData.financial_insights && dashboardData.financial_insights.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Insights Financeiros</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {dashboardData.financial_insights.map((insight, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <span className="text-blue-500 mt-0.5">💡</span>
-                    <p className="text-sm text-white/70">{insight}</p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    </HydrationBoundary>
+      {/* Financial Insights */}
+      {dashboardData.financial_insights && dashboardData.financial_insights.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Insights Financeiros</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {dashboardData.financial_insights.map((insight, index) => (
+                <div key={index} className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-0.5">💡</span>
+                  <p className="text-sm text-white/70">{insight}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }

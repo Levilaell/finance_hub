@@ -129,7 +129,6 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',             # Common functionality
     'django.middleware.csrf.CsrfViewMiddleware',             # CSRF protection
     'django.contrib.auth.middleware.AuthenticationMiddleware', # DRF authentication
-    'apps.authentication.middleware.SecurityMiddleware',     # Custom security
     'django.contrib.messages.middleware.MessageMiddleware',  # REQUIRED by admin
     'django.middleware.clickjacking.XFrameOptionsMiddleware', # Clickjacking protection
 ]

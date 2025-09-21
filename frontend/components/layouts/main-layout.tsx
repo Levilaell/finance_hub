@@ -22,7 +22,6 @@ import {
   Lock,
 } from "lucide-react";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
-import { ThemeSwitcher } from "@/components/theme-switcher";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -41,26 +40,25 @@ const navigation = [
 export function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout, _hasHydrated } = useAuthStore();
+  const { user, logout } = useAuthStore(); // ✅ Removed _hasHydrated
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
 
-  // Get user initials safely
+  // ✅ Simplified user functions - removed hydration checks
   const getUserInitials = () => {
-    if (!user || !_hasHydrated) return '??';
+    if (!user) return '??';
     const first = user.first_name?.[0] || '';
     const last = user.last_name?.[0] || '';
-    return first + last || '??';
+    return first + last || user.email?.[0]?.toUpperCase() || '??';
   };
 
   const getUserFullName = () => {
-    if (!user || !_hasHydrated) return 'Carregando...';
+    if (!user) return 'Usuário';
     return `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Usuário';
   };
 
   const getUserEmail = () => {
-    if (!user || !_hasHydrated) return '';
-    return user.email || '';
+    return user?.email || '';
   };
 
   const handleLogout = async () => {
@@ -130,15 +128,15 @@ export function MainLayout({ children }: MainLayoutProps) {
           <div className="border-t p-4">
             <div className="flex items-center space-x-3">
               <div className="h-8 w-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
-                <span className="text-sm font-medium text-white" suppressHydrationWarning>
+                <span className="text-sm font-medium text-white">
                   {getUserInitials()}
                 </span>
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium" suppressHydrationWarning>
+                <p className="text-sm font-medium">
                   {getUserFullName()}
                 </p>
-                <p className="text-xs text-muted-foreground" suppressHydrationWarning>
+                <p className="text-xs text-muted-foreground">
                   {getUserEmail()}
                 </p>
               </div>
@@ -198,15 +196,15 @@ export function MainLayout({ children }: MainLayoutProps) {
           <div className="border-t p-4">
             <div className="flex items-center space-x-3">
               <div className="h-8 w-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
-                <span className="text-sm font-medium text-white" suppressHydrationWarning>
+                <span className="text-sm font-medium text-white">
                   {getUserInitials()}
                 </span>
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium" suppressHydrationWarning>
+                <p className="text-sm font-medium">
                   {getUserFullName()}
                 </p>
-                <p className="text-xs text-muted-foreground" suppressHydrationWarning>
+                <p className="text-xs text-muted-foreground">
                   {getUserEmail()}
                 </p>
               </div>

@@ -10,19 +10,30 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, isLoading, _hasHydrated } = useAuthStore();
+  const { isAuthenticated, isLoading, user, fetchUser } = useAuthStore();
   const router = useRouter();
-  
-
 
   useEffect(() => {
-    if (_hasHydrated && !isLoading && !isAuthenticated) {
+    // Check if user is authenticated
+    const token = localStorage.getItem('access_token');
+    
+    if (!token) {
+      // No token, redirect to login
       router.push('/login');
+      return;
     }
-  }, [isAuthenticated, isLoading, _hasHydrated, router]);
 
+    if (!isAuthenticated || !user) {
+      // Token exists but no user data, try to fetch user
+      fetchUser().catch(() => {
+        // If fetch fails, redirect to login
+        router.push('/login');
+      });
+    }
+  }, [isAuthenticated, user, fetchUser, router]);
 
-  if (!_hasHydrated || isLoading) {
+  // Show loading while checking authentication
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
@@ -33,24 +44,30 @@ export default function DashboardLayout({
     );
   }
 
-  if (!isAuthenticated) {
-    // Show loading spinner while redirecting
+  // Show loading while user data is being fetched
+  if (!user && !isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p>Redirecionando...</p>
+          <p>Verificando autenticação...</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <MainLayout>
-      <div className="min-h-screen">
-        {/* Main content */}
-        {children}
-      </div>
-    </MainLayout>
-  );
+  // If we have user data, show the protected content
+  if (isAuthenticated && user) {
+    return (
+      <MainLayout>
+        <div className="min-h-screen">
+          {children}
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // Fallback - redirect to login
+  router.push('/login');
+  return null;
 }

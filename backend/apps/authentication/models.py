@@ -1,6 +1,5 @@
 """
 User authentication models
-Custom user model with enhanced features for financial SaaS
 """
 from django.contrib.auth.models import AbstractUser
 from django.db import models

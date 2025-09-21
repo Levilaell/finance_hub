@@ -1,379 +1,190 @@
 """
-Authentication serializers
+Authentication serializers - COMPLETE VERSION
 """
-from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
-from rest_framework_simplejwt.tokens import RefreshToken
-
-from apps.companies.models import Company, SubscriptionPlan
-from apps.companies.validators import validate_cnpj, validate_phone, format_cnpj, format_phone
-
-User = get_user_model()
+from .models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """User serializer for profile data"""
+    """
+    Serializer para retornar dados do usuário (sem senha)
+    """
     full_name = serializers.CharField(read_only=True)
-    initials = serializers.CharField(read_only=True)
-    company = serializers.SerializerMethodField()
     
     class Meta:
         model = User
         fields = (
-            'id', 'username', 'email', 'first_name', 'last_name',
-            'full_name', 'initials', 'phone', 'timezone', 'company'
+            'id', 
+            'username', 
+            'email', 
+            'first_name', 
+            'last_name', 
+            'full_name',
+            'phone', 
+            'timezone',
+            'created_at'
         )
-        read_only_fields = ('id', 'username', 'company')
-    
-    def get_company(self, obj):
-        """Get user's company data"""
-        try:
-            # Import here to avoid circular import
-            from apps.companies.serializers import CompanySerializer
-
-            # First try to get company if user is owner
-            if hasattr(obj, 'company'):
-                return CompanySerializer(obj.company).data
-
-            # Team member functionality has been simplified
-            # Only company owners are supported in current architecture
-
-        except (AttributeError, Company.DoesNotExist):
-            pass
-
-        return None
-
-    def get_initials(self, obj):
-        """Get user initials from first and last name"""
-        initials = ''
-        if obj.first_name:
-            initials += obj.first_name[0].upper()
-        if obj.last_name:
-            initials += obj.last_name[0].upper()
-        return initials if initials else obj.email[0].upper()
+        read_only_fields = ('id', 'username', 'created_at')
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-    """Registration serializer with company creation"""
-    email = serializers.EmailField(
-        required=True,
-        error_messages={
-            'required': 'O e-mail é obrigatório.',
-            'invalid': 'Digite um endereço de e-mail válido.',
-            'blank': 'O campo de e-mail não pode estar vazio.'
-        }
-    )
+    """
+    Serializer para registro completo: User + Company
+    """
+    # Campos do User
     password = serializers.CharField(
-        write_only=True, 
-        required=True,
-        error_messages={
-            'required': 'A senha é obrigatória.',
-            'blank': 'O campo de senha não pode estar vazio.'
-        }
+        write_only=True,
+        min_length=8,
+        style={'input_type': 'password'}
     )
     password2 = serializers.CharField(
-        write_only=True, 
-        required=True,
-        error_messages={
-            'required': 'A confirmação de senha é obrigatória.',
-            'blank': 'O campo de confirmação de senha não pode estar vazio.'
-        }
+        write_only=True,
+        style={'input_type': 'password'}
     )
-    first_name = serializers.CharField(
-        required=True,
-        error_messages={
-            'required': 'O nome é obrigatório.',
-            'blank': 'O campo de nome não pode estar vazio.'
-        }
-    )
-    last_name = serializers.CharField(
-        required=True,
-        error_messages={
-            'required': 'O sobrenome é obrigatório.',
-            'blank': 'O campo de sobrenome não pode estar vazio.'
-        }
-    )
-    company_name = serializers.CharField(
-        required=True,
-        error_messages={
-            'required': 'O nome da empresa é obrigatório.',
-            'blank': 'O campo de nome da empresa não pode estar vazio.'
-        }
-    )
-    company_type = serializers.CharField(
-        required=True,
-        error_messages={
-            'required': 'O tipo de empresa é obrigatório.',
-            'blank': 'O campo de tipo de empresa não pode estar vazio.'
-        }
-    )
-    business_sector = serializers.CharField(
-        required=True,
-        error_messages={
-            'required': 'O setor de negócios é obrigatório.',
-            'blank': 'O campo de setor de negócios não pode estar vazio.'
-        }
-    )
-    company_cnpj = serializers.CharField(
-        required=True, 
-        validators=[validate_cnpj],
-        error_messages={
-            'required': 'O CNPJ é obrigatório.',
-            'blank': 'O campo de CNPJ não pode estar vazio.',
-            'invalid': 'CNPJ inválido. Digite apenas números (14 dígitos).'
-        }
-    )
-    phone = serializers.CharField(
-        required=True, 
-        validators=[validate_phone],
-        error_messages={
-            'required': 'O telefone é obrigatório.',
-            'blank': 'O campo de telefone não pode estar vazio.',
-            'invalid': 'Telefone inválido. Use o formato: (11) 98765-4321'
-        }
-    )
-    selected_plan = serializers.CharField(required=False, default='starter')
+    
+    # Campos da Company (não estão no User model)
+    company_name = serializers.CharField(max_length=200)
+    company_cnpj = serializers.CharField(max_length=18)
+    company_type = serializers.ChoiceField(choices=[
+        ('mei', 'MEI'),
+        ('me', 'Microempresa'),
+        ('epp', 'Empresa de Pequeno Porte'),
+        ('ltda', 'Limitada'),
+        ('sa', 'Sociedade Anônima'),
+        ('other', 'Outros'),
+    ])
+    business_sector = serializers.ChoiceField(choices=[
+        ('retail', 'Comércio'),
+        ('services', 'Serviços'),
+        ('industry', 'Indústria'),
+        ('technology', 'Tecnologia'),
+        ('healthcare', 'Saúde'),
+        ('education', 'Educação'),
+        ('food', 'Alimentação'),
+        ('construction', 'Construção'),
+        ('automotive', 'Automotivo'),
+        ('agriculture', 'Agricultura'),
+        ('other', 'Outros'),
+    ])
     
     class Meta:
         model = User
         fields = (
-            'email', 'password', 'password2', 'first_name', 'last_name',
-            'phone', 'company_name', 'company_cnpj', 'company_type', 'business_sector', 'selected_plan'
+            # Campos do User
+            'email', 'password', 'password2', 'first_name', 'last_name', 'phone',
+            # Campos da Company (extras)
+            'company_name', 'company_cnpj', 'company_type', 'business_sector'
         )
-        
+    
     def validate_email(self, value):
-        """Validação customizada para email"""
+        """Verifica se email já existe"""
         if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError('Este e-mail já está cadastrado.')
+            raise serializers.ValidationError("Este email já está cadastrado.")
         return value
-    
-    def validate_first_name(self, value):
-        """Validação customizada para nome"""
-        if len(value.strip()) < 2:
-            raise serializers.ValidationError('O nome deve ter pelo menos 2 caracteres.')
-        if not value.replace(' ', '').isalpha():
-            raise serializers.ValidationError('O nome deve conter apenas letras.')
-        return value.strip()
-    
-    def validate_last_name(self, value):
-        """Validação customizada para sobrenome"""
-        if len(value.strip()) < 2:
-            raise serializers.ValidationError('O sobrenome deve ter pelo menos 2 caracteres.')
-        if not value.replace(' ', '').isalpha():
-            raise serializers.ValidationError('O sobrenome deve conter apenas letras.')
-        return value.strip()
-    
-    def validate_company_name(self, value):
-        """Validação customizada para nome da empresa"""
-        if len(value.strip()) < 3:
-            raise serializers.ValidationError('O nome da empresa deve ter pelo menos 3 caracteres.')
-        return value.strip()
     
     def validate_company_cnpj(self, value):
-        """Validação customizada para CNPJ incluindo duplicação"""
+        """Verifica se CNPJ já existe"""
+        # Import aqui para evitar circular import
         from apps.companies.models import Company
-        from apps.companies.validators import validate_cnpj as cnpj_validator
         
-        # Primeiro valida o formato
-        try:
-            cnpj_validator(value)
-        except serializers.ValidationError:
-            raise
+        # Remover formatação do CNPJ (manter só números)
+        cnpj_clean = ''.join(filter(str.isdigit, value))
         
-        # Depois verifica se já existe
-        from apps.companies.validators import format_cnpj
-        formatted_cnpj = format_cnpj(value)
+        if len(cnpj_clean) != 14:
+            raise serializers.ValidationError("CNPJ deve ter 14 dígitos.")
         
-        if Company.objects.filter(cnpj=formatted_cnpj).exists():
-            raise serializers.ValidationError('Este CNPJ já está cadastrado.')
+        if Company.objects.filter(cnpj=value).exists():
+            raise serializers.ValidationError("Este CNPJ já está cadastrado.")
         
         return value
     
-    def validate_password(self, value):
-        """Validação customizada para senha com mensagens em português"""
-        from django.contrib.auth.password_validation import (
-            MinimumLengthValidator,
-            CommonPasswordValidator,
-            NumericPasswordValidator
-        )
-        from django.core.exceptions import ValidationError as DjangoValidationError
-        
-        errors = []
-        
-        # Validação de comprimento mínimo
-        try:
-            MinimumLengthValidator(min_length=8).validate(value)
-        except DjangoValidationError:
-            errors.append('A senha deve ter pelo menos 8 caracteres.')
-        
-        # Validação de senha comum
-        try:
-            CommonPasswordValidator().validate(value)
-        except DjangoValidationError:
-            errors.append('Esta senha é muito comum. Escolha uma senha mais segura.')
-        
-        # Validação de senha numérica
-        try:
-            NumericPasswordValidator().validate(value)
-        except DjangoValidationError:
-            errors.append('A senha não pode conter apenas números.')
-        
-        # Verificações adicionais
-        if not any(char.isupper() for char in value):
-            errors.append('A senha deve conter pelo menos uma letra maiúscula.')
-        
-        if not any(char.islower() for char in value):
-            errors.append('A senha deve conter pelo menos uma letra minúscula.')
-        
-        if not any(char.isdigit() for char in value):
-            errors.append('A senha deve conter pelo menos um número.')
-        
-        if not any(char in "!@#$%^&*()_+-=[]{}|;:,.<>?" for char in value):
-            errors.append('A senha deve conter pelo menos um caractere especial (!@#$%^&* etc).')
-        
-        if errors:
-            raise serializers.ValidationError(errors)
-        
-        return value
-        
     def validate(self, attrs):
+        """Validação geral do formulário"""
+        # Verificar se senhas coincidem
         if attrs['password'] != attrs['password2']:
-            raise serializers.ValidationError({"password": "As senhas não coincidem.", "password2": "As senhas não coincidem."})
+            raise serializers.ValidationError({
+                "password": "As senhas não coincidem."
+            })
+        
+        # Validar força da senha
+        validate_password(attrs['password'])
+        
         return attrs
     
     def create(self, validated_data):
-        company_name = validated_data.pop('company_name')
-        company_cnpj = validated_data.pop('company_cnpj')
-        company_type = validated_data.pop('company_type')
-        business_sector = validated_data.pop('business_sector')
-        selected_plan_slug = validated_data.pop('selected_plan', 'starter')
+        """Criar User + Company automaticamente"""
+        # Separar dados da Company dos dados do User
+        company_data = {
+            'name': validated_data.pop('company_name'),
+            'cnpj': validated_data.pop('company_cnpj'),
+            'company_type': validated_data.pop('company_type'),
+            'business_sector': validated_data.pop('business_sector'),
+        }
+        
+        # Limpar dados do User
         validated_data.pop('password2')
+        validated_data['username'] = validated_data['email']
         
-        # Format phone before saving
-        validated_data['phone'] = format_phone(validated_data['phone'])
+        # 1. Criar User primeiro
+        user = User.objects.create_user(**validated_data)
         
-        # Create user
-        user = User.objects.create_user(
-            username=validated_data['email'],
-            **validated_data
-        )
-        
-        # Get selected plan - NO MORE FREE PLAN
-        selected_plan = SubscriptionPlan.objects.filter(slug=selected_plan_slug).first()
-        if not selected_plan or selected_plan_slug == 'free':
-            # Fallback to starter plan if invalid or trying to use free
-            selected_plan = SubscriptionPlan.objects.filter(slug='starter').first()
-            if not selected_plan:
-                # Create a minimal starter plan if it doesn't exist
-                selected_plan = SubscriptionPlan.objects.create(
-                    name='Starter',
-                    slug='starter',
-                    plan_type='starter',
-                    price_monthly=49,
-                    price_yearly=490,
-                    max_bank_accounts=2,
-                    display_order=1
-                )
-        
-        # ALWAYS CREATE TRIAL FOR 14 DAYS - NO EXCEPTIONS
-        from django.utils import timezone
-        from datetime import timedelta
-        import logging
-        
-        logger = logging.getLogger(__name__)
-        
-        trial_end_date = timezone.now() + timedelta(days=14)
-        logger.info(f"Creating company for user {user.email} with trial ending at {trial_end_date}")
-        
-        company = Company.objects.create(
+        # 2. Criar Company associada ao User
+        from apps.companies.models import Company
+        Company.objects.create(
             owner=user,
-            name=company_name,
-            cnpj=format_cnpj(company_cnpj),
-            company_type=company_type,
-            business_sector=business_sector,
-            subscription_plan=selected_plan,
-            subscription_status='trial',  # ALWAYS trial
-            trial_ends_at=trial_end_date  # ALWAYS 14 days
+            **company_data
         )
-        
-        logger.info(f"Company created: {company.id} - Status: {company.subscription_status} - Trial ends: {company.trial_ends_at}")
         
         return user
 
 
 class LoginSerializer(serializers.Serializer):
-    """Login serializer"""
-    email = serializers.EmailField(required=True)
-    password = serializers.CharField(required=True, write_only=True)
+    """
+    Serializer para login
+    """
+    email = serializers.EmailField()
+    password = serializers.CharField(
+        style={'input_type': 'password'},
+        write_only=True
+    )
     
     def validate(self, attrs):
+        """Validar credenciais"""
         email = attrs.get('email')
         password = attrs.get('password')
         
         if email and password:
-            user = authenticate(username=email, password=password)
+            # Tentar autenticar (username=email no nosso caso)
+            user = authenticate(
+                request=self.context.get('request'),
+                username=email,
+                password=password
+            )
             
             if not user:
-                raise serializers.ValidationError('Credenciais inválidas.')
+                raise serializers.ValidationError(
+                    "Email ou senha incorretos."
+                )
             
             if not user.is_active:
-                raise serializers.ValidationError('Conta de usuário desativada.')
-                
+                raise serializers.ValidationError(
+                    "Conta desativada."
+                )
+            
             attrs['user'] = user
             return attrs
-        else:
-            raise serializers.ValidationError('Deve incluir "email" e "senha".')
-
-
-
-
-class PasswordResetRequestSerializer(serializers.Serializer):
-    """Password reset request serializer"""
-    email = serializers.EmailField(required=True)
-    
-    def validate_email(self, value):
-        if not User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Nenhum usuário encontrado com este endereço de e-mail.")
-        return value
-
-
-class PasswordResetConfirmSerializer(serializers.Serializer):
-    """Password reset confirmation serializer"""
-    token = serializers.CharField(required=True)
-    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
-    password2 = serializers.CharField(write_only=True, required=True)
-    
-    def validate(self, attrs):
-        if attrs['password'] != attrs['password2']:
-            raise serializers.ValidationError({"password": "As senhas não coincidem."})
-        return attrs
-
-
-class ChangePasswordSerializer(serializers.Serializer):
-    """Change password serializer"""
-    old_password = serializers.CharField(required=True)
-    new_password = serializers.CharField(required=True, validators=[validate_password])
-
-    def validate_old_password(self, value):
-        user = self.context['request'].user
-        if not user.check_password(value):
-            raise serializers.ValidationError("Senha atual está incorreta.")
-        return value
-
-
-class DeleteAccountSerializer(serializers.Serializer):
-    """Delete account serializer with password verification"""
-    password = serializers.CharField(required=True, write_only=True)
-    confirmation = serializers.CharField(required=True)
-    
-    def validate_password(self, value):
-        user = self.context['request'].user
-        if not user.check_password(value):
-            raise serializers.ValidationError("Senha incorreta.")
-        return value
         
-    def validate_confirmation(self, value):
-        if value.lower() != 'deletar':
-            raise serializers.ValidationError("Digite 'deletar' para confirmar.")
-        return value
+        raise serializers.ValidationError(
+            "Email e senha são obrigatórios."
+        )
+
+
+class TokenResponseSerializer(serializers.Serializer):
+    """
+    Serializer para resposta de tokens (documentação)
+    """
+    access = serializers.CharField()
+    refresh = serializers.CharField()
+    user = UserSerializer()

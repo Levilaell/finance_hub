@@ -1,7 +1,6 @@
 // frontend/services/reports.service.ts
 
 import apiClient from '@/lib/api-client';
-import { authStorage } from '@/lib/auth-storage';
 import {
   Report,
   ReportParameters,

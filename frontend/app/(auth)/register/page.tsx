@@ -1,22 +1,19 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/auth-store';
 import { RegisterData } from '@/types';
-import { EyeIcon, EyeSlashIcon, CheckIcon, ExclamationCircleIcon, CreditCardIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon, CheckIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 import { validateCNPJ, validatePhone, cnpjMask, phoneMask } from '@/utils/validation';
 
 interface RegisterFormData extends RegisterData {
@@ -25,26 +22,11 @@ interface RegisterFormData extends RegisterData {
 
 function RegisterContent() {
   const router = useRouter();
-  const { setAuth, user } = useAuthStore();
+  const { register: registerUser, isLoading } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [cnpjValue, setCnpjValue] = useState('');
   const [phoneValue, setPhoneValue] = useState('');
-
-  useEffect(() => {
-    // Wait for hydration
-    if (!useAuthStore.getState()._hasHydrated) {
-      return;
-    }
-
-    // Validate auth state
-    const isAuthValid = useAuthStore.getState().validateAndSync();
-    
-    // If valid auth, redirect to dashboard
-    if (isAuthValid && user) {
-      router.push('/dashboard');
-    }
-  }, [user, router]);
 
   const {
     register,
@@ -56,41 +38,29 @@ function RegisterContent() {
 
   const password = watch('password');
 
-  const registerMutation = useMutation({
-    mutationFn: async (data: RegisterData) => {
-      const response = await authService.register(data);
-      return response;
-    },
-    onSuccess: async (data) => {
-      setAuth(data.user, data.tokens);
+  const onSubmit = async (data: RegisterFormData) => {
+    try {
+      await registerUser(data);
       
-      // Save info that payment needs to be configured
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('pending_payment_setup', 'true');
-        localStorage.setItem('trial_start_date', new Date().toISOString());
-      }
-      
-      // Show success message with email verification notice
       toast.success('Cadastro realizado com sucesso!', {
-        description: 'Verifique seu e-mail para confirmar sua conta. Você tem 14 dias grátis para testar.',
+        description: 'Você tem 14 dias grátis para testar.',
         duration: 5000,
       });
       
       router.push('/dashboard');
-    },
-    onError: (error: any) => {
+    } catch (error: any) {
       console.error('Erro no registro:', error.response?.data);
       
-      // Verificar se há erros de campo específicos
-      const fieldErrors = error.response?.data?.error?.field_errors;
-      
-      if (fieldErrors) {
-        // Mostrar primeiro erro de cada campo
-        const errorMessages = Object.entries(fieldErrors)
-          .map(([field, errors]: [string, any]) => {
+      // Handle validation errors
+      if (error.response?.status === 400) {
+        const errors = error.response.data;
+        
+        // Show first error from each field
+        const errorMessages = Object.entries(errors)
+          .filter(([key]) => key !== 'message')
+          .map(([field, fieldErrors]: [string, any]) => {
             const fieldName = field === 'email' ? 'E-mail' :
                            field === 'password' ? 'Senha' :
-                           field === 'password2' ? 'Confirmação de senha' :
                            field === 'company_cnpj' ? 'CNPJ' :
                            field === 'phone' ? 'Telefone' :
                            field === 'first_name' ? 'Nome' :
@@ -98,30 +68,23 @@ function RegisterContent() {
                            field === 'company_name' ? 'Empresa' :
                            field === 'company_type' ? 'Tipo de empresa' :
                            field === 'business_sector' ? 'Setor' : field;
-            return `${fieldName}: ${errors[0]}`;
+            
+            const errorText = Array.isArray(fieldErrors) ? fieldErrors[0] : fieldErrors;
+            return `${fieldName}: ${errorText}`;
           })
           .join('\n');
         
-        toast.error(errorMessages);
+        if (errorMessages) {
+          toast.error(errorMessages);
+        } else {
+          toast.error(error.response.data.message || 'Erro na validação dos dados');
+        }
       } else if (error.response?.status === 500) {
-        // Erro 500 - servidor
-        toast.error('Erro no servidor. Por favor, tente novamente ou entre em contato com o suporte.');
+        toast.error('Erro no servidor. Tente novamente ou entre em contato com o suporte.');
       } else {
-        // Mensagem genérica
-        const errorMessage = error.response?.data?.error?.message || 
-                           error.response?.data?.message ||
-                           error.response?.data?.detail || 
-                           error.message ||
-                           'Falha no cadastro';
-        toast.error(errorMessage);
+        toast.error(error.message || 'Falha no cadastro');
       }
-    },
-  });
-
-  const onSubmit = (data: RegisterFormData) => {
-    registerMutation.mutate({
-      ...data,
-    });
+    }
   };
 
   const passwordRequirements = [
@@ -139,7 +102,6 @@ function RegisterContent() {
         <CardDescription className="text-center text-muted-foreground">
           Inicie seu período de teste gratuito de 14 dias
         </CardDescription>
-        
 
         {/* Trial Notice */}
         <Alert className="mt-4">
@@ -431,9 +393,9 @@ function RegisterContent() {
           <Button
             type="submit"
             className="w-full bg-white hover:bg-white/90 text-black font-medium"
-            disabled={registerMutation.isPending}
+            disabled={isLoading}
           >
-            {registerMutation.isPending ? (
+            {isLoading ? (
               <LoadingSpinner />
             ) : (
               'Criar Conta e Iniciar Trial'

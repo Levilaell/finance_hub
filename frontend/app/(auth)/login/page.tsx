@@ -4,25 +4,20 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/auth-store';
-import type { LoginCredentials, LoginResponse } from '@/types';
+import type { LoginCredentials } from '@/types';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setAuth } = useAuthStore();
+  const { login, isLoading } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
-  const [show2FA, setShow2FA] = useState(false);
-  const [twoFactorCode, setTwoFactorCode] = useState('');
-  const [loginCredentials, setLoginCredentials] = useState<LoginCredentials | null>(null);
 
   const {
     register,
@@ -30,125 +25,46 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm<LoginCredentials>();
 
-  const loginMutation = useMutation<LoginResponse, Error, LoginCredentials>({
-    mutationFn: async (data: LoginCredentials) => {
-      return await authService.login(data);
-    },
-    onSuccess: (data) => {
-      if (data.requires_2fa) {
-        setShow2FA(true);
-        toast.success('Por favor, insira seu código 2FA');
-      } else {
-        setAuth(data.user, data.tokens);
-        toast.success('Login realizado com sucesso!');
-        // Add a small delay to ensure cookies are set
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 100);
-      }
-    },
-    onError: (error: any) => {
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          'Credenciais inválidas';
-      toast.error(errorMessage);
-    },
-  });
-
-  const verify2FAMutation = useMutation<LoginResponse, Error, void>({
-    mutationFn: async () => {
-      if (!loginCredentials) {
-        throw new Error('No login credentials available');
-      }
-      return await authService.loginWith2FA(loginCredentials.email, loginCredentials.password, twoFactorCode);
-    },
-    onSuccess: (data) => {
-      setAuth(data.user, data.tokens);
-      toast.success('Login successful!');
+  const onSubmit = async (data: LoginCredentials) => {
+    try {
+      await login(data.email, data.password);
+      toast.success('Login realizado com sucesso!');
       router.push('/dashboard');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || error.response?.data?.detail || 'Código 2FA inválido');
-    },
-  });
-
-  const onSubmit = (data: LoginCredentials) => {
-    setLoginCredentials(data); // Store credentials for 2FA
-    loginMutation.mutate(data);
-  };
-
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleSubmit(onSubmit)(e);
-  };
-
-  const handle2FASubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!twoFactorCode || twoFactorCode.length !== 6) {
-      toast.error('Por favor, insira um código válido de 6 dígitos');
-      return;
+    } catch (error: any) {
+    console.error('Login error:', error.response?.data); // Debug
+    
+    let errorMessage = 'Credenciais inválidas';
+    
+    if (error.response?.status === 400) {
+      // Erro de validação - extrair mensagem específica
+      const data = error.response.data;
+      
+      if (typeof data === 'string') {
+        errorMessage = data;
+      } else if (data.detail) {
+        errorMessage = data.detail;
+      } else if (data.message) {
+        errorMessage = data.message;
+      } else if (data.error) {
+        errorMessage = data.error;
+      } else {
+        // Se há erros de campo, mostrar o primeiro
+        const fieldErrors = Object.values(data).flat();
+        if (fieldErrors.length > 0) {
+          errorMessage = fieldErrors[0] as string;
+        }
+      }
+    } else if (error.response?.status === 401) {
+      errorMessage = 'Email ou senha incorretos';
+    } else if (error.response?.status === 500) {
+      errorMessage = 'Erro no servidor. Tente novamente.';
+    } else if (error.message === 'Network Error') {
+      errorMessage = 'Erro de rede. Verifique sua conexão.';
     }
-    verify2FAMutation.mutate();
-  };
-
-  if (show2FA) {
-    return (
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-white text-center text-xl font-bold">Autenticação de Dois Fatores</CardTitle>
-          <CardDescription className="text-center text-muted-foreground">
-            Insira o código de 6 dígitos do seu aplicativo autenticador
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handle2FASubmit}>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="2fa-code">Código de Autenticação</Label>
-                <Input
-                  id="2fa-code"
-                  type="text"
-                  placeholder="000000"
-                  maxLength={6}
-                  value={twoFactorCode}
-                  onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, ''))}
-                  className="text-center text-2xl tracking-widest"
-                  autoComplete="one-time-code"
-                  autoFocus
-                />
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
-            <Button
-              type="submit"
-              className="w-full bg-white hover:bg-white/90 text-black font-medium"
-              disabled={verify2FAMutation.isPending}
-            >
-              {verify2FAMutation.isPending ? (
-                <LoadingSpinner />
-              ) : (
-                'Verificar Código'
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                setShow2FA(false);
-                setTwoFactorCode('');
-                setLoginCredentials(null);
-              }}
-            >
-              Voltar ao Login
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
-    );
+    
+    toast.error(errorMessage);
   }
+  };
 
   return (
     <Card className="w-full max-w-md">
@@ -158,7 +74,7 @@ export default function LoginPage() {
           Entre na sua conta para continuar
         </CardDescription>
       </CardHeader>
-      <form onSubmit={handleFormSubmit}>
+      <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent>
           <div className="space-y-4">
             <div>
@@ -230,9 +146,9 @@ export default function LoginPage() {
           <Button
             type="submit"
             className="w-full hover-glow bg-primary hover:bg-primary/90 text-primary-foreground"
-            disabled={loginMutation.isPending}
+            disabled={isLoading}
           >
-            {loginMutation.isPending ? <LoadingSpinner /> : 'Entrar'}
+            {isLoading ? <LoadingSpinner /> : 'Entrar'}
           </Button>
           <p className="text-sm text-center text-muted-foreground">
             Não tem uma conta?{' '}
