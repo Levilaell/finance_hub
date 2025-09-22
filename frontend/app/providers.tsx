@@ -2,9 +2,8 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Toaster } from 'sonner';
-import { useAuthStore } from '@/store/auth-store';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -18,18 +17,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       })
   );
-
-  const { checkAuth, _hasHydrated } = useAuthStore();
-
-  useEffect(() => {
-    // Only check auth after hydration and if we have a token
-    if (_hasHydrated && typeof window !== 'undefined') {
-      const hasToken = localStorage.getItem('access_token');
-      if (hasToken) {
-        checkAuth();
-      }
-    }
-  }, [checkAuth, _hasHydrated]);
 
   return (
     <QueryClientProvider client={queryClient}>

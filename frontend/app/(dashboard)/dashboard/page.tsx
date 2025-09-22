@@ -31,10 +31,6 @@ interface DashboardData {
   top_categories: CategorySummary[];
   accounts_count: number;
   transactions_count: number;
-  active_budgets?: Budget[];
-  budgets_summary?: BudgetsSummary;
-  active_goals?: FinancialGoal[];
-  goals_summary?: GoalsSummary;
   monthly_trends?: MonthlyTrend[];
   expense_trends?: ExpenseTrend[];
   income_comparison?: Comparison;
@@ -59,39 +55,6 @@ interface CategorySummary {
   category__icon: string;
   total: number;
   count: number;
-}
-
-interface Budget {
-  id: number;
-  name: string;
-  amount: number;
-  spent_amount: number;
-  remaining_amount: number;
-  spent_percentage: number;
-  is_exceeded: boolean;
-}
-
-interface BudgetsSummary {
-  total_budgets: number;
-  total_budget_amount: number;
-  total_spent: number;
-  exceeded_count: number;
-}
-
-interface FinancialGoal {
-  id: number;
-  name: string;
-  target_amount: number;
-  current_amount: number;
-  progress_percentage: number;
-  days_remaining?: number;
-}
-
-interface GoalsSummary {
-  total_goals: number;
-  completed_goals: number;
-  total_target_amount: number;
-  total_current_amount: number;
 }
 
 interface MonthlyTrend {

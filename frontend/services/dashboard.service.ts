@@ -9,12 +9,6 @@ export interface DashboardData {
   top_categories: any[];
   accounts_count: number;
   transactions_count: number;
-  active_budgets?: any[];
-  budgets_summary?: any;
-  active_goals?: any[];
-  goals_summary?: any;
-  monthly_trends?: any[];
-  expense_trends?: any[];
   income_comparison?: any;
   expense_comparison?: any;
   financial_insights?: string[];

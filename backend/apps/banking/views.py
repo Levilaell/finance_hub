@@ -29,8 +29,8 @@ from .serializers import (
     PluggyConnectorSerializer, PluggyItemSerializer, BankAccountSerializer,
     TransactionSerializer, TransactionCategorySerializer,
     PluggyConnectTokenSerializer, PluggyCallbackSerializer,
-    AccountSyncSerializer, BulkCategorizeSerializer,
-    TransactionFilterSerializer, DashboardDataSerializer,
+    BulkCategorizeSerializer,
+    TransactionFilterSerializer,
     DashboardTransactionSerializer
 )
 from .integrations.pluggy.client import PluggyClient, PluggyError

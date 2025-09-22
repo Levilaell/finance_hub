@@ -20,7 +20,6 @@ import {
   SyncResponse,
   BulkCategorizeRequest,
   BulkCategorizeResponse,
-  DashboardData,
   DisconnectItemResponse,
 } from '@/types/banking.types';
 
