@@ -35,7 +35,6 @@ from .serializers import (
 )
 from .integrations.pluggy.client import PluggyClient, PluggyError
 from .tasks import sync_bank_account, process_webhook_event
-from apps.companies.mixins import CompanyValidationMixin
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +167,7 @@ class PluggyConnectorViewSet(viewsets.ReadOnlyModelViewSet):
             return _handle_pluggy_error(e, "connectors synchronization")
 
 
-class PluggyItemViewSet(CompanyValidationMixin, viewsets.ModelViewSet):
+class PluggyItemViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Pluggy items (connections)
     """
@@ -307,7 +306,7 @@ class PluggyItemViewSet(CompanyValidationMixin, viewsets.ModelViewSet):
 
 
 
-class BankAccountViewSet(CompanyValidationMixin, viewsets.ReadOnlyModelViewSet):
+class BankAccountViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet for bank accounts
     """
@@ -505,7 +504,7 @@ class BankAccountViewSet(CompanyValidationMixin, viewsets.ReadOnlyModelViewSet):
         })
 
 
-class TransactionViewSet(CompanyValidationMixin, viewsets.ModelViewSet):
+class TransactionViewSet(viewsets.ModelViewSet):
     """
     ViewSet for transactions
     """
@@ -724,7 +723,7 @@ class TransactionViewSet(CompanyValidationMixin, viewsets.ModelViewSet):
         return response
 
 
-class TransactionCategoryViewSet(CompanyValidationMixin, viewsets.ModelViewSet):
+class TransactionCategoryViewSet(viewsets.ModelViewSet):
     """
     ViewSet for transaction categories
     """
