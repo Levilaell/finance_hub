@@ -6,20 +6,17 @@ import logging
 import os
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Optional
 
 from django.db import transaction
 from django.db.models import Sum, Q, Count
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator  # Still needed for csrf_exempt
 
-from rest_framework import status, viewsets, permissions # type: ignore
-from rest_framework.decorators import action # type: ignore
-from rest_framework.response import Response # type: ignore
-from rest_framework.views import APIView # type: ignore
-from rest_framework.pagination import PageNumberPagination # type: ignore
-from rest_framework.exceptions import PermissionDenied # type: ignore
+from rest_framework import status, viewsets, permissions 
+from rest_framework.decorators import action 
+from rest_framework.response import Response 
+from rest_framework.views import APIView 
+from rest_framework.pagination import PageNumberPagination 
+from rest_framework.exceptions import PermissionDenied 
 
 from .models import (
     PluggyConnector, PluggyItem, BankAccount,
