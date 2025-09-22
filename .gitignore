@@ -178,3 +178,5 @@ media_volume/
 prometheus_data/
 grafana_data/
 pgadmin_data/
+
+claudedocs/

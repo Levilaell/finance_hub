@@ -121,7 +121,6 @@ SESSION_COOKIE_AGE = 300  # 5 minutes (short-lived since JWT is primary auth)
 # Admin app REQUIRES both SessionMiddleware and MessageMiddleware
 # Solution: Keep middleware but use dummy backends (no persistence, no Redis)
 MIDDLEWARE = [
-    'core.health_middleware.HealthCheckSSLBypassMiddleware',  # Health checks
     'django.middleware.security.SecurityMiddleware',          # Security headers
     'whitenoise.middleware.WhiteNoiseMiddleware',            # Static files
     'corsheaders.middleware.CorsMiddleware',                 # CORS headers
