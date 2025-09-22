@@ -145,12 +145,6 @@ def warn_stripe_configuration():
 # Show warning for missing Stripe config
 warn_stripe_configuration()
 
-# ===== ADICIONAR MIDDLEWARE DE TRIAL =====
-# Adicione após o AuthenticationMiddleware
-MIDDLEWARE += [
-    'apps.companies.middleware.TrialExpirationMiddleware',
-]
-
 # Logging
 LOGGING = {
     'version': 1,

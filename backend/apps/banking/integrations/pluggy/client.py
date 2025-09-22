@@ -377,15 +377,7 @@ class PluggyClient:
         Revoke consent for Open Finance item
         """
         self._make_request('DELETE', f'consents/{item_id}')
-    
-    # ===== Investments =====
-    
-    def get_investments(self, item_id: str) -> List[Dict[str, Any]]:
-        """
-        Get investments for an item
-        """
-        data = self._make_request('GET', 'investments', params={'itemId': item_id})
-        return data.get('results', [])
+
     
     # ===== Categorization =====
     

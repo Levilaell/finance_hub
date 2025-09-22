@@ -24,16 +24,14 @@ interface PricingPlan {
   badge?: string;
 }
 
-// Plans synchronized with backend (create_subscription_plans.py) and Stripe dashboard
-// IMPORTANT: Keep prices in sync with backend/apps/companies/management/commands/create_subscription_plans.py
 const plans: PricingPlan[] = [
   {
-    id: 'starter',
-    name: 'Starter',
-    slug: 'starter',
+    id: 'pro',
+    name: 'Pro',
+    slug: 'pro',
     description: 'Perfeito para empresas que estão começando a organizar suas finanças',
-    priceMonthly: 49,   // R$ 49/mês - Synced with Stripe price_1RkePtPFSVtvOaJKYbiX6TqQ
-    priceYearly: 490,   // R$ 490/ano - Synced with Stripe price_1RnPVfPFSVtvOaJKmwzNmUdz
+    priceMonthly: 49,   
+    priceYearly: 490,  
     features: [
       '1 conta bancária',
       '500 transações por mês',
@@ -46,43 +44,6 @@ const plans: PricingPlan[] = [
     limitations: [
       'Não inclui análises por IA',
     ],
-  },
-  {
-    id: 'professional',
-    name: 'Profissional',
-    slug: 'professional',
-    description: 'Ideal para empresas que querem insights inteligentes e automação completa',
-    priceMonthly: 149,  // R$ 149/mês - Synced with Stripe price_1RkeQgPFSVtvOaJKgPQzW1SD
-    priceYearly: 1490,  // R$ 1490/ano - Synced with Stripe price_1RnPVRPFSVtvOaJKlWxiSHnn
-    highlighted: true,
-    badge: 'Mais Popular',
-    features: [
-      '3 contas bancárias',
-      '2.500 transações por mês',
-      'Tudo do plano Starter, mais:',
-      '✨ IA Financeira: 10 interações mensais',
-      '✨ Insights automáticos personalizados',
-      '✨ Previsões de fluxo de caixa',
-      '✨ Alertas de gastos e anomalias',
-      '✨ Relatórios inteligentes',
-    ],
-    limitations: [
-      'Limite de 10 análises de IA por mês',
-    ],
-  },
-  {
-    id: 'enterprise',
-    name: 'Empresarial',
-    slug: 'enterprise',
-    description: 'Solução completa e ilimitada para empresas com operação complexa',
-    priceMonthly: 349,  // R$ 349/mês - Synced with Stripe price_1RkeMJPFSVtvOaJKuIZxvjPa
-    priceYearly: 3490,  // R$ 3490/ano - Synced with Stripe price_1RnPV8PFSVtvOaJKuIZxvjPa
-    features: [
-      'Contas e transações ilimitadas',
-      'Tudo dos planos anteriores, mais:',
-      '✨ IA Avançada: Interação ilimitada',
-    ],
-    limitations: [],
   },
 ];
 

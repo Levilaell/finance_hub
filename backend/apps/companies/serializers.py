@@ -28,19 +28,3 @@ class CompanySerializer(serializers.ModelSerializer):
             'owner_email', 'created_at', 'updated_at'
         ]
     
-    def validate_cnpj(self, value):
-        """Validate CNPJ format and uniqueness"""
-        # Basic format validation
-        clean_cnpj = ''.join(filter(str.isdigit, value))
-        if len(clean_cnpj) != 14:
-            raise serializers.ValidationError("CNPJ deve conter 14 dígitos")
-        
-        # Check uniqueness (excluding current instance)
-        queryset = Company.objects.filter(cnpj=value, is_active=True)
-        if self.instance:
-            queryset = queryset.exclude(pk=self.instance.pk)
-        
-        if queryset.exists():
-            raise serializers.ValidationError("CNPJ já está em uso")
-        
-        return value

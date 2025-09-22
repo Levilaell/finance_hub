@@ -757,24 +757,8 @@ class PluggyConnectView(APIView):
     
     def post(self, request):
         """Create connect token"""
-        # Check plan feature
-        if hasattr(request.user, 'company'):
-            company = request.user.company
-            if not company.can_add_bank_account():
-                current_count = company.bank_accounts.filter(is_active=True).count()
-                limit = company.subscription_plan.max_bank_accounts if company.subscription_plan else 0
-                
-                return Response({
-                    'error': f'Limite de contas bancárias atingido ({current_count}/{limit})',
-                    'limit_type': 'bank_accounts',
-                    'current': current_count,
-                    'limit': limit,
-                    'upgrade_required': True,
-                    'current_plan': company.subscription_plan.name if company.subscription_plan else 'Nenhum',
-                    'suggested_plan': 'professional' if company.subscription_plan and company.subscription_plan.plan_type == 'starter' else 'enterprise',
-                    'redirect': '/dashboard/subscription/upgrade'
-                }, status=status.HTTP_403_FORBIDDEN)
-        else:
+        # Check if user has a company
+        if not hasattr(request.user, 'company') or not request.user.company:
             return Response({
                 'error': 'Usuário não está associado a nenhuma empresa'
             }, status=status.HTTP_403_FORBIDDEN)
@@ -833,24 +817,8 @@ class PluggyCallbackView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Check plan feature
         company = request.user.company
-        if not company.can_add_bank_account():
-            current_count = company.bank_accounts.filter(is_active=True).count()
-            limit = company.subscription_plan.max_bank_accounts if company.subscription_plan else 0
-            
-            return Response({
-                'success': False,
-                'error': f'Limite de contas bancárias atingido ({current_count}/{limit})',
-                'limit_type': 'bank_accounts',
-                'current': current_count,
-                'limit': limit,
-                'upgrade_required': True,
-                'current_plan': company.subscription_plan.name if company.subscription_plan else 'Nenhum',
-                'suggested_plan': 'professional' if company.subscription_plan and company.subscription_plan.plan_type == 'starter' else 'enterprise',
-                'redirect': '/dashboard/subscription/upgrade'
-            }, status=status.HTTP_403_FORBIDDEN)
-        
+
         serializer = PluggyCallbackSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
