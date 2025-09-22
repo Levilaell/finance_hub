@@ -89,7 +89,7 @@ export const reportsService = {
   // Download report file directly
   async downloadReport(reportId: string): Promise<Blob> {
     try {
-      const token = authStorage.getAccessToken();
+      const token = localStorage.getItem('access_token');
 
       if (!token) {
         throw new Error('Token de autenticação não encontrado');

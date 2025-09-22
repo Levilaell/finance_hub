@@ -6,5 +6,3 @@ class BankingConfig(AppConfig):
     name = 'apps.banking'
     verbose_name = 'Banking'
     
-    def ready(self):
-        import apps.banking.signals
