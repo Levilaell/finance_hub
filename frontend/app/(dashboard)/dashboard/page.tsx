@@ -141,7 +141,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         <Link href="/accounts">
           <Card className="hover:shadow-lg transition-shadow cursor-pointer">
             <CardHeader>
