@@ -2,7 +2,6 @@
  * Brazilian document validation utilities
  */
 
-// Re-export only the mask functions that are actually used from lib/utils
 export { phoneMask, cnpjMask } from '@/lib/utils';
 
 /**

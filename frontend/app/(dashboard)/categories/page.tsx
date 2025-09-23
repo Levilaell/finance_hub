@@ -1,23 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { ErrorMessage } from '@/components/ui/error-message';
 import { EmptyState } from '@/components/ui/empty-state';
-import { categoriesService } from '@/services/categories.service';
-import { Category, CategoryForm } from '@/types';
 import { 
   TagIcon, 
   PlusIcon, 
   TrashIcon,
   PencilIcon,
-  SparklesIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline';
@@ -50,76 +44,48 @@ const ICONS = [
   '💰', '📱', '💡', '🏥', '🎮', '👔', '🎁', '💳'
 ];
 
+interface Category {
+  id: string;
+  name: string;
+  type: 'income' | 'expense';
+  color: string;
+  icon: string;
+  is_system?: boolean;
+}
+
+interface CategoryForm {
+  name: string;
+  type: 'income' | 'expense';
+  color: string;
+  icon: string;
+  parent?: string;
+}
+
 export default function CategoriesPage() {
-  const queryClient = useQueryClient();
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [selectedColor, setSelectedColor] = useState(DEFAULT_COLORS[0]);
-  const [selectedIcon, setSelectedIcon] = useState(ICONS[0]);
 
-  const { data: categories, isLoading, error } = useQuery({
-    queryKey: ['categories'],
-    queryFn: () => categoriesService.getCategories(),
-  });
+  // Mock empty data
+  const categories: Category[] = [];
 
-  // Rules endpoint removido - categorização agora é feita automaticamente pela Pluggy
+  const handleCreateCategory = (data: CategoryForm) => {
+    toast.info('Banking logic removed - category not created');
+    setIsAddingCategory(false);
+  };
 
-  const createCategoryMutation = useMutation({
-    mutationFn: (data: CategoryForm) => categoriesService.createCategory(data),
-    onSuccess: () => {
-      // Invalidate both categories queries to ensure transactions page updates
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      setIsAddingCategory(false);
-      toast.success('Categoria criada com sucesso');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Falha ao criar categoria');
-    },
-  });
+  const handleUpdateCategory = (data: CategoryForm) => {
+    toast.info('Banking logic removed - category not updated');
+    setEditingCategory(null);
+  };
 
-  const updateCategoryMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<CategoryForm> }) =>
-      categoriesService.updateCategory(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
-      setEditingCategory(null);
-      toast.success('Categoria atualizada com sucesso');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Falha ao atualizar categoria');
-    },
-  });
+  const handleDeleteCategory = () => {
+    toast.info('Banking logic removed - category not deleted');
+    setSelectedCategory(null);
+  };
 
-  const deleteCategoryMutation = useMutation({
-    mutationFn: (id: string) => categoriesService.deleteCategory(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
-      setSelectedCategory(null);
-      toast.success('Categoria excluída com sucesso');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Falha ao excluir categoria');
-    },
-  });
-
-  // Auto-categorização removida - agora é feita automaticamente pela Pluggy
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  if (error) {
-    return <ErrorMessage message="Falha ao carregar categorias" />;
-  }
-
-  const incomeCategories = categories?.filter(cat => cat.type === 'income') || [];
-  const expenseCategories = categories?.filter(cat => cat.type === 'expense') || [];
+  const incomeCategories = categories.filter(cat => cat.type === 'income');
+  const expenseCategories = categories.filter(cat => cat.type === 'expense');
 
   const CategoryCard = ({ category }: { category: Category }) => {
     return (
@@ -147,9 +113,7 @@ export default function CategoriesPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    setEditingCategory(category);
-                  }}
+                  onClick={() => setEditingCategory(category)}
                 >
                   <PencilIcon className="h-4 w-4" />
                 </Button>
@@ -210,79 +174,79 @@ export default function CategoriesPage() {
               required
             />
           </div>
-        <div>
-          <Label htmlFor="type">Tipo</Label>
-          <Select 
-            name="type" 
-            value={formData.type}
-            onValueChange={(value) => setFormData({ ...formData, type: value as "income" | "expense" })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="income">
-                <div className="flex items-center">
-                  <ArrowTrendingUpIcon className="h-4 w-4 mr-2 text-green-600" />
-                  Receita
-                </div>
-              </SelectItem>
-              <SelectItem value="expense">
-                <div className="flex items-center">
-                  <ArrowTrendingDownIcon className="h-4 w-4 mr-2 text-red-600" />
-                  Despesa
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label>Ícone</Label>
-          <div className="grid grid-cols-8 gap-2 mt-2">
-            {ICONS.map((icon) => (
-              <button
-                key={icon}
-                type="button"
-                className={`p-2 text-2xl rounded-lg border-2 transition-colors ${
-                  formData.icon === icon
-                    ? 'border-primary bg-primary/10'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-                onClick={() => setFormData({ ...formData, icon })}
-              >
-                {icon}
-              </button>
-            ))}
+          <div>
+            <Label htmlFor="type">Tipo</Label>
+            <Select 
+              name="type" 
+              value={formData.type}
+              onValueChange={(value) => setFormData({ ...formData, type: value as "income" | "expense" })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="income">
+                  <div className="flex items-center">
+                    <ArrowTrendingUpIcon className="h-4 w-4 mr-2 text-green-600" />
+                    Receita
+                  </div>
+                </SelectItem>
+                <SelectItem value="expense">
+                  <div className="flex items-center">
+                    <ArrowTrendingDownIcon className="h-4 w-4 mr-2 text-red-600" />
+                    Despesa
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Ícone</Label>
+            <div className="grid grid-cols-8 gap-2 mt-2">
+              {ICONS.map((icon) => (
+                <button
+                  key={icon}
+                  type="button"
+                  className={`p-2 text-2xl rounded-lg border-2 transition-colors ${
+                    formData.icon === icon
+                      ? 'border-primary bg-primary/10'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => setFormData({ ...formData, icon })}
+                >
+                  {icon}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label>Cor</Label>
+            <div className="grid grid-cols-9 gap-2 mt-2">
+              {DEFAULT_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  className={`w-10 h-10 rounded-lg border-2 transition-all ${
+                    formData.color === color
+                      ? 'border-gray-800 scale-110'
+                      : 'border-transparent hover:scale-105'
+                  }`}
+                  style={{ backgroundColor: color }}
+                  onClick={() => setFormData({ ...formData, color })}
+                />
+              ))}
+            </div>
           </div>
         </div>
-        <div>
-          <Label>Cor</Label>
-          <div className="grid grid-cols-9 gap-2 mt-2">
-            {DEFAULT_COLORS.map((color) => (
-              <button
-                key={color}
-                type="button"
-                className={`w-10 h-10 rounded-lg border-2 transition-all ${
-                  formData.color === color
-                    ? 'border-gray-800 scale-110'
-                    : 'border-transparent hover:scale-105'
-                }`}
-                style={{ backgroundColor: color }}
-                onClick={() => setFormData({ ...formData, color })}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit">
-          {category ? 'Atualizar' : 'Criar'} Categoria
-        </Button>
-      </DialogFooter>
-    </form>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button type="submit">
+            {category ? 'Atualizar' : 'Criar'} Categoria
+          </Button>
+        </DialogFooter>
+      </form>
     );
   };
 
@@ -294,7 +258,6 @@ export default function CategoriesPage() {
           <p className="text-gray-600">Organize suas transações com categorias</p>
         </div>
         <div className="flex space-x-2">
-
           <Button onClick={() => setIsAddingCategory(true)} className="w-full sm:w-auto">
             <PlusIcon className="h-4 w-4 mr-2" />
             Adicionar Categoria
@@ -310,57 +273,33 @@ export default function CategoriesPage() {
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          {categories && categories.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {categories.map((category) => (
-                <CategoryCard key={category.id} category={category} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={TagIcon}
-              title="Nenhuma categoria"
-              description="Crie sua primeira categoria para começar a organizar as transações"
-              action={
-                <Button onClick={() => setIsAddingCategory(true)}>
-                  <PlusIcon className="h-4 w-4 mr-2" />
-                  Criar Categoria
-                </Button>
-              }
-            />
-          )}
+          <EmptyState
+            icon={TagIcon}
+            title="Nenhuma categoria"
+            description="Crie sua primeira categoria para começar a organizar as transações"
+            action={
+              <Button onClick={() => setIsAddingCategory(true)}>
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Criar Categoria
+              </Button>
+            }
+          />
         </TabsContent>
 
         <TabsContent value="income" className="space-y-4">
-          {incomeCategories.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {incomeCategories.map((category) => (
-                <CategoryCard key={category.id} category={category} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={ArrowTrendingUpIcon}
-              title="Nenhuma categoria de receita"
-              description="Crie categorias para rastrear suas fontes de receita"
-            />
-          )}
+          <EmptyState
+            icon={ArrowTrendingUpIcon}
+            title="Nenhuma categoria de receita"
+            description="Crie categorias para rastrear suas fontes de receita"
+          />
         </TabsContent>
 
         <TabsContent value="expense" className="space-y-4">
-          {expenseCategories.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {expenseCategories.map((category) => (
-                <CategoryCard key={category.id} category={category} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={ArrowTrendingDownIcon}
-              title="Nenhuma categoria de despesa"
-              description="Crie categorias para rastrear suas despesas"
-            />
-          )}
+          <EmptyState
+            icon={ArrowTrendingDownIcon}
+            title="Nenhuma categoria de despesa"
+            description="Crie categorias para rastrear suas despesas"
+          />
         </TabsContent>
       </Tabs>
 
@@ -374,9 +313,7 @@ export default function CategoriesPage() {
             </DialogDescription>
           </DialogHeader>
           <CategoryForm
-            onSubmit={(data) => {
-        createCategoryMutation.mutate(data);
-      }}
+            onSubmit={handleCreateCategory}
             onCancel={() => setIsAddingCategory(false)}
           />
         </DialogContent>
@@ -394,9 +331,7 @@ export default function CategoriesPage() {
           {editingCategory && (
             <CategoryForm
               category={editingCategory}
-              onSubmit={(data) =>
-                updateCategoryMutation.mutate({ id: editingCategory.id, data })
-              }
+              onSubmit={handleUpdateCategory}
               onCancel={() => setEditingCategory(null)}
             />
           )}
@@ -422,14 +357,9 @@ export default function CategoriesPage() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => {
-                if (selectedCategory) {
-                  deleteCategoryMutation.mutate(selectedCategory.id);
-                }
-              }}
-              disabled={deleteCategoryMutation.isPending}
+              onClick={handleDeleteCategory}
             >
-              {deleteCategoryMutation.isPending ? <LoadingSpinner /> : 'Excluir Categoria'}
+              Excluir Categoria
             </Button>
           </DialogFooter>
         </DialogContent>

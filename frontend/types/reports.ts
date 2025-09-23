@@ -1,5 +1,3 @@
-// AI Types - Moved from index.ts to avoid circular dependency
-
 export interface DateRange {
   start_date: string;
   end_date: string;

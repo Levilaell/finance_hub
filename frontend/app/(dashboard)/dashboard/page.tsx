@@ -1,189 +1,39 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { ErrorMessage } from '@/components/ui/error-message';
 import Link from 'next/link';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import { 
-  ArrowUpIcon, 
-  ArrowDownIcon,
   BanknotesIcon,
   CreditCardIcon,
   ChartBarIcon,
   DocumentTextIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
-  ExclamationTriangleIcon as AlertCircle
+  ArrowDownIcon,
+  ArrowUpIcon
 } from '@heroicons/react/24/outline';
-
-interface DashboardData {
-  current_balance: number;
-  monthly_income: number;
-  monthly_expenses: number;
-  monthly_net: number;
-  recent_transactions: Transaction[];
-  top_categories: CategorySummary[];
-  accounts_count: number;
-  transactions_count: number;
-  monthly_trends?: MonthlyTrend[];
-  expense_trends?: ExpenseTrend[];
-  income_comparison?: Comparison;
-  expense_comparison?: Comparison;
-  financial_insights?: string[];
-  alerts?: Alert[];
-}
-
-interface Transaction {
-  id: number;
-  description: string;
-  amount: number;
-  transaction_date: string;
-  transaction_type: string;
-  category_name?: string;
-  category_icon?: string;
-  bank_account_name: string;
-}
-
-interface CategorySummary {
-  category__name: string;
-  category__icon: string;
-  total: number;
-  count: number;
-}
-
-interface MonthlyTrend {
-  date: string;
-  income: number;
-  expenses: number;
-  balance: number;
-  net_flow: number;
-}
-
-interface ExpenseTrend {
-  period: string;
-  category: string;
-  amount: number;
-  transaction_count: number;
-  change_from_previous: number;
-  change_percentage: number;
-}
-
-interface Comparison {
-  current_period: number;
-  previous_period: number;
-  variance: number;
-  variance_percentage: number;
-  trend: 'up' | 'down' | 'stable';
-}
-
-interface Alert {
-  type: string;
-  message: string;
-  severity: 'high' | 'medium' | 'low';
-}
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchDashboardData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // TODO: Implementar serviço de dashboard com Pluggy
-      // const { dashboardService } = await import('@/services/dashboard.service');
-      // const data = await dashboardService.getDashboardData();
-      // setDashboardData(data);
-      
-      // Mock data temporário
-      setDashboardData({
-        current_balance: 0,
-        monthly_income: 0,
-        monthly_expenses: 0,
-        monthly_net: 0,
-        recent_transactions: [],
-        top_categories: [],
-        accounts_count: 0,
-        transactions_count: 0,
-      });
-    } catch (err) {
-      console.error('Dashboard error:', err);
-      setError('Erro ao carregar dados do dashboard');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/login');
       return;
     }
+  }, [isAuthenticated, router]);
 
-    if (user && isAuthenticated) {
-      fetchDashboardData();
-    }
-  }, [isAuthenticated, user, router, fetchDashboardData]);
-  
-  // Refetch dashboard data when subscription is updated
-  useEffect(() => {
-    const handleUpdate = () => {
-      fetchDashboardData();
-    };
-    
-    window.addEventListener('subscription-updated', handleUpdate);
-    return () => window.removeEventListener('subscription-updated', handleUpdate);
-  }, [fetchDashboardData]);
-
-  const getTransactionIcon = (type: string) => {
-    switch (type) {
-      case 'credit':
-      case 'transfer_in':
-      case 'pix_in':
-        return <ArrowDownIcon className="h-4 w-4 text-green-500" />;
-      default:
-        return <ArrowUpIcon className="h-4 w-4 text-red-500" />;
-    }
-  };
-
-  const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
-    switch (trend) {
-      case 'up':
-        return <ArrowTrendingUpIcon className="h-4 w-4 text-green-500" />;
-      case 'down':
-        return <ArrowTrendingDownIcon className="h-4 w-4 text-red-500" />;
-      default:
-        return <span className="h-4 w-4 text-white/50">—</span>;
-    }
-  };
-
-  if (loading || !user) {
+  if (!isAuthenticated || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <LoadingSpinner />
       </div>
     );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <ErrorMessage message={error} onRetry={fetchDashboardData} />
-      </div>
-    );
-  }
-
-  if (!dashboardData) {
-    return null;
   }
 
   return (
@@ -198,8 +48,8 @@ export default function DashboardPage() {
             Aqui está o resumo da sua situação financeira
           </p>
         </div>
-        <Button onClick={fetchDashboardData} disabled={loading} variant="outline">
-          {loading ? <LoadingSpinner /> : 'Atualizar'}
+        <Button variant="outline">
+          Atualizar
         </Button>
       </div>
 
@@ -211,9 +61,9 @@ export default function DashboardPage() {
             <BanknotesIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(dashboardData.current_balance)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(0)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {dashboardData.accounts_count} conta{dashboardData.accounts_count !== 1 ? 's' : ''} conectada{dashboardData.accounts_count !== 1 ? 's' : ''}
+              0 contas conectadas
             </p>
           </CardContent>
         </Card>
@@ -225,19 +75,8 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(dashboardData.monthly_income)}
+              {formatCurrency(0)}
             </div>
-            {dashboardData.income_comparison && (
-              <div className="flex items-center gap-1 mt-1">
-                {getTrendIcon(dashboardData.income_comparison.trend)}
-                <span className={`text-xs ${
-                  dashboardData.income_comparison.variance >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {dashboardData.income_comparison.variance_percentage.toFixed(1)}%
-                </span>
-                <span className="text-xs text-muted-foreground">vs mês anterior</span>
-              </div>
-            )}
           </CardContent>
         </Card>
 
@@ -248,19 +87,8 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              {formatCurrency(dashboardData.monthly_expenses)}
+              {formatCurrency(0)}
             </div>
-            {dashboardData.expense_comparison && (
-              <div className="flex items-center gap-1 mt-1">
-                {getTrendIcon(dashboardData.expense_comparison.trend)}
-                <span className={`text-xs ${
-                  dashboardData.expense_comparison.variance <= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {Math.abs(dashboardData.expense_comparison.variance_percentage).toFixed(1)}%
-                </span>
-                <span className="text-xs text-muted-foreground">vs mês anterior</span>
-              </div>
-            )}
           </CardContent>
         </Card>
 
@@ -270,52 +98,15 @@ export default function DashboardPage() {
             <ChartBarIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${
-              dashboardData.monthly_net >= 0 ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {formatCurrency(dashboardData.monthly_net)}
+            <div className="text-2xl font-bold">
+              {formatCurrency(0)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {dashboardData.transactions_count} transações
+              0 transações
             </p>
           </CardContent>
         </Card>
       </div>
-
-      {/* Alerts */}
-      {dashboardData.alerts && dashboardData.alerts.length > 0 && (
-        <div className="space-y-2">
-          {dashboardData.alerts.map((alert, index) => (
-            <Card
-              key={index}
-              className={`border ${
-                alert.severity === 'high' 
-                  ? 'border-error-subtle' 
-                  : alert.severity === 'medium'
-                  ? 'border-warning-subtle'
-                  : 'border-info-subtle'
-              }`}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <div className={`mt-0.5 ${
-                    alert.severity === 'high' 
-                      ? 'text-error-subtle' 
-                      : alert.severity === 'medium'
-                      ? 'text-warning-subtle'
-                      : 'text-info-subtle'
-                  }`}>
-                    <AlertCircle className="h-4 w-4" />
-                  </div>
-                  <p className="text-sm text-foreground">
-                    {alert.message}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Recent Transactions */}
@@ -328,35 +119,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {dashboardData.recent_transactions.length > 0 ? (
-                dashboardData.recent_transactions.slice(0, 5).map((transaction) => (
-                  <div key={transaction.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50">
-                    <div className="flex items-center gap-3">
-                      {getTransactionIcon(transaction.transaction_type)}
-                      <div>
-                        <p className="font-medium text-sm">{transaction.description}</p>
-                        <p className="text-xs text-white/60">
-                          {transaction.category_name || 'Sem categoria'} • {transaction.bank_account_name}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-medium ${
-                        ['credit', 'transfer_in', 'pix_in'].includes(transaction.transaction_type)
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                      }`}>
-                        {formatCurrency(transaction.amount)}
-                      </p>
-                      <p className="text-xs text-white/60">
-                        {formatDate(transaction.transaction_date)}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-white/60 py-4">Nenhuma transação encontrada</p>
-              )}
+              <p className="text-center text-white/60 py-4">Nenhuma transação encontrada</p>
             </div>
           </CardContent>
         </Card>
@@ -371,22 +134,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {dashboardData.top_categories.length > 0 ? (
-                dashboardData.top_categories.slice(0, 5).map((category, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{category.category__icon || '📊'}</span>
-                      <span className="text-sm font-medium">{category.category__name}</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium">{formatCurrency(Math.abs(category.total))}</p>
-                      <p className="text-xs text-white/60">{category.count} transações</p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-white/60 py-4">Nenhuma categoria encontrada</p>
-              )}
+              <p className="text-center text-white/60 py-4">Nenhuma categoria encontrada</p>
             </div>
           </CardContent>
         </Card>
@@ -404,7 +152,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-white/70">
-                {dashboardData.accounts_count} conta{dashboardData.accounts_count !== 1 ? 's' : ''} conectada{dashboardData.accounts_count !== 1 ? 's' : ''}
+                0 contas conectadas
               </p>
             </CardContent>
           </Card>
@@ -420,7 +168,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-white/70">
-                {dashboardData.transactions_count} este mês
+                0 este mês
               </p>
             </CardContent>
           </Card>
@@ -442,25 +190,6 @@ export default function DashboardPage() {
           </Card>
         </Link>
       </div>
-
-      {/* Financial Insights */}
-      {dashboardData.financial_insights && dashboardData.financial_insights.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Insights Financeiros</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {dashboardData.financial_insights.map((insight, index) => (
-                <div key={index} className="flex items-start gap-2">
-                  <span className="text-blue-500 mt-0.5">💡</span>
-                  <p className="text-sm text-white/70">{insight}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
