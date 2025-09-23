@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
-import { useBankingStore } from '@/store/banking-store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -90,8 +89,7 @@ interface Alert {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuthStore(); // ✅ Removed _hasHydrated
-  const { accounts, fetchAccounts } = useBankingStore();
+  const { user, isAuthenticated } = useAuthStore();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,9 +99,22 @@ export default function DashboardPage() {
       setLoading(true);
       setError(null);
 
-      const { dashboardService } = await import('@/services/dashboard.service');
-      const data = await dashboardService.getDashboardData();
-      setDashboardData(data);
+      // TODO: Implementar serviço de dashboard com Pluggy
+      // const { dashboardService } = await import('@/services/dashboard.service');
+      // const data = await dashboardService.getDashboardData();
+      // setDashboardData(data);
+      
+      // Mock data temporário
+      setDashboardData({
+        current_balance: 0,
+        monthly_income: 0,
+        monthly_expenses: 0,
+        monthly_net: 0,
+        recent_transactions: [],
+        top_categories: [],
+        accounts_count: 0,
+        transactions_count: 0,
+      });
     } catch (err) {
       console.error('Dashboard error:', err);
       setError('Erro ao carregar dados do dashboard');
@@ -113,29 +124,25 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    // ✅ Simplified auth check
     if (!isAuthenticated) {
       router.push('/login');
       return;
     }
 
-    // ✅ Only fetch data if we have a user and are authenticated
     if (user && isAuthenticated) {
       fetchDashboardData();
-      fetchAccounts();
     }
-  }, [isAuthenticated, user, fetchAccounts, router, fetchDashboardData]);
+  }, [isAuthenticated, user, router, fetchDashboardData]);
   
   // Refetch dashboard data when subscription is updated
   useEffect(() => {
     const handleUpdate = () => {
       fetchDashboardData();
-      fetchAccounts();
     };
     
     window.addEventListener('subscription-updated', handleUpdate);
     return () => window.removeEventListener('subscription-updated', handleUpdate);
-  }, [fetchDashboardData, fetchAccounts]);
+  }, [fetchDashboardData]);
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
@@ -159,7 +166,6 @@ export default function DashboardPage() {
     }
   };
 
-  // ✅ Simplified loading check - removed _hasHydrated
   if (loading || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -192,7 +198,6 @@ export default function DashboardPage() {
             Aqui está o resumo da sua situação financeira
           </p>
         </div>
-        {/* ✅ Remove RefreshDataButton - implement simple refresh */}
         <Button onClick={fetchDashboardData} disabled={loading} variant="outline">
           {loading ? <LoadingSpinner /> : 'Atualizar'}
         </Button>
@@ -399,7 +404,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-white/70">
-                {accounts.length} conta{accounts.length !== 1 ? 's' : ''} conectada{accounts.length !== 1 ? 's' : ''}
+                {dashboardData.accounts_count} conta{dashboardData.accounts_count !== 1 ? 's' : ''} conectada{dashboardData.accounts_count !== 1 ? 's' : ''}
               </p>
             </CardContent>
           </Card>
