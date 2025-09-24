@@ -154,6 +154,40 @@ class BankingService {
     return response.results;
   }
 
+  // Financial Summary
+  async getFinancialSummary(): Promise<FinancialSummary> {
+    return apiClient.get<FinancialSummary>("/api/banking/transactions/summary/");
+  }
+
+  // Category Summary (calculated from transactions)
+  async getCategorySummary(): Promise<CategorySummary> {
+    try {
+      // Get current month's transactions
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      const transactions = await this.getTransactions({
+        date_from: startOfMonth.toISOString().split('T')[0],
+        date_to: endOfMonth.toISOString().split('T')[0]
+      });
+
+      // Calculate category totals
+      const categoryTotals: CategorySummary = {};
+      transactions.forEach(transaction => {
+        const category = transaction.category || 'Sem categoria';
+        if (transaction.type === 'DEBIT') {
+          categoryTotals[category] = (categoryTotals[category] || 0) + Math.abs(transaction.amount);
+        }
+      });
+
+      return categoryTotals;
+    } catch (error) {
+      console.error('Error calculating category summary:', error);
+      return {};
+    }
+  }
+
   // Utility methods for UI
   formatCurrency(amount: number, currencyCode: string = 'BRL'): string {
     return new Intl.NumberFormat('pt-BR', {

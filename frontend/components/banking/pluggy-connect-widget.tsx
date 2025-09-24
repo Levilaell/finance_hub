@@ -1,9 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { PluggyConnect } from 'react-pluggy-connect';
+import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+
+const PluggyConnect = dynamic(
+  () => import('react-pluggy-connect').then((mod) => mod.PluggyConnect),
+  { ssr: false }
+);
 
 interface PluggyConnectWidgetProps {
   connectToken: string;
@@ -62,7 +67,6 @@ export function PluggyConnectWidget({
           connectToken={connectToken}
           onSuccess={handleSuccess}
           onError={handleError}
-          onExit={handleExit}
         />
       )}
     </div>

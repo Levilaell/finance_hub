@@ -11,20 +11,14 @@ import { BankAccount, BankConnection } from '@/types/banking';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
 import { BankAccountCard } from '@/components/banking/bank-account-card';
 import { PluggyConnectWidget } from '@/components/banking/pluggy-connect-widget';
-import { TransactionsList } from '@/components/banking/transactions-list';
-import { FinancialDashboard } from '@/components/banking/financial-dashboard';
 
 import {
   CreditCardIcon,
   LinkIcon,
   DocumentChartBarIcon,
   ExclamationTriangleIcon,
-  ChartBarIcon,
-  BanknotesIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 
@@ -209,49 +203,16 @@ export default function AccountsPage() {
 
       {/* Main Content */}
       {hasAccounts ? (
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-[400px]">
-            <TabsTrigger value="overview">
-              <ChartBarIcon className="h-4 w-4 mr-2" />
-              Visão Geral
-            </TabsTrigger>
-            <TabsTrigger value="accounts">
-              <BanknotesIcon className="h-4 w-4 mr-2" />
-              Contas
-            </TabsTrigger>
-            <TabsTrigger value="transactions">
-              <DocumentChartBarIcon className="h-4 w-4 mr-2" />
-              Transações
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            <FinancialDashboard />
-          </TabsContent>
-
-          {/* Accounts Tab */}
-          <TabsContent value="accounts" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {accounts.map((account) => (
-                <BankAccountCard
-                  key={account.id}
-                  account={account}
-                  onSync={() => handleSyncAccount(account.id)}
-                  onView={() => setSelectedAccountId(account.id)}
-                />
-              ))}
-            </div>
-          </TabsContent>
-
-          {/* Transactions Tab */}
-          <TabsContent value="transactions" className="space-y-6">
-            <TransactionsList
-              accountId={selectedAccountId || undefined}
-              showFilters={true}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {accounts.map((account) => (
+            <BankAccountCard
+              key={account.id}
+              account={account}
+              onSync={() => handleSyncAccount(account.id)}
+              onView={() => setSelectedAccountId(account.id)}
             />
-          </TabsContent>
-        </Tabs>
+          ))}
+        </div>
       ) : (
         <EmptyState
           icon={CreditCardIcon}

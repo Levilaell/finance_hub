@@ -357,7 +357,7 @@ class TransactionService:
                             'description': description,
                             'amount': abs(Decimal(str(pluggy_tx.get('amount', 0)))),
                             'currency_code': pluggy_tx.get('currencyCode', 'BRL'),
-                            'date': datetime.fromisoformat(pluggy_tx['date']).date(),
+                            'date': datetime.fromisoformat(pluggy_tx['date'].replace('Z', '+00:00')),
                             'category': category,
                             'category_id': category_id,
                             'merchant_name': merchant_name,

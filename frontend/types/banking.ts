@@ -93,8 +93,9 @@ export interface Transaction {
 
 // Create Connection Request
 export interface CreateConnectionRequest {
-  connector_id: number;
-  credentials: Record<string, string>;
+  pluggy_item_id?: string;
+  connector_id?: number;
+  credentials?: Record<string, string>;
 }
 
 // Connect Token Response
@@ -140,6 +141,8 @@ export interface TransactionFilter {
   date_to?: string;
   type?: TransactionType;
   category?: string;
+  limit?: number;
+  offset?: number;
 }
 
 // Category Summary

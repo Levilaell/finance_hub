@@ -4,41 +4,100 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { bankingService } from '@/services/banking.service';
-import { FinancialSummary } from '@/types/banking';
-import { format, subMonths } from 'date-fns';
+import {
+  FinancialSummary,
+  Transaction,
+  BankAccount,
+  CategorySummary
+} from '@/types/banking';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
-import { 
+import {
   BanknotesIcon,
   CreditCardIcon,
   ChartBarIcon,
   DocumentTextIcon,
   ArrowDownIcon,
   ArrowUpIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
+  const [summary, setSummary] = useState<FinancialSummary | null>(null);
+  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+  const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [topCategories, setTopCategories] = useState<CategorySummary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/login');
       return;
     }
+    fetchDashboardData();
   }, [isAuthenticated, router]);
 
-  if (!isAuthenticated || !user) {
+  const fetchDashboardData = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch all data in parallel
+      const [summaryData, transactionsData, accountsData, categoriesData] = await Promise.all([
+        bankingService.getFinancialSummary(),
+        bankingService.getTransactions({ limit: 5 }),
+        bankingService.getAccounts(),
+        bankingService.getCategorySummary()
+      ]);
+
+      setSummary(summaryData);
+      setRecentTransactions(transactionsData);
+      setAccounts(accountsData);
+      setTopCategories(categoriesData);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      // Initialize with empty data if error
+      setSummary({
+        income: 0,
+        expenses: 0,
+        balance: 0,
+        period_start: startOfMonth(new Date()).toISOString(),
+        period_end: endOfMonth(new Date()).toISOString(),
+        accounts_count: 0,
+        transactions_count: 0
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchDashboardData();
+    setIsRefreshing(false);
+  };
+
+  if (!isAuthenticated || !user || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <LoadingSpinner />
       </div>
     );
   }
+
+  const totalBalance = accounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+  const monthlyIncome = summary?.income || 0;
+  const monthlyExpenses = summary?.expenses || 0;
+  const monthlyResult = monthlyIncome - monthlyExpenses;
 
   return (
     <div className="space-y-6">
@@ -52,8 +111,22 @@ export default function DashboardPage() {
             Aqui está o resumo da sua situação financeira
           </p>
         </div>
-        <Button variant="outline">
-          Atualizar
+        <Button
+          variant="outline"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+        >
+          {isRefreshing ? (
+            <>
+              <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+              Atualizando...
+            </>
+          ) : (
+            <>
+              <ArrowPathIcon className="h-4 w-4 mr-2" />
+              Atualizar
+            </>
+          )}
         </Button>
       </div>
 
@@ -65,9 +138,9 @@ export default function DashboardPage() {
             <BanknotesIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(0)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(totalBalance)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              0 contas conectadas
+              {accounts.length} {accounts.length === 1 ? 'conta conectada' : 'contas conectadas'}
             </p>
           </CardContent>
         </Card>
@@ -79,8 +152,11 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(0)}
+              {formatCurrency(monthlyIncome)}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {summary?.period_start && format(new Date(summary.period_start), 'MMM', { locale: ptBR })}
+            </p>
           </CardContent>
         </Card>
 
@@ -91,8 +167,11 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              {formatCurrency(0)}
+              {formatCurrency(Math.abs(monthlyExpenses))}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {summary?.period_start && format(new Date(summary.period_start), 'MMM', { locale: ptBR })}
+            </p>
           </CardContent>
         </Card>
 
@@ -102,11 +181,11 @@ export default function DashboardPage() {
             <ChartBarIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(0)}
+            <div className={`text-2xl font-bold ${monthlyResult >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {monthlyResult >= 0 && '+'}{formatCurrency(monthlyResult)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              0 transações
+              {summary?.transactions_count || 0} transações
             </p>
           </CardContent>
         </Card>
@@ -123,7 +202,34 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <p className="text-center text-white/60 py-4">Nenhuma transação encontrada</p>
+              {recentTransactions.length > 0 ? (
+                recentTransactions
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .slice(0, 7)
+                  .map((transaction) => (
+                  <div
+                    key={transaction.id}
+                    className="flex items-center justify-between py-3 border-b border-white/10 last:border-0"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{transaction.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {transaction.category} • {format(new Date(transaction.date), 'dd MMM HH:mm', { locale: ptBR })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`font-semibold ${
+                        transaction.type === 'CREDIT' ? 'text-green-500' : 'text-red-500'
+                      }`}>
+                        {transaction.type === 'CREDIT' ? '+' : '-'}
+                        {formatCurrency(Math.abs(transaction.amount))}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-white/60 py-8">Nenhuma transação encontrada</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -138,7 +244,27 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <p className="text-center text-white/60 py-4">Nenhuma categoria encontrada</p>
+              {topCategories && Object.keys(topCategories).length > 0 ? (
+                Object.entries(topCategories)
+                  .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+                  .slice(0, 5)
+                  .map(([category, amount]) => {
+                    const totalExpenses = Object.values(topCategories).reduce((sum, val) => sum + Math.abs(val), 0);
+                    const percentage = totalExpenses > 0 ? (Math.abs(amount) / totalExpenses) * 100 : 0;
+
+                    return (
+                      <div key={category} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">{category}</span>
+                          <span className="font-medium">{formatCurrency(Math.abs(amount))}</span>
+                        </div>
+                        <Progress value={percentage} className="h-2" />
+                      </div>
+                    );
+                  })
+              ) : (
+                <p className="text-center text-white/60 py-8">Nenhuma categoria encontrada</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -156,7 +282,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-white/70">
-                0 contas conectadas
+                {accounts.length} {accounts.length === 1 ? 'conta conectada' : 'contas conectadas'}
               </p>
             </CardContent>
           </Card>
@@ -172,7 +298,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-white/70">
-                0 este mês
+                {summary?.transactions_count || 0} este mês
               </p>
             </CardContent>
           </Card>

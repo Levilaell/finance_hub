@@ -165,7 +165,7 @@ class Transaction(models.Model):
     currency_code = models.CharField(max_length=3, default='BRL')
 
     # Dates
-    date = models.DateField(db_index=True)  # Transaction date
+    date = models.DateTimeField(db_index=True)  # Transaction date with time from Pluggy
 
     # Categorization
     category = models.CharField(max_length=100, blank=True)
