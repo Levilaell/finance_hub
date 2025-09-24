@@ -33,7 +33,7 @@ class ConnectorService:
     def __init__(self):
         self.client = PluggyClient()
 
-    def sync_connectors(self, country: str = 'BR', sandbox: bool = False) -> int:
+    def sync_connectors(self, country: str = 'BR', sandbox: Optional[bool] = None) -> int:
         """
         Sync available connectors from Pluggy.
         Returns the number of connectors synced.
@@ -98,6 +98,67 @@ class BankConnectionService:
 
     def __init__(self):
         self.client = PluggyClient()
+
+    def create_connection_from_item(self, user: User, item_id: str) -> BankConnection:
+        """
+        Create a connection from an existing Pluggy item (after widget auth).
+        Ref: https://docs.pluggy.ai/docs/connect-widget-overview
+        """
+        logger.info(f"Creating connection from item {item_id} for user {user.id}")
+
+        try:
+            # Check if connection already exists
+            existing = BankConnection.objects.filter(
+                pluggy_item_id=item_id,
+                user=user
+            ).first()
+
+            if existing:
+                logger.info(f"Connection already exists for item {item_id}")
+                return existing
+
+            logger.info(f"Fetching item details from Pluggy for item {item_id}")
+            # Get item details from Pluggy
+            pluggy_item = self.client.get_item(item_id)
+            logger.info(f"Pluggy item retrieved: {pluggy_item}")
+
+            # Get connector
+            connector = Connector.objects.filter(
+                pluggy_id=pluggy_item['connector']['id']
+            ).first()
+
+            if not connector:
+                # Try to sync connectors and get again
+                connector_service = ConnectorService()
+                connector_service.sync_connectors()
+                connector = Connector.objects.filter(
+                    pluggy_id=pluggy_item['connector']['id']
+                ).first()
+
+            if not connector:
+                raise ValueError(f"Connector {pluggy_item['connector']['id']} not found")
+
+            # Create local connection record
+            connection = BankConnection.objects.create(
+                user=user,
+                connector=connector,
+                pluggy_item_id=item_id,
+                status=pluggy_item['status'],
+                status_detail=pluggy_item.get('statusDetail'),
+                execution_status=pluggy_item.get('executionStatus', ''),
+                last_updated_at=timezone.now()
+            )
+
+            # If connection is ready, sync accounts
+            if connection.status == 'UPDATED':
+                self.sync_accounts(connection)
+
+            logger.info(f"Created bank connection {connection.id} from item {item_id}")
+            return connection
+
+        except Exception as e:
+            logger.error(f"Failed to create connection from item: {e}")
+            raise
 
     def create_connection(self, user: User, connector_id: int,
                          credentials: Dict[str, str]) -> BankConnection:
@@ -269,6 +330,11 @@ class TransactionService:
                 for pluggy_tx in pluggy_transactions:
                     tx_type = 'CREDIT' if pluggy_tx['type'] == 'CREDIT' else 'DEBIT'
 
+                    # Get merchant info safely
+                    merchant = pluggy_tx.get('merchant') or {}
+                    merchant_name = merchant.get('name', '') if merchant else ''
+                    merchant_category = merchant.get('category', '') if merchant else ''
+
                     TransactionModel.objects.update_or_create(
                         pluggy_transaction_id=pluggy_tx['id'],
                         defaults={
@@ -280,8 +346,8 @@ class TransactionService:
                             'date': datetime.fromisoformat(pluggy_tx['date']).date(),
                             'category': pluggy_tx.get('category', ''),
                             'category_id': pluggy_tx.get('categoryId', ''),
-                            'merchant_name': pluggy_tx.get('merchant', {}).get('name', ''),
-                            'merchant_category': pluggy_tx.get('merchant', {}).get('category', ''),
+                            'merchant_name': merchant_name,
+                            'merchant_category': merchant_category,
                             'payment_data': pluggy_tx.get('paymentData'),
                         }
                     )
@@ -320,54 +386,3 @@ class TransactionService:
                 results[str(account.id)] = 0
 
         return results
-
-    def get_income_expense_summary(self, user: User,
-                                  date_from: datetime,
-                                  date_to: datetime) -> Dict[str, Decimal]:
-        """
-        Calculate income and expense summary for a user.
-        """
-        transactions = TransactionModel.objects.filter(
-            account__connection__user=user,
-            account__connection__is_active=True,
-            date__gte=date_from,
-            date__lte=date_to
-        )
-
-        income = transactions.filter(type='CREDIT').aggregate(
-            total=models.Sum('amount')
-        )['total'] or Decimal('0.00')
-
-        expenses = transactions.filter(type='DEBIT').aggregate(
-            total=models.Sum('amount')
-        )['total'] or Decimal('0.00')
-
-        return {
-            'income': income,
-            'expenses': expenses,
-            'balance': income - expenses
-        }
-
-    def get_transactions_by_category(self, user: User,
-                                    date_from: datetime,
-                                    date_to: datetime) -> Dict[str, Decimal]:
-        """
-        Get transaction totals grouped by category.
-        """
-        from django.db.models import Sum
-
-        transactions = TransactionModel.objects.filter(
-            account__connection__user=user,
-            account__connection__is_active=True,
-            date__gte=date_from,
-            date__lte=date_to
-        ).values('category', 'type').annotate(
-            total=Sum('amount')
-        )
-
-        result = {}
-        for tx in transactions:
-            key = f"{tx['category'] or 'Uncategorized'}_{tx['type']}"
-            result[key] = tx['total']
-
-        return result

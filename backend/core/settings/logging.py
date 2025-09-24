@@ -131,16 +131,6 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': False,
         },
-        'apps.banking.pluggy_sync_service': {
-            'handlers': ['console', 'pluggy_file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'apps.banking.pluggy_views': {
-            'handlers': ['console', 'pluggy_file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
         'celery': {
             'handlers': ['console', 'file'],
             'level': 'INFO',

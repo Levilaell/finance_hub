@@ -88,25 +88,60 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
         Create a new bank connection.
         POST /api/banking/connections/
         """
-        serializer = CreateConnectionSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        import logging
+        logger = logging.getLogger(__name__)
 
-        service = BankConnectionService()
-        try:
-            connection = service.create_connection(
-                user=request.user,
-                connector_id=serializer.validated_data['connector_id'],
-                credentials=serializer.validated_data['credentials']
-            )
-            return Response(
-                BankConnectionSerializer(connection).data,
-                status=status.HTTP_201_CREATED
-            )
-        except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        logger.info(f"Creating connection with data: {request.data}")
+
+        # Check if this is a Pluggy widget callback (has pluggy_item_id)
+        if 'pluggy_item_id' in request.data:
+            service = BankConnectionService()
+            try:
+                logger.info(f"Creating connection from Pluggy item: {request.data['pluggy_item_id']}")
+                connection = service.create_connection_from_item(
+                    user=request.user,
+                    item_id=request.data['pluggy_item_id']
+                )
+                logger.info(f"Connection created successfully: {connection.id}")
+                return Response(
+                    BankConnectionSerializer(connection).data,
+                    status=status.HTTP_201_CREATED
+                )
+            except Exception as e:
+                logger.error(f"Error creating connection from item: {e}")
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Old flow for manual connection (if needed) - only if has connector_id
+        if 'connector_id' in request.data:
+            serializer = CreateConnectionSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
+            service = BankConnectionService()
+            try:
+                connection = service.create_connection(
+                    user=request.user,
+                    connector_id=serializer.validated_data['connector_id'],
+                    credentials=serializer.validated_data['credentials']
+                )
+                return Response(
+                    BankConnectionSerializer(connection).data,
+                    status=status.HTTP_201_CREATED
+                )
+            except Exception as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # If neither pluggy_item_id nor connector_id is provided
+        logger.error(f"Invalid request data: {request.data}")
+        return Response(
+            {'error': 'Either pluggy_item_id or connector_id is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     def destroy(self, request, pk=None):
         """
@@ -192,15 +227,29 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
         Get a connect token for Pluggy widget.
         GET /api/banking/connections/connect_token/
         """
-        client = PluggyClient()
+        import logging
+        logger = logging.getLogger(__name__)
+
         try:
+            client = PluggyClient()
+            logger.info("PluggyClient initialized successfully")
+
             token = client._get_connect_token()
+            logger.info(f"Connect token obtained: {token[:10]}...")
+
             expires_at = timezone.now() + timedelta(minutes=30)
             return Response({
                 'token': token,
                 'expires_at': expires_at
             })
+        except ValueError as e:
+            logger.error(f"Configuration error: {e}")
+            return Response(
+                {'error': f'Configuration error: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
         except Exception as e:
+            logger.error(f"Failed to get connect token: {e}")
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -255,27 +304,52 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ['account', 'type', 'category']
 
     def get_queryset(self):
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Log para debug
+        logger.info(f"Getting transactions for user {self.request.user.id}")
+
+        # Primeiro, vamos ver todas as transações sem filtro
+        all_transactions = Transaction.objects.all()
+        logger.info(f"Total transactions in DB: {all_transactions.count()}")
+
+        # Agora com filtro de usuário
         queryset = Transaction.objects.filter(
             account__connection__user=self.request.user,
             account__connection__is_active=True
         ).select_related('account')
 
+        logger.info(f"Transactions for user {self.request.user.id}: {queryset.count()}")
+
+        # Log das datas das transações
+        if queryset.exists():
+            dates = queryset.values_list('date', flat=True)[:5]
+            logger.info(f"Sample transaction dates: {list(dates)}")
+
         # Apply filters
         filter_serializer = TransactionFilterSerializer(data=self.request.query_params)
         if filter_serializer.is_valid():
             filters = filter_serializer.validated_data
+            logger.info(f"Applying filters: {filters}")
 
             if 'account_id' in filters:
                 queryset = queryset.filter(account_id=filters['account_id'])
+                logger.info(f"After account filter: {queryset.count()}")
             if 'date_from' in filters:
                 queryset = queryset.filter(date__gte=filters['date_from'])
+                logger.info(f"After date_from filter: {queryset.count()}")
             if 'date_to' in filters:
                 queryset = queryset.filter(date__lte=filters['date_to'])
+                logger.info(f"After date_to filter: {queryset.count()}")
             if 'type' in filters:
                 queryset = queryset.filter(type=filters['type'])
             if 'category' in filters:
                 queryset = queryset.filter(category__icontains=filters['category'])
+        else:
+            logger.error(f"Filter validation errors: {filter_serializer.errors}")
 
+        logger.info(f"Final queryset count: {queryset.count()}")
         return queryset.order_by('-date', '-created_at')
 
     @action(detail=False, methods=['get'])
@@ -284,6 +358,9 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
         Get financial summary.
         GET /api/banking/transactions/summary/
         """
+        import logging
+        logger = logging.getLogger(__name__)
+
         # Default to current month
         now = timezone.now()
         date_from = request.query_params.get(
@@ -300,10 +377,14 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
         if isinstance(date_to, str):
             date_to = datetime.fromisoformat(date_to).date()
 
+        logger.info(f"Summary date range: {date_from} to {date_to}")
+
         transactions = self.get_queryset().filter(
             date__gte=date_from,
             date__lte=date_to
         )
+
+        logger.info(f"Transactions in period: {transactions.count()}")
 
         income = transactions.filter(type='CREDIT').aggregate(
             total=Sum('amount')
@@ -328,35 +409,6 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
             'accounts_count': accounts_count,
             'transactions_count': transactions.count()
         })
-
-    @action(detail=False, methods=['get'])
-    def by_category(self, request):
-        """
-        Get transactions grouped by category.
-        GET /api/banking/transactions/by_category/
-        """
-        service = TransactionService()
-        now = timezone.now()
-        date_from = request.query_params.get(
-            'date_from',
-            now.replace(day=1)
-        )
-        date_to = request.query_params.get(
-            'date_to',
-            now
-        )
-
-        if isinstance(date_from, str):
-            date_from = datetime.fromisoformat(date_from)
-        if isinstance(date_to, str):
-            date_to = datetime.fromisoformat(date_to)
-
-        result = service.get_transactions_by_category(
-            request.user,
-            date_from,
-            date_to
-        )
-        return Response(result)
 
 
 class SyncLogViewSet(viewsets.ReadOnlyModelViewSet):

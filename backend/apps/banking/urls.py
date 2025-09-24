@@ -25,8 +25,8 @@ router.register('transactions', TransactionViewSet, basename='transaction')
 router.register('sync-logs', SyncLogViewSet, basename='synclog')
 
 urlpatterns = [
-    # API routes
-    path('api/', include(router.urls)),
+    # API routes (no need for 'api/' prefix as it's already added in core/urls.py)
+    path('', include(router.urls)),
 
     # Webhook endpoint
     path('webhooks/pluggy/', pluggy_webhook_handler, name='pluggy_webhook'),

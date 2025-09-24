@@ -22,12 +22,14 @@ class PluggyClient:
     """
 
     def __init__(self):
-        self.base_url = os.getenv('PLUGGY_API_URL', 'https://api.pluggy.ai')
-        self.client_id = os.getenv('PLUGGY_CLIENT_ID')
-        self.client_secret = os.getenv('PLUGGY_CLIENT_SECRET')
+        # Use Django settings instead of direct env access
+        self.base_url = getattr(settings, 'PLUGGY_BASE_URL', 'https://api.pluggy.ai')
+        self.client_id = getattr(settings, 'PLUGGY_CLIENT_ID', None)
+        self.client_secret = getattr(settings, 'PLUGGY_CLIENT_SECRET', None)
+        self.use_sandbox = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
 
         if not self.client_id or not self.client_secret:
-            raise ValueError("PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET must be set in environment variables")
+            raise ValueError("PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET must be set in Django settings")
 
     def _get_api_key(self) -> str:
         """
@@ -95,12 +97,16 @@ class PluggyClient:
             'Content-Type': 'application/json'
         }
 
-    def get_connectors(self, country: str = 'BR', sandbox: bool = False) -> List[Dict]:
+    def get_connectors(self, country: str = 'BR', sandbox: Optional[bool] = None) -> List[Dict]:
         """
         Retrieve available bank connectors.
         Ref: https://docs.pluggy.ai/reference/connectors-retrieve
         """
         url = f"{self.base_url}/connectors"
+        # Use sandbox from settings if not explicitly provided
+        if sandbox is None:
+            sandbox = self.use_sandbox
+
         params = {
             'countries': country,
             'sandbox': sandbox
@@ -256,7 +262,7 @@ class PluggyClient:
             'event': event,
             'url': url,
             'headers': {
-                'X-Webhook-Secret': os.getenv('PLUGGY_WEBHOOK_SECRET', '')
+                'X-Webhook-Secret': getattr(settings, 'PLUGGY_WEBHOOK_SECRET', '')
             }
         }
 
