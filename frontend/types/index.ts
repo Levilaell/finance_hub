@@ -57,6 +57,9 @@ export interface LoginResponse {
   requires_2fa?: boolean;
 }
 
+// Re-export banking types
+export * from './banking';
+
 
 
 

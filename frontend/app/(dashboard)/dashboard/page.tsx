@@ -1,8 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
+import { bankingService } from '@/services/banking.service';
+import { FinancialSummary } from '@/types/banking';
+import { format, subMonths } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -14,7 +17,8 @@ import {
   ChartBarIcon,
   DocumentTextIcon,
   ArrowDownIcon,
-  ArrowUpIcon
+  ArrowUpIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
 export default function DashboardPage() {

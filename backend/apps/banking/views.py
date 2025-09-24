@@ -279,7 +279,7 @@ class BankAccountViewSet(viewsets.ReadOnlyModelViewSet):
         """
         account = self.get_object()
         service = TransactionService()
-        days_back = int(request.data.get('days_back', 90))
+        days_back = int(request.data.get('days_back', 365))
 
         try:
             count = service.sync_transactions(account, days_back=days_back)

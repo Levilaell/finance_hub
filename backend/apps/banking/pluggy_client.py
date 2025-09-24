@@ -229,27 +229,39 @@ class PluggyClient:
         if date_to:
             params['to'] = date_to.isoformat()
 
+        logger.info(f"Fetching transactions for account {account_id}")
+        logger.info(f"Date range: {date_from} to {date_to}")
+        logger.info(f"Request params: {params}")
+
         all_transactions = []
         page = 1
 
         try:
             while True:
                 params['page'] = page
+                logger.debug(f"Fetching page {page}")
                 response = requests.get(url, headers=self._get_headers(), params=params)
                 response.raise_for_status()
                 data = response.json()
 
-                all_transactions.extend(data['results'])
+                logger.info(f"Page {page}: found {len(data.get('results', []))} transactions")
+                logger.debug(f"Response data keys: {data.keys()}")
+                logger.debug(f"Total pages: {data.get('totalPages', 'N/A')}")
+
+                all_transactions.extend(data.get('results', []))
 
                 # Check if there are more pages
-                if page >= data['totalPages']:
+                if page >= data.get('totalPages', 1):
                     break
                 page += 1
 
+            logger.info(f"Total transactions fetched: {len(all_transactions)}")
             return all_transactions
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to get transactions for account {account_id}: {e}")
+            logger.error(f"Response status: {e.response.status_code if hasattr(e, 'response') else 'N/A'}")
+            logger.error(f"Response body: {e.response.text if hasattr(e, 'response') else 'N/A'}")
             raise
 
     def create_webhook(self, url: str, event: str = 'item/updated') -> Dict:

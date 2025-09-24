@@ -303,7 +303,7 @@ class TransactionService:
         self.client = PluggyClient()
 
     def sync_transactions(self, account: BankAccount,
-                         days_back: int = 90) -> int:
+                         days_back: int = 365) -> int:
         """
         Sync transactions for an account.
         Ref: https://docs.pluggy.ai/reference/transactions-list
@@ -330,22 +330,36 @@ class TransactionService:
                 for pluggy_tx in pluggy_transactions:
                     tx_type = 'CREDIT' if pluggy_tx['type'] == 'CREDIT' else 'DEBIT'
 
-                    # Get merchant info safely
+                    # Get merchant info safely - ensure we never pass None
                     merchant = pluggy_tx.get('merchant') or {}
                     merchant_name = merchant.get('name', '') if merchant else ''
                     merchant_category = merchant.get('category', '') if merchant else ''
+
+                    # Ensure merchant fields are never None
+                    merchant_name = merchant_name if merchant_name is not None else ''
+                    merchant_category = merchant_category if merchant_category is not None else ''
+
+                    # Ensure all string fields are never None
+                    description = pluggy_tx.get('description', '')
+                    description = description if description is not None else ''
+
+                    category = pluggy_tx.get('category', '')
+                    category = category if category is not None else ''
+
+                    category_id = pluggy_tx.get('categoryId', '')
+                    category_id = category_id if category_id is not None else ''
 
                     TransactionModel.objects.update_or_create(
                         pluggy_transaction_id=pluggy_tx['id'],
                         defaults={
                             'account': account,
                             'type': tx_type,
-                            'description': pluggy_tx.get('description', ''),
+                            'description': description,
                             'amount': abs(Decimal(str(pluggy_tx.get('amount', 0)))),
                             'currency_code': pluggy_tx.get('currencyCode', 'BRL'),
                             'date': datetime.fromisoformat(pluggy_tx['date']).date(),
-                            'category': pluggy_tx.get('category', ''),
-                            'category_id': pluggy_tx.get('categoryId', ''),
+                            'category': category,
+                            'category_id': category_id,
                             'merchant_name': merchant_name,
                             'merchant_category': merchant_category,
                             'payment_data': pluggy_tx.get('paymentData'),
