@@ -1,433 +1,269 @@
 """
-Pluggy API Client for banking integration
+Pluggy API Client - Handles authentication and communication with Pluggy API
+Docs: https://docs.pluggy.ai/docs/authentication
 """
-import logging
+
+import os
 import requests
+import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
-from django.conf import settings
+from typing import Optional, Dict, Any, List
 from django.core.cache import cache
-from django.utils import timezone
+from django.conf import settings
 
-logger = logging.getLogger('apps.banking.pluggy_client')
-
-
-class PluggyError(Exception):
-    """Base exception for Pluggy API errors"""
-    pass
-
-
-class PluggyAuthError(PluggyError):
-    """Authentication errors with Pluggy API"""
-    pass
-
-
-class PluggyRateLimitError(PluggyError):
-    """Rate limiting errors"""
-    pass
+logger = logging.getLogger(__name__)
 
 
 class PluggyClient:
     """
-    Pluggy API Client
-    Handles authentication, rate limiting, and API calls
+    Client for Pluggy API communication.
+    Manages authentication tokens and API requests.
+    Reference: https://docs.pluggy.ai/reference/getting-started-with-your-api
     """
-    
+
     def __init__(self):
-        self.base_url = getattr(settings, 'PLUGGY_BASE_URL', 'https://api.pluggy.ai')
-        self.client_id = getattr(settings, 'PLUGGY_CLIENT_ID', '')
-        self.client_secret = getattr(settings, 'PLUGGY_CLIENT_SECRET', '')
-        self.use_sandbox = getattr(settings, 'PLUGGY_USE_SANDBOX', False)
-        
+        self.base_url = os.getenv('PLUGGY_API_URL', 'https://api.pluggy.ai')
+        self.client_id = os.getenv('PLUGGY_CLIENT_ID')
+        self.client_secret = os.getenv('PLUGGY_CLIENT_SECRET')
+
         if not self.client_id or not self.client_secret:
-            raise PluggyError("Pluggy credentials not configured")
-        
-        self.session = requests.Session()
-        self.session.headers.update({
-            'Content-Type': 'application/json',
-            'User-Agent': 'CaixaHub/1.0'
-        })
-        
-        self._access_token = None
-        self._token_expires_at = None
+            raise ValueError("PLUGGY_CLIENT_ID and PLUGGY_CLIENT_SECRET must be set in environment variables")
 
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.session.close()
+    def _get_api_key(self) -> str:
+        """
+        Get or refresh API Key (expires in 2 hours).
+        Uses caching to avoid unnecessary token generation.
+        Ref: https://docs.pluggy.ai/reference/auth-create
+        """
+        cached_key = cache.get('pluggy_api_key')
+        if cached_key:
+            return cached_key
 
-    def _get_access_token(self) -> str:
-        """Get or refresh access token"""
-        cache_key = 'pluggy_access_token'
-        token = cache.get(cache_key)
-        
-        if token:
-            return token
-        
-        logger.info("Requesting new Pluggy access token")
-        
+        url = f"{self.base_url}/auth"
+        payload = {
+            "clientId": self.client_id,
+            "clientSecret": self.client_secret
+        }
+
         try:
-            response = self.session.post(
-                f"{self.base_url}/auth",
-                json={
-                    'clientId': self.client_id,
-                    'clientSecret': self.client_secret
-                },
-                timeout=30
-            )
+            response = requests.post(url, json=payload)
             response.raise_for_status()
-            
             data = response.json()
-            access_token = data.get('accessToken')
-            
-            if not access_token:
-                raise PluggyAuthError("No access token in response")
-            
-            # Cache token for 50 minutes (Pluggy tokens last 1 hour)
-            cache.set(cache_key, access_token, 50 * 60)
-            
-            logger.info("Successfully obtained Pluggy access token")
-            return access_token
-            
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to get Pluggy access token: {e}")
-            raise PluggyAuthError(f"Authentication failed: {e}")
+            api_key = data.get('apiKey')
 
-    def _make_request(
-        self, 
-        method: str, 
-        endpoint: str, 
-        data: Optional[Dict] = None,
-        params: Optional[Dict] = None,
-        timeout: int = 60
-    ) -> Dict[Any, Any]:
-        """Make authenticated request to Pluggy API"""
-        
-        # Get access token
-        access_token = self._get_access_token()
-        
-        # Prepare headers
-        headers = {
-            'Authorization': f'Bearer {access_token}',
-            'X-API-KEY': self.client_id  # Some endpoints may require this
-        }
-        
-        url = f"{self.base_url}{endpoint}"
-        
-        logger.debug(f"Making {method} request to {url}")
-        
+            # Cache for 1h50m (just under 2 hours)
+            cache.set('pluggy_api_key', api_key, 6600)
+            return api_key
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to get API key: {e}")
+            raise
+
+    def _get_connect_token(self, item_id: Optional[str] = None) -> str:
+        """
+        Get Connect Token for frontend usage (expires in 30 minutes).
+        Ref: https://docs.pluggy.ai/docs/use-our-sdks-to-authenticate
+        """
+        cached_key = cache.get(f'pluggy_connect_token_{item_id or "new"}')
+        if cached_key:
+            return cached_key
+
+        url = f"{self.base_url}/connect_token"
+        headers = self._get_headers()
+        payload = {}
+        if item_id:
+            payload['itemId'] = item_id
+
         try:
-            response = self.session.request(
-                method=method,
-                url=url,
-                json=data,
-                params=params,
-                headers=headers,
-                timeout=timeout
-            )
-            
-            # Handle rate limiting
-            if response.status_code == 429:
-                retry_after = int(response.headers.get('Retry-After', 60))
-                logger.warning(f"Rate limited by Pluggy API. Retry after {retry_after} seconds")
-                raise PluggyRateLimitError(f"Rate limited. Retry after {retry_after} seconds")
-            
-            # Handle authentication errors
-            if response.status_code == 401:
-                # Clear cached token and retry once
-                cache.delete('pluggy_access_token')
-                access_token = self._get_access_token()
-                headers['Authorization'] = f'Bearer {access_token}'
-                
-                response = self.session.request(
-                    method=method,
-                    url=url,
-                    json=data,
-                    params=params,
-                    headers=headers,
-                    timeout=timeout
-                )
-            
+            response = requests.post(url, json=payload, headers=headers)
             response.raise_for_status()
-            
-            result = response.json()
-            logger.debug(f"Successful response from {endpoint}")
-            return result
-            
-        except requests.exceptions.Timeout:
-            logger.error(f"Timeout on {method} {endpoint}")
-            raise PluggyError(f"Request timeout: {endpoint}")
+            data = response.json()
+            token = data.get('accessToken')
+
+            # Cache for 25 minutes
+            cache.set(f'pluggy_connect_token_{item_id or "new"}', token, 1500)
+            return token
+
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request failed {method} {endpoint}: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                try:
-                    error_data = e.response.json()
-                    error_message = error_data.get('message', str(e))
-                except:
-                    error_message = str(e)
-            else:
-                error_message = str(e)
-            raise PluggyError(f"API request failed: {error_message}")
+            logger.error(f"Failed to get connect token: {e}")
+            raise
 
-    # === CONNECTOR METHODS ===
-    
-    def get_connectors(self, country: str = 'BR') -> List[Dict]:
-        """Get list of available connectors"""
-        params = {'country': country}
-        if self.use_sandbox:
-            params['sandbox'] = 'true'
-            
-        response = self._make_request('GET', '/connectors', params=params)
-        return response.get('results', [])
-    
-    def get_connector(self, connector_id: int) -> Dict:
-        """Get specific connector details"""
-        return self._make_request('GET', f'/connectors/{connector_id}')
-
-    # === ITEM METHODS ===
-    
-    def create_item(
-        self, 
-        connector_id: int,
-        credentials: Dict,
-        webhook_url: Optional[str] = None,
-        client_user_id: Optional[str] = None,
-        products: Optional[List[str]] = None
-    ) -> Dict:
-        """Create a new item (bank connection)"""
-        
-        data = {
-            'connectorId': connector_id,
-            'credentials': credentials
+    def _get_headers(self) -> Dict[str, str]:
+        """Get headers with authentication for API requests."""
+        return {
+            'X-API-KEY': self._get_api_key(),
+            'Content-Type': 'application/json'
         }
-        
-        if webhook_url:
-            data['webhookUrl'] = webhook_url
-        if client_user_id:
-            data['clientUserId'] = client_user_id
-        if products:
-            data['products'] = products
-        
-        logger.info(f"Creating item for connector {connector_id}")
-        return self._make_request('POST', '/items', data=data)
-    
-    def get_item(self, item_id: str) -> Dict:
-        """Get item details"""
-        return self._make_request('GET', f'/items/{item_id}')
-    
-    def update_item(self, item_id: str, credentials: Dict) -> Dict:
-        """Update item credentials"""
-        data = {'credentials': credentials}
-        return self._make_request('PATCH', f'/items/{item_id}', data=data)
-    
-    def delete_item(self, item_id: str) -> bool:
-        """Delete an item"""
+
+    def get_connectors(self, country: str = 'BR', sandbox: bool = False) -> List[Dict]:
+        """
+        Retrieve available bank connectors.
+        Ref: https://docs.pluggy.ai/reference/connectors-retrieve
+        """
+        url = f"{self.base_url}/connectors"
+        params = {
+            'countries': country,
+            'sandbox': sandbox
+        }
+
         try:
-            self._make_request('DELETE', f'/items/{item_id}')
+            response = requests.get(url, headers=self._get_headers(), params=params)
+            response.raise_for_status()
+            return response.json()['results']
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to get connectors: {e}")
+            raise
+
+    def create_item(self, connector_id: int, credentials: Dict[str, Any],
+                   webhook_url: Optional[str] = None, user_data: Optional[Dict] = None) -> Dict:
+        """
+        Create a new item (bank connection).
+        Ref: https://docs.pluggy.ai/reference/items-create
+        """
+        url = f"{self.base_url}/items"
+        payload = {
+            'connectorId': connector_id,
+            'parameters': credentials
+        }
+
+        if webhook_url:
+            payload['webhookUrl'] = webhook_url
+
+        if user_data:
+            payload['clientUserId'] = user_data.get('id')
+
+        try:
+            response = requests.post(url, json=payload, headers=self._get_headers())
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to create item: {e}")
+            raise
+
+    def get_item(self, item_id: str) -> Dict:
+        """
+        Get item details and status.
+        Ref: https://docs.pluggy.ai/reference/items-retrieve
+        """
+        url = f"{self.base_url}/items/{item_id}"
+
+        try:
+            response = requests.get(url, headers=self._get_headers())
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to get item {item_id}: {e}")
+            raise
+
+    def update_item(self, item_id: str, credentials: Dict[str, Any]) -> Dict:
+        """
+        Update item credentials (for MFA or reconnection).
+        Ref: https://docs.pluggy.ai/reference/items-update
+        """
+        url = f"{self.base_url}/items/{item_id}"
+        payload = {
+            'parameters': credentials
+        }
+
+        try:
+            response = requests.patch(url, json=payload, headers=self._get_headers())
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to update item {item_id}: {e}")
+            raise
+
+    def delete_item(self, item_id: str) -> bool:
+        """
+        Delete an item (disconnect bank).
+        Ref: https://docs.pluggy.ai/reference/items-delete
+        """
+        url = f"{self.base_url}/items/{item_id}"
+
+        try:
+            response = requests.delete(url, headers=self._get_headers())
+            response.raise_for_status()
             return True
-        except PluggyError:
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to delete item {item_id}: {e}")
             return False
 
-    # === ACCOUNT METHODS ===
-    
     def get_accounts(self, item_id: str) -> List[Dict]:
-        """Get accounts for an item"""
-        response = self._make_request('GET', f'/accounts?itemId={item_id}')
-        return response.get('results', [])
-    
-    def get_account(self, account_id: str) -> Dict:
-        """Get specific account details"""
-        return self._make_request('GET', f'/accounts/{account_id}')
+        """
+        Get all accounts for an item.
+        Ref: https://docs.pluggy.ai/reference/accounts-list
+        """
+        url = f"{self.base_url}/accounts"
+        params = {'itemId': item_id}
 
-    # === TRANSACTION METHODS ===
-    
-    def get_transactions(
-        self,
-        account_id: str,
-        from_date: Optional[datetime] = None,
-        to_date: Optional[datetime] = None,
-        page: int = 1,
-        page_size: int = 500
-    ) -> Dict:
-        """Get transactions for an account"""
-        
+        try:
+            response = requests.get(url, headers=self._get_headers(), params=params)
+            response.raise_for_status()
+            return response.json()['results']
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to get accounts for item {item_id}: {e}")
+            raise
+
+    def get_transactions(self, account_id: str,
+                        date_from: Optional[datetime] = None,
+                        date_to: Optional[datetime] = None,
+                        page_size: int = 500) -> List[Dict]:
+        """
+        Get transactions for an account.
+        Ref: https://docs.pluggy.ai/reference/transactions-list-1
+        """
+        url = f"{self.base_url}/transactions"
         params = {
             'accountId': account_id,
-            'page': page,
-            'pageSize': min(page_size, 500)  # Pluggy max is 500
+            'pageSize': page_size
         }
-        
-        if from_date:
-            params['from'] = from_date.strftime('%Y-%m-%d')
-        if to_date:
-            params['to'] = to_date.strftime('%Y-%m-%d')
-        
-        response = self._make_request('GET', '/transactions', params=params)
-        return response
-    
-    def get_all_transactions_for_account(
-        self,
-        account_id: str,
-        from_date: Optional[datetime] = None,
-        to_date: Optional[datetime] = None
-    ) -> List[Dict]:
-        """Get all transactions for an account (handles pagination)"""
-        
+
+        if date_from:
+            params['from'] = date_from.isoformat()
+        if date_to:
+            params['to'] = date_to.isoformat()
+
         all_transactions = []
         page = 1
-        page_size = 500
-        
-        while True:
-            logger.debug(f"Fetching transactions page {page} for account {account_id}")
-            
-            response = self.get_transactions(
-                account_id=account_id,
-                from_date=from_date,
-                to_date=to_date,
-                page=page,
-                page_size=page_size
-            )
-            
-            transactions = response.get('results', [])
-            if not transactions:
-                break
-                
-            all_transactions.extend(transactions)
-            
-            # Check if we have more pages
-            total = response.get('total', 0)
-            if len(all_transactions) >= total:
-                break
-                
-            page += 1
-        
-        logger.info(f"Retrieved {len(all_transactions)} transactions for account {account_id}")
-        return all_transactions
 
-    # === CATEGORY METHODS ===
-    
-    def get_categories(self) -> List[Dict]:
-        """Get transaction categories"""
-        response = self._make_request('GET', '/categories')
-        return response.get('results', [])
-
-    # === IDENTITY METHODS ===
-    
-    def get_identity(self, item_id: str) -> Dict:
-        """Get identity information for an item"""
-        return self._make_request('GET', f'/identity/{item_id}')
-
-    # === INVESTMENT METHODS ===
-    
-    def get_investments(self, item_id: str) -> List[Dict]:
-        """Get investments for an item"""
-        response = self._make_request('GET', f'/investments?itemId={item_id}')
-        return response.get('results', [])
-    
-    def get_investment_transactions(
-        self,
-        item_id: str,
-        from_date: Optional[datetime] = None,
-        to_date: Optional[datetime] = None
-    ) -> List[Dict]:
-        """Get investment transactions"""
-        
-        params = {'itemId': item_id}
-        if from_date:
-            params['from'] = from_date.strftime('%Y-%m-%d')
-        if to_date:
-            params['to'] = to_date.strftime('%Y-%m-%d')
-        
-        response = self._make_request('GET', '/investment-transactions', params=params)
-        return response.get('results', [])
-
-    # === PAYMENT METHODS ===
-    
-    def get_payment_data(self, item_id: str) -> Dict:
-        """Get payment data for an item"""
-        return self._make_request('GET', f'/payment-data/{item_id}')
-
-    # === UTILITY METHODS ===
-    
-    def validate_credentials(self, connector_id: int, credentials: Dict) -> bool:
-        """Validate credentials without creating an item"""
         try:
-            data = {
-                'connectorId': connector_id,
-                'credentials': credentials
+            while True:
+                params['page'] = page
+                response = requests.get(url, headers=self._get_headers(), params=params)
+                response.raise_for_status()
+                data = response.json()
+
+                all_transactions.extend(data['results'])
+
+                # Check if there are more pages
+                if page >= data['totalPages']:
+                    break
+                page += 1
+
+            return all_transactions
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to get transactions for account {account_id}: {e}")
+            raise
+
+    def create_webhook(self, url: str, event: str = 'item/updated') -> Dict:
+        """
+        Create webhook for item updates.
+        Ref: https://docs.pluggy.ai/reference/webhooks-create
+        """
+        endpoint = f"{self.base_url}/webhooks"
+        payload = {
+            'event': event,
+            'url': url,
+            'headers': {
+                'X-Webhook-Secret': os.getenv('PLUGGY_WEBHOOK_SECRET', '')
             }
-            self._make_request('POST', '/validate-credentials', data=data)
-            return True
-        except PluggyError:
-            return False
-    
-    def get_webhook_events(self, item_id: str) -> List[Dict]:
-        """Get webhook events for an item"""
-        response = self._make_request('GET', f'/webhooks/{item_id}')
-        return response.get('results', [])
-    
-    def test_connection(self) -> bool:
-        """Test API connection"""
+        }
+
         try:
-            self._make_request('GET', '/connectors', params={'country': 'BR', 'limit': 1})
-            return True
-        except PluggyError:
-            return False
-
-
-# === UTILITY FUNCTIONS ===
-
-def format_pluggy_date(date_str: str) -> datetime:
-    """Convert Pluggy date string to datetime"""
-    if not date_str:
-        return None
-    
-    try:
-        # Pluggy uses ISO format: 2023-01-01T10:00:00.000Z
-        return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-    except ValueError:
-        # Fallback for different formats
-        try:
-            return datetime.strptime(date_str, '%Y-%m-%dT%H:%M:%S.%fZ')
-        except ValueError:
-            try:
-                return datetime.strptime(date_str, '%Y-%m-%d')
-            except ValueError:
-                logger.warning(f"Could not parse Pluggy date: {date_str}")
-                return timezone.now()
-
-
-def get_pluggy_error_message(error_data: Dict) -> str:
-    """Extract user-friendly error message from Pluggy error response"""
-    
-    if isinstance(error_data, str):
-        return error_data
-    
-    # Common error patterns
-    error_code = error_data.get('code', '')
-    error_message = error_data.get('message', '')
-    error_details = error_data.get('details', '')
-    
-    # Map common errors to user-friendly messages
-    error_mappings = {
-        'INVALID_CREDENTIALS': 'Credenciais inválidas. Verifique seu usuário e senha.',
-        'ACCOUNT_LOCKED': 'Conta bloqueada no banco. Entre em contato com sua instituição.',
-        'CONNECTION_ERROR': 'Erro de conexão com o banco. Tente novamente em alguns minutos.',
-        'SITE_NOT_AVAILABLE': 'Site do banco indisponível. Tente novamente mais tarde.',
-        'USER_INPUT_TIMEOUT': 'Tempo limite excedido. Tente novamente.',
-        'INVALID_CREDENTIALS_MFA': 'Código de autenticação inválido.',
-        'USER_NOT_SUPPORTED': 'Tipo de conta não suportado.',
-        'ACCOUNT_NEEDS_ACTION': 'Sua conta precisa de ação no site do banco.',
-    }
-    
-    if error_code in error_mappings:
-        return error_mappings[error_code]
-    
-    if error_message:
-        return error_message
-    
-    if error_details:
-        return error_details
-    
-    return 'Erro desconhecido na conexão bancária.'
+            response = requests.post(endpoint, json=payload, headers=self._get_headers())
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to create webhook: {e}")
+            raise

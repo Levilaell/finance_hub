@@ -1,42 +1,33 @@
 """
-Banking URLs
+URL configuration for Banking app.
 """
+
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+
 from .views import (
-    PluggyConnectorViewSet,
-    PluggyItemViewSet,
+    ConnectorViewSet,
+    BankConnectionViewSet,
     BankAccountViewSet,
     TransactionViewSet,
-    TransactionCategoryViewSet,
-    DashboardView,
-    sync_categories,
-    create_default_categories,
-    banking_health,
-    delete_item
+    SyncLogViewSet
 )
-from .webhooks import get_webhook_urls
+from .webhooks import pluggy_webhook_handler
 
 app_name = 'banking'
 
 # Create router for ViewSets
 router = DefaultRouter()
-router.register(r'connectors', PluggyConnectorViewSet, basename='connectors')
-router.register(r'items', PluggyItemViewSet, basename='items')
-router.register(r'accounts', BankAccountViewSet, basename='accounts')
-router.register(r'transactions', TransactionViewSet, basename='transactions')
-router.register(r'categories', TransactionCategoryViewSet, basename='categories')
+router.register('connectors', ConnectorViewSet, basename='connector')
+router.register('connections', BankConnectionViewSet, basename='connection')
+router.register('accounts', BankAccountViewSet, basename='account')
+router.register('transactions', TransactionViewSet, basename='transaction')
+router.register('sync-logs', SyncLogViewSet, basename='synclog')
 
 urlpatterns = [
-    # Router URLs
-    path('', include(router.urls)),
-    
-    # Custom endpoints
-    path('dashboard/', DashboardView.as_view(), name='dashboard'),
-    path('sync/categories/', sync_categories, name='sync-categories'),
-    path('categories/create-defaults/', create_default_categories, name='create-default-categories'),
-    path('health/', banking_health, name='health'),
-    path('items/<uuid:item_id>/delete/', delete_item, name='delete-item'),
-    
-    # Webhook endpoints
-] + get_webhook_urls()
+    # API routes
+    path('api/', include(router.urls)),
+
+    # Webhook endpoint
+    path('webhooks/pluggy/', pluggy_webhook_handler, name='pluggy_webhook'),
+]
