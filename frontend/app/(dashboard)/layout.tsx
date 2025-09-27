@@ -10,30 +10,35 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, isLoading, user, fetchUser } = useAuthStore();
+  const { isAuthenticated, isLoading, user, fetchUser, hasHydrated } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
+    // Wait for Zustand to hydrate from localStorage
+    if (!hasHydrated) {
+      return;
+    }
+
     // Check if user is authenticated
     const token = localStorage.getItem('access_token');
-    
+
     if (!token) {
       // No token, redirect to login
       router.push('/login');
       return;
     }
 
-    if (!isAuthenticated || !user) {
-      // Token exists but no user data, try to fetch user
+    // Only fetch user if we have a token but no user data after hydration
+    if (token && !user && !isLoading) {
       fetchUser().catch(() => {
         // If fetch fails, redirect to login
         router.push('/login');
       });
     }
-  }, [isAuthenticated, user, fetchUser, router]);
+  }, [hasHydrated, user, fetchUser, router, isLoading]);
 
-  // Show loading while checking authentication
-  if (isLoading) {
+  // Show loading while hydrating or checking authentication
+  if (!hasHydrated || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
@@ -45,7 +50,7 @@ export default function DashboardLayout({
   }
 
   // Show loading while user data is being fetched
-  if (!user && !isLoading) {
+  if (!user && !isLoading && hasHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">

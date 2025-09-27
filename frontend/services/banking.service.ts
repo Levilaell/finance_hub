@@ -52,7 +52,7 @@ class BankingService {
   }
 
   async deleteConnection(id: string): Promise<void> {
-    return apiClient.delete(`/api/banking/api/connections/${id}/`);
+    return apiClient.delete(`/api/banking/connections/${id}/`);
   }
 
   async refreshConnectionStatus(id: string): Promise<BankConnection> {

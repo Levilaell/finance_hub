@@ -161,22 +161,89 @@ class PluggyClient:
             logger.error(f"Failed to get item {item_id}: {e}")
             raise
 
-    def update_item(self, item_id: str, credentials: Dict[str, Any]) -> Dict:
+    def update_item(self, item_id: str, credentials: Optional[Dict[str, Any]] = None) -> Dict:
         """
-        Update item credentials (for MFA or reconnection).
+        Update item to trigger new data synchronization.
+        Can be used with or without credentials.
         Ref: https://docs.pluggy.ai/reference/items-update
+
+        Args:
+            item_id: The Pluggy item ID
+            credentials: Optional credentials for reconnection or MFA
+
+        Returns:
+            Updated item data
         """
         url = f"{self.base_url}/items/{item_id}"
-        payload = {
-            'parameters': credentials
-        }
+
+        # Empty payload triggers sync with existing credentials
+        # Credentials are only needed for reconnection or MFA
+        payload = {}
+        if credentials:
+            payload['parameters'] = credentials
+
+        logger.info(f"Updating item {item_id} with payload: {payload}")
 
         try:
             response = requests.patch(url, json=payload, headers=self._get_headers())
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+            logger.info(f"Item {item_id} updated successfully. Status: {result.get('status')}")
+            return result
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to update item {item_id}: {e}")
+            if hasattr(e, 'response') and e.response:
+                logger.error(f"Response status: {e.response.status_code}")
+                logger.error(f"Response body: {e.response.text}")
+            raise
+
+    def trigger_item_update(self, item_id: str) -> Dict:
+        """
+        Trigger a data synchronization for an item without changing credentials.
+        This forces Pluggy to fetch new data from the financial institution.
+        Ref: https://docs.pluggy.ai/docs/data-sync-update-an-item
+
+        Args:
+            item_id: The Pluggy item ID
+
+        Returns:
+            Updated item data
+        """
+        logger.info(f"Triggering data sync for item {item_id}")
+        return self.update_item(item_id, credentials=None)
+
+    def send_mfa(self, item_id: str, mfa_value: str, mfa_parameter_name: str = 'token') -> Dict:
+        """
+        Send MFA (Multi-Factor Authentication) for an item.
+        Used when item status is WAITING_USER_INPUT.
+        Ref: https://docs.pluggy.ai/reference/items-send-mfa
+
+        Args:
+            item_id: The Pluggy item ID
+            mfa_value: The MFA value (e.g., token, code)
+            mfa_parameter_name: The parameter name expected by the connector (default: 'token')
+
+        Returns:
+            Updated item data
+        """
+        url = f"{self.base_url}/items/{item_id}/mfa"
+        payload = {
+            mfa_parameter_name: mfa_value
+        }
+
+        logger.info(f"Sending MFA for item {item_id}")
+
+        try:
+            response = requests.post(url, json=payload, headers=self._get_headers())
+            response.raise_for_status()
+            result = response.json()
+            logger.info(f"MFA sent successfully for item {item_id}. Status: {result.get('status')}")
+            return result
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to send MFA for item {item_id}: {e}")
+            if hasattr(e, 'response') and e.response:
+                logger.error(f"Response status: {e.response.status_code}")
+                logger.error(f"Response body: {e.response.text}")
             raise
 
     def delete_item(self, item_id: str) -> bool:

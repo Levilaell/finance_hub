@@ -13,6 +13,14 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { BankAccountCard } from '@/components/banking/bank-account-card';
 import { PluggyConnectWidget } from '@/components/banking/pluggy-connect-widget';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 import {
   CreditCardIcon,
@@ -31,6 +39,9 @@ export default function AccountsPage() {
   const [showPluggyWidget, setShowPluggyWidget] = useState(false);
   const [connectToken, setConnectToken] = useState<string | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState<BankAccount | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Check authentication
   useEffect(() => {
@@ -131,6 +142,41 @@ export default function AccountsPage() {
     }
   };
 
+  // Open delete confirmation dialog
+  const handleDeleteAccount = (accountId: string) => {
+    const account = accounts.find(a => a.id === accountId);
+    if (!account) return;
+
+    setAccountToDelete(account);
+    setDeleteConfirmOpen(true);
+  };
+
+  // Confirm and execute deletion
+  const confirmDelete = async () => {
+    if (!accountToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      // Delete the connection (which will delete all associated accounts)
+      await bankingService.deleteConnection(accountToDelete.connection_id);
+      toast.success('Conta desconectada com sucesso!');
+      setDeleteConfirmOpen(false);
+      setAccountToDelete(null);
+      await fetchData();
+    } catch (error) {
+      toast.error('Erro ao desconectar conta');
+      console.error('Error deleting connection:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Cancel deletion
+  const cancelDelete = () => {
+    setDeleteConfirmOpen(false);
+    setAccountToDelete(null);
+  };
+
   // Loading state
   if (authLoading || isLoadingData) {
     return (
@@ -210,6 +256,7 @@ export default function AccountsPage() {
               account={account}
               onSync={() => handleSyncAccount(account.id)}
               onView={() => setSelectedAccountId(account.id)}
+              onDelete={() => handleDeleteAccount(account.id)}
             />
           ))}
         </div>
@@ -237,6 +284,56 @@ export default function AccountsPage() {
           />
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="bg-gray-900 border-gray-800">
+          <DialogHeader>
+            <DialogTitle className="text-white">Desconectar conta bancária</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {accountToDelete && (
+                <>
+                  Você tem certeza que deseja desconectar a conta <span className="font-semibold text-white">{accountToDelete.name}</span>?
+                  <br />
+                  <br />
+                  Esta ação irá:
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>Remover a conexão com o banco</li>
+                    <li>Excluir todas as transações sincronizadas</li>
+                    <li>Remover o histórico de sincronização</li>
+                  </ul>
+                  <br />
+                  <span className="text-amber-400 font-medium">Esta ação não pode ser desfeita.</span>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-6">
+            <Button
+              variant="outline"
+              onClick={cancelDelete}
+              disabled={isDeleting}
+              className="border-gray-700 text-gray-300 hover:bg-gray-800"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDeleting ? (
+                <>
+                  <LoadingSpinner className="w-4 h-4 mr-2" />
+                  Desconectando...
+                </>
+              ) : (
+                'Desconectar'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

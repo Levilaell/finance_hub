@@ -7,6 +7,7 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  hasHydrated: boolean;
 
   // Actions
   setAuth: (user: User, tokens: { access: string; refresh: string }) => void;
@@ -15,6 +16,7 @@ interface AuthState {
   logout: () => Promise<void>;
   fetchUser: () => Promise<void>;
   updateUser: (user: Partial<User>) => void;
+  setHasHydrated: (state: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -23,6 +25,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       isLoading: false,
+      hasHydrated: false,
 
       setAuth: (user, tokens) => {
         // Tokens are already stored by apiClient
@@ -115,6 +118,10 @@ export const useAuthStore = create<AuthState>()(
           set({ user: { ...currentUser, ...userData } });
         }
       },
+
+      setHasHydrated: (state) => {
+        set({ hasHydrated: state });
+      },
     }),
     {
       name: "auth-storage",
@@ -123,6 +130,9 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

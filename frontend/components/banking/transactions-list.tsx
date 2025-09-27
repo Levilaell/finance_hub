@@ -164,14 +164,14 @@ export function TransactionsList({
 
           <div className="flex gap-2">
             <Select
-              value={filters.type}
-              onValueChange={(value) => handleFilterChange('type', value)}
+              value={filters.type || 'all'}
+              onValueChange={(value) => handleFilterChange('type', value === 'all' ? undefined : value)}
             >
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Tipo" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="CREDIT">Entrada</SelectItem>
                 <SelectItem value="DEBIT">Saída</SelectItem>
               </SelectContent>

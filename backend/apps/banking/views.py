@@ -202,19 +202,128 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
     def sync_transactions(self, request, pk=None):
         """
         Sync all transactions for this connection.
+        This will trigger an item update in Pluggy to fetch fresh data.
         POST /api/banking/connections/{id}/sync_transactions/
         """
         connection = self.get_object()
         service = TransactionService()
 
         try:
-            results = service.sync_all_accounts_transactions(connection)
+            # Check if we should trigger update (default: True for manual syncs)
+            trigger_update = request.data.get('trigger_update', True)
+
+            results = service.sync_all_accounts_transactions(
+                connection,
+                trigger_update=trigger_update
+            )
             total = sum(results.values())
+
             return Response({
                 'message': f'Synced {total} transactions',
                 'results': results,
-                'total': total
+                'total': total,
+                'status': 'SUCCESS'
             })
+        except ValueError as e:
+            # Handle MFA or credential errors
+            error_msg = str(e)
+            if 'MFA required' in error_msg:
+                return Response({
+                    'error': error_msg,
+                    'status': 'MFA_REQUIRED',
+                    'requires_action': True
+                }, status=status.HTTP_400_BAD_REQUEST)
+            elif 'Invalid credentials' in error_msg:
+                return Response({
+                    'error': error_msg,
+                    'status': 'CREDENTIALS_REQUIRED',
+                    'requires_action': True
+                }, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({
+                    'error': error_msg,
+                    'status': 'ERROR'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response(
+                {'error': str(e), 'status': 'ERROR'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['post'])
+    def send_mfa(self, request, pk=None):
+        """
+        Send MFA token for a connection.
+        POST /api/banking/connections/{id}/send_mfa/
+        {
+            "mfa_value": "123456",
+            "parameter_name": "token"  // optional, defaults to 'token'
+        }
+        """
+        connection = self.get_object()
+        mfa_value = request.data.get('mfa_value')
+        parameter_name = request.data.get('parameter_name', 'token')
+
+        if not mfa_value:
+            return Response(
+                {'error': 'mfa_value is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            client = PluggyClient()
+            result = client.send_mfa(
+                item_id=connection.pluggy_item_id,
+                mfa_value=mfa_value,
+                mfa_parameter_name=parameter_name
+            )
+
+            # Update connection status
+            connection.status = result['status']
+            connection.last_updated_at = timezone.now()
+            connection.save()
+
+            return Response({
+                'message': 'MFA sent successfully',
+                'status': result['status']
+            })
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['get'])
+    def check_status(self, request, pk=None):
+        """
+        Check the current status of a connection.
+        GET /api/banking/connections/{id}/check_status/
+        """
+        connection = self.get_object()
+
+        try:
+            client = PluggyClient()
+            item = client.get_item(connection.pluggy_item_id)
+
+            # Update local status
+            connection.status = item['status']
+            connection.status_detail = item.get('statusDetail')
+            connection.last_updated_at = timezone.now()
+            connection.save()
+
+            response_data = {
+                'status': item['status'],
+                'status_detail': item.get('statusDetail'),
+                'execution_status': item.get('executionStatus'),
+                'last_updated_at': connection.last_updated_at
+            }
+
+            # Add MFA info if waiting for user input
+            if item['status'] == 'WAITING_USER_INPUT':
+                response_data['mfa_required'] = True
+                response_data['parameter'] = item.get('parameter', {})
+
+            return Response(response_data)
         except Exception as e:
             return Response(
                 {'error': str(e)},
@@ -225,22 +334,28 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
     def connect_token(self, request):
         """
         Get a connect token for Pluggy widget.
+        Can optionally update an existing item.
         GET /api/banking/connections/connect_token/
+        Query params:
+            - item_id: Optional, for updating an existing connection
         """
         import logging
         logger = logging.getLogger(__name__)
+
+        item_id = request.query_params.get('item_id')
 
         try:
             client = PluggyClient()
             logger.info("PluggyClient initialized successfully")
 
-            token = client._get_connect_token()
-            logger.info(f"Connect token obtained: {token[:10]}...")
+            token = client._get_connect_token(item_id=item_id)
+            logger.info(f"Connect token obtained for item_id={item_id}: {token[:10]}...")
 
             expires_at = timezone.now() + timedelta(minutes=30)
             return Response({
                 'token': token,
-                'expires_at': expires_at
+                'expires_at': expires_at,
+                'item_id': item_id
             })
         except ValueError as e:
             logger.error(f"Configuration error: {e}")

@@ -225,6 +225,84 @@ class BankConnectionService:
             logger.error(f"Failed to update connection status: {e}")
             raise
 
+    def trigger_manual_sync(self, connection: BankConnection) -> Dict:
+        """
+        Trigger a manual synchronization for a connection.
+        This updates the item in Pluggy to fetch new data from the financial institution.
+
+        Returns:
+            Dict with sync status and any required actions
+        """
+        try:
+            logger.info(f"Triggering manual sync for connection {connection.id}")
+
+            # First, check current item status
+            current_item = self.client.get_item(connection.pluggy_item_id)
+            current_status = current_item['status']
+
+            logger.info(f"Current item status: {current_status}")
+
+            # Handle different status scenarios
+            if current_status == 'WAITING_USER_INPUT':
+                # MFA is required
+                parameter = current_item.get('parameter', {})
+                logger.warning(f"Item requires MFA. Parameter: {parameter}")
+                return {
+                    'status': 'MFA_REQUIRED',
+                    'message': 'Multi-factor authentication required',
+                    'parameter': parameter,
+                    'item_status': current_status
+                }
+
+            elif current_status == 'LOGIN_ERROR':
+                # Credentials are invalid
+                logger.warning(f"Item has login error. Need to update credentials.")
+                return {
+                    'status': 'CREDENTIALS_REQUIRED',
+                    'message': 'Invalid credentials, please reconnect',
+                    'item_status': current_status
+                }
+
+            elif current_status in ['UPDATED', 'OUTDATED']:
+                # Item can be updated - trigger sync
+                logger.info(f"Triggering item update for sync")
+                updated_item = self.client.trigger_item_update(connection.pluggy_item_id)
+
+                # Update local status
+                connection.status = updated_item['status']
+                connection.status_detail = updated_item.get('statusDetail')
+                connection.execution_status = updated_item.get('executionStatus', '')
+                connection.last_updated_at = timezone.now()
+                connection.save()
+
+                return {
+                    'status': 'SYNC_TRIGGERED',
+                    'message': 'Synchronization started successfully',
+                    'item_status': updated_item['status']
+                }
+
+            elif current_status == 'UPDATING':
+                # Already updating
+                logger.info(f"Item is already updating")
+                return {
+                    'status': 'ALREADY_SYNCING',
+                    'message': 'Synchronization already in progress',
+                    'item_status': current_status
+                }
+
+            else:
+                # Unknown status
+                logger.warning(f"Unknown item status: {current_status}")
+                return {
+                    'status': 'UNKNOWN',
+                    'message': f'Unknown item status: {current_status}',
+                    'item_status': current_status
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to trigger manual sync: {e}")
+            raise
+
     def sync_accounts(self, connection: BankConnection) -> int:
         """
         Sync accounts for a connection.
@@ -247,7 +325,7 @@ class BankConnectionService:
                         'number': pluggy_account.get('number', ''),
                         'balance': Decimal(str(pluggy_account.get('balance', 0))),
                         'currency_code': pluggy_account.get('currencyCode', 'BRL'),
-                        'bank_data': pluggy_account.get('bankData', {}),
+                        'bank_data': pluggy_account.get('bankData') or {},  # Ensure never None
                         'last_synced_at': timezone.now(),
                     }
                 )
@@ -262,18 +340,24 @@ class BankConnectionService:
 
     def delete_connection(self, connection: BankConnection) -> bool:
         """
-        Delete a bank connection.
+        Delete a bank connection and all associated data.
         Ref: https://docs.pluggy.ai/reference/items-delete
         """
         try:
-            # Delete from Pluggy
-            self.client.delete_item(connection.pluggy_item_id)
+            # Delete from Pluggy first
+            try:
+                self.client.delete_item(connection.pluggy_item_id)
+            except Exception as pluggy_error:
+                logger.warning(f"Failed to delete from Pluggy: {pluggy_error}")
+                # Continue with local deletion even if Pluggy deletion fails
 
-            # Mark as inactive (soft delete)
-            connection.is_active = False
-            connection.save()
+            # Store connection ID for logging
+            connection_id = connection.id
 
-            logger.info(f"Deleted connection {connection.id}")
+            # Delete from database (will cascade delete accounts and transactions)
+            connection.delete()
+
+            logger.info(f"Deleted connection {connection_id} and all associated data")
             return True
 
         except Exception as e:
@@ -303,10 +387,17 @@ class TransactionService:
         self.client = PluggyClient()
 
     def sync_transactions(self, account: BankAccount,
-                         days_back: int = 365) -> int:
+                         days_back: int = 365,
+                         trigger_update: bool = True) -> int:
         """
         Sync transactions for an account.
+        By default, triggers an item update first to get fresh data.
         Ref: https://docs.pluggy.ai/reference/transactions-list
+
+        Args:
+            account: The bank account to sync
+            days_back: How many days of transactions to sync
+            trigger_update: Whether to trigger item update before syncing (default: True)
         """
         sync_log = SyncLog.objects.create(
             connection=account.connection,
@@ -316,6 +407,33 @@ class TransactionService:
         )
 
         try:
+            # Trigger item update for manual syncs to get fresh data
+            if trigger_update:
+                logger.info(f"Triggering item update before syncing transactions for account {account.id}")
+                connection_service = BankConnectionService()
+                sync_status = connection_service.trigger_manual_sync(account.connection)
+
+                if sync_status['status'] == 'MFA_REQUIRED':
+                    sync_log.status = 'FAILED'
+                    sync_log.error_message = 'MFA required for sync'
+                    sync_log.completed_at = timezone.now()
+                    sync_log.save()
+                    raise ValueError('MFA required. Please complete authentication through the app.')
+
+                elif sync_status['status'] == 'CREDENTIALS_REQUIRED':
+                    sync_log.status = 'FAILED'
+                    sync_log.error_message = 'Invalid credentials'
+                    sync_log.completed_at = timezone.now()
+                    sync_log.save()
+                    raise ValueError('Invalid credentials. Please reconnect your account.')
+
+                elif sync_status['status'] not in ['SYNC_TRIGGERED', 'ALREADY_SYNCING']:
+                    logger.warning(f"Unexpected sync status: {sync_status}")
+
+                # Wait a moment for the update to start processing
+                import time
+                time.sleep(2)
+
             date_from = timezone.now() - timedelta(days=days_back)
             date_to = timezone.now()
 
@@ -386,14 +504,36 @@ class TransactionService:
             logger.error(f"Failed to sync transactions: {e}")
             raise
 
-    def sync_all_accounts_transactions(self, connection: BankConnection) -> Dict[str, int]:
+    def sync_all_accounts_transactions(self, connection: BankConnection,
+                                      trigger_update: bool = True) -> Dict[str, int]:
         """
         Sync transactions for all accounts in a connection.
+
+        Args:
+            connection: The bank connection
+            trigger_update: Whether to trigger item update before syncing (default: True)
         """
         results = {}
+
+        # Only trigger update once for the connection, not for each account
+        if trigger_update:
+            logger.info(f"Triggering item update for connection {connection.id}")
+            connection_service = BankConnectionService()
+            sync_status = connection_service.trigger_manual_sync(connection)
+
+            if sync_status['status'] == 'MFA_REQUIRED':
+                raise ValueError('MFA required. Please complete authentication through the app.')
+            elif sync_status['status'] == 'CREDENTIALS_REQUIRED':
+                raise ValueError('Invalid credentials. Please reconnect your account.')
+
+            # Wait for update to process
+            import time
+            time.sleep(3)
+
         for account in connection.accounts.filter(is_active=True):
             try:
-                count = self.sync_transactions(account)
+                # Don't trigger update again since we did it for the connection
+                count = self.sync_transactions(account, trigger_update=False)
                 results[str(account.id)] = count
             except Exception as e:
                 logger.error(f"Failed to sync transactions for account {account.id}: {e}")
