@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatDate, cn } from '@/lib/utils';
-import { 
+import {
   DocumentChartBarIcon,
   ArrowDownTrayIcon,
   PlayIcon,
@@ -25,6 +25,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { bankingService } from '@/services/banking.service';
+import { Transaction } from '@/types/banking';
 
 const REPORT_TYPES = [
   { value: 'profit_loss', label: 'DRE - Demonstração de Resultados', icon: DocumentChartBarIcon },
@@ -39,6 +42,26 @@ const QUICK_PERIODS = [
   { id: 'quarterly', label: 'Trimestre', icon: ChartBarIcon },
   { id: 'year_to_date', label: 'Ano Atual', icon: TrendingUpIcon },
 ];
+
+interface CashFlowData {
+  date: string;
+  receitas: number;
+  despesas: number;
+  saldo: number;
+}
+
+interface CategoryData {
+  name: string;
+  value: number;
+}
+
+interface ComparisonData {
+  periodo: string;
+  receitas: number;
+  despesas: number;
+}
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B6B', '#4ECDC4', '#45B7D1'];
 
 function ReportsPageContent() {
   // State
@@ -55,10 +78,159 @@ function ReportsPageContent() {
     };
   });
 
+  // Charts data state
+  const [cashFlowData, setCashFlowData] = useState<CashFlowData[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [comparisonData, setComparisonData] = useState<ComparisonData[]>([]);
+  const [loading, setLoading] = useState(true);
+
   // Mock empty data
   const reports = { results: [] };
   const accounts = { results: [] };
   const categories = { results: [] };
+
+  // Fetch chart data
+  useEffect(() => {
+    loadChartData();
+  }, [selectedPeriod]);
+
+  const loadChartData = async () => {
+    try {
+      setLoading(true);
+
+      console.log('Loading chart data for period:', selectedPeriod);
+
+      // Fetch transactions for the selected period
+      const transactions = await bankingService.getTransactions({
+        date_from: selectedPeriod.start_date,
+        date_to: selectedPeriod.end_date,
+      });
+
+      console.log('Transactions fetched:', transactions.length);
+
+      // Process cash flow data (daily aggregation)
+      const cashFlow = processCashFlowData(transactions);
+      console.log('Cash flow data:', cashFlow);
+      setCashFlowData(cashFlow);
+
+      // Process category distribution
+      const categories = processCategoryData(transactions);
+      console.log('Category data:', categories);
+      setCategoryData(categories);
+
+      // Process comparison data (current vs previous period)
+      const comparison = await processComparisonData();
+      console.log('Comparison data:', comparison);
+      setComparisonData(comparison);
+
+    } catch (error) {
+      console.error('Error loading chart data:', error);
+      toast.error('Erro ao carregar dados dos gráficos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const processCashFlowData = (transactions: Transaction[]): CashFlowData[] => {
+    const dailyData: Record<string, { receitas: number; despesas: number }> = {};
+
+    transactions.forEach(transaction => {
+      const date = transaction.date;
+      if (!dailyData[date]) {
+        dailyData[date] = { receitas: 0, despesas: 0 };
+      }
+
+      if (transaction.type === 'CREDIT') {
+        dailyData[date].receitas += transaction.amount;
+      } else {
+        dailyData[date].despesas += Math.abs(transaction.amount);
+      }
+    });
+
+    // Convert to array and calculate running balance
+    let runningBalance = 0;
+    return Object.entries(dailyData)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, data]) => {
+        runningBalance += data.receitas - data.despesas;
+        return {
+          date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+          receitas: data.receitas,
+          despesas: data.despesas,
+          saldo: runningBalance,
+        };
+      });
+  };
+
+  const processCategoryData = (transactions: Transaction[]): CategoryData[] => {
+    const categoryTotals: Record<string, number> = {};
+
+    transactions.forEach(transaction => {
+      if (transaction.type === 'DEBIT') {
+        const category = transaction.category || 'Sem categoria';
+        categoryTotals[category] = (categoryTotals[category] || 0) + Math.abs(transaction.amount);
+      }
+    });
+
+    return Object.entries(categoryTotals)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10); // Top 10 categories
+  };
+
+  const processComparisonData = async (): Promise<ComparisonData[]> => {
+    // Usar o período selecionado
+    const startDate = new Date(selectedPeriod.start_date);
+    const endDate = new Date(selectedPeriod.end_date);
+    const periodDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Calcular período anterior (mesmo tamanho que o período atual)
+    const prevEndDate = new Date(startDate);
+    prevEndDate.setDate(prevEndDate.getDate() - 1);
+    const prevStartDate = new Date(prevEndDate);
+    prevStartDate.setDate(prevStartDate.getDate() - periodDays);
+
+    const currentPeriod = await bankingService.getTransactionsSummary(
+      selectedPeriod.start_date,
+      selectedPeriod.end_date
+    );
+
+    const previousPeriod = await bankingService.getTransactionsSummary(
+      prevStartDate.toISOString().split('T')[0],
+      prevEndDate.toISOString().split('T')[0]
+    );
+
+    // Gerar labels baseados no tamanho do período
+    let currentLabel = '';
+    let previousLabel = '';
+
+    if (periodDays <= 31) {
+      // Período mensal ou menor - mostrar mês/ano
+      currentLabel = startDate.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '');
+      previousLabel = prevStartDate.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '');
+    } else if (periodDays <= 92) {
+      // Período trimestral
+      currentLabel = `${startDate.toLocaleDateString('pt-BR', { month: 'short' })} - ${endDate.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}`.replace(/\./g, '');
+      previousLabel = `${prevStartDate.toLocaleDateString('pt-BR', { month: 'short' })} - ${prevEndDate.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}`.replace(/\./g, '');
+    } else {
+      // Período anual ou maior
+      currentLabel = `Ano ${startDate.getFullYear()}`;
+      previousLabel = `Ano ${prevStartDate.getFullYear()}`;
+    }
+
+    return [
+      {
+        periodo: previousLabel,
+        receitas: previousPeriod.income || 0,
+        despesas: Math.abs(previousPeriod.expenses) || 0,
+      },
+      {
+        periodo: currentLabel,
+        receitas: currentPeriod.income || 0,
+        despesas: Math.abs(currentPeriod.expenses) || 0,
+      },
+    ];
+  };
 
   const handleQuickPeriod = (periodId: string) => {
     const today = new Date();
@@ -164,13 +336,41 @@ function ReportsPageContent() {
                   <BanknotesIcon className="h-5 w-5 mr-2 text-blue-600" />
                   Fluxo de Caixa
                 </CardTitle>
+                <CardDescription>
+                  Acompanhamento diário de receitas, despesas e saldo acumulado
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <EmptyState
-                  icon={BanknotesIcon}
-                  title="Nenhum dado disponível"
-                  description="Conecte contas bancárias para visualizar o fluxo de caixa"
-                />
+                {loading ? (
+                  <div className="flex items-center justify-center h-80">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : cashFlowData.length === 0 ? (
+                  <EmptyState
+                    icon={BanknotesIcon}
+                    title="Nenhum dado disponível"
+                    description="Conecte contas bancárias para visualizar o fluxo de caixa"
+                  />
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={cashFlowData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip
+                        formatter={(value: number) =>
+                          new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          }).format(value)
+                        }
+                      />
+                      <Legend />
+                      <Line type="monotone" dataKey="receitas" stroke="#10b981" name="Receitas" strokeWidth={2} />
+                      <Line type="monotone" dataKey="despesas" stroke="#ef4444" name="Despesas" strokeWidth={2} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
 
@@ -181,13 +381,70 @@ function ReportsPageContent() {
                   <ChartPieIcon className="h-5 w-5 mr-2 text-purple-600" />
                   Distribuição por Categoria
                 </CardTitle>
+                <CardDescription>
+                  Top 10 categorias de despesas no período
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <EmptyState
-                  icon={ChartPieIcon}
-                  title="Nenhum dado disponível"
-                  description="Conecte contas bancárias para visualizar categorias"
-                />
+                {loading ? (
+                  <div className="flex items-center justify-center h-80">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : categoryData.length === 0 ? (
+                  <EmptyState
+                    icon={ChartPieIcon}
+                    title="Nenhum dado disponível"
+                    description="Conecte contas bancárias para visualizar categorias"
+                  />
+                ) : (
+                  <div className="space-y-4">
+                    <ResponsiveContainer width="100%" height={240}>
+                      <PieChart>
+                        <Pie
+                          data={categoryData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {categoryData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: number) =>
+                            new Intl.NumberFormat('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            }).format(value)
+                          }
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="space-y-2">
+                      {categoryData.map((category, index) => (
+                        <div key={category.name} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                            />
+                            <span className="text-muted-foreground">{category.name}</span>
+                          </div>
+                          <span className="font-medium">
+                            {new Intl.NumberFormat('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            }).format(category.value)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -198,13 +455,41 @@ function ReportsPageContent() {
                   <ChartBarIcon className="h-5 w-5 mr-2 text-blue-600" />
                   Comparativo: Receitas vs Despesas
                 </CardTitle>
+                <CardDescription>
+                  Comparação entre período anterior e período selecionado
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <EmptyState
-                  icon={ChartBarIcon}
-                  title="Nenhum dado disponível"
-                  description="Conecte contas bancárias para visualizar receitas e despesas"
-                />
+                {loading ? (
+                  <div className="flex items-center justify-center h-80">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : comparisonData.length === 0 ? (
+                  <EmptyState
+                    icon={ChartBarIcon}
+                    title="Nenhum dado disponível"
+                    description="Conecte contas bancárias para visualizar receitas e despesas"
+                  />
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={comparisonData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="periodo" />
+                      <YAxis />
+                      <Tooltip
+                        formatter={(value: number) =>
+                          new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          }).format(value)
+                        }
+                      />
+                      <Legend />
+                      <Bar dataKey="receitas" fill="#10b981" name="Receitas" />
+                      <Bar dataKey="despesas" fill="#ef4444" name="Despesas" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </div>
