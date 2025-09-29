@@ -9,7 +9,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Min, Max
 
 from .models import (
     Connector, BankConnection, BankAccount,
@@ -476,30 +476,26 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
         import logging
         logger = logging.getLogger(__name__)
 
-        # Default to current month
-        now = timezone.now()
-        date_from = request.query_params.get(
-            'date_from',
-            now.replace(day=1).date()
-        )
-        date_to = request.query_params.get(
-            'date_to',
-            now.date()
-        )
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
 
-        if isinstance(date_from, str):
-            date_from = datetime.fromisoformat(date_from).date()
-        if isinstance(date_to, str):
-            date_to = datetime.fromisoformat(date_to).date()
+        # Start with all user transactions
+        transactions = self.get_queryset()
 
-        logger.info(f"Summary date range: {date_from} to {date_to}")
+        # Apply date filters only if provided
+        if date_from:
+            if isinstance(date_from, str):
+                date_from = datetime.fromisoformat(date_from).date()
+            transactions = transactions.filter(date__gte=date_from)
+            logger.info(f"Filtering from date: {date_from}")
 
-        transactions = self.get_queryset().filter(
-            date__gte=date_from,
-            date__lte=date_to
-        )
+        if date_to:
+            if isinstance(date_to, str):
+                date_to = datetime.fromisoformat(date_to).date()
+            transactions = transactions.filter(date__lte=date_to)
+            logger.info(f"Filtering to date: {date_to}")
 
-        logger.info(f"Transactions in period: {transactions.count()}")
+        logger.info(f"Summary transactions count: {transactions.count()}")
 
         income = transactions.filter(type='CREDIT').aggregate(
             total=Sum('amount')
@@ -514,6 +510,17 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
             connection__is_active=True,
             is_active=True
         ).count()
+
+        # Get earliest and latest transaction dates for period if not specified
+        if not date_from or not date_to:
+            date_range = transactions.aggregate(
+                earliest=Min('date'),
+                latest=Max('date')
+            )
+            if not date_from:
+                date_from = date_range['earliest']
+            if not date_to:
+                date_to = date_range['latest']
 
         return Response({
             'income': income,

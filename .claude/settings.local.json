@@ -3,7 +3,14 @@
     "allow": [
       "Read(//mnt/c/Users/**)",
       "Bash(grep:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(cat:*)",
+      "SlashCommand(/sc:load --c7)",
+      "SlashCommand(/sc:load:*)",
+      "Bash(python manage.py shell:*)",
+      "Bash(find:*)",
+      "Read(//private/tmp/**)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []
