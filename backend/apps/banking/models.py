@@ -202,6 +202,38 @@ class Transaction(models.Model):
         return self.type == 'DEBIT'
 
 
+class Category(models.Model):
+    """
+    Represents a transaction category.
+    """
+    TYPE_CHOICES = [
+        ('income', 'Income'),
+        ('expense', 'Expense'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='categories')
+    name = models.CharField(max_length=100)
+    type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    color = models.CharField(max_length=7, default='#d946ef')  # Hex color
+    icon = models.CharField(max_length=10, default='📁')  # Emoji icon
+    is_system = models.BooleanField(default=False)  # System categories can't be deleted
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='subcategories')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name_plural = 'Categories'
+        unique_together = [['user', 'name', 'type']]
+        indexes = [
+            models.Index(fields=['user', 'type']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_type_display()})"
+
+
 class SyncLog(models.Model):
     """
     Logs for synchronization operations.

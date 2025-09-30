@@ -94,10 +94,14 @@ export default function DashboardPage() {
     );
   }
 
-  const totalBalance = accounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+  const totalBalance = accounts.reduce((sum, acc) => {
+    const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
+    return sum + (isNaN(balance) ? 0 : balance);
+  }, 0);
   const monthlyIncome = summary?.income || 0;
   const monthlyExpenses = summary?.expenses || 0;
-  const monthlyResult = monthlyIncome - monthlyExpenses;
+  // Use balance from API (expenses are already negative)
+  const monthlyResult = summary?.balance || 0;
 
   return (
     <div className="space-y-6">

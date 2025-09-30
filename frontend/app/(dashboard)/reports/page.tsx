@@ -31,7 +31,7 @@ import {
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline';
-import { format, startOfMonth, endOfMonth, subMonths, subYears, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, subYears, parseISO, startOfYear, endOfYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface PeriodFilter {
@@ -52,16 +52,16 @@ export default function ReportsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>({
-    label: 'Todas',
-    startDate: null,
-    endDate: null
+    label: 'Mês atual',
+    startDate: startOfMonth(new Date()),
+    endDate: endOfMonth(new Date())
   });
 
   const periods: PeriodFilter[] = [
     {
       label: 'Todas',
-      startDate: null,
-      endDate: null
+      startDate: new Date('2020-01-01'), // Far enough back to get all transactions
+      endDate: new Date()
     },
     {
       label: 'Mês atual',
@@ -70,23 +70,23 @@ export default function ReportsPage() {
     },
     {
       label: 'Últimos 3 meses',
-      startDate: startOfMonth(subMonths(new Date(), 2)),
-      endDate: endOfMonth(new Date())
+      startDate: new Date(new Date().setDate(new Date().getDate() - 90)),
+      endDate: new Date()
     },
     {
       label: 'Últimos 6 meses',
-      startDate: startOfMonth(subMonths(new Date(), 5)),
-      endDate: endOfMonth(new Date())
+      startDate: new Date(new Date().setDate(new Date().getDate() - 180)),
+      endDate: new Date()
     },
     {
-      label: 'Último ano',
-      startDate: startOfMonth(subMonths(new Date(), 12)),
-      endDate: endOfMonth(new Date())
+      label: 'Ano atual',
+      startDate: startOfYear(new Date()),
+      endDate: new Date()
     },
     {
-      label: 'Últimos 2 anos',
-      startDate: startOfMonth(subYears(new Date(), 2)),
-      endDate: endOfMonth(new Date())
+      label: 'Ano anterior',
+      startDate: startOfYear(subYears(new Date(), 1)),
+      endDate: endOfYear(subYears(new Date(), 1))
     }
   ];
 
@@ -270,7 +270,8 @@ export default function ReportsPage() {
   const categoryData = getCategoryData();
   const monthlyData = getMonthlyData();
   const dailyBalanceData = getDailyBalanceData();
-  const monthlyResult = (summary?.income || 0) - Math.abs(summary?.expenses || 0);
+  // Expenses come as negative from API, balance is already calculated
+  const monthlyResult = summary?.balance || 0;
 
   return (
     <div className="space-y-6 print:space-y-4">

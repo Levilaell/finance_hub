@@ -13,14 +13,14 @@ from django.db.models import Sum, Count, Min, Max
 
 from .models import (
     Connector, BankConnection, BankAccount,
-    Transaction, SyncLog
+    Transaction, SyncLog, Category
 )
 from .serializers import (
     ConnectorSerializer, BankConnectionSerializer,
     BankAccountSerializer, TransactionSerializer,
     CreateConnectionSerializer, TransactionFilterSerializer,
     SyncStatusSerializer, ConnectTokenSerializer,
-    SummarySerializer
+    SummarySerializer, CategorySerializer
 )
 from .services import (
     ConnectorService, BankConnectionService,
@@ -474,6 +474,7 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
         GET /api/banking/transactions/summary/
         """
         import logging
+        from calendar import monthrange
         logger = logging.getLogger(__name__)
 
         date_from = request.query_params.get('date_from')
@@ -482,7 +483,15 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
         # Start with all user transactions
         transactions = self.get_queryset()
 
-        # Apply date filters only if provided
+        # If no dates provided, default to current month
+        if not date_from and not date_to:
+            now = timezone.now()
+            date_from = now.replace(day=1).date()
+            last_day = monthrange(now.year, now.month)[1]
+            date_to = now.replace(day=last_day).date()
+            logger.info(f"No dates provided, using current month: {date_from} to {date_to}")
+
+        # Apply date filters
         if date_from:
             if isinstance(date_from, str):
                 date_from = datetime.fromisoformat(date_from).date()
@@ -505,27 +514,24 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
             total=Sum('amount')
         )['total'] or 0
 
+        # Expenses should be negative for proper balance calculation
+        # If expenses are positive in DB, negate them
+        if expenses > 0:
+            expenses = -expenses
+
         accounts_count = BankAccount.objects.filter(
             connection__user=request.user,
             connection__is_active=True,
             is_active=True
         ).count()
 
-        # Get earliest and latest transaction dates for period if not specified
-        if not date_from or not date_to:
-            date_range = transactions.aggregate(
-                earliest=Min('date'),
-                latest=Max('date')
-            )
-            if not date_from:
-                date_from = date_range['earliest']
-            if not date_to:
-                date_to = date_range['latest']
+        # Balance = income + expenses (expenses already negative)
+        balance = income + expenses
 
         return Response({
             'income': income,
             'expenses': expenses,
-            'balance': income - expenses,
+            'balance': balance,
             'period_start': date_from,
             'period_end': date_to,
             'accounts_count': accounts_count,
@@ -544,3 +550,38 @@ class SyncLogViewSet(viewsets.ReadOnlyModelViewSet):
         return SyncLog.objects.filter(
             connection__user=self.request.user
         ).order_by('-started_at')[:20]  # Last 20 logs
+
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing transaction categories.
+    """
+    serializer_class = CategorySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Category.objects.filter(user=self.request.user)
+
+        # Filter by type if provided
+        category_type = self.request.query_params.get('type')
+        if category_type:
+            queryset = queryset.filter(type=category_type)
+
+        return queryset.order_by('type', 'name')
+
+    def perform_create(self, serializer):
+        """Assign current user when creating a category."""
+        serializer.save(user=self.request.user)
+
+    def destroy(self, request, pk=None):
+        """Prevent deletion of system categories."""
+        category = self.get_object()
+
+        if category.is_system:
+            return Response(
+                {'error': 'Cannot delete system categories'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        category.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

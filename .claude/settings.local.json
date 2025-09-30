@@ -10,7 +10,18 @@
       "Bash(python manage.py shell:*)",
       "Bash(find:*)",
       "Read(//private/tmp/**)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(.venv/Scripts/python:*)",
+      "Bash(python:*)",
+      "Bash(source:*)",
+      "Bash(.venv/Scripts/activate)",
+      "Bash(.venv/Scripts/python.exe manage.py shell:*)",
+      "Bash(.venv/Scripts/pip.exe list:*)",
+      "Bash(.venv/Scripts/pip.exe install:*)",
+      "Bash(.venv/Scripts/python.exe manage.py makemigrations:*)",
+      "Bash(.venv/Scripts/python.exe manage.py migrate:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(set DJANGO_SETTINGS_MODULE=backend.settings)"
     ],
     "deny": [],
     "ask": []

@@ -6,7 +6,7 @@ Ref: https://www.django-rest-framework.org/api-guide/serializers/
 from rest_framework import serializers
 from .models import (
     Connector, BankConnection, BankAccount,
-    Transaction, SyncLog
+    Transaction, SyncLog, Category
 )
 
 
@@ -139,3 +139,33 @@ class SummarySerializer(serializers.Serializer):
     period_end = serializers.DateField()
     accounts_count = serializers.IntegerField()
     transactions_count = serializers.IntegerField()
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    """Serializer for categories."""
+
+    class Meta:
+        model = Category
+        fields = [
+            'id', 'name', 'type', 'color', 'icon',
+            'is_system', 'parent', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'is_system', 'created_at', 'updated_at']
+
+    def validate(self, data):
+        """Validate that user doesn't create duplicate categories."""
+        user = self.context['request'].user
+        name = data.get('name')
+        type_value = data.get('type')
+
+        # Check for duplicates (excluding current instance on updates)
+        queryset = Category.objects.filter(user=user, name=name, type=type_value)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+
+        if queryset.exists():
+            raise serializers.ValidationError({
+                'name': f'Category "{name}" already exists for {type_value}'
+            })
+
+        return data
