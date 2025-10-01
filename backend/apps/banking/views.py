@@ -204,26 +204,26 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
         Sync all transactions for this connection.
         This will trigger an item update in Pluggy to fetch fresh data.
         POST /api/banking/connections/{id}/sync_transactions/
+
+        Returns immediately with sync initiation status.
+        Use check_status endpoint to monitor progress.
         """
         connection = self.get_object()
-        service = TransactionService()
+        service = BankConnectionService()
 
         try:
-            # Check if we should trigger update (default: True for manual syncs)
-            trigger_update = request.data.get('trigger_update', True)
+            # Trigger manual sync
+            sync_status = service.trigger_manual_sync(connection)
 
-            results = service.sync_all_accounts_transactions(
-                connection,
-                trigger_update=trigger_update
-            )
-            total = sum(results.values())
-
+            # Return sync initiation status immediately
             return Response({
-                'message': f'Synced {total} transactions',
-                'results': results,
-                'total': total,
-                'status': 'SUCCESS'
+                'message': 'Synchronization initiated',
+                'sync_status': sync_status['status'],
+                'item_status': sync_status.get('item_status'),
+                'requires_action': sync_status['status'] in ['MFA_REQUIRED', 'CREDENTIALS_REQUIRED'],
+                'mfa_parameter': sync_status.get('parameter') if sync_status['status'] == 'MFA_REQUIRED' else None
             })
+
         except ValueError as e:
             # Handle MFA or credential errors
             error_msg = str(e)
@@ -296,8 +296,15 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def check_status(self, request, pk=None):
         """
-        Check the current status of a connection.
+        Check the current status of a connection and sync progress.
         GET /api/banking/connections/{id}/check_status/
+
+        Returns:
+            status: Item status (UPDATING, UPDATED, etc)
+            execution_status: Current execution phase (LOGIN_IN_PROGRESS, TRANSACTIONS_IN_PROGRESS, SUCCESS, etc)
+            is_syncing: Boolean indicating if sync is in progress
+            sync_complete: Boolean indicating if sync has completed
+            requires_action: Boolean indicating if user action needed
         """
         connection = self.get_object()
 
@@ -308,20 +315,36 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
             # Update local status
             connection.status = item['status']
             connection.status_detail = item.get('statusDetail')
+            connection.execution_status = item.get('executionStatus', '')
             connection.last_updated_at = timezone.now()
             connection.save()
 
+            item_status = item['status']
+            execution_status = item.get('executionStatus')
+
+            # Determine sync state
+            is_syncing = item_status == 'UPDATING'
+            sync_complete = item_status == 'UPDATED' and execution_status == 'SUCCESS'
+            requires_action = item_status in ['WAITING_USER_INPUT', 'LOGIN_ERROR']
+
             response_data = {
-                'status': item['status'],
+                'status': item_status,
                 'status_detail': item.get('statusDetail'),
-                'execution_status': item.get('executionStatus'),
-                'last_updated_at': connection.last_updated_at
+                'execution_status': execution_status,
+                'last_updated_at': connection.last_updated_at.isoformat(),
+                'is_syncing': is_syncing,
+                'sync_complete': sync_complete,
+                'requires_action': requires_action
             }
 
             # Add MFA info if waiting for user input
-            if item['status'] == 'WAITING_USER_INPUT':
+            if item_status == 'WAITING_USER_INPUT':
                 response_data['mfa_required'] = True
                 response_data['parameter'] = item.get('parameter', {})
+
+            # Add error info if needed
+            if item_status in ['LOGIN_ERROR', 'ERROR', 'OUTDATED']:
+                response_data['error_message'] = item.get('statusDetail', {}).get('message', 'Unknown error')
 
             return Response(response_data)
         except Exception as e:
@@ -409,14 +432,15 @@ class BankAccountViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
 
-class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
+class TransactionViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for viewing transactions.
+    ViewSet for viewing transactions and updating their categories.
     Ref: https://docs.pluggy.ai/reference/transactions
     """
     serializer_class = TransactionSerializer
     permission_classes = [IsAuthenticated]
     filterset_fields = ['account', 'type', 'category']
+    http_method_names = ['get', 'patch', 'head', 'options']  # Only allow GET and PATCH
 
     def get_queryset(self):
         import logging
@@ -460,12 +484,37 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
             if 'type' in filters:
                 queryset = queryset.filter(type=filters['type'])
             if 'category' in filters:
-                queryset = queryset.filter(category__icontains=filters['category'])
+                queryset = queryset.filter(pluggy_category__icontains=filters['category'])
         else:
             logger.error(f"Filter validation errors: {filter_serializer.errors}")
 
         logger.info(f"Final queryset count: {queryset.count()}")
         return queryset.order_by('-date', '-created_at')
+
+    def update(self, request, *args, **kwargs):
+        """
+        Update transaction category.
+        PATCH /api/banking/transactions/{id}/
+        Body: { "user_category_id": "uuid" } or { "user_category_id": null }
+        """
+        partial = kwargs.pop('partial', True)  # Force partial update
+        instance = self.get_object()
+
+        # Only allow updating user_category
+        allowed_fields = {'user_category_id'}
+        request_fields = set(request.data.keys())
+
+        if not request_fields.issubset(allowed_fields):
+            return Response(
+                {'error': 'Only user_category_id can be updated'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
     def summary(self, request):
@@ -483,13 +532,50 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
         # Start with all user transactions
         transactions = self.get_queryset()
 
-        # If no dates provided, default to current month
+        # If no dates provided, default to current month OR last month with transactions
         if not date_from and not date_to:
-            now = timezone.now()
-            date_from = now.replace(day=1).date()
-            last_day = monthrange(now.year, now.month)[1]
-            date_to = now.replace(day=last_day).date()
-            logger.info(f"No dates provided, using current month: {date_from} to {date_to}")
+            # Use timezone-aware current time in local timezone (America/Sao_Paulo)
+            from django.conf import settings
+            import pytz
+
+            utc_now = timezone.now()
+            local_tz = pytz.timezone(settings.TIME_ZONE)
+            local_now = utc_now.astimezone(local_tz)
+
+            logger.info(f"UTC now: {utc_now}, Local now ({settings.TIME_ZONE}): {local_now}")
+
+            # Try current month first (using local timezone)
+            current_month_start = local_now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            last_day = monthrange(local_now.year, local_now.month)[1]
+            current_month_end = local_now.replace(day=last_day, hour=23, minute=59, second=59, microsecond=999999)
+
+            # Check if current month has transactions
+            has_transactions_this_month = transactions.filter(
+                date__gte=current_month_start,
+                date__lte=current_month_end
+            ).exists()
+
+            if has_transactions_this_month:
+                date_from = current_month_start.date()
+                date_to = current_month_end.date()
+                logger.info(f"Using current month: {date_from} to {date_to}")
+            else:
+                # No transactions in current month, use the last month with activity
+                last_transaction = transactions.order_by('-date').first()
+                if last_transaction:
+                    # Convert last transaction date to local timezone
+                    last_trans_local = last_transaction.date.astimezone(local_tz)
+                    transaction_month = last_trans_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                    last_day_of_month = monthrange(last_trans_local.year, last_trans_local.month)[1]
+                    month_end = last_trans_local.replace(day=last_day_of_month, hour=23, minute=59, second=59, microsecond=999999)
+                    date_from = transaction_month.date()
+                    date_to = month_end.date()
+                    logger.info(f"No transactions in current month, using last active month: {date_from} to {date_to}")
+                else:
+                    # No transactions at all, use current month anyway
+                    date_from = current_month_start.date()
+                    date_to = current_month_end.date()
+                    logger.info(f"No transactions found, defaulting to current month: {date_from} to {date_to}")
 
         # Apply date filters
         if date_from:

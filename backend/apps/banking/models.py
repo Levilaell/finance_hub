@@ -167,9 +167,18 @@ class Transaction(models.Model):
     # Dates
     date = models.DateTimeField(db_index=True)  # Transaction date with time from Pluggy
 
-    # Categorization
-    category = models.CharField(max_length=100, blank=True)
-    category_id = models.CharField(max_length=50, blank=True)
+    # Categorization - Pluggy original (reference only)
+    pluggy_category = models.CharField(max_length=100, blank=True)
+    pluggy_category_id = models.CharField(max_length=50, blank=True)
+
+    # User customizable category
+    user_category = models.ForeignKey(
+        'Category',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='transactions'
+    )
 
     # Payment data
     payment_data = models.JSONField(null=True, blank=True)  # Additional payment details
@@ -185,7 +194,8 @@ class Transaction(models.Model):
         indexes = [
             models.Index(fields=['account', 'date']),
             models.Index(fields=['type', 'date']),
-            models.Index(fields=['category', 'date']),
+            models.Index(fields=['pluggy_category', 'date']),
+            models.Index(fields=['user_category', 'date']),
         ]
 
     def __str__(self):
@@ -200,6 +210,13 @@ class Transaction(models.Model):
     def is_expense(self):
         """Check if transaction is expense (debit)."""
         return self.type == 'DEBIT'
+
+    @property
+    def effective_category(self):
+        """Get the effective category (user category if set, otherwise Pluggy category)."""
+        if self.user_category:
+            return self.user_category.name
+        return self.pluggy_category
 
 
 class Category(models.Model):

@@ -6,7 +6,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from .models import (
     Connector, BankConnection, BankAccount,
-    Transaction, SyncLog
+    Transaction, Category, SyncLog
 )
 
 
@@ -97,24 +97,31 @@ class TransactionAdmin(admin.ModelAdmin):
     """Admin interface for Transactions."""
     list_display = [
         'date', 'description', 'type_badge', 'amount_display',
-        'category', 'account_name', 'created_at'
+        'effective_category', 'account_name', 'created_at'
     ]
-    list_filter = ['type', 'date', 'category']
+    list_filter = ['type', 'date', 'user_category', 'pluggy_category']
     search_fields = [
-        'description', 'merchant_name', 'category',
+        'description', 'merchant_name', 'pluggy_category',
         'account__name', 'account__connection__user__username'
     ]
     readonly_fields = [
-        'id', 'pluggy_transaction_id', 'payment_data',
-        'created_at', 'updated_at'
+        'id', 'pluggy_transaction_id', 'pluggy_category', 'pluggy_category_id',
+        'payment_data', 'created_at', 'updated_at'
     ]
-    raw_id_fields = ['account']
+    raw_id_fields = ['account', 'user_category']
     date_hierarchy = 'date'
     ordering = ['-date', '-created_at']
 
     def account_name(self, obj):
         return obj.account.name
     account_name.short_description = 'Account'
+
+    def effective_category(self, obj):
+        """Display user category if set, otherwise Pluggy category."""
+        if obj.user_category:
+            return f"{obj.user_category.name} (custom)"
+        return obj.pluggy_category or '-'
+    effective_category.short_description = 'Category'
 
     def type_badge(self, obj):
         color = 'green' if obj.type == 'CREDIT' else 'red'
@@ -128,6 +135,27 @@ class TransactionAdmin(admin.ModelAdmin):
         sign = '+' if obj.type == 'CREDIT' else '-'
         return f"{sign}{obj.currency_code} {obj.amount:,.2f}"
     amount_display.short_description = 'Amount'
+
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    """Admin interface for Categories."""
+    list_display = [
+        'name', 'type', 'color_badge', 'icon', 'user',
+        'is_system', 'parent', 'created_at'
+    ]
+    list_filter = ['type', 'is_system', 'created_at']
+    search_fields = ['name', 'user__username', 'user__email']
+    readonly_fields = ['id', 'created_at', 'updated_at']
+    raw_id_fields = ['user', 'parent']
+    ordering = ['type', 'name']
+
+    def color_badge(self, obj):
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 2px 8px; border-radius: 3px;">{}</span>',
+            obj.color, obj.color
+        )
+    color_badge.short_description = 'Color'
 
 
 @admin.register(SyncLog)

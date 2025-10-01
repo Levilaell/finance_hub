@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import { useAuthStore } from '@/store/auth-store';
 import { bankingService } from '@/services/banking.service';
 import { BankAccount, BankConnection } from '@/types/banking';
+import { useSyncStatus } from '@/hooks/useSyncStatus';
 
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -42,6 +43,8 @@ export default function AccountsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState<BankAccount | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [syncingConnectionId, setSyncingConnectionId] = useState<string | null>(null);
+  const { syncStatus, startPolling, stopPolling } = useSyncStatus(syncingConnectionId);
 
   // Check authentication
   useEffect(() => {
@@ -53,6 +56,45 @@ export default function AccountsPage() {
       fetchData();
     }
   }, [isAuthenticated, authLoading, router]);
+
+  // Handle sync status updates
+  useEffect(() => {
+    console.log('[AccountsPage] useEffect triggered - syncingConnectionId:', syncingConnectionId, 'syncStatus:', syncStatus);
+
+    // Show initial toast when sync starts
+    if (syncingConnectionId && !syncStatus.isPolling && !syncStatus.isComplete && !syncStatus.hasError) {
+      console.log('[AccountsPage] Showing initial toast');
+      toast.loading('Iniciando sincronização...', { id: 'sync-progress' });
+      return;
+    }
+
+    if (!syncingConnectionId) {
+      console.log('[AccountsPage] No syncingConnectionId, skipping');
+      return;
+    }
+
+    if (syncStatus.isPolling) {
+      console.log('[AccountsPage] Polling in progress, updating toast:', syncStatus.message);
+      // Update toast with current progress
+      toast.loading(syncStatus.message, { id: 'sync-progress' });
+    } else if (syncStatus.isComplete) {
+      console.log('[AccountsPage] Sync complete!');
+      // Sync completed successfully
+      toast.success(syncStatus.message, { id: 'sync-progress' });
+      setSyncingConnectionId(null);
+
+      // Reload data after a short delay to ensure backend has processed
+      setTimeout(() => {
+        console.log('[AccountsPage] Reloading data after sync completion');
+        fetchData();
+      }, 1500);
+    } else if (syncStatus.hasError) {
+      console.log('[AccountsPage] Sync error:', syncStatus.errorMessage || syncStatus.message);
+      // Sync failed
+      toast.error(syncStatus.errorMessage || syncStatus.message, { id: 'sync-progress' });
+      setSyncingConnectionId(null);
+    }
+  }, [syncStatus, syncingConnectionId]);
 
   // Fetch accounts and connections
   const fetchData = async () => {
@@ -119,28 +161,94 @@ export default function AccountsPage() {
   };
 
   // Sync account transactions
-  const handleSyncAccount = async (accountId: string) => {
+  const handleSyncAccount = useCallback(async (accountId: string) => {
     try {
-      await bankingService.syncAccountTransactions(accountId);
-      toast.success('Transações sincronizadas!');
-      await fetchData();
-    } catch (error) {
-      toast.error('Erro ao sincronizar transações');
+      console.log('[AccountsPage] handleSyncAccount called for account:', accountId);
+
+      // Find the connection for this account
+      const account = accounts.find(a => a.id === accountId);
+      if (!account) {
+        toast.error('Conta não encontrada');
+        return;
+      }
+
+      console.log('[AccountsPage] Found account, connection_id:', account.connection_id);
+
+      // Set syncing connection (this will trigger the useEffect to show initial toast)
+      setSyncingConnectionId(account.connection_id);
+      console.log('[AccountsPage] Set syncingConnectionId');
+
+      // Trigger sync
+      console.log('[AccountsPage] Calling syncConnectionTransactions...');
+      const response = await bankingService.syncConnectionTransactions(account.connection_id);
+      console.log('[AccountsPage] Sync response:', response);
+
+      // Check if requires action (MFA, credentials, etc)
+      if (response.requires_action) {
+        console.log('[AccountsPage] Requires action, stopping');
+        toast.error('Ação necessária: verifique suas credenciais ou autenticação', { id: 'sync-progress' });
+        setSyncingConnectionId(null);
+        return;
+      }
+
+      // Check if sync was initiated or is already running
+      const validStatuses = ['SYNC_TRIGGERED', 'ALREADY_SYNCING'];
+      if (!validStatuses.includes(response.sync_status)) {
+        console.log('[AccountsPage] Unexpected sync_status:', response.sync_status);
+        toast.error(`Status inesperado: ${response.sync_status}`, { id: 'sync-progress' });
+        setSyncingConnectionId(null);
+        return;
+      }
+
+      // Start polling for status (works for both new syncs and already running syncs)
+      // Pass connection ID explicitly to avoid race condition with setState
+      console.log('[AccountsPage] Starting polling... (sync_status:', response.sync_status, ')');
+      startPolling(account.connection_id);
+      console.log('[AccountsPage] Polling started');
+
+    } catch (error: any) {
+      console.error('[AccountsPage] Error syncing account:', error);
+      toast.error('Erro ao iniciar sincronização', { id: 'sync-progress' });
+      setSyncingConnectionId(null);
     }
-  };
+  }, [accounts, startPolling]);
 
   // Sync all connections
-  const handleSyncAll = async () => {
+  const handleSyncAll = useCallback(async () => {
+    if (connections.length === 0) return;
+
     try {
-      for (const connection of connections) {
-        await bankingService.syncConnectionTransactions(connection.id);
+      // Sync first connection with polling
+      const firstConnection = connections[0];
+      setSyncingConnectionId(firstConnection.id);
+
+      const response = await bankingService.syncConnectionTransactions(firstConnection.id);
+
+      if (response.requires_action) {
+        toast.error('Ação necessária: verifique suas credenciais', { id: 'sync-progress' });
+        setSyncingConnectionId(null);
+        return;
       }
-      toast.success('Todas as contas foram sincronizadas!');
-      await fetchData();
+
+      // Start polling for the first connection
+      startPolling(firstConnection.id);
+
+      // For subsequent connections, trigger sync without waiting
+      // (They will sync via webhooks in the background)
+      for (let i = 1; i < connections.length; i++) {
+        try {
+          await bankingService.syncConnectionTransactions(connections[i].id);
+        } catch (error) {
+          console.error(`Error syncing connection ${connections[i].id}:`, error);
+        }
+      }
+
     } catch (error) {
-      toast.error('Erro ao sincronizar contas');
+      console.error('Error syncing all accounts:', error);
+      toast.error('Erro ao iniciar sincronização', { id: 'sync-progress' });
+      setSyncingConnectionId(null);
     }
-  };
+  }, [connections, startPolling]);
 
   // Open delete confirmation dialog
   const handleDeleteAccount = (accountId: string) => {

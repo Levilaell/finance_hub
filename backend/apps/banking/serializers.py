@@ -86,15 +86,31 @@ class TransactionSerializer(serializers.ModelSerializer):
     is_income = serializers.BooleanField(read_only=True)
     is_expense = serializers.BooleanField(read_only=True)
 
+    # Category information
+    category = serializers.CharField(source='effective_category', read_only=True)
+    user_category_id = serializers.PrimaryKeyRelatedField(
+        source='user_category',
+        queryset=Category.objects.none(),
+        required=False,
+        allow_null=True
+    )
+
     class Meta:
         model = Transaction
         fields = [
             'id', 'account_name', 'account_type',
             'type', 'description', 'amount', 'currency_code',
-            'date', 'category', 'merchant_name',
-            'is_income', 'is_expense', 'created_at'
+            'date', 'category', 'user_category_id', 'pluggy_category',
+            'merchant_name', 'is_income', 'is_expense', 'created_at'
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'pluggy_category', 'pluggy_category_id', 'created_at']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set queryset for user_category based on request user
+        if 'request' in self.context:
+            user = self.context['request'].user
+            self.fields['user_category_id'].queryset = Category.objects.filter(user=user)
 
 
 class TransactionFilterSerializer(serializers.Serializer):

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { bankingService } from '@/services/banking.service';
-import { Transaction, BankAccount } from '@/types/banking';
+import { Transaction, BankAccount, Category } from '@/types/banking';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +16,9 @@ import {
   FunnelIcon,
   ArrowPathIcon,
   ArrowDownTrayIcon,
-  XMarkIcon
+  XMarkIcon,
+  ChevronDownIcon,
+  CheckIcon,
 } from '@heroicons/react/24/outline';
 import { Input } from '@/components/ui/input';
 import {
@@ -26,6 +28,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { toast } from 'sonner';
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -33,8 +41,10 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [updatingTransactionId, setUpdatingTransactionId] = useState<string | null>(null);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,12 +75,14 @@ export default function TransactionsPage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [transactionsData, accountsData] = await Promise.all([
+      const [transactionsData, accountsData, categoriesData] = await Promise.all([
         bankingService.getTransactions(),
-        bankingService.getAccounts()
+        bankingService.getAccounts(),
+        bankingService.getCategories(),
       ]);
       setTransactions(transactionsData);
       setAccounts(accountsData);
+      setCategories(categoriesData);
     } catch (error) {
       console.error('Error fetching transactions:', error);
     } finally {
@@ -143,6 +155,35 @@ export default function TransactionsPage() {
     setFilteredTransactions(filtered);
   };
 
+  const handleUpdateCategory = async (transactionId: string, categoryId: string | null) => {
+    setUpdatingTransactionId(transactionId);
+    try {
+      await bankingService.updateTransactionCategory(transactionId, categoryId);
+
+      // Update local state
+      setTransactions(prev =>
+        prev.map(t =>
+          t.id === transactionId
+            ? {
+                ...t,
+                user_category_id: categoryId,
+                category: categoryId
+                  ? categories.find(c => c.id === categoryId)?.name
+                  : t.pluggy_category
+              }
+            : t
+        )
+      );
+
+      toast.success('Categoria atualizada com sucesso!');
+    } catch (error) {
+      console.error('Error updating category:', error);
+      toast.error('Erro ao atualizar categoria');
+    } finally {
+      setUpdatingTransactionId(null);
+    }
+  };
+
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedAccount('all');
@@ -173,7 +214,7 @@ export default function TransactionsPage() {
   };
 
   // Get unique categories for filter
-  const categories = Array.from(
+  const uniqueCategoryNames = Array.from(
     new Set(transactions.map((t) => t.category).filter(Boolean))
   ).sort();
 
@@ -314,7 +355,7 @@ export default function TransactionsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas as categorias</SelectItem>
-                    {categories.map((category) => (
+                    {uniqueCategoryNames.map((category) => (
                       <SelectItem key={category} value={category!}>
                         {category}
                       </SelectItem>
@@ -418,11 +459,70 @@ export default function TransactionsPage() {
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          {transaction.category && (
-                            <span className="text-sm px-2 py-1 bg-white/10 rounded">
-                              {transaction.category}
-                            </span>
-                          )}
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button
+                                className="text-sm px-2 py-1 bg-white/10 rounded hover:bg-white/20 transition-colors flex items-center gap-1 group"
+                                disabled={updatingTransactionId === transaction.id}
+                              >
+                                {updatingTransactionId === transaction.id ? (
+                                  <LoadingSpinner className="w-3 h-3" />
+                                ) : (
+                                  <>
+                                    <span>
+                                      {transaction.category || 'Sem categoria'}
+                                    </span>
+                                    <ChevronDownIcon className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </>
+                                )}
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-2" align="start">
+                              <div className="space-y-1">
+                                <div className="text-xs font-medium text-muted-foreground px-2 py-1">
+                                  Selecione uma categoria
+                                </div>
+                                <button
+                                  onClick={() => handleUpdateCategory(transaction.id, null)}
+                                  className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-white/10 transition-colors flex items-center justify-between"
+                                >
+                                  <span>Remover categoria</span>
+                                  {!transaction.user_category_id && (
+                                    <CheckIcon className="h-4 w-4 text-green-500" />
+                                  )}
+                                </button>
+                                <div className="border-t border-white/10 my-1" />
+                                {categories
+                                  .filter((c) =>
+                                    transaction.type === 'CREDIT'
+                                      ? c.type === 'income'
+                                      : c.type === 'expense'
+                                  )
+                                  .map((category) => (
+                                    <button
+                                      key={category.id}
+                                      onClick={() =>
+                                        handleUpdateCategory(transaction.id, category.id)
+                                      }
+                                      className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-white/10 transition-colors flex items-center justify-between gap-2"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <div
+                                          className="w-5 h-5 rounded flex items-center justify-center text-xs"
+                                          style={{ backgroundColor: category.color }}
+                                        >
+                                          {category.icon}
+                                        </div>
+                                        <span>{category.name}</span>
+                                      </div>
+                                      {transaction.user_category_id === category.id && (
+                                        <CheckIcon className="h-4 w-4 text-green-500" />
+                                      )}
+                                    </button>
+                                  ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex flex-col">

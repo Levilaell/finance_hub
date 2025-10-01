@@ -461,11 +461,11 @@ class TransactionService:
                     description = pluggy_tx.get('description', '')
                     description = description if description is not None else ''
 
-                    category = pluggy_tx.get('category', '')
-                    category = category if category is not None else ''
+                    pluggy_category = pluggy_tx.get('category', '')
+                    pluggy_category = pluggy_category if pluggy_category is not None else ''
 
-                    category_id = pluggy_tx.get('categoryId', '')
-                    category_id = category_id if category_id is not None else ''
+                    pluggy_category_id = pluggy_tx.get('categoryId', '')
+                    pluggy_category_id = pluggy_category_id if pluggy_category_id is not None else ''
 
                     TransactionModel.objects.update_or_create(
                         pluggy_transaction_id=pluggy_tx['id'],
@@ -476,8 +476,8 @@ class TransactionService:
                             'amount': abs(Decimal(str(pluggy_tx.get('amount', 0)))),
                             'currency_code': pluggy_tx.get('currencyCode', 'BRL'),
                             'date': datetime.fromisoformat(pluggy_tx['date'].replace('Z', '+00:00')),
-                            'category': category,
-                            'category_id': category_id,
+                            'pluggy_category': pluggy_category,
+                            'pluggy_category_id': pluggy_category_id,
                             'merchant_name': merchant_name,
                             'merchant_category': merchant_category,
                             'payment_data': pluggy_tx.get('paymentData'),

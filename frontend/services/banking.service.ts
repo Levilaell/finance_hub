@@ -15,7 +15,9 @@ import {
   FinancialSummary,
   TransactionFilter,
   CategorySummary,
-  PaginatedResponse
+  PaginatedResponse,
+  Category,
+  CategoryRequest
 } from "@/types/banking";
 
 class BankingService {
@@ -69,11 +71,26 @@ class BankingService {
 
   async syncConnectionTransactions(id: string): Promise<{
     message: string;
-    results: Record<string, number>;
-    total: number;
+    sync_status: string;
+    item_status: string;
+    requires_action: boolean;
   }> {
     return apiClient.post(
-      `/api/banking/api/connections/${id}/sync_transactions/`
+      `/api/banking/connections/${id}/sync_transactions/`
+    );
+  }
+
+  async checkConnectionStatus(id: string): Promise<{
+    status: string;
+    execution_status: string;
+    is_syncing: boolean;
+    sync_complete: boolean;
+    requires_action: boolean;
+    error_message?: string;
+    last_updated_at: string;
+  }> {
+    return apiClient.get(
+      `/api/banking/connections/${id}/check_status/`
     );
   }
 
@@ -148,6 +165,16 @@ class BankingService {
     return apiClient.get<Transaction>(`/api/banking/api/transactions/${id}/`);
   }
 
+  async updateTransactionCategory(
+    id: string,
+    categoryId: string | null
+  ): Promise<Transaction> {
+    return apiClient.patch<Transaction>(
+      `/api/banking/transactions/${id}/`,
+      { user_category_id: categoryId }
+    );
+  }
+
   async getTransactionsSummary(
     dateFrom?: string,
     dateTo?: string
@@ -216,6 +243,34 @@ class BankingService {
       console.error('Error calculating category summary:', error);
       return {};
     }
+  }
+
+  // Categories
+  async getCategories(type?: string): Promise<Category[]> {
+    const params: Record<string, string> = {};
+    if (type) params.type = type;
+
+    const response = await apiClient.get<PaginatedResponse<Category>>(
+      "/api/banking/categories/",
+      params
+    );
+    return response.results;
+  }
+
+  async getCategory(id: string): Promise<Category> {
+    return apiClient.get<Category>(`/api/banking/categories/${id}/`);
+  }
+
+  async createCategory(data: CategoryRequest): Promise<Category> {
+    return apiClient.post<Category>("/api/banking/categories/", data);
+  }
+
+  async updateCategory(id: string, data: Partial<CategoryRequest>): Promise<Category> {
+    return apiClient.patch<Category>(`/api/banking/categories/${id}/`, data);
+  }
+
+  async deleteCategory(id: string): Promise<void> {
+    return apiClient.delete(`/api/banking/categories/${id}/`);
   }
 
   // Utility methods for UI

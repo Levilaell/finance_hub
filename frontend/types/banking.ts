@@ -85,10 +85,37 @@ export interface Transaction {
   currency_code: string;
   date: string;
   category?: string;
+  user_category_id?: string | null;
+  pluggy_category?: string;
   merchant_name?: string;
   is_income: boolean;
   is_expense: boolean;
   created_at: string;
+}
+
+// Category Types
+export type CategoryType = 'income' | 'expense';
+
+// Category
+export interface Category {
+  id: string;
+  name: string;
+  type: CategoryType;
+  color: string;
+  icon: string;
+  is_system: boolean;
+  parent?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Create/Update Category Request
+export interface CategoryRequest {
+  name: string;
+  type: CategoryType;
+  color?: string;
+  icon?: string;
+  parent?: string | null;
 }
 
 // Create Connection Request
