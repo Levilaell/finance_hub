@@ -26,6 +26,7 @@ THIRD_PARTY_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'djstripe',
 ]
 
 LOCAL_APPS = [
@@ -33,6 +34,7 @@ LOCAL_APPS = [
     'apps.companies',
     'apps.banking',
     'apps.reports',
+    'apps.subscriptions',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -46,6 +48,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'apps.subscriptions.middleware.SubscriptionRequiredMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'

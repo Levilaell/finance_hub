@@ -1,81 +1,25 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckIcon, XMarkIcon, SparklesIcon, BanknotesIcon, StarIcon } from '@heroicons/react/24/outline';
+import { useRouter } from 'next/navigation';
+import { CheckIcon, SparklesIcon, BanknotesIcon, StarIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { formatCurrency } from '@/lib/utils';
-
-interface PricingPlan {
-  id: string;
-  name: string;
-  slug: string;
-  description: string;
-  priceMonthly: number;
-  priceYearly: number;
-  features: string[];
-  limitations: string[];
-  highlighted?: boolean;
-  badge?: string;
-}
-
-const plans: PricingPlan[] = [
-  {
-    id: 'pro',
-    name: 'Pro',
-    slug: 'pro',
-    description: 'Perfeito para empresas que estão começando a organizar suas finanças',
-    priceMonthly: 49,   
-    priceYearly: 490,  
-    features: [
-      '1 conta bancária',
-      '500 transações por mês',
-      'Dashboard financeiro',
-      'Relatórios básicos',
-      'Categorização automática',
-      'Exportação PDF/Excel',
-      'Suporte por email',
-    ],
-    limitations: [
-      'Não inclui análises por IA',
-    ],
-  },
-];
 
 function PricingContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [isYearly, setIsYearly] = useState(true); // Default para anual (mais vantajoso)
-  const fromRegister = searchParams.get('from') === 'register';
 
-  const handleSelectPlan = (planSlug: string) => {
-    // Always redirect to register page with the selected plan
-    router.push(`/register?plan=${planSlug}`);
-  };
-
-  const formatPrice = (price: number) => {
-    // Use shared formatCurrency with minimumFractionDigits: 0
-    const formatted = formatCurrency(price);
-    // Remove decimal places if they are .00
-    return formatted.replace(/,00$/, '');
-  };
-
-  const getDiscountPercentage = (monthly: number, yearly: number) => {
-    if (monthly === 0) return 0;
-    const yearlyMonthly = yearly / 12;
-    return Math.round(((monthly - yearlyMonthly) / monthly) * 100);
+  const handleSelectPlan = () => {
+    router.push('/register');
   };
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Background effects */}
       <div className="absolute inset-0 bg-gradient-subtle opacity-30"></div>
-      
+
       {/* Navigation */}
       <header className="border-b glass sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -94,59 +38,36 @@ function PricingContent() {
               </Button>
               <Button asChild className="btn-gradient">
                 <Link href="/register">
-                  Teste Grátis
+                  Começar Trial
                 </Link>
               </Button>
             </div>
           </div>
         </div>
       </header>
-      
+
       <div className="container mx-auto px-4 py-16 relative">
         {/* Header */}
         <div className="text-center mb-12">
           <div className="flex justify-center mb-6">
             <Badge className="glass px-6 py-2 text-lg">
               <StarIcon className="h-5 w-5 mr-2" />
-              Planos e Preços
+              Plano Único
             </Badge>
           </div>
           <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
-            Escolha o plano ideal
+            Um único plano com
             <br />
-            <span className="text-white">para sua empresa</span>
+            <span className="text-white">acesso completo</span>
           </h1>
           <p className="text-xl text-white mb-4">
-            Sistema financeiro que funciona sozinho com IA
+            Tudo que você precisa para automatizar sua gestão financeira
           </p>
           <div className="text-center mb-8">
             <div className="glass rounded-lg p-4 inline-block">
               <p className="text-lg">
-                <span className="text-success font-bold">14 dias grátis</span> em todos os planos • <span className="text-white">Cancele quando quiser</span>
+                <span className="text-success font-bold">7 dias de trial grátis</span> • <span className="text-white">Cancele quando quiser</span>
               </p>
-            </div>
-          </div>
-          
-          {/* Billing Toggle */}
-          <div className="text-center">
-            <div className="glass rounded-xl p-6 inline-flex items-center gap-6">
-              <Label htmlFor="billing-toggle" className={`transition-colors ${!isYearly ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-                Mensal
-              </Label>
-              <Switch
-                id="billing-toggle"
-                checked={isYearly}
-                onCheckedChange={setIsYearly}
-                className="mx-2"
-              />
-              <div className="flex items-center gap-2">
-                <Label htmlFor="billing-toggle" className={`transition-colors ${isYearly ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-                  Anual
-                </Label>
-                <Badge className="bg-success/10 text-success border-success/20 whitespace-nowrap">
-                  Economize até 17%
-                </Badge>
-              </div>
             </div>
           </div>
         </div>
@@ -156,13 +77,13 @@ function PricingContent() {
           <div className="glass rounded-lg p-4 hover-lift transition-all duration-300">
             <div className="text-center">
               <CheckIcon className="h-8 w-8 text-success mx-auto mb-2" />
-              <p className="text-sm font-medium">Categorização automática via Open Banking</p>
+              <p className="text-sm font-medium">Conexão com +20 bancos</p>
             </div>
           </div>
           <div className="glass rounded-lg p-4 hover-lift transition-all duration-300">
             <div className="text-center">
               <SparklesIcon className="h-8 w-8 text-white mx-auto mb-2" />
-              <p className="text-sm font-medium">IA que aprende seu negócio</p>
+              <p className="text-sm font-medium">Categorização por IA</p>
             </div>
           </div>
           <div className="glass rounded-lg p-4 hover-lift transition-all duration-300">
@@ -170,207 +91,113 @@ function PricingContent() {
               <svg className="h-8 w-8 text-white mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
-              <p className="text-sm font-medium">Relatórios prontos em segundos</p>
+              <p className="text-sm font-medium">Relatórios ilimitados</p>
             </div>
           </div>
           <div className="glass rounded-lg p-4 hover-lift transition-all duration-300">
             <div className="text-center">
-              <svg className="h-8 w-8 text-info mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-sm font-medium">14 dias para testar grátis</p>
+              <ShieldCheckIcon className="h-8 w-8 text-white mx-auto mb-2" />
+              <p className="text-sm font-medium">Segurança bancária</p>
             </div>
           </div>
         </div>
 
-        {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16 max-w-6xl mx-auto">
-          {plans.map((plan) => {
-            const price = isYearly ? plan.priceYearly : plan.priceMonthly;
-            const monthlyPrice = isYearly ? plan.priceYearly / 12 : plan.priceMonthly;
-            const discount = getDiscountPercentage(plan.priceMonthly, plan.priceYearly);
-            
-            return (
-              <Card
-                key={plan.id}
-                className={`relative flex flex-col glass hover-lift transition-all duration-300 ${
-                  plan.highlighted
-                    ? 'border-white/50 shadow-xl hover:shadow-2xl hover:shadow-white/25 scale-105 z-10'
-                    : 'hover:shadow-lg'
-                }`}
+        {/* Pricing Card */}
+        <div className="max-w-lg mx-auto mb-16">
+          <Card className="glass hover-lift transition-all duration-300 border-white/50 shadow-xl">
+            <CardHeader className="text-center pb-8">
+              <CardTitle className="text-3xl text-white mb-2">Plano Pro</CardTitle>
+              <CardDescription className="text-white/80 text-lg">
+                Acesso completo a todos os recursos da plataforma
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="text-center">
+              <div className="mb-8">
+                <div className="flex items-baseline justify-center">
+                  <span className="text-5xl font-bold text-white">R$ 97</span>
+                  <span className="text-white/70 ml-2 text-xl">/mês</span>
+                </div>
+                <p className="text-sm text-white/70 mt-2">
+                  Cobrado mensalmente
+                </p>
+              </div>
+
+              <div className="p-4 glass rounded-lg border border-success/30 mb-8">
+                <p className="text-success font-medium flex items-center justify-center">
+                  <CheckIcon className="h-5 w-5 mr-2" />
+                  7 dias de trial grátis para testar
+                </p>
+                <p className="text-xs text-white/70 mt-2">
+                  Cartão de crédito necessário • Cancele a qualquer momento
+                </p>
+              </div>
+
+              <div className="space-y-3 text-left">
+                <p className="font-semibold text-sm text-foreground mb-4">Tudo que está incluído:</p>
+
+                <div className="flex items-start gap-2">
+                  <CheckIcon className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-foreground">Conexão ilimitada com bancos via Open Banking</span>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <CheckIcon className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-foreground">Sincronização automática 24/7</span>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <CheckIcon className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-foreground">Transações ilimitadas</span>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <SparklesIcon className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-foreground font-medium">Categorização automática por IA</span>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <SparklesIcon className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-foreground font-medium">Insights inteligentes ilimitados</span>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <CheckIcon className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-foreground">Dashboard financeiro completo</span>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <CheckIcon className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-foreground">Relatórios detalhados (PDF e Excel)</span>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <CheckIcon className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-foreground">Categorias personalizadas</span>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <CheckIcon className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-foreground">Suporte via WhatsApp</span>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <CheckIcon className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-foreground">Atualizações e novos recursos incluídos</span>
+                </div>
+              </div>
+            </CardContent>
+
+            <CardFooter className="pt-6">
+              <Button
+                className="w-full btn-gradient hover-glow transition-all duration-300"
+                size="lg"
+                onClick={handleSelectPlan}
               >
-                {plan.badge && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-white/10 border border-white/20 text-white px-4 py-1">
-                      <StarIcon className="h-4 w-4 mr-1" />
-                      {plan.badge}
-                    </Badge>
-                  </div>
-                )}
-                
-                <CardHeader className="pb-8">
-                  <CardTitle className="text-2xl text-white">{plan.name}</CardTitle>
-                  <CardDescription className="mt-2 text-white/80">{plan.description}</CardDescription>
-                </CardHeader>
-                
-                <CardContent className="flex-1">
-                  <div className="mb-6">
-                    <div className="flex items-baseline">
-                      <span className="text-4xl font-bold text-white">
-                        {formatPrice(monthlyPrice)}
-                      </span>
-                      <span className="text-white/70 ml-2">/mês</span>
-                    </div>
-                    {isYearly && (
-                      <div className="mt-2">
-                        <p className="text-sm text-white/70">
-                          Cobrado anualmente: {formatPrice(price)}
-                        </p>
-                        {discount > 0 && (
-                          <p className="text-sm text-success font-medium">
-                            Economia de {discount}% no plano anual
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    <div className="mt-4 p-3 glass rounded-lg border border-success/20">
-                      <p className="text-sm text-success font-medium flex items-center">
-                        <CheckIcon className="h-4 w-4 mr-2" />
-                        14 dias grátis para testar
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <p className="font-semibold text-sm text-foreground">O que está incluído:</p>
-                    {plan.features.map((feature, index) => {
-                      // Handle separator text
-                      if (feature.startsWith('Tudo do')) {
-                        return (
-                          <div key={index} className="pt-3 pb-1">
-                            <div className="h-px bg-border mb-3"></div>
-                            <span className="text-sm text-white font-semibold italic">
-                              {feature}
-                            </span>
-                          </div>
-                        );
-                      }
-                      
-                      return (
-                        <div key={index} className="flex items-start gap-2">
-                          {feature.startsWith('✨') ? (
-                            <>
-                              <SparklesIcon className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />
-                              <span className="text-sm text-foreground font-medium">
-                                {feature.replace('✨ ', '')}
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <CheckIcon className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
-                              <span className="text-sm text-foreground">{feature}</span>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
-                    
-                    {plan.limitations.length > 0 && (
-                      <>
-                        <div className="pt-3 border-t border-border" />
-                        {plan.limitations.map((limitation, index) => (
-                          <div key={index} className="flex items-start gap-2">
-                            <XMarkIcon className="h-5 w-5 text-white/50 flex-shrink-0 mt-0.5" />
-                            <span className="text-sm text-white/60">{limitation}</span>
-                          </div>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                </CardContent>
-                
-                <CardFooter className="pt-6">
-                  <Button
-                    className={`w-full transition-all duration-300 ${
-                      plan.highlighted 
-                        ? 'btn-gradient hover-glow' 
-                        : 'hover:bg-muted hover-lift'
-                    }`}
-                    variant={plan.highlighted ? 'default' : 'outline'}
-                    size="lg"
-                    onClick={() => handleSelectPlan(plan.slug)}
-                  >
-                    Começar teste grátis
-                  </Button>
-                </CardFooter>
-              </Card>
-            );
-          })}
-        </div>
-
-        {/* Comparison Table */}
-        <div className="max-w-4xl mx-auto mb-16">
-          <h2 className="text-3xl font-bold text-center mb-8 text-white">
-            Compare os recursos
-          </h2>
-          <div className="glass rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-border bg-muted/50">
-                    <th className="text-left p-4 text-foreground font-semibold">Recurso</th>
-                    <th className="text-center p-4 text-foreground font-semibold">Starter</th>
-                    <th className="text-center p-4 bg-white/5 text-white font-semibold">Professional</th>
-                    <th className="text-center p-4 text-foreground font-semibold">Enterprise</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-border hover:bg-muted/30 transition-colors">
-                    <td className="p-4 text-foreground font-medium">Contas bancárias</td>
-                    <td className="text-center p-4 text-white/80">1</td>
-                    <td className="text-center p-4 bg-white/5 text-white font-semibold">3</td>
-                    <td className="text-center p-4 text-foreground font-medium">Ilimitadas</td>
-                  </tr>
-                  <tr className="border-b border-border hover:bg-muted/30 transition-colors">
-                    <td className="p-4 text-foreground font-medium">Transações mensais</td>
-                    <td className="text-center p-4 text-white/80">500</td>
-                    <td className="text-center p-4 bg-white/5 text-white font-semibold">2.500</td>
-                    <td className="text-center p-4 text-foreground font-medium">Ilimitadas</td>
-                  </tr>
-                  <tr className="border-b border-border hover:bg-muted/30 transition-colors">
-                    <td className="p-4 text-foreground font-medium">Análises de IA</td>
-                    <td className="text-center p-4">
-                      <XMarkIcon className="h-5 w-5 text-white/60 mx-auto" />
-                    </td>
-                    <td className="text-center p-4 bg-white/5">
-                      <div className="flex items-center justify-center gap-2">
-                        <SparklesIcon className="h-5 w-5 text-white" />
-                        <span className="text-white font-semibold">10/mês</span>
-                      </div>
-                    </td>
-                    <td className="text-center p-4">
-                      <div className="flex items-center justify-center gap-2">
-                        <SparklesIcon className="h-5 w-5 text-white" />
-                        <span className="text-foreground font-medium">Ilimitado</span>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr className="border-b border-border hover:bg-muted/30 transition-colors">
-                    <td className="p-4 text-foreground font-medium">Tipo de suporte</td>
-                    <td className="text-center p-4 text-white/80">Email</td>
-                    <td className="text-center p-4 bg-white/5 text-white font-semibold">WhatsApp</td>
-                    <td className="text-center p-4 text-foreground font-medium">Telefone + Email</td>
-                  </tr>
-                  <tr className="hover:bg-muted/30 transition-colors">
-                    <td className="p-4 text-foreground font-medium">Período de teste</td>
-                    <td className="text-center p-4 text-success font-semibold">14 dias</td>
-                    <td className="text-center p-4 bg-primary/10 text-success font-semibold">14 dias</td>
-                    <td className="text-center p-4 text-success font-semibold">14 dias</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+                Começar Trial de 7 Dias
+              </Button>
+            </CardFooter>
+          </Card>
         </div>
 
         {/* FAQ Section */}
@@ -378,69 +205,80 @@ function PricingContent() {
           <h2 className="text-3xl font-bold text-center mb-8 text-white">
             Perguntas Frequentes
           </h2>
-          
+
           <div className="space-y-6">
             <div className="glass rounded-lg p-6 hover-lift transition-all duration-300">
               <h3 className="font-semibold text-lg mb-3 text-white">
-                Como funciona o período de teste?
+                Como funciona o trial de 7 dias?
               </h3>
               <p className="text-white/80">
-                Todos os planos incluem 14 dias de teste grátis com acesso completo aos recursos. 
-                Não é necessário cartão de crédito para começar. Você só paga se decidir continuar 
-                após o período de teste.
+                Ao se cadastrar, você tem 7 dias para testar todos os recursos da plataforma gratuitamente.
+                É necessário cadastrar um cartão de crédito, mas você só será cobrado após o período de trial.
+                Pode cancelar a qualquer momento durante o trial sem nenhum custo.
               </p>
             </div>
-            
+
             <div className="glass rounded-lg p-6 hover-lift transition-all duration-300">
               <h3 className="font-semibold text-lg mb-3 text-white">
-                O que são as análises de IA?
+                Preciso cadastrar cartão de crédito no trial?
               </h3>
               <p className="text-white/80">
-                Nossa IA analisa seus dados financeiros e gera insights personalizados: identifica padrões de gastos, 
-                prevê seu fluxo de caixa, detecta gastos incomuns e sugere oportunidades de economia específicas 
-                para o seu negócio. É como ter um consultor financeiro inteligente trabalhando 24/7.
+                Sim. Para garantir uma transição suave após o trial, pedimos o cadastro do cartão no início.
+                Você não será cobrado durante os 7 dias de trial e pode cancelar a qualquer momento sem custos.
               </p>
             </div>
-            
+
             <div className="glass rounded-lg p-6 hover-lift transition-all duration-300">
               <h3 className="font-semibold text-lg mb-3 text-white">
-                Posso mudar de plano depois?
+                É seguro conectar minhas contas bancárias?
               </h3>
               <p className="text-white/80">
-                Sim! Você pode fazer upgrade ou downgrade a qualquer momento. 
-                As mudanças são aplicadas imediatamente e os valores são calculados proporcionalmente.
+                Absolutamente. Usamos Open Banking, a tecnologia oficial regulamentada pelo Banco Central.
+                Seus dados são criptografados com padrão militar e nunca armazenamos senhas bancárias.
+                Temos a mesma segurança dos grandes bancos brasileiros.
               </p>
             </div>
-            
+
             <div className="glass rounded-lg p-6 hover-lift transition-all duration-300">
               <h3 className="font-semibold text-lg mb-3 text-white">
-                O que acontece após o período de teste?
+                Posso cancelar a qualquer momento?
               </h3>
               <p className="text-white/80">
-                Após os 14 dias de teste, você precisará configurar um método de pagamento para 
-                continuar usando o sistema. Você será notificado com antecedência e poderá escolher 
-                entre pagamento mensal ou anual (com desconto).
+                Sim! Não há fidelidade ou multa por cancelamento. Você pode cancelar sua assinatura
+                a qualquer momento diretamente nas configurações da plataforma. Seu acesso continuará
+                até o final do período já pago.
               </p>
             </div>
-            
+
             <div className="glass rounded-lg p-6 hover-lift transition-all duration-300">
               <h3 className="font-semibold text-lg mb-3 text-white">
-                O que acontece se eu precisar de mais do que meu plano oferece?
+                O que acontece após o trial?
               </h3>
               <p className="text-white/80">
-                Você será notificado quando atingir 80% dos limites de transações ou análises de IA. 
-                Pode fazer upgrade instantaneamente para o próximo plano ou aguardar o próximo mês. 
-                O plano Empresarial não tem limites.
+                Após os 7 dias de trial, seu cartão será cobrado automaticamente no valor de R$ 97,00
+                e você continuará tendo acesso completo à plataforma. Você receberá um aviso por email
+                antes do término do trial.
               </p>
             </div>
-            
+
             <div className="glass rounded-lg p-6 hover-lift transition-all duration-300">
               <h3 className="font-semibold text-lg mb-3 text-white">
-                A categorização automática funciona com todos os bancos?
+                Tem limite de transações ou bancos?
               </h3>
               <p className="text-white/80">
-                Sim! Usamos o Open Banking e integrações diretas com os principais bancos brasileiros. 
-                A categorização é feita automaticamente pela Pluggy, sem nenhum trabalho manual.
+                Não! O Plano Pro inclui transações ilimitadas, conexão com quantos bancos você precisar,
+                e uso ilimitado de todos os recursos da plataforma, incluindo categorização por IA e relatórios.
+              </p>
+            </div>
+
+            <div className="glass rounded-lg p-6 hover-lift transition-all duration-300">
+              <h3 className="font-semibold text-lg mb-3 text-white">
+                Quais formas de pagamento são aceitas?
+              </h3>
+              <p className="text-white/80">
+                Aceitamos todos os principais cartões de crédito (Visa, Mastercard, Amex, Elo).
+                O pagamento é processado de forma segura pela Stripe, uma das maiores plataformas
+                de pagamento do mundo.
               </p>
             </div>
           </div>
@@ -451,20 +289,23 @@ function PricingContent() {
           <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-white/5"></div>
           <div className="relative z-10">
             <h3 className="text-3xl font-bold mb-4">
-              Pronto para automatizar suas finanças?
+              Pronto para transformar sua gestão financeira?
             </h3>
             <p className="text-white/90 mb-6 text-lg">
-              Junte-se a milhares de empresas que economizam 10+ horas por mês com o CaixaHub
+              Comece seu trial de 7 dias e veja como é fácil automatizar suas finanças
             </p>
             <Button asChild size="lg" className="bg-white text-black hover:bg-white/90 hover-lift">
               <Link href="/register">
-                Começar Teste Grátis de 14 Dias
+                Começar Trial Grátis de 7 Dias
               </Link>
             </Button>
+            <p className="text-sm text-white/70 mt-4">
+              Cancele a qualquer momento • Sem fidelidade
+            </p>
           </div>
         </div>
       </div>
-      
+
       {/* Footer */}
       <footer className="border-t py-12 bg-card mt-16">
         <div className="container mx-auto px-4">

@@ -12,15 +12,17 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/auth-store';
 import { User } from '@/types';
-import { 
+import {
   UserIcon,
   ShieldCheckIcon,
   EyeIcon,
   EyeSlashIcon,
   KeyIcon,
-  TrashIcon
+  TrashIcon,
+  CreditCardIcon
 } from '@heroicons/react/24/outline';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SubscriptionManagement } from '@/components/subscription/SubscriptionManagement';
 import {
   Dialog,
   DialogContent,
@@ -173,9 +175,10 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 gap-1">
+        <TabsList className="grid w-full grid-cols-3 gap-1">
           <TabsTrigger value="profile" className="text-xs sm:text-sm">Perfil</TabsTrigger>
           <TabsTrigger value="security" className="text-xs sm:text-sm">Segurança</TabsTrigger>
+          <TabsTrigger value="subscription" className="text-xs sm:text-sm">Assinatura</TabsTrigger>
         </TabsList>
 
         {/* Profile Settings */}
@@ -413,6 +416,11 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Subscription Settings */}
+        <TabsContent value="subscription">
+          <SubscriptionManagement />
         </TabsContent>
       </Tabs>
 

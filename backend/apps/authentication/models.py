@@ -35,10 +35,26 @@ class User(AbstractUser):
     
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.email})"
-    
+
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
+
+    @property
+    def has_active_subscription(self):
+        """
+        Check if user has an active subscription via dj-stripe
+        Returns True if subscription status is 'trialing' or 'active'
+        """
+        try:
+            from djstripe.models import Subscription
+            return Subscription.objects.filter(
+                customer__subscriber=self,
+                status__in=['trialing', 'active']
+            ).exists()
+        except Exception:
+            # If dj-stripe is not configured or error occurs, return False
+            return False
 
 
 class PasswordReset(models.Model):

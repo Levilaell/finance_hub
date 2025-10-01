@@ -1,9 +1,10 @@
 'use client';
 
 import { useAuthStore } from '@/store/auth-store';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { MainLayout } from '@/components/layouts/main-layout';
+import { subscriptionService } from '@/services/subscription.service';
 
 export default function DashboardLayout({
   children,
@@ -12,6 +13,9 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, isLoading, user, fetchUser, hasHydrated } = useAuthStore();
   const router = useRouter();
+  const pathname = usePathname();
+  const [checkingSubscription, setCheckingSubscription] = useState(true);
+  const [hasSubscription, setHasSubscription] = useState(false);
 
   useEffect(() => {
     // Wait for Zustand to hydrate from localStorage
@@ -37,13 +41,50 @@ export default function DashboardLayout({
     }
   }, [hasHydrated, user, fetchUser, router, isLoading]);
 
+  // Check subscription status after authentication
+  useEffect(() => {
+    if (!hasHydrated || !isAuthenticated || !user) {
+      return;
+    }
+
+    // Paths that don't require subscription check
+    const exemptPaths = ['/settings', '/checkout'];
+    const isExempt = exemptPaths.some(path => pathname?.startsWith(path));
+
+    if (isExempt) {
+      setHasSubscription(true);
+      setCheckingSubscription(false);
+      return;
+    }
+
+    // Check subscription
+    subscriptionService.getStatus()
+      .then((status) => {
+        if (status.status === 'trialing' || status.status === 'active') {
+          setHasSubscription(true);
+        } else if (status.status === 'none') {
+          router.push('/checkout');
+        } else {
+          router.push('/subscription/expired');
+        }
+      })
+      .catch((error) => {
+        console.error('Error checking subscription:', error);
+        // Se der erro na verificação, redireciona para checkout
+        router.push('/checkout');
+      })
+      .finally(() => {
+        setCheckingSubscription(false);
+      });
+  }, [hasHydrated, isAuthenticated, user, pathname, router]);
+
   // Show loading while hydrating or checking authentication
-  if (!hasHydrated || isLoading) {
+  if (!hasHydrated || isLoading || checkingSubscription) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p>Carregando...</p>
+          <p>{checkingSubscription ? 'Verificando assinatura...' : 'Carregando...'}</p>
         </div>
       </div>
     );
@@ -59,6 +100,11 @@ export default function DashboardLayout({
         </div>
       </div>
     );
+  }
+
+  // Block access if no subscription
+  if (!hasSubscription) {
+    return null;
   }
 
   // If we have user data, show the protected content

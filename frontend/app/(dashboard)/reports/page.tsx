@@ -477,7 +477,7 @@ export default function ReportsPage() {
         {/* Gráfico de Saldo ao Longo do Tempo */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Evolução do Saldo</CardTitle>
+            <CardTitle>Fluxo de Caixa Acumulado</CardTitle>
           </CardHeader>
           <CardContent>
             {dailyBalanceData.length > 0 ? (

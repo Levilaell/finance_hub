@@ -32,7 +32,7 @@ export default function Home() {
                 Como funciona
               </Link>
               <Link href="/pricing" className="hidden sm:inline text-muted-foreground hover:text-foreground transition-colors">
-                Planos
+                Plano
               </Link>
               <Button variant="ghost" asChild className="text-sm sm:text-base hover:bg-muted">
                 <Link href="/login">
@@ -87,7 +87,7 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 pt-8 text-sm text-muted-foreground">
               <div className="flex items-center space-x-2">
                 <CheckCircleIcon className="h-5 w-5 text-success" />
-                <span>Grátis para começar</span>
+                <span>Trial de 7 dias grátis</span>
               </div>
               <div className="flex items-center space-x-2">
                 <CheckCircleIcon className="h-5 w-5 text-success" />
@@ -436,9 +436,9 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Sim! Oferecemos 14 dias grátis com acesso completo a todas as funcionalidades. 
-                  Sem cartão de crédito, sem compromisso. Teste tudo e veja como nossa plataforma 
-                  pode transformar sua gestão financeira.
+                  Sim! Oferecemos 7 dias de trial grátis com acesso completo a todas as funcionalidades.
+                  É necessário cadastrar cartão de crédito, mas você não será cobrado durante o trial.
+                  Cancele a qualquer momento sem custos.
                 </p>
               </CardContent>
             </Card>
@@ -474,13 +474,13 @@ export default function Home() {
               sua gestão financeira com nossa plataforma.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Button 
-                size="lg" 
-                asChild 
+              <Button
+                size="lg"
+                asChild
                 className="text-lg px-8 btn-primary hover-lift"
               >
                 <Link href="/pricing">
-                  Ver Planos e Preços
+                  Ver Plano e Preço
                   <ArrowRightIcon className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
@@ -495,7 +495,7 @@ export default function Home() {
               </Button>
             </div>
             <p className="text-sm opacity-75">
-              Grátis para começar • Sem cartão de crédito • Setup em 5 minutos
+              Trial de 7 dias • Cancele quando quiser • Setup em 5 minutos
             </p>
           </div>
         </div>
@@ -513,7 +513,7 @@ export default function Home() {
             </div>
             <div className="flex space-x-6 text-sm text-muted-foreground">
               <Link href="/pricing" className="hover:text-foreground transition-colors">
-                Planos
+                Plano
               </Link>
               <Link href="/terms" className="hover:text-foreground transition-colors">
                 Termos de Uso

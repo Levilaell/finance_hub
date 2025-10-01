@@ -108,9 +108,25 @@ PLUGGY_WEBHOOK_SECRET = config('PLUGGY_WEBHOOK_SECRET', default='')
 PLUGGY_WEBHOOK_URL = config('PLUGGY_WEBHOOK_URL', default='http://localhost:8000/api/banking/webhooks/pluggy/')
 
 # Stripe Configuration
-STRIPE_PUBLIC_KEY = config('STRIPE_PUBLIC_KEY', default='')
-STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
+STRIPE_LIVE_MODE = config('STRIPE_LIVE_MODE', default=False, cast=bool)
+STRIPE_TEST_SECRET_KEY = config('STRIPE_TEST_SECRET_KEY', default='')
+STRIPE_LIVE_SECRET_KEY = config('STRIPE_LIVE_SECRET_KEY', default='')
+STRIPE_TEST_PUBLIC_KEY = config('STRIPE_TEST_PUBLIC_KEY', default='')
+STRIPE_LIVE_PUBLIC_KEY = config('STRIPE_LIVE_PUBLIC_KEY', default='')
+
+# Legacy support (backwards compatibility)
+STRIPE_PUBLIC_KEY = STRIPE_TEST_PUBLIC_KEY if not STRIPE_LIVE_MODE else STRIPE_LIVE_PUBLIC_KEY
+STRIPE_SECRET_KEY = STRIPE_TEST_SECRET_KEY if not STRIPE_LIVE_MODE else STRIPE_LIVE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
+
+# dj-stripe configuration
+DJSTRIPE_WEBHOOK_SECRET = config('DJSTRIPE_WEBHOOK_SECRET', default=STRIPE_WEBHOOK_SECRET)
+DJSTRIPE_FOREIGN_KEY_TO_FIELD = 'id'
+DJSTRIPE_USE_NATIVE_JSONFIELD = True
+DJSTRIPE_SUBSCRIBER_MODEL = 'authentication.User'
+
+# Stripe Default Price ID
+STRIPE_DEFAULT_PRICE_ID = config('STRIPE_DEFAULT_PRICE_ID', default='')
 
 # Validate Stripe Configuration (Warning only in development)
 def warn_stripe_configuration():
@@ -119,27 +135,27 @@ def warn_stripe_configuration():
     Only shows warnings - doesn't block development.
     """
     import sys
-    
+
     required_stripe_settings = {
-        'STRIPE_PUBLIC_KEY': STRIPE_PUBLIC_KEY,
-        'STRIPE_SECRET_KEY': STRIPE_SECRET_KEY, 
-        'STRIPE_WEBHOOK_SECRET': STRIPE_WEBHOOK_SECRET,
+        'STRIPE_TEST_SECRET_KEY': STRIPE_TEST_SECRET_KEY,
+        'STRIPE_TEST_PUBLIC_KEY': STRIPE_TEST_PUBLIC_KEY,
+        'DJSTRIPE_WEBHOOK_SECRET': DJSTRIPE_WEBHOOK_SECRET,
     }
-    
+
     missing_settings = [name for name, value in required_stripe_settings.items() if not value]
-    
+
     if missing_settings and 'runserver' in sys.argv:
         print("\n⚠️  STRIPE CONFIGURATION WARNING:")
         print("   Missing Stripe environment variables:", ', '.join(missing_settings))
         print("   Payment functionality will be limited.")
         print("   Add to .env file or set environment variables:")
         for setting in missing_settings:
-            if setting == 'STRIPE_PUBLIC_KEY':
-                print("   STRIPE_PUBLIC_KEY=pk_test_...")
-            elif setting == 'STRIPE_SECRET_KEY': 
-                print("   STRIPE_SECRET_KEY=sk_test_...")
-            elif setting == 'STRIPE_WEBHOOK_SECRET':
-                print("   STRIPE_WEBHOOK_SECRET=whsec_...")
+            if setting == 'STRIPE_TEST_PUBLIC_KEY':
+                print("   STRIPE_TEST_PUBLIC_KEY=pk_test_...")
+            elif setting == 'STRIPE_TEST_SECRET_KEY':
+                print("   STRIPE_TEST_SECRET_KEY=sk_test_...")
+            elif setting == 'DJSTRIPE_WEBHOOK_SECRET':
+                print("   DJSTRIPE_WEBHOOK_SECRET=whsec_...")
         print()
 
 # Show warning for missing Stripe config

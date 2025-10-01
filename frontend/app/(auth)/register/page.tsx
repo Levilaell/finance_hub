@@ -43,11 +43,11 @@ function RegisterContent() {
       await registerUser(data);
       
       toast.success('Cadastro realizado com sucesso!', {
-        description: 'Você tem 14 dias grátis para testar.',
+        description: 'Agora vamos configurar seu pagamento.',
         duration: 5000,
       });
-      
-      router.push('/dashboard');
+
+      router.push('/checkout');
     } catch (error: any) {
       console.error('Erro no registro:', error.response?.data);
       
@@ -100,15 +100,15 @@ function RegisterContent() {
       <CardHeader>
         <CardTitle className="text-white text-center text-2xl font-bold">Criar uma Conta</CardTitle>
         <CardDescription className="text-center text-muted-foreground">
-          Inicie seu período de teste gratuito de 14 dias
+          Inicie seu trial gratuito de 7 dias
         </CardDescription>
 
         {/* Trial Notice */}
         <Alert className="mt-4">
           <CreditCardIcon className="h-4 w-4" />
           <AlertDescription>
-            <strong>14 dias grátis:</strong> Teste todos os recursos sem compromisso.
-            Não é necessário cartão de crédito para começar.
+            <strong>7 dias de trial grátis:</strong> Teste todos os recursos sem compromisso.
+            Após o cadastro, você adicionará um cartão de crédito para ativar o trial.
           </AlertDescription>
         </Alert>
       </CardHeader>

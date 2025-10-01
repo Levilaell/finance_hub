@@ -17,7 +17,6 @@ export interface User {
   is_two_factor_enabled: boolean;
   two_factor_secret?: string;
   backup_codes: string[];
-  payment_gateway?: 'stripe';
   created_at: string;
   updated_at: string;
 
@@ -45,7 +44,6 @@ export interface RegisterData {
   company_type: string;
   business_sector: string;
   phone: string;
-  selected_plan?: string;
 }
 
 export interface LoginResponse {
