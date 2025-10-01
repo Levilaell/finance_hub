@@ -10,7 +10,6 @@ import stripe
 import logging
 
 from .services import (
-    create_subscription_with_trial,
     get_subscription_status,
     create_customer_portal_session,
 )
@@ -37,6 +36,9 @@ def create_checkout_session(request):
     """
     try:
         from .services import get_or_create_customer
+        from .models import TrialUsageTracking
+        from djstripe.models import Subscription
+        from django.utils import timezone
 
         # Get URLs from request or use defaults
         success_url = request.data.get('success_url', f"{settings.FRONTEND_URL}/checkout/success?session_id={{CHECKOUT_SESSION_ID}}")
@@ -54,6 +56,15 @@ def create_checkout_session(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Check if user is eligible for trial
+        trial_tracking, _ = TrialUsageTracking.objects.get_or_create(user=request.user)
+        has_past_subscriptions = Subscription.objects.filter(customer=customer).exists()
+
+        # Trial eligibility: no previous trials AND no past subscriptions
+        trial_days = 7 if (not trial_tracking.has_used_trial and not has_past_subscriptions) else 0
+
+        # DON'T mark trial as used here - let webhook handle it to avoid race condition
+
         # Create Checkout Session
         checkout_session = stripe.checkout.Session.create(
             customer=customer.id,
@@ -63,9 +74,10 @@ def create_checkout_session(request):
                 'quantity': 1,
             }],
             subscription_data={
-                'trial_period_days': 7,
+                'trial_period_days': trial_days,
                 'metadata': {
                     'user_id': str(request.user.id),
+                    'trial_eligible': str(trial_days > 0),
                 },
             },
             success_url=success_url,
@@ -101,6 +113,14 @@ def subscription_status(request):
         subscription_data = get_subscription_status(request.user)
 
         if subscription_data:
+            # Handle incomplete/unpaid status
+            if subscription_data['status'] in ['incomplete', 'incomplete_expired', 'unpaid']:
+                return Response({
+                    **subscription_data,
+                    'requires_action': True,
+                    'message': 'Pagamento requer ação adicional'
+                }, status=status.HTTP_200_OK)
+
             return Response(subscription_data, status=status.HTTP_200_OK)
         else:
             return Response(
@@ -163,17 +183,3 @@ def stripe_config(request):
     return Response({
         'publishable_key': settings.STRIPE_TEST_PUBLIC_KEY if not settings.STRIPE_LIVE_MODE else settings.STRIPE_LIVE_PUBLIC_KEY
     })
-
-
-# Webhook handlers are automatically handled by dj-stripe
-# Events are processed and synced to database automatically
-# You can add custom logic in signals if needed:
-#
-# from django.dispatch import receiver
-# from djstripe import signals
-#
-# @receiver(signals.WEBHOOK_SIGNALS["customer.subscription.created"])
-# def handle_subscription_created(sender, event, **kwargs):
-#     logger.info(f"Subscription created: {event.customer}")
-#
-# For now, dj-stripe handles all syncing automatically

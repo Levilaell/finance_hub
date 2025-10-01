@@ -32,6 +32,9 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
       // Permite acesso se status for trialing ou active
       if (status.status === 'trialing' || status.status === 'active') {
         setHasAccess(true);
+      } else if (status.requires_action) {
+        // Payment requires action (3D Secure, etc)
+        router.push('/subscription/requires-action');
       } else if (status.status === 'none') {
         // Sem subscription - redireciona para checkout
         router.push('/checkout');

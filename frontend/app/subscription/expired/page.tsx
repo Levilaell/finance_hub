@@ -33,7 +33,7 @@ export default function SubscriptionExpiredPage() {
   const handleUpdatePayment = async () => {
     setRedirecting(true);
     try {
-      const response = await apiClient.post('/api/subscriptions/portal/', {
+      const response = await apiClient.post<{ url: string }>('/api/subscriptions/portal/', {
         return_url: `${window.location.origin}/settings?tab=subscription`
       });
 

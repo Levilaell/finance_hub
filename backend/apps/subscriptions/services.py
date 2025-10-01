@@ -23,15 +23,21 @@ def get_or_create_customer(user) -> Customer:
         # Create customer in Stripe
         stripe_customer = stripe.Customer.create(
             email=user.email,
-            name=user.full_name,
+            name=f"{user.first_name} {user.last_name}".strip() or user.email,
             metadata={
-                'user_id': user.id,
-                'username': user.username,
+                'user_id': str(user.id),
+                'email': user.email,
             }
         )
 
         # Sync to dj-stripe
         customer = Customer.sync_from_stripe_data(stripe_customer)
+
+        # CRITICAL: Associate customer with user
+        customer.subscriber = user
+        customer.save()
+
+        logger.info(f"Created and linked Customer {customer.id} to User {user.id}")
 
     return customer
 
@@ -122,9 +128,17 @@ def get_subscription_status(user) -> Optional[Dict]:
     Get user's subscription status and details
     """
     try:
+        # Get most recent active/trialing subscription first
         subscription = Subscription.objects.filter(
-            customer__subscriber=user
-        ).first()
+            customer__subscriber=user,
+            status__in=['active', 'trialing', 'past_due']
+        ).order_by('-created').first()
+
+        # Fallback to any subscription if no active one found
+        if not subscription:
+            subscription = Subscription.objects.filter(
+                customer__subscriber=user
+            ).order_by('-created').first()
 
         if not subscription:
             return None

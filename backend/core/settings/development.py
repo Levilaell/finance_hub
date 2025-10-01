@@ -19,7 +19,7 @@ os.environ['PYTHONIOENCODING'] = 'utf-8'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'testserver', 'bunny-bitterish-photodynamically.ngrok-free.dev']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'testserver', 'bunny-bitterish-photodynamically.ngrok-free.dev', 'unnumerously-unchampioned-karla.ngrok-free.dev']
 
 # Security settings that depend on DEBUG
 SESSION_COOKIE_SECURE = not DEBUG

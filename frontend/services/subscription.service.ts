@@ -1,7 +1,7 @@
 import apiClient from "@/lib/api-client";
 
 export interface SubscriptionStatus {
-  status: 'trialing' | 'active' | 'past_due' | 'canceled' | 'none';
+  status: 'trialing' | 'active' | 'past_due' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'unpaid' | 'none';
   trial_end?: string;
   current_period_end?: string;
   cancel_at_period_end?: boolean;
@@ -9,6 +9,8 @@ export interface SubscriptionStatus {
   days_until_renewal?: number;
   amount?: number;
   currency?: string;
+  requires_action?: boolean;
+  message?: string;
   payment_method?: {
     last4?: string;
     brand?: string;
