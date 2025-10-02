@@ -169,7 +169,7 @@ def get_subscription_status(user) -> Optional[Dict]:
             'cancel_at_period_end': subscription.cancel_at_period_end,
             'canceled_at': subscription.canceled_at.isoformat() if subscription.canceled_at else None,
             'days_until_renewal': days_left,
-            'amount': float(subscription.plan.amount / 100) if subscription.plan else 0,
+            'amount': float(subscription.plan.amount) if subscription.plan else 0,  # plan.amount já está em decimal
             'currency': subscription.plan.currency.upper() if subscription.plan else 'BRL',
             'payment_method': payment_method,
         }

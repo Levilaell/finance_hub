@@ -351,15 +351,44 @@ export default function TransactionsPage() {
                   onValueChange={setSelectedCategory}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Todas as categorias" />
+                    <SelectValue placeholder="Todas as categorias">
+                      {selectedCategory === 'all' ? (
+                        'Todas as categorias'
+                      ) : (
+                        (() => {
+                          const cat = categories.find(c => c.name === selectedCategory);
+                          return cat ? (
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-4 h-4 rounded flex items-center justify-center text-xs"
+                                style={{ backgroundColor: cat.color }}
+                              >
+                                {cat.icon}
+                              </div>
+                              <span>{cat.name}</span>
+                            </div>
+                          ) : selectedCategory;
+                        })()
+                      )}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas as categorias</SelectItem>
-                    {uniqueCategoryNames.map((category) => (
-                      <SelectItem key={category} value={category!}>
-                        {category}
-                      </SelectItem>
-                    ))}
+                    {categories
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((category) => (
+                        <SelectItem key={category.id} value={category.name}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-4 h-4 rounded flex items-center justify-center text-xs"
+                              style={{ backgroundColor: category.color }}
+                            >
+                              {category.icon}
+                            </div>
+                            <span>{category.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -462,16 +491,31 @@ export default function TransactionsPage() {
                           <Popover>
                             <PopoverTrigger asChild>
                               <button
-                                className="text-sm px-2 py-1 bg-white/10 rounded hover:bg-white/20 transition-colors flex items-center gap-1 group"
+                                className="text-sm px-2 py-1 bg-white/10 rounded hover:bg-white/20 transition-colors flex items-center gap-2 group"
                                 disabled={updatingTransactionId === transaction.id}
                               >
                                 {updatingTransactionId === transaction.id ? (
                                   <LoadingSpinner className="w-3 h-3" />
                                 ) : (
                                   <>
-                                    <span>
-                                      {transaction.category || 'Sem categoria'}
-                                    </span>
+                                    {(() => {
+                                      const currentCategory = categories.find(
+                                        c => c.id === transaction.user_category_id
+                                      );
+                                      return currentCategory ? (
+                                        <>
+                                          <div
+                                            className="w-5 h-5 rounded flex items-center justify-center text-xs flex-shrink-0"
+                                            style={{ backgroundColor: currentCategory.color }}
+                                          >
+                                            {currentCategory.icon}
+                                          </div>
+                                          <span>{currentCategory.name}</span>
+                                        </>
+                                      ) : (
+                                        <span>{transaction.category || 'Sem categoria'}</span>
+                                      );
+                                    })()}
                                     <ChevronDownIcon className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                                   </>
                                 )}

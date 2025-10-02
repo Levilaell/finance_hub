@@ -4,6 +4,8 @@ Ref: https://docs.pluggy.ai/docs/creating-an-use-case-from-scratch
 """
 
 import logging
+import json
+import os
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from decimal import Decimal
@@ -16,12 +18,461 @@ from django.conf import settings
 
 from .models import (
     Connector, BankConnection, BankAccount,
-    Transaction as TransactionModel, SyncLog
+    Transaction as TransactionModel, SyncLog, Category
 )
 from .pluggy_client import PluggyClient
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+
+# Load Pluggy categories translations
+def load_category_translations() -> Dict[str, str]:
+    """
+    Load category translations from pluggy_categories.json.
+    Returns a dict mapping English category names to Portuguese translations.
+    """
+    json_path = os.path.join(os.path.dirname(__file__), 'pluggy_categories.json')
+
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        # Create mapping: English description -> Portuguese translation
+        translations = {}
+        for category in data.get('results', []):
+            english_name = category.get('description', '')
+            portuguese_name = category.get('descriptionTranslated', '')
+            if english_name and portuguese_name:
+                translations[english_name] = portuguese_name
+
+        logger.info(f"Loaded {len(translations)} category translations")
+        return translations
+    except Exception as e:
+        logger.error(f"Failed to load category translations: {e}")
+        return {}
+
+
+# Global cache for translations
+_CATEGORY_TRANSLATIONS = None
+
+
+def get_category_translations() -> Dict[str, str]:
+    """Get cached category translations."""
+    global _CATEGORY_TRANSLATIONS
+    if _CATEGORY_TRANSLATIONS is None:
+        _CATEGORY_TRANSLATIONS = load_category_translations()
+    return _CATEGORY_TRANSLATIONS
+
+
+def get_category_icon(category_name_pt: str) -> str:
+    """
+    Get the best emoji icon for a category based on its Portuguese name.
+    Returns a default icon if category is not found.
+    """
+    # Mapping of Portuguese category names to emojis
+    CATEGORY_ICONS = {
+        # Income categories
+        'Renda': '💰',
+        'Salário': '💵',
+        'Aposentadoria': '👴',
+        'Atividades de empreendedorismo': '💼',
+        'Auxílio do governo': '🏛️',
+        'Renda não-recorrente': '💸',
+        'Juros de rendimentos de dividendos': '📈',
+
+        # Loans and financing
+        'Empréstimos e financiamento': '🏦',
+        'Atraso no pagamento e custos de cheque especial': '⚠️',
+        'Juros cobrados': '📊',
+        'Financiamento': '🏗️',
+        'Financiamento imobiliário': '🏠',
+        'Financiamento de veículos': '🚗',
+        'Empréstimo estudantil': '🎓',
+        'Empréstimos': '💳',
+
+        # Investments
+        'Investimentos': '📊',
+        'Investimento automático': '🤖',
+        'Renda fixa': '📉',
+        'Fundos multimercado': '📈',
+        'Renda variável': '📊',
+        'Ajuste de margem': '⚖️',
+        'Pensão': '👵',
+
+        # Transfers
+        'Transferência mesma titularidade': '🔄',
+        'Transferência mesma titularidade - Dinheiro': '💵',
+        'Transferência mesma titularidade - PIX': '⚡',
+        'Transferência mesma titularidade - TED': '🏦',
+        'Transferências': '💸',
+        'Transferência - Boleto bancário': '📄',
+        'Transferência - Dinheiro': '💵',
+        'Transferência - Cheque': '📝',
+        'Transferências- DOC': '🏦',
+        'Transferência - Câmbio': '💱',
+        'Transferência - Mesma instituição': '🏦',
+        'Transferência - PIX': '⚡',
+        'Transferência - TED': '🏦',
+        'Transferências para terceiros': '👥',
+        'Transferência para terceiros - Boleto bancário': '📄',
+        'Transferência para terceiros - Débito': '💳',
+        'Transferência para terceiros - DOC': '🏦',
+        'Transferência para terceiros - PIX': '⚡',
+        'Transferência para terceiros - TED': '🏦',
+        'Pagamento de cartão de crédito': '💳',
+
+        # Legal obligations
+        'Obrigações legais': '⚖️',
+        'Saldo bloqueado': '🔒',
+        'Pensão alimentícia': '👨‍👩‍👧',
+
+        # Services
+        'Serviços': '🛠️',
+        'Telecomunicação': '📱',
+        'Internet': '🌐',
+        'Celular': '📱',
+        'TV': '📺',
+        'Educação': '📚',
+        'Cursos online': '💻',
+        'Universidade': '🎓',
+        'Escola': '🏫',
+        'Creche': '👶',
+        'Saúde e bem-estar': '💪',
+        'Academia e centros de lazer': '🏋️',
+        'Prática de esportes': '⚽',
+        'Bem-estar': '🧘',
+        'Bilhetes': '🎫',
+        'Estádios e arenas': '🏟️',
+        'Museus e pontos turísticos': '🏛️',
+        'Cinema, Teatro e Concertos': '🎭',
+
+        # Shopping
+        'Compras': '🛍️',
+        'Compras online': '🛒',
+        'Eletrônicos': '📱',
+        'Pet Shops e veterinários': '🐾',
+        'Vestiário': '👔',
+        'Artigos infantis': '🧸',
+        'Livraria': '📚',
+        'Artigos esportivos': '⚽',
+        'Papelaria': '✏️',
+        'Cashback': '💰',
+
+        # Digital services
+        'Serviços digitais': '💻',
+        'Jogos e videogames': '🎮',
+        'Streaming de vídeo': '📺',
+        'Streaming de música': '🎵',
+
+        # Food
+        'Supermercado': '🛒',
+        'Alimentos e bebidas': '🍽️',
+        'Restaurantes, bares e lanchonetes': '🍕',
+        'Delivery de alimentos': '🚚',
+
+        # Travel
+        'Viagens': '✈️',
+        'Aeroportos e cias. aéreas': '✈️',
+        'Hospedagem': '🏨',
+        'Programas de milhagem': '🎯',
+        'Passagem de ônibus': '🚌',
+
+        # Others
+        'Doações': '❤️',
+        'Apostas': '🎰',
+        'Loteria': '🎲',
+        'Apostas online': '🎰',
+
+        # Taxes
+        'Impostos': '🏛️',
+        'Imposto de renda': '💼',
+        'Imposto sobre investimentos': '📊',
+        'Impostos sobre operações financeiras': '🏦',
+
+        # Bank fees
+        'Taxas bancárias': '🏦',
+        'Taxas de conta corrente': '💳',
+        'Taxas sobre transferências e caixa eletrônico': '🏧',
+        'Taxas de cartão de crédito': '💳',
+
+        # Housing
+        'Moradia': '🏠',
+        'Aluguel': '🔑',
+        'Serviços de utilidade pública': '⚡',
+        'Água': '💧',
+        'Eletricidade': '💡',
+        'Gás': '🔥',
+        'Utensílios para casa': '🛋️',
+        'Impostos sobre moradia': '🏠',
+
+        # Healthcare
+        'Saúde': '🏥',
+        'Dentista': '🦷',
+        'Farmácia': '💊',
+        'Ótica': '👓',
+        'Hospitais, clínicas e laboratórios': '🏥',
+
+        # Transportation
+        'Transporte': '🚗',
+        'Táxi e transporte privado urbano': '🚕',
+        'Transporte público': '🚌',
+        'Aluguel de veículos': '🚗',
+        'Aluguel de bicicletas': '🚴',
+        'Serviços automotivos': '🔧',
+        'Postos de gasolina': '⛽',
+        'Estacionamentos': '🅿️',
+        'Pedágios e pagamentos no veículo': '🛣️',
+        'Taxas e impostos sobre veículos': '🚗',
+        'Manutenção de veículos': '🔧',
+        'Multas de trânsito': '🚨',
+
+        # Insurance
+        'Seguros': '🛡️',
+        'Seguro de vida': '❤️',
+        'Seguro residencial': '🏠',
+        'Seguro saúde': '🏥',
+        'Seguro de veículos': '🚗',
+
+        # Leisure
+        'Lazer': '🎉',
+
+        # Other
+        'Outros': '📁',
+    }
+
+    return CATEGORY_ICONS.get(category_name_pt, '📁')
+
+
+def get_category_color(category_name_pt: str) -> str:
+    """
+    Get the appropriate color for a category based on its Portuguese name.
+    Returns a default color if category is not found.
+    Colors are in hex format (#RRGGBB).
+    """
+    # Mapping of Portuguese category names to colors
+    CATEGORY_COLORS = {
+        # Income categories - Green tones
+        'Renda': '#10b981',  # emerald-500
+        'Salário': '#059669',  # emerald-600
+        'Aposentadoria': '#047857',  # emerald-700
+        'Atividades de empreendedorismo': '#34d399',  # emerald-400
+        'Auxílio do governo': '#6ee7b7',  # emerald-300
+        'Renda não-recorrente': '#a7f3d0',  # emerald-200
+        'Juros de rendimentos de dividendos': '#0891b2',  # cyan-600
+
+        # Loans and financing - Red/Orange tones
+        'Empréstimos e financiamento': '#dc2626',  # red-600
+        'Atraso no pagamento e custos de cheque especial': '#b91c1c',  # red-700
+        'Juros cobrados': '#991b1b',  # red-800
+        'Financiamento': '#ea580c',  # orange-600
+        'Financiamento imobiliário': '#c2410c',  # orange-700
+        'Financiamento de veículos': '#9a3412',  # orange-800
+        'Empréstimo estudantil': '#f97316',  # orange-500
+        'Empréstimos': '#dc2626',  # red-600
+
+        # Investments - Blue/Cyan tones
+        'Investimentos': '#0ea5e9',  # sky-500
+        'Investimento automático': '#0284c7',  # sky-600
+        'Renda fixa': '#0369a1',  # sky-700
+        'Fundos multimercado': '#38bdf8',  # sky-400
+        'Renda variável': '#0891b2',  # cyan-600
+        'Ajuste de margem': '#06b6d4',  # cyan-500
+        'Pensão': '#0e7490',  # cyan-700
+
+        # Transfers - Indigo/Purple tones
+        'Transferência mesma titularidade': '#6366f1',  # indigo-500
+        'Transferência mesma titularidade - Dinheiro': '#4f46e5',  # indigo-600
+        'Transferência mesma titularidade - PIX': '#8b5cf6',  # violet-500
+        'Transferência mesma titularidade - TED': '#7c3aed',  # violet-600
+        'Transferências': '#6366f1',  # indigo-500
+        'Transferência - Boleto bancário': '#818cf8',  # indigo-400
+        'Transferência - Dinheiro': '#4f46e5',  # indigo-600
+        'Transferência - Cheque': '#4338ca',  # indigo-700
+        'Transferências- DOC': '#3730a3',  # indigo-800
+        'Transferência - Câmbio': '#a78bfa',  # violet-400
+        'Transferência - Mesma instituição': '#6366f1',  # indigo-500
+        'Transferência - PIX': '#8b5cf6',  # violet-500
+        'Transferência - TED': '#7c3aed',  # violet-600
+        'Transferências para terceiros': '#6366f1',  # indigo-500
+        'Transferência para terceiros - Boleto bancário': '#818cf8',  # indigo-400
+        'Transferência para terceiros - Débito': '#a78bfa',  # violet-400
+        'Transferência para terceiros - DOC': '#4338ca',  # indigo-700
+        'Transferência para terceiros - PIX': '#8b5cf6',  # violet-500
+        'Transferência para terceiros - TED': '#7c3aed',  # violet-600
+        'Pagamento de cartão de crédito': '#ec4899',  # pink-500
+
+        # Legal obligations - Gray tones
+        'Obrigações legais': '#64748b',  # slate-500
+        'Saldo bloqueado': '#475569',  # slate-600
+        'Pensão alimentícia': '#334155',  # slate-700
+
+        # Services - Teal tones
+        'Serviços': '#14b8a6',  # teal-500
+        'Telecomunicação': '#0d9488',  # teal-600
+        'Internet': '#0f766e',  # teal-700
+        'Celular': '#2dd4bf',  # teal-400
+        'TV': '#5eead4',  # teal-300
+        'Educação': '#f59e0b',  # amber-500
+        'Cursos online': '#d97706',  # amber-600
+        'Universidade': '#b45309',  # amber-700
+        'Escola': '#92400e',  # amber-800
+        'Creche': '#fbbf24',  # amber-400
+        'Saúde e bem-estar': '#8b5cf6',  # violet-500
+        'Academia e centros de lazer': '#a78bfa',  # violet-400
+        'Prática de esportes': '#7c3aed',  # violet-600
+        'Bem-estar': '#c4b5fd',  # violet-300
+        'Bilhetes': '#ec4899',  # pink-500
+        'Estádios e arenas': '#db2777',  # pink-600
+        'Museus e pontos turísticos': '#be185d',  # pink-700
+        'Cinema, Teatro e Concertos': '#f472b6',  # pink-400
+
+        # Shopping - Pink/Rose tones
+        'Compras': '#ec4899',  # pink-500
+        'Compras online': '#db2777',  # pink-600
+        'Eletrônicos': '#be185d',  # pink-700
+        'Pet Shops e veterinários': '#f472b6',  # pink-400
+        'Vestiário': '#f9a8d4',  # pink-300
+        'Artigos infantis': '#fbcfe8',  # pink-200
+        'Livraria': '#be185d',  # pink-700
+        'Artigos esportivos': '#db2777',  # pink-600
+        'Papelaria': '#ec4899',  # pink-500
+        'Cashback': '#10b981',  # emerald-500
+
+        # Digital services - Purple tones
+        'Serviços digitais': '#a855f7',  # purple-500
+        'Jogos e videogames': '#9333ea',  # purple-600
+        'Streaming de vídeo': '#7e22ce',  # purple-700
+        'Streaming de música': '#c084fc',  # purple-400
+
+        # Food - Orange/Yellow tones
+        'Supermercado': '#f59e0b',  # amber-500
+        'Alimentos e bebidas': '#f97316',  # orange-500
+        'Restaurantes, bares e lanchonetes': '#ea580c',  # orange-600
+        'Delivery de alimentos': '#fb923c',  # orange-400
+
+        # Travel - Sky blue tones
+        'Viagens': '#0ea5e9',  # sky-500
+        'Aeroportos e cias. aéreas': '#0284c7',  # sky-600
+        'Hospedagem': '#0369a1',  # sky-700
+        'Programas de milhagem': '#38bdf8',  # sky-400
+        'Passagem de ônibus': '#7dd3fc',  # sky-300
+
+        # Others - Various
+        'Doações': '#ef4444',  # red-500
+        'Apostas': '#dc2626',  # red-600
+        'Loteria': '#b91c1c',  # red-700
+        'Apostas online': '#dc2626',  # red-600
+
+        # Taxes - Gray/Red tones
+        'Impostos': '#64748b',  # slate-500
+        'Imposto de renda': '#475569',  # slate-600
+        'Imposto sobre investimentos': '#334155',  # slate-700
+        'Impostos sobre operações financeiras': '#1e293b',  # slate-800
+
+        # Bank fees - Slate tones
+        'Taxas bancárias': '#64748b',  # slate-500
+        'Taxas de conta corrente': '#475569',  # slate-600
+        'Taxas sobre transferências e caixa eletrônico': '#334155',  # slate-700
+        'Taxas de cartão de crédito': '#1e293b',  # slate-800
+
+        # Housing - Brown/Amber tones
+        'Moradia': '#92400e',  # amber-800
+        'Aluguel': '#78350f',  # amber-900
+        'Serviços de utilidade pública': '#b45309',  # amber-700
+        'Água': '#06b6d4',  # cyan-500
+        'Eletricidade': '#fbbf24',  # amber-400
+        'Gás': '#f97316',  # orange-500
+        'Utensílios para casa': '#d97706',  # amber-600
+        'Impostos sobre moradia': '#92400e',  # amber-800
+
+        # Healthcare - Red/Rose tones
+        'Saúde': '#ef4444',  # red-500
+        'Dentista': '#dc2626',  # red-600
+        'Farmácia': '#b91c1c',  # red-700
+        'Ótica': '#f87171',  # red-400
+        'Hospitais, clínicas e laboratórios': '#991b1b',  # red-800
+
+        # Transportation - Lime/Green tones
+        'Transporte': '#84cc16',  # lime-500
+        'Táxi e transporte privado urbano': '#65a30d',  # lime-600
+        'Transporte público': '#4d7c0f',  # lime-700
+        'Aluguel de veículos': '#a3e635',  # lime-400
+        'Aluguel de bicicletas': '#bef264',  # lime-300
+        'Serviços automotivos': '#65a30d',  # lime-600
+        'Postos de gasolina': '#4d7c0f',  # lime-700
+        'Estacionamentos': '#84cc16',  # lime-500
+        'Pedágios e pagamentos no veículo': '#a3e635',  # lime-400
+        'Taxas e impostos sobre veículos': '#4d7c0f',  # lime-700
+        'Manutenção de veículos': '#65a30d',  # lime-600
+        'Multas de trânsito': '#dc2626',  # red-600
+
+        # Insurance - Blue tones
+        'Seguros': '#3b82f6',  # blue-500
+        'Seguro de vida': '#2563eb',  # blue-600
+        'Seguro residencial': '#1d4ed8',  # blue-700
+        'Seguro saúde': '#60a5fa',  # blue-400
+        'Seguro de veículos': '#93c5fd',  # blue-300
+
+        # Leisure - Yellow tones
+        'Lazer': '#eab308',  # yellow-500
+
+        # Other
+        'Outros': '#6b7280',  # gray-500
+    }
+
+    return CATEGORY_COLORS.get(category_name_pt, '#d946ef')
+
+
+def get_or_create_category(user: User, category_name: str, transaction_type: str) -> Optional[Category]:
+    """
+    Get or create a category for a user based on the Pluggy category name.
+    Automatically translates category names to Portuguese.
+
+    Args:
+        user: The user who owns the category
+        category_name: The category name from Pluggy (in English)
+        transaction_type: 'CREDIT' or 'DEBIT' to determine category type
+
+    Returns:
+        Category instance or None if category_name is empty
+    """
+    if not category_name or not category_name.strip():
+        return None
+
+    category_name = category_name.strip()
+
+    # Get translation for the category name
+    translations = get_category_translations()
+    translated_name = translations.get(category_name, category_name)
+
+    # Map transaction type to category type
+    category_type = 'income' if transaction_type == 'CREDIT' else 'expense'
+
+    # Try to get existing category (case-insensitive, by translated name)
+    category = Category.objects.filter(
+        user=user,
+        name__iexact=translated_name,
+        type=category_type
+    ).first()
+
+    if not category:
+        # Get the appropriate emoji and color for this category
+        category_icon = get_category_icon(translated_name)
+        category_color = get_category_color(translated_name)
+
+        # Create new category with translated name, appropriate icon and color
+        category = Category.objects.create(
+            user=user,
+            name=translated_name,
+            type=category_type,
+            color=category_color,
+            icon=category_icon,
+            is_system=False
+        )
+        logger.info(f"Created new category '{translated_name}' {category_icon} ({category_type}) for user {user.id}")
+
+    return category
 
 
 class ConnectorService:
@@ -467,6 +918,10 @@ class TransactionService:
                     pluggy_category_id = pluggy_tx.get('categoryId', '')
                     pluggy_category_id = pluggy_category_id if pluggy_category_id is not None else ''
 
+                    # Get or create category for this transaction
+                    user = account.connection.user
+                    category = get_or_create_category(user, pluggy_category, tx_type)
+
                     TransactionModel.objects.update_or_create(
                         pluggy_transaction_id=pluggy_tx['id'],
                         defaults={
@@ -481,6 +936,7 @@ class TransactionService:
                             'merchant_name': merchant_name,
                             'merchant_category': merchant_category,
                             'payment_data': pluggy_tx.get('paymentData'),
+                            'user_category': category,  # Assign the auto-created category
                         }
                     )
                     synced_count += 1

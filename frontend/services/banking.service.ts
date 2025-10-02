@@ -229,7 +229,7 @@ class BankingService {
         date_to: endOfMonth.toISOString().split('T')[0]
       });
 
-      // Calculate category totals
+      // Calculate category totals (only expenses)
       const categoryTotals: CategorySummary = {};
       transactions.forEach(transaction => {
         const category = transaction.category || 'Sem categoria';
@@ -250,11 +250,29 @@ class BankingService {
     const params: Record<string, string> = {};
     if (type) params.type = type;
 
-    const response = await apiClient.get<PaginatedResponse<Category>>(
-      "/api/banking/categories/",
-      params
-    );
-    return response.results;
+    // Fetch all pages of categories (similar to getTransactions)
+    const allCategories: Category[] = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await apiClient.get<PaginatedResponse<Category>>(
+        "/api/banking/categories/",
+        { ...params, page }
+      );
+
+      allCategories.push(...response.results);
+      hasMore = response.next !== null && response.next !== undefined;
+      page++;
+
+      // Safety limit
+      if (page > 10) {
+        console.warn('⚠️ Category pagination limit reached (10 pages)');
+        break;
+      }
+    }
+
+    return allCategories;
   }
 
   async getCategory(id: string): Promise<Category> {

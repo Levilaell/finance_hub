@@ -159,7 +159,7 @@ export default function DashboardPage() {
               {formatCurrency(monthlyIncome)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {summary?.period_start && format(new Date(summary.period_start), 'MMM', { locale: ptBR })}
+              {summary?.period_start && format(new Date(summary.period_start + 'T12:00:00'), 'MMM', { locale: ptBR })}
             </p>
           </CardContent>
         </Card>
@@ -174,7 +174,7 @@ export default function DashboardPage() {
               {formatCurrency(Math.abs(monthlyExpenses))}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {summary?.period_start && format(new Date(summary.period_start), 'MMM', { locale: ptBR })}
+              {summary?.period_start && format(new Date(summary.period_start + 'T12:00:00'), 'MMM', { locale: ptBR })}
             </p>
           </CardContent>
         </Card>
@@ -241,7 +241,7 @@ export default function DashboardPage() {
         {/* Top Categories */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Principais Categorias</CardTitle>
+            <CardTitle>Principais Categorias (Mês)</CardTitle>
             <Link href="/categories">
               <Button variant="ghost" size="sm">Ver todas</Button>
             </Link>

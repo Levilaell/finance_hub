@@ -113,7 +113,8 @@ class SubscriptionAdmin(admin.ModelAdmin):
 
     def plan_display(self, obj):
         if obj.plan:
-            amount = obj.plan.amount / 100 if obj.plan.amount else 0
+            # plan.amount já está em formato decimal (não precisa dividir por 100)
+            amount = obj.plan.amount if obj.plan.amount else 0
             interval = {'month': 'mês', 'year': 'ano', 'week': 'semana', 'day': 'dia'}.get(obj.plan.interval, obj.plan.interval)
             return f'R$ {amount:.2f}/{interval}'
         return '-'

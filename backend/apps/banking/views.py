@@ -532,7 +532,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         # Start with all user transactions
         transactions = self.get_queryset()
 
-        # If no dates provided, default to current month OR last month with transactions
+        # If no dates provided, always default to current month
         if not date_from and not date_to:
             # Use timezone-aware current time in local timezone (America/Sao_Paulo)
             from django.conf import settings
@@ -544,38 +544,14 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
             logger.info(f"UTC now: {utc_now}, Local now ({settings.TIME_ZONE}): {local_now}")
 
-            # Try current month first (using local timezone)
+            # Always use current month (using local timezone)
             current_month_start = local_now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             last_day = monthrange(local_now.year, local_now.month)[1]
             current_month_end = local_now.replace(day=last_day, hour=23, minute=59, second=59, microsecond=999999)
 
-            # Check if current month has transactions
-            has_transactions_this_month = transactions.filter(
-                date__gte=current_month_start,
-                date__lte=current_month_end
-            ).exists()
-
-            if has_transactions_this_month:
-                date_from = current_month_start.date()
-                date_to = current_month_end.date()
-                logger.info(f"Using current month: {date_from} to {date_to}")
-            else:
-                # No transactions in current month, use the last month with activity
-                last_transaction = transactions.order_by('-date').first()
-                if last_transaction:
-                    # Convert last transaction date to local timezone
-                    last_trans_local = last_transaction.date.astimezone(local_tz)
-                    transaction_month = last_trans_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-                    last_day_of_month = monthrange(last_trans_local.year, last_trans_local.month)[1]
-                    month_end = last_trans_local.replace(day=last_day_of_month, hour=23, minute=59, second=59, microsecond=999999)
-                    date_from = transaction_month.date()
-                    date_to = month_end.date()
-                    logger.info(f"No transactions in current month, using last active month: {date_from} to {date_to}")
-                else:
-                    # No transactions at all, use current month anyway
-                    date_from = current_month_start.date()
-                    date_to = current_month_end.date()
-                    logger.info(f"No transactions found, defaulting to current month: {date_from} to {date_to}")
+            date_from = current_month_start.date()
+            date_to = current_month_end.date()
+            logger.info(f"Using current month: {date_from} to {date_to}")
 
         # Apply date filters
         if date_from:

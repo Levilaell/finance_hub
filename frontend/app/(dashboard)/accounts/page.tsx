@@ -338,14 +338,6 @@ export default function AccountsPage() {
             </Button>
           )}
           <Button
-            onClick={() => router.push('/reports')}
-            variant="outline"
-            className="w-full sm:w-auto border-white/20 text-white hover:bg-white/10 transition-all duration-300"
-          >
-            <DocumentChartBarIcon className="h-4 w-4 mr-2" />
-            Gerar Relatórios
-          </Button>
-          <Button
             onClick={handleConnectBank}
             className="w-full sm:w-auto bg-white text-black hover:bg-white/90 transition-all duration-300"
           >

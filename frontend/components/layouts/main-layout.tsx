@@ -32,7 +32,7 @@ const navigation = [
   { name: "Transações", href: "/transactions", icon: Receipt },
   { name: "Contas", href: "/accounts", icon: Wallet },
   { name: "Categorias", href: "/categories", icon: Tags },
-  { name: "Insights com IA", href: "/ai-insights", icon: Sparkles, comingSoon: true },
+  { name: "Insights", href: "/ai-insights", icon: Sparkles, comingSoon: true },
   { name: "Relatórios", href: "/reports", icon: FileText },
   { name: "Configurações", href: "/settings", icon: Settings },
 ];
@@ -113,12 +113,12 @@ export function MainLayout({ children }: MainLayoutProps) {
                   )}
                   onClick={() => setSidebarOpen(false)}
                 >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.name}</span>
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  <span className="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{item.name}</span>
                   {item.comingSoon && (
-                    <div className="ml-auto flex items-center">
+                    <div className="ml-auto flex items-center gap-1 flex-shrink-0">
                       <Lock className="h-3.5 w-3.5 text-yellow-500" />
-                      <span className="ml-1 text-xs text-yellow-500 font-medium">Em breve</span>
+                      <span className="text-xs text-yellow-500 font-medium whitespace-nowrap">Em breve</span>
                     </div>
                   )}
                 </Link>
@@ -181,12 +181,12 @@ export function MainLayout({ children }: MainLayoutProps) {
                     item.comingSoon && "opacity-75"
                   )}
                 >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.name}</span>
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  <span className="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{item.name}</span>
                   {item.comingSoon && (
-                    <div className="ml-auto flex items-center">
+                    <div className="ml-auto flex items-center gap-1 flex-shrink-0">
                       <Lock className="h-3.5 w-3.5 text-yellow-500" />
-                      <span className="ml-1 text-xs text-yellow-500 font-medium">Em breve</span>
+                      <span className="text-xs text-yellow-500 font-medium whitespace-nowrap">Em breve</span>
                     </div>
                   )}
                 </Link>
