@@ -46,8 +46,21 @@ export default function SubscriptionExpiredPage() {
     }
   };
 
-  const handleReactivate = () => {
-    router.push('/pricing');
+  const handleReactivate = async () => {
+    setRedirecting(true);
+    try {
+      const response = await apiClient.post<{ checkout_url: string }>('/api/subscriptions/checkout/', {
+        success_url: `${window.location.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${window.location.origin}/subscription/expired`
+      });
+
+      if (response.checkout_url) {
+        window.location.href = response.checkout_url;
+      }
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      setRedirecting(false);
+    }
   };
 
   if (loading) {
@@ -129,11 +142,21 @@ export default function SubscriptionExpiredPage() {
               <div className="space-y-4">
                 <Button
                   onClick={handleReactivate}
+                  disabled={redirecting}
                   className="w-full"
                   size="lg"
                 >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Reativar Assinatura
+                  {redirecting ? (
+                    <>
+                      <LoadingSpinner className="mr-2" />
+                      Redirecionando...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Reativar Assinatura
+                    </>
+                  )}
                 </Button>
               </div>
             </>

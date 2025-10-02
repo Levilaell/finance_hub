@@ -65,6 +65,18 @@ def create_checkout_session(request):
 
         # DON'T mark trial as used here - let webhook handle it to avoid race condition
 
+        # Build subscription_data
+        subscription_data = {
+            'metadata': {
+                'user_id': str(request.user.id),
+                'trial_eligible': str(trial_days > 0),
+            },
+        }
+
+        # Only add trial_period_days if there's actually a trial
+        if trial_days > 0:
+            subscription_data['trial_period_days'] = trial_days
+
         # Create Checkout Session
         checkout_session = stripe.checkout.Session.create(
             customer=customer.id,
@@ -73,13 +85,7 @@ def create_checkout_session(request):
                 'price': price_id,
                 'quantity': 1,
             }],
-            subscription_data={
-                'trial_period_days': trial_days,
-                'metadata': {
-                    'user_id': str(request.user.id),
-                    'trial_eligible': str(trial_days > 0),
-                },
-            },
+            subscription_data=subscription_data,
             success_url=success_url,
             cancel_url=cancel_url,
             allow_promotion_codes=True,

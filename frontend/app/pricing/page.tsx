@@ -50,10 +50,7 @@ function PricingContent() {
         {/* Header */}
         <div className="text-center mb-12">
           <div className="flex justify-center mb-6">
-            <Badge className="glass px-6 py-2 text-lg">
-              <StarIcon className="h-5 w-5 mr-2" />
-              Plano Único
-            </Badge>
+
           </div>
           <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
             Um único plano com
@@ -143,7 +140,7 @@ function PricingContent() {
 
                 <div className="flex items-start gap-2">
                   <CheckIcon className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-foreground">Sincronização automática 24/7</span>
+                  <span className="text-sm text-foreground">Sincronização automática</span>
                 </div>
 
                 <div className="flex items-start gap-2">
@@ -152,13 +149,8 @@ function PricingContent() {
                 </div>
 
                 <div className="flex items-start gap-2">
-                  <SparklesIcon className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />
+                  <CheckIcon className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
                   <span className="text-sm text-foreground font-medium">Categorização automática por IA</span>
-                </div>
-
-                <div className="flex items-start gap-2">
-                  <SparklesIcon className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-foreground font-medium">Insights inteligentes ilimitados</span>
                 </div>
 
                 <div className="flex items-start gap-2">
@@ -185,7 +177,13 @@ function PricingContent() {
                   <CheckIcon className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
                   <span className="text-sm text-foreground">Atualizações e novos recursos incluídos</span>
                 </div>
+
+                <div className="flex items-start gap-2">
+                  <SparklesIcon className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-foreground font-medium">Insights inteligentes ilimitados</span>
+                </div>
               </div>
+              
             </CardContent>
 
             <CardFooter className="pt-6">

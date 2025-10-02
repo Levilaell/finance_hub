@@ -33,12 +33,25 @@ import {
 } from '@heroicons/react/24/outline';
 import { format, startOfMonth, endOfMonth, subMonths, subYears, parseISO, startOfYear, endOfYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Input } from '@/components/ui/input';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
+import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface PeriodFilter {
   label: string;
   startDate: Date | null;
   endDate: Date | null;
 }
+
+type ReportType = 'complete' | 'summary' | 'categories' | 'monthly';
 
 const CHART_COLORS = [
   '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
@@ -56,6 +69,9 @@ export default function ReportsPage() {
     startDate: startOfMonth(new Date()),
     endDate: endOfMonth(new Date())
   });
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [showCustomPeriod, setShowCustomPeriod] = useState(false);
 
   const periods: PeriodFilter[] = [
     {
@@ -141,27 +157,191 @@ export default function ReportsPage() {
     };
   }, [isAuthenticated, router, selectedPeriod.label]);
 
-  const handleExportPDF = () => {
-    window.print();
+  const applyCustomPeriod = () => {
+    if (!customStartDate || !customEndDate) {
+      toast.error('Selecione data inicial e final');
+      return;
+    }
+
+    const start = new Date(customStartDate);
+    const end = new Date(customEndDate);
+
+    if (start > end) {
+      toast.error('Data inicial deve ser anterior à data final');
+      return;
+    }
+
+    setSelectedPeriod({
+      label: 'Personalizado',
+      startDate: start,
+      endDate: end
+    });
+    setShowCustomPeriod(false);
+    toast.success('Período personalizado aplicado');
   };
 
-  const handleExportExcel = () => {
-    const csvContent = [
-      ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor'],
-      ...transactions.map(t => [
-        format(parseISO(t.date), 'dd/MM/yyyy'),
-        t.description,
-        t.category || 'Sem categoria',
-        t.type === 'CREDIT' ? 'Receita' : 'Despesa',
-        t.amount.toString()
-      ])
-    ].map(row => row.join(',')).join('\n');
+  const generatePDF = async (reportType: ReportType) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `relatorio-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    link.click();
+    // Header
+    doc.setFontSize(20);
+    doc.text('Relatório Financeiro', pageWidth / 2, 20, { align: 'center' });
+
+    doc.setFontSize(10);
+    const periodText = selectedPeriod.startDate && selectedPeriod.endDate
+      ? `${format(selectedPeriod.startDate, 'dd/MM/yyyy')} - ${format(selectedPeriod.endDate, 'dd/MM/yyyy')}`
+      : 'Todas as transações';
+    doc.text(periodText, pageWidth / 2, 28, { align: 'center' });
+
+    let yPosition = 40;
+
+    // Summary cards
+    if (reportType === 'complete' || reportType === 'summary') {
+      doc.setFontSize(14);
+      doc.text('Resumo Financeiro', 14, yPosition);
+      yPosition += 10;
+
+      const summaryData = [
+        ['Receitas', formatCurrency(summary?.income || 0)],
+        ['Despesas', formatCurrency(Math.abs(summary?.expenses || 0))],
+        ['Resultado', formatCurrency(summary?.balance || 0)],
+        ['Transações', (summary?.transactions_count || 0).toString()]
+      ];
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['Métrica', 'Valor']],
+        body: summaryData,
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] },
+      });
+
+      yPosition = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // Income Categories table
+    if (reportType === 'complete' || reportType === 'categories') {
+      if (incomeCategoryData.length > 0) {
+        doc.setFontSize(14);
+        doc.text('Receitas por Categoria', 14, yPosition);
+        yPosition += 10;
+
+        const incomeCategoryTableData = incomeCategoryData.map((cat, index) => {
+          const totalIncome = incomeCategoryData.reduce((sum, c) => sum + c.value, 0);
+          const percentage = ((cat.value / totalIncome) * 100).toFixed(1);
+          const transactionCount = transactions.filter(
+            t => t.type === 'CREDIT' && (t.category || 'Sem categoria') === cat.name
+          ).length;
+
+          return [
+            cat.name,
+            formatCurrency(cat.value),
+            `${percentage}%`,
+            transactionCount.toString()
+          ];
+        });
+
+        autoTable(doc, {
+          startY: yPosition,
+          head: [['Categoria', 'Total', '% do Total', 'Transações']],
+          body: incomeCategoryTableData,
+          theme: 'grid',
+          headStyles: { fillColor: [16, 185, 129] },
+        });
+
+        yPosition = (doc as any).lastAutoTable.finalY + 15;
+      }
+
+      // Expense Categories table
+      if (categoryData.length > 0) {
+        if (yPosition > 230) {
+          doc.addPage();
+          yPosition = 20;
+        }
+
+        doc.setFontSize(14);
+        doc.text('Despesas por Categoria', 14, yPosition);
+        yPosition += 10;
+
+        const categoryTableData = categoryData.map((cat, index) => {
+          const totalExpenses = categoryData.reduce((sum, c) => sum + c.value, 0);
+          const percentage = ((cat.value / totalExpenses) * 100).toFixed(1);
+          const transactionCount = transactions.filter(
+            t => t.type === 'DEBIT' && (t.category || 'Sem categoria') === cat.name
+          ).length;
+
+          return [
+            cat.name,
+            formatCurrency(cat.value),
+            `${percentage}%`,
+            transactionCount.toString()
+          ];
+        });
+
+        autoTable(doc, {
+          startY: yPosition,
+          head: [['Categoria', 'Total', '% do Total', 'Transações']],
+          body: categoryTableData,
+          theme: 'grid',
+          headStyles: { fillColor: [239, 68, 68] },
+        });
+
+        yPosition = (doc as any).lastAutoTable.finalY + 15;
+      }
+    }
+
+    // Monthly data
+    if (reportType === 'complete' || reportType === 'monthly') {
+      if (yPosition > 250) {
+        doc.addPage();
+        yPosition = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.text('Receitas vs Despesas Mensais', 14, yPosition);
+      yPosition += 10;
+
+      const monthlyTableData = monthlyData.map(month => [
+        month.mes,
+        formatCurrency(month.receitas),
+        formatCurrency(month.despesas),
+        formatCurrency(month.receitas - month.despesas)
+      ]);
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['Mês', 'Receitas', 'Despesas', 'Saldo']],
+        body: monthlyTableData,
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] },
+      });
+    }
+
+    // Footer
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.text(
+        `Página ${i} de ${pageCount}`,
+        pageWidth / 2,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: 'center' }
+      );
+    }
+
+    const dateRange = selectedPeriod.label === 'Personalizado' && customStartDate && customEndDate
+      ? `_${customStartDate}_a_${customEndDate}`
+      : `_${selectedPeriod.label.toLowerCase().replace(/\s/g, '-')}`;
+
+    const reportTypeLabel = reportType === 'complete' ? 'completo'
+      : reportType === 'summary' ? 'resumo'
+      : reportType === 'categories' ? 'categorias'
+      : 'mensal';
+
+    doc.save(`relatorio_${reportTypeLabel}${dateRange}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    toast.success('PDF gerado com sucesso!');
   };
 
   // Processar dados para gráficos
@@ -194,6 +374,31 @@ export default function ReportsPage() {
       .map(([name, value]) => ({ name, value }));
 
     console.log('Category data result:', result);
+    return result;
+  };
+
+  const getIncomeCategoryData = () => {
+    if (!transactions || transactions.length === 0) {
+      console.log('No transactions for income categories');
+      return [];
+    }
+
+    const categoryMap: Record<string, number> = {};
+
+    // Processar todas as receitas
+    transactions.forEach(t => {
+      if (t.is_income) {
+        const cat = t.category || 'Sem categoria';
+        categoryMap[cat] = (categoryMap[cat] || 0) + Math.abs(t.amount);
+      }
+    });
+
+    const result = Object.entries(categoryMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, value]) => ({ name, value }));
+
+    console.log('Income category data result:', result);
     return result;
   };
 
@@ -268,6 +473,7 @@ export default function ReportsPage() {
   }
 
   const categoryData = getCategoryData();
+  const incomeCategoryData = getIncomeCategoryData();
   const monthlyData = getMonthlyData();
   const dailyBalanceData = getDailyBalanceData();
   // Expenses come as negative from API, balance is already calculated
@@ -284,14 +490,28 @@ export default function ReportsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportExcel}>
-            <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
-            Excel
-          </Button>
-          <Button variant="outline" onClick={handleExportPDF}>
-            <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
-            PDF
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
+                Exportar PDF
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => generatePDF('complete')}>
+                Relatório Completo
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => generatePDF('summary')}>
+                Resumo Financeiro
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => generatePDF('categories')}>
+                Análise por Categorias
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => generatePDF('monthly')}>
+                Análise Mensal
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -309,12 +529,50 @@ export default function ReportsPage() {
               <Button
                 key={period.label}
                 variant={selectedPeriod.label === period.label ? 'default' : 'outline'}
-                onClick={() => setSelectedPeriod(period)}
+                onClick={() => {
+                  setSelectedPeriod(period);
+                  setShowCustomPeriod(false);
+                }}
               >
                 {period.label}
               </Button>
             ))}
+            <Button
+              variant={selectedPeriod.label === 'Personalizado' ? 'default' : 'outline'}
+              onClick={() => setShowCustomPeriod(!showCustomPeriod)}
+            >
+              Personalizado
+            </Button>
           </div>
+
+          {showCustomPeriod && (
+            <div className="mt-4 p-4 bg-white/5 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Data Inicial</label>
+                  <Input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Data Final</label>
+                  <Input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={applyCustomPeriod} className="w-full">
+                    Aplicar Período
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <p className="text-sm text-white/60 mt-3">
             {selectedPeriod.startDate && selectedPeriod.endDate ? (
               <>
@@ -401,7 +659,7 @@ export default function ReportsPage() {
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gráfico de Evolução Mensal */}
-        <Card>
+        <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Receitas vs Despesas</CardTitle>
           </CardHeader>
@@ -433,7 +691,48 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
 
-        {/* Gráfico de Categorias */}
+        {/* Gráfico de Receitas por Categoria */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Receitas por Categoria</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {incomeCategoryData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={incomeCategoryData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {incomeCategoryData.map((entry, index) => (
+                      <Cell key={`cell-income-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1e293b',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: number) => formatCurrency(value)}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-white/60">
+                <p>Nenhuma receita categorizada no período</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Gráfico de Despesas por Categoria */}
         <Card>
           <CardHeader>
             <CardTitle>Despesas por Categoria</CardTitle>
@@ -453,7 +752,7 @@ export default function ReportsPage() {
                     dataKey="value"
                   >
                     {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      <Cell key={`cell-expense-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -475,7 +774,7 @@ export default function ReportsPage() {
         </Card>
 
         {/* Gráfico de Saldo ao Longo do Tempo */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Fluxo de Caixa Acumulado</CardTitle>
           </CardHeader>
@@ -513,58 +812,112 @@ export default function ReportsPage() {
         </Card>
       </div>
 
-      {/* Tabela de Categorias Detalhada */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Análise por Categoria</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="text-left py-3 px-4 text-sm font-medium text-white/70">Categoria</th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-white/70">Total</th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-white/70">% do Total</th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-white/70">Transações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categoryData.map((cat, index) => {
-                  const totalExpenses = categoryData.reduce((sum, c) => sum + c.value, 0);
-                  const percentage = (cat.value / totalExpenses) * 100;
-                  const transactionCount = transactions.filter(
-                    t => t.type === 'DEBIT' && (t.category || 'Sem categoria') === cat.name
-                  ).length;
-
-                  return (
-                    <tr key={cat.name} className="border-b border-white/5 hover:bg-white/5">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
-                          />
-                          <span className="text-sm">{cat.name}</span>
-                        </div>
-                      </td>
-                      <td className="text-right py-3 px-4 text-sm font-medium">
-                        {formatCurrency(cat.value)}
-                      </td>
-                      <td className="text-right py-3 px-4 text-sm text-white/70">
-                        {percentage.toFixed(1)}%
-                      </td>
-                      <td className="text-right py-3 px-4 text-sm text-white/70">
-                        {transactionCount}
-                      </td>
+      {/* Tabelas de Categorias Detalhadas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Tabela de Receitas por Categoria */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Receitas por Categoria</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {incomeCategoryData.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="text-left py-3 px-4 text-sm font-medium text-white/70">Categoria</th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-white/70">Total</th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-white/70">%</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                  </thead>
+                  <tbody>
+                    {incomeCategoryData.map((cat, index) => {
+                      const totalIncome = incomeCategoryData.reduce((sum, c) => sum + c.value, 0);
+                      const percentage = (cat.value / totalIncome) * 100;
+
+                      return (
+                        <tr key={cat.name} className="border-b border-white/5 hover:bg-white/5">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                              />
+                              <span className="text-sm">{cat.name}</span>
+                            </div>
+                          </td>
+                          <td className="text-right py-3 px-4 text-sm font-medium text-green-500">
+                            {formatCurrency(cat.value)}
+                          </td>
+                          <td className="text-right py-3 px-4 text-sm text-white/70">
+                            {percentage.toFixed(1)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="py-8 text-center text-white/60">
+                <p>Nenhuma receita categorizada no período</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Tabela de Despesas por Categoria */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Despesas por Categoria</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {categoryData.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="text-left py-3 px-4 text-sm font-medium text-white/70">Categoria</th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-white/70">Total</th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-white/70">%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoryData.map((cat, index) => {
+                      const totalExpenses = categoryData.reduce((sum, c) => sum + c.value, 0);
+                      const percentage = (cat.value / totalExpenses) * 100;
+
+                      return (
+                        <tr key={cat.name} className="border-b border-white/5 hover:bg-white/5">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                              />
+                              <span className="text-sm">{cat.name}</span>
+                            </div>
+                          </td>
+                          <td className="text-right py-3 px-4 text-sm font-medium text-red-500">
+                            {formatCurrency(cat.value)}
+                          </td>
+                          <td className="text-right py-3 px-4 text-sm text-white/70">
+                            {percentage.toFixed(1)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="py-8 text-center text-white/60">
+                <p>Nenhuma despesa categorizada no período</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

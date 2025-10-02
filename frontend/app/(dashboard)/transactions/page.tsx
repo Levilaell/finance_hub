@@ -33,7 +33,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -194,23 +201,84 @@ export default function TransactionsPage() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Data', 'Hora', 'Descricao', 'Categoria', 'Conta', 'Tipo', 'Valor'];
+    if (filteredTransactions.length === 0) {
+      toast.error('Nenhuma transação para exportar');
+      return;
+    }
+
+    const headers = ['Data', 'Hora', 'Descrição', 'Categoria', 'Conta', 'Tipo', 'Valor'];
     const rows = filteredTransactions.map((t) => [
       format(new Date(t.date), 'dd/MM/yyyy', { locale: ptBR }),
       format(new Date(t.date), 'HH:mm', { locale: ptBR }),
-      t.description,
-      t.category || 'Sem categoria',
-      t.account_name,
+      `"${t.description.replace(/"/g, '""')}"`,
+      `"${(t.category || 'Sem categoria').replace(/"/g, '""')}"`,
+      `"${t.account_name.replace(/"/g, '""')}"`,
       t.type === 'CREDIT' ? 'Receita' : 'Despesa',
-      t.amount.toFixed(2)
+      Number(Math.abs(t.amount)).toFixed(2).replace('.', ',')
     ]);
 
-    const csv = [headers, ...rows].map((row) => row.join(',')).join('\n');
+    // Add BOM for Excel UTF-8 compatibility
+    const BOM = '\uFEFF';
+    const csv = BOM + [headers, ...rows].map((row) => row.join(';')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `transacoes_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+
+    const dateRange = startDate && endDate
+      ? `_${format(new Date(startDate), 'yyyy-MM-dd')}_a_${format(new Date(endDate), 'yyyy-MM-dd')}`
+      : startDate
+      ? `_desde_${format(new Date(startDate), 'yyyy-MM-dd')}`
+      : endDate
+      ? `_ate_${format(new Date(endDate), 'yyyy-MM-dd')}`
+      : '';
+
+    link.download = `transacoes${dateRange}_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.csv`;
     link.click();
+    toast.success(`${filteredTransactions.length} transações exportadas para CSV`);
+  };
+
+  const exportToExcel = () => {
+    if (filteredTransactions.length === 0) {
+      toast.error('Nenhuma transação para exportar');
+      return;
+    }
+
+    const data = filteredTransactions.map((t) => ({
+      Data: format(new Date(t.date), 'dd/MM/yyyy', { locale: ptBR }),
+      Hora: format(new Date(t.date), 'HH:mm', { locale: ptBR }),
+      Descrição: t.description,
+      Categoria: t.category || 'Sem categoria',
+      Conta: t.account_name,
+      Tipo: t.type === 'CREDIT' ? 'Receita' : 'Despesa',
+      Valor: Math.abs(t.amount)
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 12 }, // Data
+      { wch: 8 },  // Hora
+      { wch: 40 }, // Descrição
+      { wch: 20 }, // Categoria
+      { wch: 25 }, // Conta
+      { wch: 10 }, // Tipo
+      { wch: 15 }  // Valor
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Transações');
+
+    const dateRange = startDate && endDate
+      ? `_${format(new Date(startDate), 'yyyy-MM-dd')}_a_${format(new Date(endDate), 'yyyy-MM-dd')}`
+      : startDate
+      ? `_desde_${format(new Date(startDate), 'yyyy-MM-dd')}`
+      : endDate
+      ? `_ate_${format(new Date(endDate), 'yyyy-MM-dd')}`
+      : '';
+
+    XLSX.writeFile(workbook, `transacoes${dateRange}_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`);
+    toast.success(`${filteredTransactions.length} transações exportadas para Excel`);
   };
 
   // Get unique categories for filter
@@ -281,10 +349,22 @@ export default function TransactionsPage() {
               <ArrowPathIcon className="h-4 w-4" />
             )}
           </Button>
-          <Button variant="outline" onClick={exportToCSV}>
-            <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
-            Exportar
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportToCSV}>
+                Exportar CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportToExcel}>
+                Exportar Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
