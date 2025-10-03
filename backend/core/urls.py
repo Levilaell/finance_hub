@@ -3,11 +3,7 @@ CaixaHub URL Configuration
 """
 from django.contrib import admin
 from django.urls import include, path
-from django.http import JsonResponse
-
-
-def health_check(request):
-    return JsonResponse({"status": "ok"})
+from .views import health_check
 
 
 urlpatterns = [
