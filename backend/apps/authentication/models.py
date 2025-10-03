@@ -44,13 +44,15 @@ class User(AbstractUser):
     def has_active_subscription(self):
         """
         Check if user has an active subscription via dj-stripe
-        Returns True if subscription status is 'trialing' or 'active'
+        Returns True if subscription status is 'trialing', 'active', or 'past_due'
+
+        Note: 'past_due' is included to give users grace period during payment retry attempts
         """
         try:
             from djstripe.models import Subscription
             return Subscription.objects.filter(
                 customer__subscriber=self,
-                status__in=['trialing', 'active']
+                status__in=['trialing', 'active', 'past_due']
             ).exists()
         except Exception:
             # If dj-stripe is not configured or error occurs, return False

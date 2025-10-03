@@ -1,6 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
+    ],
+  },
   
   async rewrites() {
     return [
@@ -27,7 +36,7 @@ const nextConfig = {
                 ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.pluggy.ai https://*.pluggy.ai https://js.stripe.com"
                 : "script-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai https://js.stripe.com",
               "style-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai",
-              "img-src 'self' data: blob: https://*.pluggy.ai https://*.pluggycdn.com",
+              "img-src 'self' data: blob: https://*.pluggy.ai https://*.pluggycdn.com https://lh3.googleusercontent.com",
               "font-src 'self' data:",
               // Connect sources: API + Pluggy + Stripe
               "connect-src 'self' http://localhost:8000 https://*.pluggy.ai https://api.pluggy.ai https://financehub-production.up.railway.app https://api.stripe.com",

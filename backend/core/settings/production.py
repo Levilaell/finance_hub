@@ -134,11 +134,10 @@ MIDDLEWARE = [
 
 # Open Banking - Pluggy API Configuration
 PLUGGY_BASE_URL = os.environ.get('PLUGGY_BASE_URL', 'https://api.pluggy.ai')
-PLUGGY_CLIENT_ID = os.environ.get('PLUGGY_CLIENT_ID', '')
-PLUGGY_CLIENT_SECRET = os.environ.get('PLUGGY_CLIENT_SECRET', '')
+PLUGGY_CLIENT_ID = os.environ.get('PLUGGY_CLIENT_ID')
+PLUGGY_CLIENT_SECRET = os.environ.get('PLUGGY_CLIENT_SECRET')
 PLUGGY_USE_SANDBOX = os.environ.get('PLUGGY_USE_SANDBOX', 'false').lower() == 'true'
 PLUGGY_CONNECT_URL = os.environ.get('PLUGGY_CONNECT_URL', 'https://connect.pluggy.ai')
 
 # Webhook settings for Pluggy
-PLUGGY_WEBHOOK_SECRET = os.environ.get('PLUGGY_WEBHOOK_SECRET', '')
-PLUGGY_WEBHOOK_URL = os.environ.get('PLUGGY_WEBHOOK_URL', 'https://your-backend.railway.app/api/banking/webhooks/pluggy/')
+PLUGGY_WEBHOOK_URL = os.environ.get('PLUGGY_WEBHOOK_URL')

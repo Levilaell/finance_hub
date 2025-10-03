@@ -4,50 +4,50 @@
 
 @layer base {
   :root {
-    /* Light mode - Minimalist Monochrome */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 9%;
+    /* Light mode - FinanceHub Green */
+    --background: 0 0% 98%;
+    --foreground: 210 15% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
+    --card-foreground: 210 15% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 100%;
+    --popover-foreground: 210 15% 10%;
+    --primary: 145 75% 56%;
+    --primary-foreground: 210 15% 10%;
     --secondary: 0 0% 94%;
-    --secondary-foreground: 0 0% 9%;
+    --secondary-foreground: 210 15% 10%;
     --muted: 0 0% 94%;
-    --muted-foreground: 0 0% 65%;
-    --accent: 0 0% 50%;
-    --accent-foreground: 0 0% 100%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 145 75% 56%;
+    --accent-foreground: 210 15% 10%;
     --destructive: 0 60% 45%;
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 88%;
     --input: 0 0% 94%;
-    --ring: 0 0% 9%;
+    --ring: 145 75% 56%;
     --radius: 0.5rem;
   }
 
   .dark {
-    /* Dark mode - Pure Minimalist */
-    --background: 0 0% 3%;
+    /* Dark mode - FinanceHub Dark Green */
+    --background: 210 20% 7%;
     --foreground: 0 0% 95%;
-    --card: 0 0% 6%;
+    --card: 210 18% 10%;
     --card-foreground: 0 0% 95%;
-    --popover: 0 0% 12%;
+    --popover: 210 18% 12%;
     --popover-foreground: 0 0% 95%;
-    --primary: 0 0% 95%;
-    --primary-foreground: 0 0% 3%;
-    --secondary: 0 0% 12%;
+    --primary: 145 75% 56%;
+    --primary-foreground: 210 15% 10%;
+    --secondary: 210 18% 12%;
     --secondary-foreground: 0 0% 95%;
-    --muted: 0 0% 12%;
+    --muted: 210 18% 12%;
     --muted-foreground: 0 0% 65%;
-    --accent: 0 0% 50%;
-    --accent-foreground: 0 0% 95%;
+    --accent: 145 75% 56%;
+    --accent-foreground: 210 15% 10%;
     --destructive: 0 60% 45%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 18%;
-    --input: 0 0% 12%;
-    --ring: 0 0% 95%;
+    --border: 145 75% 56% / 0.2;
+    --input: 210 18% 12%;
+    --ring: 145 75% 56%;
   }
 }
 
@@ -55,26 +55,35 @@
   * {
     @apply border-border;
   }
+
+  html {
+    overflow-x: hidden;
+    width: 100%;
+  }
+
   body {
     @apply bg-background text-foreground;
     overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+    position: relative;
   }
-  
-  html {
+
+  main, section {
+    max-width: 100%;
     overflow-x: hidden;
   }
-  
+
   /* Ensure responsive behavior on mobile */
   * {
-    max-width: 100%;
     box-sizing: border-box;
   }
-  
+
   /* Prevent layout breaks on mobile */
   .grid {
     min-width: 0;
   }
-  
+
   .grid > * {
     min-width: 0;
   }

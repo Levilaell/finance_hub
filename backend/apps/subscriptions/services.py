@@ -128,6 +128,8 @@ def get_subscription_status(user) -> Optional[Dict]:
     Get user's subscription status and details
     """
     try:
+        from .models import TrialUsageTracking
+
         # Get most recent active/trialing subscription first
         subscription = Subscription.objects.filter(
             customer__subscriber=user,
@@ -140,8 +142,15 @@ def get_subscription_status(user) -> Optional[Dict]:
                 customer__subscriber=user
             ).order_by('-created').first()
 
+        # Check trial usage even if no subscription exists
+        trial_tracking, _ = TrialUsageTracking.objects.get_or_create(user=user)
+
         if not subscription:
-            return None
+            return {
+                'status': 'none',
+                'has_used_trial': trial_tracking.has_used_trial,
+                'first_trial_at': trial_tracking.first_trial_at.isoformat() if trial_tracking.first_trial_at else None,
+            }
 
         # Calculate days until renewal/trial end
         from datetime import datetime
@@ -172,6 +181,8 @@ def get_subscription_status(user) -> Optional[Dict]:
             'amount': float(subscription.plan.amount) if subscription.plan else 0,  # plan.amount já está em decimal
             'currency': subscription.plan.currency.upper() if subscription.plan else 'BRL',
             'payment_method': payment_method,
+            'has_used_trial': trial_tracking.has_used_trial,
+            'first_trial_at': trial_tracking.first_trial_at.isoformat() if trial_tracking.first_trial_at else None,
         }
 
     except Exception as e:

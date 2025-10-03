@@ -39,6 +39,8 @@ DATABASES = {
         'OPTIONS': {
             'options': '-c client_encoding=UTF8',
         },
+        'CONN_MAX_AGE': 600,  # Connection pooling
+        'ATOMIC_REQUESTS': True,  # Wrap each request in a transaction
     }
 }
 
@@ -124,6 +126,17 @@ DJSTRIPE_WEBHOOK_SECRET = config('DJSTRIPE_WEBHOOK_SECRET', default=STRIPE_WEBHO
 DJSTRIPE_FOREIGN_KEY_TO_FIELD = 'id'
 DJSTRIPE_USE_NATIVE_JSONFIELD = True
 DJSTRIPE_SUBSCRIBER_MODEL = 'authentication.User'
+DJSTRIPE_WEBHOOK_VALIDATION = 'verify_signature'  # Always verify webhook signatures
+DJSTRIPE_WEBHOOK_TOLERANCE = 300  # 5 minutes tolerance for webhook timestamps
+
+# Webhook handling settings to prevent deadlocks
+DJSTRIPE_IDEMPOTENCY_KEY_CALLBACK = None  # Let Stripe handle idempotency
+DJSTRIPE_WEBHOOK_EVENT_CALLBACK = None  # Use signals instead
+
+# Reduce webhook processing depth to prevent deadlocks
+# Don't automatically expand and sync nested objects
+import os
+os.environ['DJSTRIPE_LAZY_SYNC'] = 'True'  # Only sync what's needed
 
 # Stripe Default Price ID
 STRIPE_DEFAULT_PRICE_ID = config('STRIPE_DEFAULT_PRICE_ID', default='')
@@ -295,4 +308,10 @@ REST_FRAMEWORK.update({
         'webhook': '2000/hour'
     }
 })
+
+# Add deadlock retry middleware for webhook processing
+MIDDLEWARE = MIDDLEWARE + [
+    'core.middleware.WebhookSerializationMiddleware',  # Prevent concurrent webhook processing
+    'core.middleware.DeadlockRetryMiddleware',  # Retry on deadlock
+]
 

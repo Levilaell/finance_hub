@@ -31,9 +31,13 @@ function CheckoutSuccessContent() {
 
       if (response.ok) {
         const status = await response.json();
-        setSubscriptionActive(
-          status.status === 'trialing' || status.status === 'active'
-        );
+        const isActive = status.status === 'trialing' || status.status === 'active';
+        setSubscriptionActive(isActive);
+
+        // Store subscription status to show correct message
+        if (isActive) {
+          sessionStorage.setItem('subscription_type', status.status);
+        }
       }
     } catch (error) {
       console.error('Error verifying subscription:', error);
@@ -87,6 +91,10 @@ function CheckoutSuccessContent() {
     );
   }
 
+  const subscriptionType = sessionStorage.getItem('subscription_type');
+  const isReactivation = subscriptionType === 'active';
+  const isTrial = subscriptionType === 'trialing';
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="max-w-md w-full">
@@ -94,9 +102,14 @@ function CheckoutSuccessContent() {
           <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center">
             <CheckCircleIcon className="h-10 w-10 text-green-500" />
           </div>
-          <CardTitle className="text-2xl">Trial Ativado com Sucesso!</CardTitle>
+          <CardTitle className="text-2xl">
+            {isReactivation ? 'Assinatura Reativada com Sucesso!' : 'Trial Ativado com Sucesso!'}
+          </CardTitle>
           <CardDescription>
-            Seu trial de 7 dias começou agora
+            {isReactivation
+              ? 'Sua assinatura foi reativada e já está ativa'
+              : 'Seu trial de 7 dias começou agora'
+            }
           </CardDescription>
         </CardHeader>
 
@@ -105,9 +118,11 @@ function CheckoutSuccessContent() {
             <p className="text-muted-foreground">
               Parabéns! Você agora tem acesso completo a todos os recursos do CaixaHub.
             </p>
-            <p className="text-sm text-muted-foreground">
-              Seu cartão será cobrado R$ 97,00 após 7 dias. Cancele a qualquer momento sem custos.
-            </p>
+            {isTrial && (
+              <p className="text-sm text-muted-foreground">
+                Seu cartão será cobrado R$ 97,00 após 7 dias. Cancele a qualquer momento sem custos.
+              </p>
+            )}
           </div>
 
           <div className="space-y-3">

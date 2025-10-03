@@ -36,8 +36,14 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
         // Payment requires action (3D Secure, etc)
         router.push('/subscription/requires-action');
       } else if (status.status === 'none') {
-        // Sem subscription - redireciona para checkout
-        router.push('/checkout');
+        // Verifica se já usou o trial
+        if (status.has_used_trial) {
+          // Trial já foi usado - não pode usar novamente
+          router.push('/subscription/trial-used');
+        } else {
+          // Sem subscription e trial disponível - redireciona para checkout
+          router.push('/checkout');
+        }
       } else {
         // Subscription expirada/cancelada - redireciona para página de reativação
         router.push('/subscription/expired');

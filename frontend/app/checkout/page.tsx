@@ -16,13 +16,39 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    checkTrialEligibility();
+  }, [isAuthenticated, router]);
+
+  const checkTrialEligibility = async () => {
     if (!isAuthenticated) {
       router.push('/login?redirect=/checkout');
+      return;
     }
-  }, [isAuthenticated, router]);
+
+    try {
+      const status = await subscriptionService.getStatus();
+
+      // Se já usou o trial, redireciona para página específica
+      if (status.has_used_trial && status.status === 'none') {
+        router.push('/subscription/trial-used');
+        return;
+      }
+
+      // Se já tem subscription ativa, redireciona para dashboard
+      if (status.status === 'active' || status.status === 'trialing') {
+        router.push('/dashboard');
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking trial eligibility:', error);
+    } finally {
+      setChecking(false);
+    }
+  };
 
   const handleStartCheckout = async () => {
     setLoading(true);
@@ -47,8 +73,12 @@ export default function CheckoutPage() {
     }
   };
 
-  if (!isAuthenticated) {
-    return null;
+  if (checking || !isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   return (

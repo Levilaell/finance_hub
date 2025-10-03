@@ -499,7 +499,7 @@ export default function TransactionsPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>
-            {filteredTransactions.length} Transacao
+            {filteredTransactions.length} Transação
             {filteredTransactions.length === 1 ? '' : 'es'}
           </CardTitle>
           {totalPages > 1 && (
@@ -759,7 +759,7 @@ export default function TransactionsPage() {
           ) : (
             <div className="text-center py-12">
               <p className="text-white/60">
-                Nenhuma transacao encontrada com os filtros aplicados
+                Nenhuma transação encontrada com os filtros aplicados
               </p>
               {(searchTerm ||
                 selectedAccount !== 'all' ||

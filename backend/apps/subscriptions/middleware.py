@@ -21,6 +21,7 @@ class SubscriptionRequiredMiddleware:
         '/api/subscriptions/webhooks/',
         '/admin/',
         '/subscription/expired',
+        '/subscription/trial-used',
         '/checkout',
         '/pricing',
         '/register',
@@ -53,6 +54,8 @@ class SubscriptionRequiredMiddleware:
 
         # Check if user has ANY subscription (even if expired)
         from djstripe.models import Subscription
+        from .models import TrialUsageTracking
+
         has_any_subscription = Subscription.objects.filter(
             customer__subscriber=request.user
         ).exists()
@@ -63,23 +66,28 @@ class SubscriptionRequiredMiddleware:
             if self.is_allowed_without_subscription(request.path):
                 return self.get_response(request)
 
-            # Block access and redirect to checkout
+            # Check if user already used trial
+            trial_tracking, _ = TrialUsageTracking.objects.get_or_create(user=request.user)
+            redirect_path = '/subscription/trial-used' if trial_tracking.has_used_trial else '/checkout'
+
+            # Block access and redirect
             if request.path.startswith('/api/'):
                 return JsonResponse({
-                    'error': 'Subscription required. Please complete checkout.',
-                    'code': 'CHECKOUT_REQUIRED',
-                    'redirect': '/checkout'
+                    'error': 'Subscription required. Please complete checkout.' if not trial_tracking.has_used_trial else 'Trial already used. Please subscribe.',
+                    'code': 'TRIAL_USED' if trial_tracking.has_used_trial else 'CHECKOUT_REQUIRED',
+                    'redirect': redirect_path
                 }, status=402)
             else:
-                return redirect('/checkout')
+                return redirect(redirect_path)
 
-        # User has subscription but it's not active (expired/canceled/past_due)
+        # User has subscription but it's not active (expired/canceled)
+        # Note: past_due is considered active (grace period) in has_active_subscription
         if not request.user.has_active_subscription:
             # Allow certain paths even when subscription is expired
             if self.is_allowed_without_subscription(request.path):
                 return self.get_response(request)
 
-            # Block access
+            # Block access and redirect to expired page
             if request.path.startswith('/api/'):
                 return JsonResponse({
                     'error': 'Active subscription required',

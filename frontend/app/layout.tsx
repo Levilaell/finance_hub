@@ -6,8 +6,8 @@ import { Providers } from './providers'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'CaixaHub',
-  description: 'Gestão financeira para SMEs brasileiras',
+  title: 'CaixaHub - Automação Financeira',
+  description: 'Conecte seu banco e deixe nossa IA automatizar suas finanças. Automação financeira para o pequeno e médio varejista brasileiro.',
 }
 
 export const viewport: Viewport = {
