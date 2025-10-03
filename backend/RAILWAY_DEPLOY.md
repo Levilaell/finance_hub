@@ -1,5 +1,27 @@
 # 🚂 Railway Deploy - Troubleshooting
 
+## ⚠️ Deploy Fica em "DEPLOYING" Infinitamente?
+
+**Causa:** Railway não consegue acessar o healthcheck endpoint
+
+**Sintomas:**
+- Build completa com sucesso ✅
+- Migrations rodam ✅
+- Gunicorn inicia ✅
+- Deploy fica em "DEPLOYING" 🔄 (nunca finaliza)
+
+**Solução:**
+1. Endpoint `/health/` criado ✅
+2. `railway.json` configurado para usar `/health/` ✅
+3. `ALLOWED_HOSTS` aceita Railway domains ✅
+4. Push para main → Railway redeploy automático
+
+**Verificar no Railway:**
+- Settings → Deploy → Healthcheck Path deve ser `/health/`
+- Logs devem mostrar: `GET /health/ 200 OK`
+
+---
+
 ## ✅ Arquivos Necessários
 
 Certifique-se que estes arquivos existem:
