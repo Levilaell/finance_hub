@@ -20,27 +20,23 @@ if DATABASE_URL:
 else:
     raise ImproperlyConfigured("DATABASE_URL environment variable is required!")
 
-# Allowed Hosts
-# Railway healthcheck comes from internal network, needs permissive ALLOWED_HOSTS
-# Railway provides RAILWAY_PUBLIC_DOMAIN and RAILWAY_PRIVATE_DOMAIN
+# Allowed Hosts - Secure configuration
 RAILWAY_PUBLIC_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
 RAILWAY_PRIVATE_DOMAIN = os.environ.get('RAILWAY_PRIVATE_DOMAIN')
 
-# Accept all hosts for Railway deployment (healthcheck comes from internal IPs)
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    'financehub-production.up.railway.app',
+    'caixahub.com.br',
+    'www.caixahub.com.br',
+]
 
-# Uncomment for stricter security after healthcheck works:
-# ALLOWED_HOSTS = [
-#     'localhost',
-#     '127.0.0.1',
-#     'financehub-production.up.railway.app',
-#     'caixahub.com.br',
-#     'www.caixahub.com.br',
-# ]
-# if RAILWAY_PUBLIC_DOMAIN:
-#     ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
-# if RAILWAY_PRIVATE_DOMAIN:
-#     ALLOWED_HOSTS.append(RAILWAY_PRIVATE_DOMAIN)
+# Add Railway domains dynamically
+if RAILWAY_PUBLIC_DOMAIN:
+    ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
+if RAILWAY_PRIVATE_DOMAIN:
+    ALLOWED_HOSTS.append(RAILWAY_PRIVATE_DOMAIN)
 
 # CORS - SIMPLIFIED
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://caixahub.com.br')

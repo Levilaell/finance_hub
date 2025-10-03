@@ -18,10 +18,6 @@ def health_check(request):
     Health check endpoint for Railway deployment monitoring.
     Returns 200 OK when the application is healthy.
     """
-    # Log every healthcheck request for debugging
-    logger.info(f"Healthcheck requested from {request.META.get('REMOTE_ADDR')} - Host: {request.get_host()}")
-    print(f"🏥 HEALTHCHECK: {request.method} /health/ from {request.META.get('REMOTE_ADDR')}")
-
     try:
         # Test database connection
         with connection.cursor() as cursor:
@@ -33,13 +29,10 @@ def health_check(request):
             'python_version': sys.version.split()[0],
         }
 
-        print(f"✅ HEALTHCHECK OK: {response_data}")
         return JsonResponse(response_data, status=200)
     except Exception as e:
-        error_data = {
+        logger.error(f"Healthcheck failed: {e}")
+        return JsonResponse({
             'status': 'unhealthy',
             'error': str(e),
-        }
-        print(f"❌ HEALTHCHECK FAILED: {error_data}")
-        logger.error(f"Healthcheck failed: {e}")
-        return JsonResponse(error_data, status=503)
+        }, status=503)
