@@ -2,11 +2,11 @@
 set -e  # Exit on error
 
 echo "========================================="
-echo "=Ä Starting Finance Hub Backend"
+echo "=ÔøΩ Starting Finance Hub Backend"
 echo "========================================="
 
 # Environment info
-echo "=À Environment: ${DJANGO_ENV:-production}"
+echo "=ÔøΩ Environment: ${DJANGO_ENV:-production}"
 echo "= Python version: $(python --version)"
 echo "=' Django settings: ${DJANGO_SETTINGS_MODULE:-core.settings.production}"
 
@@ -28,11 +28,11 @@ check_env_var "DJANGO_SECRET_KEY"
 
 # Optional but recommended checks (warnings only)
 if [ -z "$STRIPE_TEST_SECRET_KEY" ] && [ -z "$STRIPE_LIVE_SECRET_KEY" ]; then
-    echo "†  WARNING: Stripe keys not configured - payment features will not work"
+    echo "ÔøΩ  WARNING: Stripe keys not configured - payment features will not work"
 fi
 
 if [ -z "$PLUGGY_CLIENT_ID" ] || [ -z "$PLUGGY_CLIENT_SECRET" ]; then
-    echo "†  WARNING: Pluggy credentials not configured - banking features will not work"
+    echo "ÔøΩ  WARNING: Pluggy credentials not configured - banking features will not work"
 fi
 
 # Test database connection
@@ -40,7 +40,7 @@ echo ""
 echo "= Testing database connection..."
 python manage.py check --database default || {
     echo "L Database connection failed!"
-    echo "=° Check your DATABASE_URL configuration"
+    echo "=ÔøΩ Check your DATABASE_URL configuration"
     exit 1
 }
 echo " Database connection successful"
@@ -56,7 +56,7 @@ echo " Migrations completed"
 
 # Collect static files
 echo ""
-echo "=Ê Collecting static files..."
+echo "=ÔøΩ Collecting static files..."
 python manage.py collectstatic --noinput --clear || {
     echo "L Static files collection failed!"
     exit 1
@@ -79,10 +79,21 @@ echo ""
 echo "========================================="
 echo "< Starting Gunicorn server"
 echo "========================================="
-echo "=Õ Port: $PORT"
+echo "=ÔøΩ Port: $PORT"
 echo "=w Workers: $WORKERS"
-echo "Ò  Timeout: ${TIMEOUT}s"
+echo "ÔøΩ  Timeout: ${TIMEOUT}s"
 echo "========================================="
+
+# Self-ping helper function (runs in background after Gunicorn starts)
+self_ping() {
+    echo "‚è≥ Waiting 5s for Gunicorn..."
+    sleep 5
+    echo "üèì Self-ping to wake Railway networking..."
+    curl -f http://localhost:$PORT/health/ 2>/dev/null && echo "‚úÖ Self-ping successful!" || echo "‚ö†Ô∏è  Self-ping failed"
+}
+
+# Start self-ping in background
+self_ping &
 
 # Start Gunicorn with production settings
 exec gunicorn core.wsgi:application \
