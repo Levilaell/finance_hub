@@ -59,37 +59,29 @@ export default function AccountsPage() {
 
   // Handle sync status updates
   useEffect(() => {
-    console.log('[AccountsPage] useEffect triggered - syncingConnectionId:', syncingConnectionId, 'syncStatus:', syncStatus);
-
     // Show initial toast when sync starts
     if (syncingConnectionId && !syncStatus.isPolling && !syncStatus.isComplete && !syncStatus.hasError) {
-      console.log('[AccountsPage] Showing initial toast');
       toast.loading('Iniciando sincronização...', { id: 'sync-progress' });
       return;
     }
 
     if (!syncingConnectionId) {
-      console.log('[AccountsPage] No syncingConnectionId, skipping');
       return;
     }
 
     if (syncStatus.isPolling) {
-      console.log('[AccountsPage] Polling in progress, updating toast:', syncStatus.message);
       // Update toast with current progress
       toast.loading(syncStatus.message, { id: 'sync-progress' });
     } else if (syncStatus.isComplete) {
-      console.log('[AccountsPage] Sync complete!');
       // Sync completed successfully
       toast.success(syncStatus.message, { id: 'sync-progress' });
       setSyncingConnectionId(null);
 
       // Reload data after a short delay to ensure backend has processed
       setTimeout(() => {
-        console.log('[AccountsPage] Reloading data after sync completion');
         fetchData();
       }, 1500);
     } else if (syncStatus.hasError) {
-      console.log('[AccountsPage] Sync error:', syncStatus.errorMessage || syncStatus.message);
       // Sync failed
       toast.error(syncStatus.errorMessage || syncStatus.message, { id: 'sync-progress' });
       setSyncingConnectionId(null);
@@ -128,12 +120,9 @@ export default function AccountsPage() {
 
   // Handle successful connection
   const handleConnectionSuccess = async (itemId: string) => {
-    console.log('Received itemId from Pluggy:', itemId);
-
     try {
       // Create the connection in our backend
       const payload = { pluggy_item_id: itemId };
-      console.log('Sending to backend:', payload);
 
       await bankingService.createConnection(payload);
 
@@ -163,8 +152,6 @@ export default function AccountsPage() {
   // Sync account transactions
   const handleSyncAccount = useCallback(async (accountId: string) => {
     try {
-      console.log('[AccountsPage] handleSyncAccount called for account:', accountId);
-
       // Find the connection for this account
       const account = accounts.find(a => a.id === accountId);
       if (!account) {
@@ -172,20 +159,14 @@ export default function AccountsPage() {
         return;
       }
 
-      console.log('[AccountsPage] Found account, connection_id:', account.connection_id);
-
       // Set syncing connection (this will trigger the useEffect to show initial toast)
       setSyncingConnectionId(account.connection_id);
-      console.log('[AccountsPage] Set syncingConnectionId');
 
       // Trigger sync
-      console.log('[AccountsPage] Calling syncConnectionTransactions...');
       const response = await bankingService.syncConnectionTransactions(account.connection_id);
-      console.log('[AccountsPage] Sync response:', response);
 
       // Check if requires action (MFA, credentials, etc)
       if (response.requires_action) {
-        console.log('[AccountsPage] Requires action, stopping');
         toast.error('Ação necessária: verifique suas credenciais ou autenticação', { id: 'sync-progress' });
         setSyncingConnectionId(null);
         return;
@@ -194,7 +175,6 @@ export default function AccountsPage() {
       // Check if sync was initiated or is already running
       const validStatuses = ['SYNC_TRIGGERED', 'ALREADY_SYNCING'];
       if (!validStatuses.includes(response.sync_status)) {
-        console.log('[AccountsPage] Unexpected sync_status:', response.sync_status);
         toast.error(`Status inesperado: ${response.sync_status}`, { id: 'sync-progress' });
         setSyncingConnectionId(null);
         return;
@@ -202,9 +182,7 @@ export default function AccountsPage() {
 
       // Start polling for status (works for both new syncs and already running syncs)
       // Pass connection ID explicitly to avoid race condition with setState
-      console.log('[AccountsPage] Starting polling... (sync_status:', response.sync_status, ')');
       startPolling(account.connection_id);
-      console.log('[AccountsPage] Polling started');
 
     } catch (error: any) {
       console.error('[AccountsPage] Error syncing account:', error);

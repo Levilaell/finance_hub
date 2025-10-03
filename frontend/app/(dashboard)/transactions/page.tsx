@@ -499,8 +499,7 @@ export default function TransactionsPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>
-            {filteredTransactions.length} Transação
-            {filteredTransactions.length === 1 ? '' : 'es'}
+            {filteredTransactions.length} {filteredTransactions.length === 1 ? 'Transação' : 'Transações'}
           </CardTitle>
           {totalPages > 1 && (
             <div className="text-sm text-muted-foreground">

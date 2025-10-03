@@ -70,22 +70,16 @@ export const useSyncStatus = (connectionId: string | null) => {
 
   const checkStatus = useCallback(async () => {
     if (!connectionId) {
-      console.log('[useSyncStatus] checkStatus: No connectionId, skipping');
       return;
     }
 
-    console.log('[useSyncStatus] Checking status for connection:', connectionId);
-
     try {
       const statusResponse = await bankingService.checkConnectionStatus(connectionId);
-      console.log('[useSyncStatus] Status response:', statusResponse);
 
       const message = getProgressMessage(statusResponse.execution_status, statusResponse.status);
       const isComplete = statusResponse.sync_complete;
       const hasError = statusResponse.requires_action ||
                        ['ERROR', 'LOGIN_ERROR', 'OUTDATED'].includes(statusResponse.status);
-
-      console.log('[useSyncStatus] Processed:', { message, isComplete, hasError });
 
       setSyncStatus({
         isPolling: !isComplete && !hasError,
@@ -99,7 +93,6 @@ export const useSyncStatus = (connectionId: string | null) => {
 
       // Stop polling if complete or error
       if (isComplete || hasError) {
-        console.log('[useSyncStatus] Stopping polling - complete or error');
         stopPolling();
         return true; // Indicates polling should stop
       }
@@ -107,7 +100,6 @@ export const useSyncStatus = (connectionId: string | null) => {
       // Check for timeout
       const elapsed = Date.now() - startTimeRef.current;
       if (elapsed >= MAX_POLLING_TIME) {
-        console.log('[useSyncStatus] Timeout reached, stopping polling');
         setSyncStatus(prev => ({
           ...prev,
           isPolling: false,
@@ -118,7 +110,6 @@ export const useSyncStatus = (connectionId: string | null) => {
         return true;
       }
 
-      console.log('[useSyncStatus] Continue polling');
       return false; // Continue polling
     } catch (error) {
       console.error('[useSyncStatus] Error checking sync status:', error);
@@ -137,15 +128,11 @@ export const useSyncStatus = (connectionId: string | null) => {
     const targetConnectionId = explicitConnectionId || connectionId;
 
     if (!targetConnectionId) {
-      console.log('[useSyncStatus] startPolling: No connectionId (explicit:', explicitConnectionId, ', current:', connectionId, ')');
       return;
     }
 
-    console.log('[useSyncStatus] Starting polling for connection:', targetConnectionId);
-
     // Stop any existing polling first
     if (pollingIntervalRef.current) {
-      console.log('[useSyncStatus] Clearing existing interval');
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
@@ -161,22 +148,15 @@ export const useSyncStatus = (connectionId: string | null) => {
       hasError: false,
     });
 
-    console.log('[useSyncStatus] Initial status set, checking immediately...');
-
     // Check immediately (use targetConnectionId directly to avoid closure issues)
     const checkStatusNow = async () => {
-      console.log('[useSyncStatus] checkStatusNow for:', targetConnectionId);
-
       try {
         const statusResponse = await bankingService.checkConnectionStatus(targetConnectionId);
-        console.log('[useSyncStatus] Status response:', statusResponse);
 
         const message = getProgressMessage(statusResponse.execution_status, statusResponse.status);
         const isComplete = statusResponse.sync_complete;
         const hasError = statusResponse.requires_action ||
                          ['ERROR', 'LOGIN_ERROR', 'OUTDATED'].includes(statusResponse.status);
-
-        console.log('[useSyncStatus] Processed:', { message, isComplete, hasError });
 
         setSyncStatus({
           isPolling: !isComplete && !hasError,
@@ -204,17 +184,12 @@ export const useSyncStatus = (connectionId: string | null) => {
     checkStatusNow();
 
     // Then poll every interval using checkStatusNow
-    console.log('[useSyncStatus] Setting up interval (every', POLLING_INTERVAL, 'ms)');
     pollingIntervalRef.current = setInterval(async () => {
-      console.log('[useSyncStatus] Interval tick - calling checkStatusNow');
       const shouldStop = await checkStatusNow();
       if (shouldStop) {
-        console.log('[useSyncStatus] checkStatusNow returned true, stopping');
         stopPolling();
       }
     }, POLLING_INTERVAL);
-
-    console.log('[useSyncStatus] Polling started with interval ID:', pollingIntervalRef.current);
   }, [connectionId, stopPolling]);
 
   // Cleanup on unmount
@@ -226,8 +201,6 @@ export const useSyncStatus = (connectionId: string | null) => {
 
   // Auto-start polling when connectionId changes
   useEffect(() => {
-    console.log('[useSyncStatus] connectionId changed:', connectionId);
-
     // If we have a connectionId but no polling is active, something went wrong
     if (connectionId && !pollingIntervalRef.current) {
       console.warn('[useSyncStatus] Have connectionId but no polling! This should not happen.');

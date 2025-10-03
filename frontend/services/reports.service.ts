@@ -163,9 +163,7 @@ class ReportsService {
     granularity?: 'daily' | 'weekly' | 'monthly' | 'yearly';
   }): Promise<CashFlowReport> {
     try {
-      console.log('Fetching cash flow report with params:', params);
       const response = await apiClient.get<CashFlowReport>('/api/reports/cash_flow/', params);
-      console.log('Cash flow response:', response);
       return response;
     } catch (error) {
       console.error('Error fetching cash flow report:', error);
@@ -182,9 +180,7 @@ class ReportsService {
     transaction_type?: 'DEBIT' | 'CREDIT';
   }): Promise<CategoryBreakdownReport> {
     try {
-      console.log('Fetching category breakdown with params:', params);
       const response = await apiClient.get<CategoryBreakdownReport>('/api/reports/category_breakdown/', params);
-      console.log('Category breakdown response:', response);
       return response;
     } catch (error) {
       console.error('Error fetching category breakdown:', error);
@@ -205,9 +201,7 @@ class ReportsService {
         ...params,
         account_ids: params?.account_ids?.join(',')
       };
-      console.log('Fetching account balances with params:', queryParams);
       const response = await apiClient.get<AccountBalancesReport>('/api/reports/account_balances/', queryParams);
-      console.log('Account balances response:', response);
       return response;
     } catch (error) {
       console.error('Error fetching account balances:', error);
@@ -221,9 +215,7 @@ class ReportsService {
   async getMonthlySummary(month: number, year: number): Promise<MonthlySummaryReport> {
     try {
       const params = { month, year };
-      console.log('Fetching monthly summary with params:', params);
       const response = await apiClient.get<MonthlySummaryReport>('/api/reports/monthly_summary/', params);
-      console.log('Monthly summary response:', response);
       return response;
     } catch (error) {
       console.error('Error fetching monthly summary:', error);
@@ -239,9 +231,7 @@ class ReportsService {
     end_date?: string;
   }): Promise<TrendAnalysisReport> {
     try {
-      console.log('Fetching trend analysis with params:', params);
       const response = await apiClient.get<TrendAnalysisReport>('/api/reports/trend_analysis/', params);
-      console.log('Trend analysis response:', response);
       return response;
     } catch (error) {
       console.error('Error fetching trend analysis:', error);
@@ -259,9 +249,7 @@ class ReportsService {
     period2_end: string;
   }): Promise<ComparisonReport> {
     try {
-      console.log('Fetching comparison report with params:', params);
       const response = await apiClient.post<any>('/api/reports/comparison/', params);
-      console.log('Comparison report response:', response);
       return response.data as ComparisonReport;
     } catch (error) {
       console.error('Error fetching comparison report:', error);
@@ -274,9 +262,7 @@ class ReportsService {
    */
   async getDashboardSummary(): Promise<DashboardSummaryData> {
     try {
-      console.log('Fetching dashboard summary');
       const response = await apiClient.get<DashboardSummaryData>('/api/reports/dashboard_summary/');
-      console.log('Dashboard summary response:', response);
       return response;
     } catch (error) {
       console.error('Error fetching dashboard summary:', error);
@@ -294,9 +280,7 @@ class ReportsService {
     granularity?: 'daily' | 'weekly' | 'monthly' | 'yearly';
   }): Promise<any> {
     try {
-      console.log('Fetching bulk reports with params:', params);
       const response = await apiClient.post<any>('/api/reports/bulk/', params);
-      console.log('Bulk reports response:', response);
       return response.data;
     } catch (error) {
       console.error('Error fetching bulk reports:', error);
@@ -309,9 +293,7 @@ class ReportsService {
    */
   async getAvailableReports(): Promise<any> {
     try {
-      console.log('Fetching available reports');
       const response = await apiClient.get<any>('/api/reports/available/');
-      console.log('Available reports response:', response);
       return response;
     } catch (error) {
       console.error('Error fetching available reports:', error);

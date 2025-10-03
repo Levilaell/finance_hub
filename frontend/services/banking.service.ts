@@ -136,8 +136,6 @@ class BankingService {
           { ...filters, page }
         );
 
-        console.log(`📄 Página ${page}: ${response.results.length} transações | Total acumulado: ${allTransactions.length + response.results.length} | Próxima: ${response.next ? 'Sim' : 'Não'}`);
-
         allTransactions.push(...response.results);
         hasMore = response.next !== null && response.next !== undefined;
         page++;
@@ -149,7 +147,6 @@ class BankingService {
         }
       }
 
-      console.log(`✅ Total de transações carregadas: ${allTransactions.length}`);
       return allTransactions;
     }
 

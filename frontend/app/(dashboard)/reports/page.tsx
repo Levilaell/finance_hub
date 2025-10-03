@@ -134,8 +134,6 @@ export default function ReportsPage() {
         ]);
 
         if (!cancelled) {
-          console.log('Transações carregadas:', transactionsData);
-          console.log('Summary:', summaryData);
           setTransactions(transactionsData);
           setSummary(summaryData);
         }
@@ -347,18 +345,13 @@ export default function ReportsPage() {
   // Processar dados para gráficos
   const getCategoryData = () => {
     if (!transactions || transactions.length === 0) {
-      console.log('No transactions for categories');
       return [];
     }
-
-    console.log('Processing categories from transactions:', transactions);
 
     const categoryMap: Record<string, number> = {};
 
     // Processar todas as despesas (amount negativo OU type DEBIT)
     transactions.forEach(t => {
-      console.log(`Transaction: ${t.description}, type: ${t.type}, amount: ${t.amount}, is_expense: ${t.is_expense}`);
-
       // Usar is_expense do backend
       if (t.is_expense) {
         const cat = t.category || 'Sem categoria';
@@ -366,20 +359,16 @@ export default function ReportsPage() {
       }
     });
 
-    console.log('Category map:', categoryMap);
-
     const result = Object.entries(categoryMap)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([name, value]) => ({ name, value }));
 
-    console.log('Category data result:', result);
     return result;
   };
 
   const getIncomeCategoryData = () => {
     if (!transactions || transactions.length === 0) {
-      console.log('No transactions for income categories');
       return [];
     }
 
@@ -398,7 +387,6 @@ export default function ReportsPage() {
       .slice(0, 10)
       .map(([name, value]) => ({ name, value }));
 
-    console.log('Income category data result:', result);
     return result;
   };
 
@@ -430,7 +418,6 @@ export default function ReportsPage() {
       }))
       .slice(-12);
 
-    console.log('Monthly data:', result);
     return result;
   };
 
@@ -460,7 +447,6 @@ export default function ReportsPage() {
       .map(([dia, saldo]) => ({ dia, saldo }))
       .slice(-30);
 
-    console.log('Daily balance data:', result);
     return result;
   };
 

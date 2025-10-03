@@ -32,7 +32,6 @@ export function PluggyConnectWidget({
   }, []);
 
   const handleSuccess = (response: any) => {
-    console.log('Pluggy success response:', response);
     toast.success('Banco conectado com sucesso!');
 
     // Pluggy returns itemId in the response
