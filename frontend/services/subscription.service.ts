@@ -11,6 +11,7 @@ export interface SubscriptionStatus {
   currency?: string;
   requires_action?: boolean;
   message?: string;
+  has_used_trial?: boolean;
   payment_method?: {
     last4?: string;
     brand?: string;
