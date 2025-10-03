@@ -21,13 +21,23 @@ else:
     raise ImproperlyConfigured("DATABASE_URL environment variable is required!")
 
 # Allowed Hosts
+# Railway provides RAILWAY_PUBLIC_DOMAIN and RAILWAY_PRIVATE_DOMAIN
+RAILWAY_PUBLIC_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+RAILWAY_PRIVATE_DOMAIN = os.environ.get('RAILWAY_PRIVATE_DOMAIN')
+
 ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
     'financehub-production.up.railway.app',
     'caixahub.com.br',
     'www.caixahub.com.br',
-    'healthcheck.railway.app',  # Railway health check
-    '*.railway.app',  # Any Railway subdomain
 ]
+
+# Add Railway domains if present
+if RAILWAY_PUBLIC_DOMAIN:
+    ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
+if RAILWAY_PRIVATE_DOMAIN:
+    ALLOWED_HOSTS.append(RAILWAY_PRIVATE_DOMAIN)
 
 # CORS - SIMPLIFIED
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://caixahub.com.br')
