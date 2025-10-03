@@ -10,5 +10,11 @@
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
+  },
+  "env": {
+    "DJANGO_ENV": "production",
+    "DJANGO_SETTINGS_MODULE": "core.settings.production",
+    "PYTHONUNBUFFERED": "1",
+    "DISABLE_COLLECTSTATIC": "1"
   }
 }
