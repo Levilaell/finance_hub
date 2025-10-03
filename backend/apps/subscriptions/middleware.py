@@ -16,6 +16,7 @@ class SubscriptionRequiredMiddleware:
 
     # Paths that don't require subscription verification
     EXEMPT_PATHS = [
+        '/health/',              # Railway healthcheck
         '/api/auth/',
         '/api/subscriptions/',
         '/api/subscriptions/webhooks/',
