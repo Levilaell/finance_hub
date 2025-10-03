@@ -838,7 +838,7 @@ class TransactionService:
         self.client = PluggyClient()
 
     def sync_transactions(self, account: BankAccount,
-                         days_back: int = 365,
+                         days_back: int = 90,
                          trigger_update: bool = True) -> int:
         """
         Sync transactions for an account.
