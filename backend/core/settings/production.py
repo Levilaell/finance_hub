@@ -141,3 +141,30 @@ PLUGGY_CONNECT_URL = os.environ.get('PLUGGY_CONNECT_URL', 'https://connect.plugg
 
 # Webhook settings for Pluggy
 PLUGGY_WEBHOOK_URL = os.environ.get('PLUGGY_WEBHOOK_URL')
+PLUGGY_WEBHOOK_SECRET = os.environ.get('PLUGGY_WEBHOOK_SECRET', '')
+
+# Stripe Configuration
+STRIPE_LIVE_MODE = os.environ.get('STRIPE_LIVE_MODE', 'false').lower() == 'true'
+STRIPE_TEST_SECRET_KEY = os.environ.get('STRIPE_TEST_SECRET_KEY', '')
+STRIPE_LIVE_SECRET_KEY = os.environ.get('STRIPE_LIVE_SECRET_KEY', '')
+STRIPE_TEST_PUBLIC_KEY = os.environ.get('STRIPE_TEST_PUBLIC_KEY', '')
+STRIPE_LIVE_PUBLIC_KEY = os.environ.get('STRIPE_LIVE_PUBLIC_KEY', '')
+
+# Legacy support (backwards compatibility)
+STRIPE_PUBLIC_KEY = STRIPE_LIVE_PUBLIC_KEY if STRIPE_LIVE_MODE else STRIPE_TEST_PUBLIC_KEY
+STRIPE_SECRET_KEY = STRIPE_LIVE_SECRET_KEY if STRIPE_LIVE_MODE else STRIPE_TEST_SECRET_KEY
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+
+# dj-stripe configuration
+DJSTRIPE_WEBHOOK_SECRET = os.environ.get('DJSTRIPE_WEBHOOK_SECRET', STRIPE_WEBHOOK_SECRET)
+DJSTRIPE_FOREIGN_KEY_TO_FIELD = 'id'
+DJSTRIPE_USE_NATIVE_JSONFIELD = True
+DJSTRIPE_SUBSCRIBER_MODEL = 'authentication.User'
+DJSTRIPE_WEBHOOK_VALIDATION = 'verify_signature'
+DJSTRIPE_WEBHOOK_TOLERANCE = 300
+
+# Stripe Default Price ID
+STRIPE_DEFAULT_PRICE_ID = os.environ.get('STRIPE_DEFAULT_PRICE_ID', '')
+
+# OpenAI API (Optional)
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
