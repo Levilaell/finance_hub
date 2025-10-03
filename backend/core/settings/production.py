@@ -114,6 +114,9 @@ SECURE_HSTS_PRELOAD = True
 SECURE_SSL_REDIRECT = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+# Exempt /health/ from SSL redirect for Railway healthcheck
+SECURE_REDIRECT_EXEMPT = [r'^health/$']
+
 # Cache Configuration - PRODUCTION FIX (No Redis in Railway)
 # Override base.py Redis cache with dummy cache to eliminate connection errors
 CACHES = {
