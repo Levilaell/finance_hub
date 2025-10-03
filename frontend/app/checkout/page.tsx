@@ -180,7 +180,7 @@ export default function CheckoutPage() {
               ) : (
                 <>
                   <CreditCardIcon className="mr-2 h-5 w-5" />
-                  Continuar para Pagamento Seguro
+                  Continuar
                 </>
               )}
             </Button>

@@ -126,7 +126,7 @@ function PricingContent() {
                   7 dias de trial grátis para testar
                 </p>
                 <p className="text-xs text-white/70 mt-2">
-                  Cartão de crédito necessário • Cancele a qualquer momento
+                  Cancele a qualquer momento
                 </p>
               </div>
 
@@ -211,7 +211,7 @@ function PricingContent() {
               </h3>
               <p className="text-white/80">
                 Ao se cadastrar, você tem 7 dias para testar todos os recursos da plataforma gratuitamente.
-                É necessário cadastrar um cartão de crédito, mas você só será cobrado após o período de trial.
+                Você só será cobrado após o período de trial.
                 Pode cancelar a qualquer momento durante o trial sem nenhum custo.
               </p>
             </div>
