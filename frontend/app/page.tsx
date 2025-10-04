@@ -371,12 +371,9 @@ export default function Home() {
               <Link href="/pricing" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                 Preços
               </Link>
-              <Link href="#recursos" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                Recursos
-              </Link>
-              <Link href="/terms" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              <a href="https://wa.me/5517992679645" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                 Contato
-              </Link>
+              </a>
             </div>
             <div className="flex justify-center gap-4">
               <a className="text-muted-foreground hover:text-primary transition-colors" href="#">

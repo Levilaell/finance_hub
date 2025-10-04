@@ -59,12 +59,17 @@ export default function PrivacyPolicy() {
 
               <h3 className="text-lg font-medium mt-6 mb-3">1.2 Dados Financeiros</h3>
               <ul className="list-disc ml-6 mb-4 space-y-2">
-                <li>Informações de contas bancárias conectadas</li>
-                <li>Histórico de transações bancárias</li>
-                <li>Saldos e extratos</li>
-                <li>Categorias de despesas e receitas</li>
-                <li>Informações de cartões (apenas últimos 4 dígitos)</li>
+                <li>Informações de contas bancárias conectadas via Open Banking (Pluggy)</li>
+                <li>Histórico de transações bancárias em modo somente leitura</li>
+                <li>Saldos, limites e extratos bancários</li>
+                <li>Categorias de despesas e receitas (atribuídas manualmente ou por IA)</li>
+                <li>Informações de cartões de crédito processadas pela Stripe (não armazenamos dados completos)</li>
               </ul>
+
+              <p className="mb-4 text-sm bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
+                <strong>Importante:</strong> Não armazenamos senhas bancárias. O acesso aos bancos é feito exclusivamente
+                via Open Banking regulamentado pelo Banco Central, em modo somente leitura.
+              </p>
 
               <h3 className="text-lg font-medium mt-6 mb-3">1.3 Dados de Uso</h3>
               <ul className="list-disc ml-6 mb-4 space-y-2">
@@ -78,13 +83,29 @@ export default function PrivacyPolicy() {
               <h2 className="text-xl font-semibold mt-8 mb-4">2. Como Usamos Suas Informações</h2>
               <p className="mb-4">Utilizamos seus dados para:</p>
               <ul className="list-disc ml-6 mb-4 space-y-2">
-                <li>Fornecer e melhorar nossos serviços de gestão financeira</li>
-                <li>Categorizar automaticamente suas transações</li>
-                <li>Gerar relatórios e análises financeiras personalizadas</li>
-                <li>Enviar notificações importantes sobre sua conta</li>
+                <li>Fornecer e melhorar nossos serviços de gestão financeira automatizada</li>
+                <li>Categorizar automaticamente suas transações usando inteligência artificial</li>
+                <li>Gerar relatórios, análises financeiras e insights personalizados</li>
+                <li>Sincronizar automaticamente suas contas bancárias via Open Banking</li>
+                <li>Processar pagamentos de assinatura através da Stripe</li>
+                <li>Enviar notificações importantes sobre sua conta, trial e cobranças</li>
                 <li>Prevenir fraudes e atividades ilegais</li>
-                <li>Cumprir obrigações legais e regulatórias</li>
-                <li>Desenvolver novos recursos baseados em padrões de uso</li>
+                <li>Cumprir obrigações legais e regulatórias (LGPD, Banco Central)</li>
+                <li>Desenvolver novos recursos baseados em padrões de uso (dados anonimizados)</li>
+                <li>Enviar dados anonimizados para serviços de IA para melhorar a categorização</li>
+              </ul>
+
+              <h3 className="text-lg font-medium mt-6 mb-3">2.1 Uso de Inteligência Artificial</h3>
+              <p className="mb-4">
+                Utilizamos serviços de IA de terceiros (como OpenAI) para processar suas transações e gerar insights.
+                Estes dados são enviados de forma <strong>anonimizada</strong>, sem informações que possam identificá-lo pessoalmente.
+                A IA ajuda a:
+              </p>
+              <ul className="list-disc ml-6 mb-4 space-y-2">
+                <li>Categorizar transações com base em descrições e histórico</li>
+                <li>Gerar insights e recomendações financeiras personalizadas</li>
+                <li>Detectar padrões e anomalias nas finanças</li>
+                <li>Criar análises preditivas e projeções</li>
               </ul>
 
               <h2 className="text-xl font-semibold mt-8 mb-4">3. Base Legal para Processamento</h2>
@@ -102,33 +123,78 @@ export default function PrivacyPolicy() {
               <p className="mb-4">
                 <strong>Nunca vendemos seus dados.</strong> Compartilhamos informações apenas com:
               </p>
+
+              <h3 className="text-lg font-medium mt-6 mb-3">4.1 Serviços de Terceiros Essenciais</h3>
               <ul className="list-disc ml-6 mb-4 space-y-2">
-                <li><strong>Pluggy (Open Banking):</strong> Para conexão segura com instituições financeiras</li>
-                <li><strong>Processadores de pagamento:</strong> Para processar assinaturas (apenas dados necessários)</li>
-                <li><strong>Prestadores de serviço:</strong> Sob rigorosos acordos de confidencialidade</li>
-                <li><strong>Autoridades legais:</strong> Quando exigido por lei ou ordem judicial</li>
+                <li>
+                  <strong>Pluggy (Open Banking):</strong> Para conexão segura com instituições financeiras.
+                  Compartilhamos: credenciais bancárias (criptografadas), dados de transações.
+                  Pluggy é certificado pelo Banco Central do Brasil.
+                </li>
+                <li>
+                  <strong>Stripe (Pagamentos):</strong> Para processar pagamentos de assinatura.
+                  Compartilhamos: nome, e-mail, informações de cartão (processadas diretamente pela Stripe).
+                  Stripe é certificado PCI-DSS Nível 1.
+                </li>
+                <li>
+                  <strong>Serviços de IA (OpenAI e outros):</strong> Para categorização e insights.
+                  Compartilhamos: descrições de transações <strong>anonimizadas</strong>, sem dados pessoais identificáveis.
+                </li>
               </ul>
+
+              <h3 className="text-lg font-medium mt-6 mb-3">4.2 Outras Situações</h3>
+              <ul className="list-disc ml-6 mb-4 space-y-2">
+                <li><strong>Prestadores de serviço:</strong> Hospedagem, análise de dados - sob rigorosos acordos de confidencialidade (DPA)</li>
+                <li><strong>Autoridades legais:</strong> Quando exigido por lei, ordem judicial ou investigação oficial</li>
+                <li><strong>Sucessores de negócio:</strong> Em caso de fusão, aquisição ou venda de ativos (com notificação prévia)</li>
+              </ul>
+
+              <p className="mb-4 text-sm bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                <strong>Garantia:</strong> Todos os parceiros são selecionados com base em rigorosos critérios de segurança
+                e conformidade com a LGPD. Estabelecemos acordos de processamento de dados (DPA) com todos os prestadores.
+              </p>
 
               <h2 className="text-xl font-semibold mt-8 mb-4">5. Segurança dos Dados</h2>
               <p className="mb-4">Implementamos medidas robustas de segurança:</p>
               <ul className="list-disc ml-6 mb-4 space-y-2">
                 <li>Criptografia AES-256 para dados em repouso</li>
                 <li>TLS 1.3 para dados em trânsito</li>
-                <li>Autenticação de dois fatores (2FA)</li>
-                <li>Monitoramento 24/7 contra ameaças</li>
-                <li>Backups regulares em múltiplas localizações</li>
-                <li>Testes de penetração periódicos</li>
+                <li>Autenticação segura e controle de acesso</li>
+                <li>Monitoramento 24/7 contra ameaças e atividades suspeitas</li>
+                <li>Backups automáticos diários em múltiplas localizações</li>
+                <li>Testes de segurança e penetração periódicos</li>
                 <li>Certificação ISO 27001 (em processo)</li>
+                <li>Logs de auditoria para rastreabilidade</li>
+              </ul>
+
+              <h3 className="text-lg font-medium mt-6 mb-3">5.1 Incidentes de Segurança</h3>
+              <p className="mb-4">
+                Em caso de incidente de segurança que possa causar risco aos seus dados:
+              </p>
+              <ul className="list-disc ml-6 mb-4 space-y-2">
+                <li>Notificaremos você em até 72 horas após a descoberta do incidente</li>
+                <li>Informaremos a ANPD conforme exigido pela LGPD</li>
+                <li>Forneceremos informações sobre o incidente, dados afetados e medidas tomadas</li>
+                <li>Implementaremos medidas corretivas imediatas para mitigar riscos</li>
               </ul>
 
               <h2 className="text-xl font-semibold mt-8 mb-4">6. Retenção de Dados</h2>
               <p className="mb-4">Mantemos seus dados pelo tempo necessário:</p>
               <ul className="list-disc ml-6 mb-4 space-y-2">
-                <li><strong>Dados de conta:</strong> Durante a vigência da conta + 5 anos (obrigação legal)</li>
-                <li><strong>Dados financeiros:</strong> 5 anos após a última transação</li>
-                <li><strong>Logs de acesso:</strong> 6 meses</li>
+                <li><strong>Durante conta ativa:</strong> Todos os dados são mantidos para operação da plataforma</li>
+                <li><strong>Durante trial de 7 dias:</strong> Dados completos mantidos para conversão em assinatura paga</li>
+                <li><strong>Após cancelamento:</strong> Dados disponíveis por 30 dias para possível reativação</li>
+                <li><strong>Após 30 dias do cancelamento:</strong> Dados financeiros são anonimizados para fins estatísticos</li>
+                <li><strong>Dados fiscais/legais:</strong> Retidos por até 5 anos conforme legislação brasileira (Receita Federal)</li>
+                <li><strong>Dados de pagamento (Stripe):</strong> Mantidos conforme política da Stripe e requisitos PCI-DSS</li>
+                <li><strong>Logs de segurança:</strong> 12 meses para investigação de incidentes</li>
                 <li><strong>Dados de marketing:</strong> Até revogação do consentimento</li>
               </ul>
+
+              <p className="mb-4 text-sm bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                <strong>Direito de exclusão:</strong> Você pode solicitar a exclusão completa de seus dados a qualquer momento,
+                exceto aqueles que devemos reter por obrigação legal. Entre em contato via WhatsApp para exercer esse direito.
+              </p>
 
               <h2 className="text-xl font-semibold mt-8 mb-4">7. Seus Direitos (LGPD)</h2>
               <p className="mb-4">Você tem direito a:</p>
@@ -142,20 +208,30 @@ export default function PrivacyPolicy() {
                 <li><strong>Informação:</strong> Saber com quem compartilhamos seus dados</li>
               </ul>
               <p className="mb-4">
-                Para exercer seus direitos, envie um e-mail para: privacidade@caixahub.com.br
+                Para exercer seus direitos, entre em contato:
               </p>
+              <ul className="list-disc ml-6 mb-4 space-y-2">
+                <li>WhatsApp: <a href="https://wa.me/5517992679645" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">(17) 99267-9645</a></li>
+                <li>Horário: Segunda a Sexta, 9h às 18h</li>
+              </ul>
 
               <h2 className="text-xl font-semibold mt-8 mb-4">8. Cookies e Tecnologias Similares</h2>
-              <p className="mb-4">Utilizamos cookies para:</p>
+
+              <h3 className="text-lg font-medium mt-6 mb-3">8.1 Tipos de Cookies</h3>
               <ul className="list-disc ml-6 mb-4 space-y-2">
-                <li>Manter você conectado à plataforma</li>
-                <li>Lembrar suas preferências</li>
-                <li>Analisar o uso da plataforma</li>
-                <li>Melhorar a performance</li>
+                <li><strong>Cookies essenciais:</strong> Necessários para autenticação e funcionamento da plataforma</li>
+                <li><strong>Cookies de preferência:</strong> Armazenam suas configurações e preferências de uso</li>
+                <li><strong>Cookies de desempenho:</strong> Coletam informações sobre como você usa a plataforma (anonimizados)</li>
+                <li><strong>Cookies de segurança:</strong> Ajudam a detectar fraudes e proteger sua conta</li>
               </ul>
+
+              <h3 className="text-lg font-medium mt-6 mb-3">8.2 Gerenciamento de Cookies</h3>
               <p className="mb-4">
-                Você pode gerenciar cookies nas configurações do seu navegador, mas isso pode afetar 
-                a funcionalidade da plataforma.
+                Você pode gerenciar cookies nas configurações do seu navegador. No entanto, desabilitar cookies
+                essenciais pode afetar a funcionalidade da plataforma (ex: você não conseguirá fazer login).
+              </p>
+              <p className="mb-4">
+                Cookies de desempenho e preferência podem ser desabilitados sem afetar funcionalidades básicas.
               </p>
 
               <h2 className="text-xl font-semibold mt-8 mb-4">9. Menores de Idade</h2>
@@ -166,9 +242,28 @@ export default function PrivacyPolicy() {
 
               <h2 className="text-xl font-semibold mt-8 mb-4">10. Transferências Internacionais</h2>
               <p className="mb-4">
-                Seus dados são processados e armazenados no Brasil. Caso seja necessária transferência 
-                internacional, garantiremos proteção adequada conforme a LGPD, incluindo cláusulas 
-                contratuais padrão.
+                <strong>Armazenamento principal:</strong> Seus dados são processados e armazenados no Brasil.
+              </p>
+              <p className="mb-4">
+                <strong>Transferências para terceiros:</strong> Alguns serviços que utilizamos podem processar dados fora do Brasil:
+              </p>
+              <ul className="list-disc ml-6 mb-4 space-y-2">
+                <li>
+                  <strong>Stripe (EUA):</strong> Processa dados de pagamento com proteção adequada conforme LGPD.
+                  Stripe possui certificação PCI-DSS e cláusulas contratuais padrão (SCCs).
+                </li>
+                <li>
+                  <strong>Serviços de IA (EUA/Europa):</strong> Recebem dados <strong>anonimizados</strong> para processamento.
+                  Não há transferência de dados pessoais identificáveis.
+                </li>
+                <li>
+                  <strong>Infraestrutura de nuvem:</strong> Utilizamos servidores com data centers no Brasil, mas backups
+                  podem ser replicados em outras regiões com criptografia adequada.
+                </li>
+              </ul>
+              <p className="mb-4">
+                Todas as transferências internacionais são realizadas com garantias adequadas conforme Art. 33 da LGPD,
+                incluindo cláusulas contratuais padrão, certificações de segurança e acordos de proteção de dados.
               </p>
 
               <h2 className="text-xl font-semibold mt-8 mb-4">11. Alterações nesta Política</h2>
@@ -180,12 +275,12 @@ export default function PrivacyPolicy() {
 
               <h2 className="text-xl font-semibold mt-8 mb-4">12. Encarregado de Dados (DPO)</h2>
               <p className="mb-4">
-                Nosso Encarregado de Proteção de Dados está disponível para esclarecer dúvidas:
+                Estamos em processo de designação formal de um Encarregado de Proteção de Dados (DPO).
+                Enquanto isso, todas as questões relacionadas à privacidade e LGPD devem ser direcionadas para:
               </p>
               <ul className="list-disc ml-6 mb-4 space-y-2">
-                <li>Nome: [Nome do DPO]</li>
-                <li>E-mail: dpo@caixahub.com.br</li>
-                <li>Telefone: (11) 9XXXX-XXXX</li>
+                <li>WhatsApp: <a href="https://wa.me/5517992679645" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">(17) 99267-9645</a></li>
+                <li>Horário: Segunda a Sexta, 9h às 18h</li>
               </ul>
 
               <h2 className="text-xl font-semibold mt-8 mb-4">13. Autoridade Nacional de Proteção de Dados</h2>
@@ -202,10 +297,14 @@ export default function PrivacyPolicy() {
                 Para questões sobre privacidade e proteção de dados:
               </p>
               <ul className="list-disc ml-6 mb-4 space-y-2">
-                <li>E-mail: privacidade@caixahub.com.br</li>
-                <li>WhatsApp: (11) 9XXXX-XXXX</li>
-                <li>Endereço: [Endereço da empresa]</li>
+                <li>WhatsApp: <a href="https://wa.me/5517992679645" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">(17) 99267-9645</a></li>
+                <li>Horário de atendimento: Segunda a Sexta, 9h às 18h</li>
               </ul>
+
+              <p className="mt-4 mb-4">
+                <strong>Tempo de resposta:</strong> Responderemos sua solicitação em até 15 dias úteis, conforme estabelecido pela LGPD.
+                Em casos complexos, podemos prorrogar por mais 15 dias, com notificação prévia.
+              </p>
 
               <div className="mt-12 p-6 bg-muted rounded-lg">
                 <p className="text-sm text-center text-muted-foreground">

@@ -305,7 +305,7 @@ function PricingContent() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t py-12 bg-card mt-16">
+      <footer className="border-t border-white/20 py-12 bg-background/80 backdrop-blur-sm mt-16 relative z-10">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="flex items-center space-x-2">
@@ -314,14 +314,14 @@ function PricingContent() {
               </div>
               <span className="font-semibold text-white">CaixaHub</span>
             </div>
-            <div className="flex space-x-6 text-sm text-white/70">
-              <Link href="/" className="hover:text-foreground transition-colors">
+            <div className="flex space-x-6 text-sm">
+              <Link href="/" className="text-white/80 hover:text-white transition-colors cursor-pointer">
                 Início
               </Link>
-              <Link href="/terms" className="hover:text-foreground transition-colors">
+              <Link href="/terms" className="text-white/80 hover:text-white transition-colors cursor-pointer">
                 Termos de Uso
               </Link>
-              <Link href="/privacy" className="hover:text-foreground transition-colors">
+              <Link href="/privacy" className="text-white/80 hover:text-white transition-colors cursor-pointer">
                 Privacidade
               </Link>
             </div>
