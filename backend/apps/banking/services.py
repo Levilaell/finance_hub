@@ -765,20 +765,37 @@ class BankConnectionService:
 
             for pluggy_account in pluggy_accounts:
                 account_type = self._map_account_type(pluggy_account.get('type', 'BANK'))
+                pluggy_type = pluggy_account.get('type', 'BANK')
+
+                # Prepare default fields
+                defaults = {
+                    'connection': connection,
+                    'type': account_type,
+                    'subtype': pluggy_account.get('subtype', ''),
+                    'name': pluggy_account.get('name', ''),
+                    'number': pluggy_account.get('number', ''),
+                    'balance': Decimal(str(pluggy_account.get('balance', 0))),
+                    'currency_code': pluggy_account.get('currencyCode', 'BRL'),
+                    'bank_data': pluggy_account.get('bankData') or {},
+                    'last_synced_at': timezone.now(),
+                }
+
+                # Handle credit card specific fields
+                if pluggy_type == 'CREDIT':
+                    credit_data = pluggy_account.get('creditData') or {}
+                    defaults['credit_data'] = credit_data
+                    defaults['available_credit_limit'] = Decimal(str(credit_data.get('availableCreditLimit', 0)))
+                    defaults['credit_limit'] = Decimal(str(credit_data.get('creditLimit', 0)))
+                    logger.info(f"Credit card synced - Available: {defaults['available_credit_limit']}, Total: {defaults['credit_limit']}, Balance: {defaults['balance']}")
+                else:
+                    # For non-credit accounts, clear credit fields
+                    defaults['credit_data'] = {}
+                    defaults['available_credit_limit'] = None
+                    defaults['credit_limit'] = None
 
                 BankAccount.objects.update_or_create(
                     pluggy_account_id=pluggy_account['id'],
-                    defaults={
-                        'connection': connection,
-                        'type': account_type,
-                        'subtype': pluggy_account.get('subtype', ''),
-                        'name': pluggy_account.get('name', ''),
-                        'number': pluggy_account.get('number', ''),
-                        'balance': Decimal(str(pluggy_account.get('balance', 0))),
-                        'currency_code': pluggy_account.get('currencyCode', 'BRL'),
-                        'bank_data': pluggy_account.get('bankData') or {},  # Ensure never None
-                        'last_synced_at': timezone.now(),
-                    }
+                    defaults=defaults
                 )
                 synced_count += 1
 

@@ -122,6 +122,20 @@ class BankAccount(models.Model):
     balance = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
     currency_code = models.CharField(max_length=3, default='BRL')
 
+    # Credit card fields
+    available_credit_limit = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True,
+        help_text='Available credit limit for credit cards'
+    )
+    credit_limit = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True,
+        help_text='Total credit limit for credit cards'
+    )
+    credit_data = models.JSONField(
+        default=dict, blank=True,
+        help_text='Additional credit card data from Pluggy'
+    )
+
     # Bank details
     bank_data = models.JSONField(default=dict)  # Additional bank-specific data
 

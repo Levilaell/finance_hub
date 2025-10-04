@@ -28,19 +28,25 @@ class BankAccountSerializer(serializers.ModelSerializer):
     """Serializer for bank accounts."""
     connection_id = serializers.UUIDField(source='connection.id', read_only=True)
     institution_name = serializers.CharField(source='connection.connector.institution_name', read_only=True)
+    is_credit_card = serializers.SerializerMethodField()
 
     class Meta:
         model = BankAccount
         fields = [
             'id', 'connection_id', 'institution_name',
             'type', 'subtype', 'name', 'number',
-            'balance', 'currency_code', 'last_synced_at',
-            'is_active', 'created_at', 'updated_at'
+            'balance', 'currency_code',
+            'is_credit_card', 'available_credit_limit', 'credit_limit', 'credit_data',
+            'last_synced_at', 'is_active', 'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'connection_id', 'institution_name',
+            'id', 'connection_id', 'institution_name', 'is_credit_card',
             'last_synced_at', 'created_at', 'updated_at'
         ]
+
+    def get_is_credit_card(self, obj):
+        """Check if account is a credit card."""
+        return obj.type == 'CREDIT_CARD'
 
 
 class BankConnectionSerializer(serializers.ModelSerializer):

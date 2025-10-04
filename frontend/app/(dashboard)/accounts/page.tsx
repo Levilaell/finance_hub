@@ -292,7 +292,7 @@ export default function AccountsPage() {
             </p>
           </div>
         </div>
-      </div>
+      </div>  
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
