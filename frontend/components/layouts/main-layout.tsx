@@ -21,6 +21,7 @@ import {
   Sparkles,
   Lock,
   Package,
+  BookOpen,
 } from "lucide-react";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
 
@@ -36,6 +37,7 @@ const navigation = [
   { name: "Estoque", href: "/estoque", icon: Package, comingSoon: true },
   { name: "Insights", href: "/ai-insights", icon: Sparkles, comingSoon: true },
   { name: "Relatórios", href: "/reports", icon: FileText },
+  { name: "Como Usar", href: "/como-usar", icon: BookOpen },
   { name: "Configurações", href: "/settings", icon: Settings },
 ];
 
