@@ -838,6 +838,7 @@ class BankConnectionService:
             'BANK': 'CHECKING',
             'CHECKING': 'CHECKING',
             'SAVINGS': 'SAVINGS',
+            'CREDIT': 'CREDIT_CARD',  # Pluggy sends 'CREDIT' for credit cards
             'CREDIT_CARD': 'CREDIT_CARD',
             'LOAN': 'LOAN',
             'INVESTMENT': 'INVESTMENT',
