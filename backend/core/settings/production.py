@@ -57,6 +57,14 @@ CSRF_COOKIE_SECURE = True         # HTTPS only
 # JWT Configuration - SIMPLIFIED (HS256 only for maximum compatibility)
 from datetime import timedelta
 
+# JWT_SECRET_KEY must be different from DJANGO_SECRET_KEY for security
+JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
+if not JWT_SECRET_KEY:
+    raise ImproperlyConfigured(
+        "JWT_SECRET_KEY environment variable is required! "
+        "Generate one with: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'"
+    )
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=3),
@@ -64,7 +72,7 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
     'ALGORITHM': 'HS256',  # Simple and reliable
-    'SIGNING_KEY': SECRET_KEY,
+    'SIGNING_KEY': JWT_SECRET_KEY,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
     'USER_ID_FIELD': 'id',

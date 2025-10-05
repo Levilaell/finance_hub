@@ -65,6 +65,10 @@ export interface BankAccount {
   number?: string;
   balance: number;
   currency_code: string;
+  is_credit_card: boolean;
+  available_credit_limit?: number;
+  credit_limit?: number;
+  credit_data?: Record<string, any>;
   last_synced_at?: string;
   is_active: boolean;
   created_at: string;

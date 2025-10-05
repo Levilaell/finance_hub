@@ -94,10 +94,14 @@ export default function DashboardPage() {
     );
   }
 
-  const totalBalance = accounts.reduce((sum, acc) => {
-    const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
-    return sum + (isNaN(balance) ? 0 : balance);
-  }, 0);
+  // Only sum balance from non-credit card accounts (checking, savings, etc.)
+  // Credit cards show the invoice balance, not available funds
+  const totalBalance = accounts
+    .filter(acc => !acc.is_credit_card && acc.type !== 'CREDIT_CARD')
+    .reduce((sum, acc) => {
+      const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
+      return sum + (isNaN(balance) ? 0 : balance);
+    }, 0);
   const monthlyIncome = summary?.income || 0;
   const monthlyExpenses = summary?.expenses || 0;
   // Use balance from API (expenses are already negative)

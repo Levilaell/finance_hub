@@ -179,6 +179,186 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Benefits Section */}
+      <section className="w-full bg-background py-16 sm:py-24 lg:py-32">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="flex flex-col items-center justify-center gap-4 text-center mb-12">
+            <h2 className="text-3xl font-bold tracking-tighter text-foreground sm:text-4xl md:text-5xl">
+              Por Que Escolher o CaixaHub?
+            </h2>
+            <p className="max-w-[720px] text-muted-foreground md:text-xl">
+              Recursos desenvolvidos especificamente para o varejo brasileiro.
+            </p>
+          </div>
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+            <Card className="border-primary/20">
+              <CardHeader>
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                  <CpuChipIcon className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>IA Inteligente de Verdade</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Nossa IA aprende com seu negócio e categoriza transações com 99% de precisão, eliminando o trabalho manual.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary/20">
+              <CardHeader>
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                  <ClockIcon className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>Economize Tempo e Dinheiro</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Reduza até 90% do tempo gasto em gestão financeira. Isso significa mais tempo para focar no crescimento do seu negócio.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary/20">
+              <CardHeader>
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                  <ShieldCheckIcon className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>100% Seguro e Regulamentado</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Certificado pelo Banco Central com tecnologia Open Finance. Seus dados são criptografados e nunca compartilhados.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary/20">
+              <CardHeader>
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                  <ChartBarIcon className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>Relatórios que Fazem Sentido</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Dashboards simples e visuais para você entender exatamente para onde vai cada centavo, sem planilhas complexas.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary/20">
+              <CardHeader>
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                  <BanknotesIcon className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>Fluxo de Caixa em Tempo Real</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Saiba exatamente quanto você tem disponível agora e nos próximos 90 dias para tomar decisões com segurança.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary/20">
+              <CardHeader>
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                  <SparklesIcon className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>Insights Acionáveis</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Receba alertas e sugestões práticas para reduzir custos, melhorar margens e planejar investimentos estratégicos.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Comparison Section */}
+      <section className="w-full bg-card py-16 sm:py-24 lg:py-32">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="flex flex-col items-center justify-center gap-4 text-center mb-12">
+            <h2 className="text-3xl font-bold tracking-tighter text-foreground sm:text-4xl md:text-5xl">
+              Gestão Manual vs. CaixaHub
+            </h2>
+            <p className="max-w-[720px] text-muted-foreground md:text-xl">
+              Veja a diferença real que a automação faz no seu dia a dia.
+            </p>
+          </div>
+          <div className="grid gap-8 md:grid-cols-2 max-w-5xl mx-auto">
+            <div className="rounded-xl bg-destructive/10 border-2 border-destructive/20 p-8">
+              <div className="mb-6 flex items-center gap-3">
+                <XMarkIcon className="h-8 w-8 text-destructive" />
+                <h3 className="text-2xl font-bold text-foreground">Gestão Manual</h3>
+              </div>
+              <ul className="space-y-4">
+                <li className="flex items-start gap-3">
+                  <XMarkIcon className="mt-1 h-5 w-5 text-destructive flex-shrink-0" />
+                  <span className="text-muted-foreground">15-20 horas/mês categorizando transações</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <XMarkIcon className="mt-1 h-5 w-5 text-destructive flex-shrink-0" />
+                  <span className="text-muted-foreground">Dados desatualizados e espalhados</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <XMarkIcon className="mt-1 h-5 w-5 text-destructive flex-shrink-0" />
+                  <span className="text-muted-foreground">Erros de digitação e duplicação</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <XMarkIcon className="mt-1 h-5 w-5 text-destructive flex-shrink-0" />
+                  <span className="text-muted-foreground">Planilhas complexas e confusas</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <XMarkIcon className="mt-1 h-5 w-5 text-destructive flex-shrink-0" />
+                  <span className="text-muted-foreground">Decisões baseadas em dados do mês passado</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <XMarkIcon className="mt-1 h-5 w-5 text-destructive flex-shrink-0" />
+                  <span className="text-muted-foreground">Custo de R$ 450-900/mês (analista)</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="rounded-xl bg-primary/10 border-2 border-primary/20 p-8">
+              <div className="mb-6 flex items-center gap-3">
+                <CheckCircleIcon className="h-8 w-8 text-primary" />
+                <h3 className="text-2xl font-bold text-foreground">Com CaixaHub</h3>
+              </div>
+              <ul className="space-y-4">
+                <li className="flex items-start gap-3">
+                  <CheckCircleIcon className="mt-1 h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="text-muted-foreground">100% automático, zero trabalho manual</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircleIcon className="mt-1 h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="text-muted-foreground">Sincronização em tempo real 24/7</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircleIcon className="mt-1 h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="text-muted-foreground">99% de precisão com IA treinada</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircleIcon className="mt-1 h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="text-muted-foreground">Dashboards visuais e intuitivos</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircleIcon className="mt-1 h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="text-muted-foreground">Decisões baseadas em dados atuais</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircleIcon className="mt-1 h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="text-muted-foreground">A partir de R$ 97/mês (ROI de 6x)</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* How It Works Section */}
       <section className="w-full bg-background py-16 sm:py-24 lg:py-32">
         <div className="container mx-auto px-4 md:px-6">
@@ -261,6 +441,265 @@ export default function Home() {
           <p className="mt-8 text-center text-sm text-muted-foreground">
             *Baseado no custo médio de um analista financeiro (R$ 30/hora).
           </p>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="w-full bg-background py-16 sm:py-24 lg:py-32">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="flex flex-col items-center justify-center gap-4 text-center mb-12">
+            <h2 className="text-3xl font-bold tracking-tighter text-foreground sm:text-4xl md:text-5xl">
+              O Que Nossos Clientes Dizem
+            </h2>
+            <p className="max-w-[720px] text-muted-foreground md:text-xl">
+              Varejistas como você já estão economizando tempo e dinheiro com o CaixaHub.
+            </p>
+          </div>
+          <div className="grid gap-8 md:grid-cols-3 max-w-6xl mx-auto">
+            <Card className="border-primary/20">
+              <CardHeader>
+                <div className="flex items-center gap-4 mb-2">
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-lg font-bold text-primary">
+                    MC
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Maria Costa</CardTitle>
+                    <CardDescription>Farmácia São José</CardDescription>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  "Economizei mais de 10 horas por mês. Antes passava o final de semana organizando planilhas, agora tudo acontece sozinho. Incrível!"
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary/20">
+              <CardHeader>
+                <div className="flex items-center gap-4 mb-2">
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-lg font-bold text-primary">
+                    JS
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">João Silva</CardTitle>
+                    <CardDescription>Mercearia Central</CardDescription>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  "Finalmente consigo ver para onde vai meu dinheiro. Os relatórios são simples de entender e me ajudam a tomar decisões melhores."
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary/20">
+              <CardHeader>
+                <div className="flex items-center gap-4 mb-2">
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-lg font-bold text-primary">
+                    AS
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Ana Santos</CardTitle>
+                    <CardDescription>Boutique Elegance</CardDescription>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                  <StarIcon className="h-5 w-5 fill-primary text-primary" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  "A integração com meu banco foi super rápida. Em 2 minutos estava tudo funcionando. Valeu cada centavo do investimento."
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Trust & Security Section */}
+      <section className="w-full bg-card py-16 sm:py-24 lg:py-32">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="flex flex-col items-center justify-center gap-4 text-center mb-12">
+            <h2 className="text-3xl font-bold tracking-tighter text-foreground sm:text-4xl md:text-5xl">
+              Segurança e Confiança em Primeiro Lugar
+            </h2>
+            <p className="max-w-[720px] text-muted-foreground md:text-xl">
+              Seus dados financeiros protegidos pelos mais altos padrões de segurança.
+            </p>
+          </div>
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto">
+            <div className="flex flex-col items-center gap-4 text-center p-6 rounded-xl bg-background">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                <ShieldCheckIcon className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground">Certificado Banco Central</h3>
+              <p className="text-sm text-muted-foreground">
+                Regulamentado e certificado pelo Banco Central do Brasil via Open Finance.
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center gap-4 text-center p-6 rounded-xl bg-background">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                <ShieldCheckIcon className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground">Criptografia de Ponta</h3>
+              <p className="text-sm text-muted-foreground">
+                Seus dados são protegidos com criptografia de nível bancário AES-256.
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center gap-4 text-center p-6 rounded-xl bg-background">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                <ShieldCheckIcon className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground">Modo Somente Leitura</h3>
+              <p className="text-sm text-muted-foreground">
+                Nunca movemos dinheiro. Acesso 100% em modo leitura para sua segurança.
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center gap-4 text-center p-6 rounded-xl bg-background">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                <ShieldCheckIcon className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground">Privacidade Total</h3>
+              <p className="text-sm text-muted-foreground">
+                Seus dados nunca são vendidos ou compartilhados com terceiros. Ponto final.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Risk Reversal Section */}
+      <section className="w-full bg-background py-16 sm:py-24 lg:py-32">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="mx-auto max-w-4xl rounded-2xl bg-primary/5 border-2 border-primary/20 p-8 md:p-12 text-center">
+            <Badge className="mb-4 bg-primary text-primary-foreground">Sem Riscos</Badge>
+            <h2 className="text-3xl font-bold tracking-tighter text-foreground sm:text-4xl md:text-5xl mb-6">
+              Experimente 7 Dias Grátis
+            </h2>
+            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
+              Não precisa de cartão de crédito. Cancele quando quiser, sem burocracia.
+            </p>
+            <div className="grid gap-6 md:grid-cols-3 mb-8 text-left">
+              <div className="flex items-start gap-3">
+                <CheckCircleIcon className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
+                <div>
+                  <h3 className="font-bold text-foreground mb-1">7 Dias Grátis</h3>
+                  <p className="text-sm text-muted-foreground">Teste todas as funcionalidades sem compromisso</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <CheckCircleIcon className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
+                <div>
+                  <h3 className="font-bold text-foreground mb-1">Sem Cartão</h3>
+                  <p className="text-sm text-muted-foreground">Não pedimos cartão de crédito no cadastro</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <CheckCircleIcon className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
+                <div>
+                  <h3 className="font-bold text-foreground mb-1">Cancele a Qualquer Momento</h3>
+                  <p className="text-sm text-muted-foreground">Um clique para cancelar, sem taxas ou multas</p>
+                </div>
+              </div>
+            </div>
+            <Button asChild size="lg" className="h-14 min-w-[240px] text-lg font-bold shadow-xl hover:scale-105 transition-transform">
+              <Link href="/pricing">
+                Começar Teste Grátis
+                <ArrowRightIcon className="ml-2 h-5 w-5" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* For Who Section */}
+      <section className="w-full bg-card py-16 sm:py-24 lg:py-32">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="flex flex-col items-center justify-center gap-4 text-center mb-12">
+            <h2 className="text-3xl font-bold tracking-tighter text-foreground sm:text-4xl md:text-5xl">
+              Feito Para o Varejo Brasileiro
+            </h2>
+            <p className="max-w-[720px] text-muted-foreground md:text-xl">
+              Pequenos e médios varejistas já usam o CaixaHub para transformar sua gestão financeira.
+            </p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto">
+            <div className="rounded-xl bg-background p-6 border border-primary/20">
+              <h3 className="text-xl font-bold text-foreground mb-3">🛒 Supermercados e Mercearias</h3>
+              <p className="text-muted-foreground">
+                Gerencie alto volume de transações e identifique suas categorias de maior custo automaticamente.
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-background p-6 border border-primary/20">
+              <h3 className="text-xl font-bold text-foreground mb-3">💊 Farmácias e Drogarias</h3>
+              <p className="text-muted-foreground">
+                Controle estoque financeiro, margens e vencimentos com relatórios específicos para o setor.
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-background p-6 border border-primary/20">
+              <h3 className="text-xl font-bold text-foreground mb-3">👗 Lojas de Roupa e Acessórios</h3>
+              <p className="text-muted-foreground">
+                Acompanhe sazonalidade, margem por produto e planeje coleções com dados reais de vendas.
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-background p-6 border border-primary/20">
+              <h3 className="text-xl font-bold text-foreground mb-3">🍕 Restaurantes e Lanchonetes</h3>
+              <p className="text-muted-foreground">
+                Monitore CMV (Custo de Mercadoria Vendida), desperdícios e otimize compras de insumos.
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-background p-6 border border-primary/20">
+              <h3 className="text-xl font-bold text-foreground mb-3">🔧 Lojas de Materiais e Ferramentas</h3>
+              <p className="text-muted-foreground">
+                Controle produtos de alto ticket, fornecedores e margem de lucro em tempo real.
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-background p-6 border border-primary/20">
+              <h3 className="text-xl font-bold text-foreground mb-3">🏪 Pet Shops e Agropecuárias</h3>
+              <p className="text-muted-foreground">
+                Gerencie produtos perecíveis, controle de estoque e despesas operacionais com precisão.
+              </p>
+            </div>
+          </div>
+          <div className="mt-12 text-center">
+            <p className="text-muted-foreground mb-6">
+              Não viu seu tipo de negócio aqui? O CaixaHub funciona para qualquer varejo!
+            </p>
+            <Button asChild variant="outline" size="lg">
+              <Link href="/pricing">
+                Começar Agora
+              </Link>
+            </Button>
+          </div>
         </div>
       </section>
 

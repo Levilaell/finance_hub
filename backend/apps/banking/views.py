@@ -89,9 +89,10 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
         POST /api/banking/connections/
         """
         import logging
+        from core.security_utils import sanitize_for_logging
         logger = logging.getLogger(__name__)
 
-        logger.info(f"Creating connection with data: {request.data}")
+        logger.info(f"Creating connection with data: {sanitize_for_logging(request.data)}")
 
         # Check if this is a Pluggy widget callback (has pluggy_item_id)
         if 'pluggy_item_id' in request.data:

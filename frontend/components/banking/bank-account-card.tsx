@@ -92,12 +92,28 @@ export function BankAccountCard({ account, onSync, onView, onDelete }: BankAccou
           </Badge>
         </div>
 
-        {/* Balance */}
+        {/* Balance or Credit Limit */}
         <div className="py-2">
-          <p className="text-sm text-muted-foreground mb-1">Saldo</p>
-          <p className="text-3xl font-bold">
-            {bankingService.formatCurrency(account.balance, account.currency_code)}
-          </p>
+          {account.is_credit_card || account.type === 'CREDIT_CARD' ? (
+            <>
+              <p className="text-sm text-muted-foreground mb-1">Limite Disponível</p>
+              <p className="text-3xl font-bold">
+                {bankingService.formatCurrency(account.available_credit_limit || 0, account.currency_code)}
+              </p>
+              {account.credit_limit && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Limite total: {bankingService.formatCurrency(account.credit_limit, account.currency_code)}
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground mb-1">Saldo Disponível</p>
+              <p className="text-3xl font-bold">
+                {bankingService.formatCurrency(account.balance, account.currency_code)}
+              </p>
+            </>
+          )}
         </div>
 
         {/* Last Update and Actions */}

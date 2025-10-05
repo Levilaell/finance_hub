@@ -20,6 +20,7 @@ import {
   Bell,
   Sparkles,
   Lock,
+  Package,
 } from "lucide-react";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
 
@@ -32,6 +33,7 @@ const navigation = [
   { name: "Transações", href: "/transactions", icon: Receipt },
   { name: "Contas", href: "/accounts", icon: Wallet },
   { name: "Categorias", href: "/categories", icon: Tags },
+  { name: "Estoque", href: "/estoque", icon: Package, comingSoon: true },
   { name: "Insights", href: "/ai-insights", icon: Sparkles, comingSoon: true },
   { name: "Relatórios", href: "/reports", icon: FileText },
   { name: "Configurações", href: "/settings", icon: Settings },

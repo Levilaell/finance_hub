@@ -296,9 +296,11 @@ class PluggyClient:
         if date_to:
             params['to'] = date_to.isoformat()
 
+        from core.security_utils import sanitize_for_logging
+
         logger.info(f"Fetching transactions for account {account_id}")
         logger.info(f"Date range: {date_from} to {date_to}")
-        logger.info(f"Request params: {params}")
+        logger.info(f"Request params: {sanitize_for_logging(params)}")
 
         all_transactions = []
         page = 1
