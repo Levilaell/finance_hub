@@ -23,6 +23,8 @@ const nextConfig = {
   },
 
   async headers() {
+    const isDev = process.env.NODE_ENV === 'development';
+
     return [
       {
         source: '/(.*)',
@@ -31,15 +33,19 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              // Script sources: Pluggy + Stripe
-              process.env.NODE_ENV === 'development'
+              // Script sources: Pluggy + Stripe (unsafe-inline needed for third-party widgets)
+              isDev
                 ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.pluggy.ai https://*.pluggy.ai https://js.stripe.com"
                 : "script-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai https://js.stripe.com",
               "style-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai",
               "img-src 'self' data: blob: https://*.pluggy.ai https://*.pluggycdn.com https://lh3.googleusercontent.com",
               "font-src 'self' data:",
-              // Connect sources: API + Pluggy + Stripe
-              "connect-src 'self' http://localhost:8000 https://*.pluggy.ai https://api.pluggy.ai https://financehub-production.up.railway.app https://api.stripe.com",
+              // Connect sources: API + Pluggy + Stripe (localhost only in dev)
+              [
+                "connect-src 'self'",
+                isDev ? "http://localhost:8000" : "",
+                "https://*.pluggy.ai https://api.pluggy.ai https://financehub-production.up.railway.app https://api.stripe.com"
+              ].filter(Boolean).join(' '),
               // Frame sources: Pluggy + Stripe
               "frame-src 'self' https://*.pluggy.ai https://connect.pluggy.ai https://js.stripe.com https://*.stripe.com",
               "frame-ancestors 'none'",

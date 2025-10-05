@@ -2,18 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  
-  // For API routes, add CORS headers
-  if (pathname.startsWith("/api/")) {
-    const response = NextResponse.next();
-    response.headers.set("Access-Control-Allow-Origin", process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
-    response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    response.headers.set("Access-Control-Allow-Credentials", "true");
-    return response;
-  }
-
+  // No middleware logic needed - CORS is handled by backend
   return NextResponse.next();
 }
 
