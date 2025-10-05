@@ -318,6 +318,14 @@ function PricingContent() {
               <Link href="/" className="text-white/80 hover:text-white transition-colors cursor-pointer">
                 Início
               </Link>
+              <a
+                href="https://wa.me/5517992679645?text=Olá%2C%20vim%20do%20CaixaHub%20e%20gostaria%20de%20falar%20com%20o%20suporte"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white/80 hover:text-white transition-colors cursor-pointer"
+              >
+                Contato
+              </a>
               <Link href="/terms" className="text-white/80 hover:text-white transition-colors cursor-pointer">
                 Termos de Uso
               </Link>

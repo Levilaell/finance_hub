@@ -326,6 +326,14 @@ export default function PrivacyPolicy() {
               <span className="font-semibold">CaixaHub</span>
             </div>
             <div className="flex space-x-6 text-sm text-muted-foreground">
+              <a
+                href="https://wa.me/5517992679645?text=Olá%2C%20vim%20do%20CaixaHub%20e%20gostaria%20de%20falar%20com%20o%20suporte"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground"
+              >
+                Contato
+              </a>
               <Link href="/privacy" className="hover:text-foreground">
                 Política de Privacidade
               </Link>

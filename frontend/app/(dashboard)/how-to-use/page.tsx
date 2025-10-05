@@ -12,14 +12,15 @@ import {
 
 export default function ComoUsarPage() {
   return (
-    <div className="space-y-8 max-w-4xl">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-white">Como Usar o CaixaHub</h1>
-        <p className="text-muted-foreground mt-1">
-          Guia completo para começar a gerenciar suas finanças
-        </p>
-      </div>
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
+      <div className="space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-white">Como Usar o CaixaHub</h1>
+          <p className="text-muted-foreground mt-1">
+            Guia completo para começar a gerenciar suas finanças
+          </p>
+        </div>
 
       {/* Quick Start Guide */}
       <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg p-6">
@@ -213,6 +214,7 @@ export default function ComoUsarPage() {
           <li>Certifique-se de que suas credenciais estão corretas</li>
           <li>Aguarde alguns minutos entre tentativas de sincronização</li>
         </ul>
+      </div>
       </div>
     </div>
   );

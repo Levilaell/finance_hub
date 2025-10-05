@@ -37,7 +37,7 @@ const navigation = [
   { name: "Estoque", href: "/estoque", icon: Package, comingSoon: true },
   { name: "Insights", href: "/ai-insights", icon: Sparkles, comingSoon: true },
   { name: "Relatórios", href: "/reports", icon: FileText },
-  { name: "Como Usar", href: "/como-usar", icon: BookOpen },
+  { name: "Como Usar", href: "/how-to-use", icon: BookOpen },
   { name: "Configurações", href: "/settings", icon: Settings },
 ];
 
@@ -289,6 +289,14 @@ export function MainLayout({ children }: MainLayoutProps) {
                 © 2025 CaixaHub. Todos os direitos reservados.
               </div>
               <div className="flex space-x-4 text-sm text-muted-foreground">
+                <a
+                  href="https://wa.me/5517992679645?text=Olá%2C%20vim%20do%20CaixaHub%20e%20gostaria%20de%20falar%20com%20o%20suporte"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-foreground transition-colors"
+                >
+                  Contato
+                </a>
                 <Link href="/terms" className="hover:text-foreground transition-colors">
                   Termos de Serviço
                 </Link>
