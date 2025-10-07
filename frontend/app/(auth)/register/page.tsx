@@ -15,6 +15,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { RegisterData } from '@/types';
 import { EyeIcon, EyeSlashIcon, CheckIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 import { validateCNPJ, validatePhone, cnpjMask, phoneMask } from '@/utils/validation';
+import { trackLead } from '@/lib/meta-pixel';
 
 interface RegisterFormData extends RegisterData {
   password2: string;
@@ -41,7 +42,14 @@ function RegisterContent() {
   const onSubmit = async (data: RegisterFormData) => {
     try {
       await registerUser(data);
-      
+
+      // Track lead conversion
+      trackLead({
+        content_name: 'Registration Form',
+        value: 0,
+        currency: 'BRL'
+      });
+
       toast.success('Cadastro realizado com sucesso!', {
         description: 'Agora vamos configurar seu pagamento.',
         duration: 5000,
