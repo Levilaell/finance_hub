@@ -23,8 +23,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className="dark">
-      <body className={inter.className}>
-        <Script id="meta-pixel" strategy="afterInteractive">
+      <head>
+        <Script id="meta-pixel" strategy="beforeInteractive">
           {`
             !function(f,b,e,v,n,t,s)
             {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
@@ -47,6 +47,8 @@ export default function RootLayout({
             alt=""
           />
         </noscript>
+      </head>
+      <body className={inter.className}>
         <Providers>{children}</Providers>
       </body>
     </html>
