@@ -16,24 +16,17 @@ class Command(BaseCommand):
             # Fetch account from Stripe
             stripe_account = stripe.Account.retrieve()
 
-            # Sync to djstripe database
-            account, created = Account.objects.update_or_create(
-                id=stripe_account.id,
-                defaults={
-                    'livemode': stripe_account.livemode,
-                }
-            )
+            self.stdout.write(f'Retrieved Stripe Account: {stripe_account.id}')
 
-            # Force sync to update all fields
-            account.sync_from_stripe_data(stripe_account)
+            # Sync using djstripe's built-in method
+            account = Account.sync_from_stripe_data(stripe_account)
 
-            if created:
-                self.stdout.write(self.style.SUCCESS(f'✓ Created Account: {account.id}'))
-            else:
-                self.stdout.write(self.style.SUCCESS(f'✓ Updated Account: {account.id}'))
+            self.stdout.write(self.style.SUCCESS(f'✓ Synced Account: {account.id}'))
+            self.stdout.write(self.style.SUCCESS(f'  Mode: {"LIVE" if settings.STRIPE_LIVE_MODE else "TEST"}'))
 
-            self.stdout.write(self.style.SUCCESS(f'  Mode: {"LIVE" if account.livemode else "TEST"}'))
-            self.stdout.write(self.style.SUCCESS(f'  Business Name: {account.business_profile.get("name", "N/A") if account.business_profile else "N/A"}'))
+            if hasattr(account, 'business_profile') and account.business_profile:
+                business_name = account.business_profile.get("name", "N/A")
+                self.stdout.write(self.style.SUCCESS(f'  Business Name: {business_name}'))
 
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'✗ Error syncing account: {str(e)}'))
