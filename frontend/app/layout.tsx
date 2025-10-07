@@ -23,7 +23,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className="dark">
-      <head>
+      <body className={inter.className}>
         <Script id="meta-pixel" strategy="afterInteractive">
           {`
             !function(f,b,e,v,n,t,s)
@@ -47,8 +47,6 @@ export default function RootLayout({
             alt=""
           />
         </noscript>
-      </head>
-      <body className={inter.className}>
         <Providers>{children}</Providers>
       </body>
     </html>
