@@ -183,6 +183,10 @@ DJSTRIPE_SUBSCRIBER_MODEL = 'authentication.User'
 DJSTRIPE_WEBHOOK_VALIDATION = 'verify_signature'
 DJSTRIPE_WEBHOOK_TOLERANCE = 300
 
+# Fix for webhook Account error - tell djstripe to fetch account on startup
+STRIPE_LIVE_SECRET_KEY_ENV = STRIPE_LIVE_SECRET_KEY if STRIPE_LIVE_MODE else None
+STRIPE_TEST_SECRET_KEY_ENV = STRIPE_TEST_SECRET_KEY if not STRIPE_LIVE_MODE else None
+
 # Stripe Default Price ID
 STRIPE_DEFAULT_PRICE_ID = os.environ.get('STRIPE_DEFAULT_PRICE_ID', '')
 
