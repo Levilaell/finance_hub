@@ -23,6 +23,17 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className="dark">
+      <head>
+        <noscript>
+          <img
+            height="1"
+            width="1"
+            style={{ display: 'none' }}
+            src="https://www.facebook.com/tr?id=24169428459391565&ev=PageView&noscript=1"
+            alt=""
+          />
+        </noscript>
+      </head>
       <body className={inter.className}>
         <PixelTracker />
         <Providers>{children}</Providers>

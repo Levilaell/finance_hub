@@ -3,7 +3,9 @@
  * Use these functions to track custom events throughout your application
  */
 
-export const PIXEL_ID = '24169428459391565';
+import { PIXEL_ID } from '@/components/PixelTracker';
+
+export { PIXEL_ID };
 
 // Standard Meta Pixel events
 export const META_EVENTS = {
