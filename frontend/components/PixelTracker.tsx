@@ -1,11 +1,23 @@
 'use client';
+import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import Script from 'next/script';
+import { PIXEL_ID } from '@/lib/meta-pixel';
 
 const PixelTracker = () => {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    // Track PageView on route change
+    if (typeof window !== 'undefined' && window.fbq) {
+      window.fbq('track', 'PageView');
+    }
+  }, [pathname]);
+
   return (
     <>
       <Script
-        id="meta-pixel"
+        id="meta-pixel-base"
         strategy="afterInteractive"
         dangerouslySetInnerHTML={{
           __html: `
@@ -17,7 +29,15 @@ const PixelTracker = () => {
             t.src=v;s=b.getElementsByTagName(e)[0];
             s.parentNode.insertBefore(t,s)}(window, document,'script',
             'https://connect.facebook.net/en_US/fbevents.js');
-            fbq('init', '24169428459391565');
+          `,
+        }}
+      />
+      <Script
+        id="meta-pixel-init"
+        strategy="afterInteractive"
+        dangerouslySetInnerHTML={{
+          __html: `
+            fbq('init', '${PIXEL_ID}');
             fbq('track', 'PageView');
           `,
         }}
@@ -27,7 +47,7 @@ const PixelTracker = () => {
           height="1"
           width="1"
           style={{ display: 'none' }}
-          src="https://www.facebook.com/tr?id=24169428459391565&ev=PageView&noscript=1"
+          src={`https://www.facebook.com/tr?id=${PIXEL_ID}&ev=PageView&noscript=1`}
           alt=""
         />
       </noscript>
