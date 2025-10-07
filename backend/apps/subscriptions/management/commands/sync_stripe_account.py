@@ -21,8 +21,14 @@ class Command(BaseCommand):
             # Sync using djstripe's built-in method
             account = Account.sync_from_stripe_data(stripe_account)
 
+            # Force update livemode based on settings
+            if account.livemode is None:
+                account.livemode = settings.STRIPE_LIVE_MODE
+                account.save()
+                self.stdout.write(self.style.WARNING(f'Updated livemode to: {account.livemode}'))
+
             self.stdout.write(self.style.SUCCESS(f'✓ Synced Account: {account.id}'))
-            self.stdout.write(self.style.SUCCESS(f'  Mode: {"LIVE" if settings.STRIPE_LIVE_MODE else "TEST"}'))
+            self.stdout.write(self.style.SUCCESS(f'  Livemode: {account.livemode}'))
 
             if hasattr(account, 'business_profile') and account.business_profile:
                 business_name = account.business_profile.get("name", "N/A")
