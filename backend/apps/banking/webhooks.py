@@ -12,6 +12,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.conf import settings
 from django.utils import timezone
+from django.core.cache import cache
 
 from .models import BankConnection, SyncLog
 from .services import BankConnectionService, TransactionService
@@ -60,9 +61,20 @@ def pluggy_webhook_handler(request):
         payload = json.loads(request.body.decode('utf-8'))
         event_type = payload.get('event')
         item_id = payload.get('itemId')
+        event_id = payload.get('eventId')
 
         logger.info(f"Received webhook: {event_type} for item {item_id}")
         logger.debug(f"Webhook payload: {payload}")
+
+        # Idempotency: Check if event was already processed
+        if event_id:
+            cache_key = f"pluggy_event_{event_id}"
+            if cache.get(cache_key):
+                logger.info(f"Event {event_id} already processed, skipping (idempotency)")
+                return JsonResponse({'status': 'ok', 'processed': False})
+
+            # Mark event as processed (expires in 7 days)
+            cache.set(cache_key, True, timeout=60*60*24*7)
 
         # Handle different event types
         if event_type == 'item/updated':

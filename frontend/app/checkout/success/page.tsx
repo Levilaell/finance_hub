@@ -54,7 +54,7 @@ function CheckoutSuccessContent() {
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
-            router.push('/dashboard');
+            router.push('/how-to-use');
             return 0;
           }
           return prev - 1;
@@ -127,11 +127,11 @@ function CheckoutSuccessContent() {
 
           <div className="space-y-3">
             <Button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push('/how-to-use')}
               className="w-full"
               size="lg"
             >
-              Ir para o Dashboard
+              Começar Tutorial
             </Button>
 
             <p className="text-sm text-muted-foreground">
