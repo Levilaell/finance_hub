@@ -1,12 +1,11 @@
 'use client';
 import { useEffect } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 export const PIXEL_ID = '24169428459391565';
 
 export default function PixelTracker() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
     const isDev = process.env.NODE_ENV === 'development';
@@ -60,7 +59,7 @@ export default function PixelTracker() {
       window.fbq('track', 'PageView');
       if (isDev) console.log('[Meta Pixel] PageView tracked for:', pathname);
     }
-  }, [pathname, searchParams]);
+  }, [pathname]);
 
   return null;
 }
