@@ -14,19 +14,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuthStore } from '@/store/auth-store';
 import { RegisterData } from '@/types';
 import { EyeIcon, EyeSlashIcon, CheckIcon, CreditCardIcon } from '@heroicons/react/24/outline';
-import { validateCNPJ, validatePhone, cnpjMask, phoneMask } from '@/utils/validation';
+import { validatePhone, phoneMask } from '@/utils/validation';
 import { trackLead } from '@/lib/meta-pixel';
-
-interface RegisterFormData extends RegisterData {
-  password2: string;
-}
 
 function RegisterContent() {
   const router = useRouter();
   const { register: registerUser, isLoading } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [cnpjValue, setCnpjValue] = useState('');
   const [phoneValue, setPhoneValue] = useState('');
 
   const {
@@ -35,11 +29,11 @@ function RegisterContent() {
     watch,
     setValue,
     formState: { errors },
-  } = useForm<RegisterFormData>();
+  } = useForm<RegisterData>();
 
   const password = watch('password');
 
-  const onSubmit = async (data: RegisterFormData) => {
+  const onSubmit = async (data: RegisterData) => {
     try {
       await registerUser(data);
 
@@ -58,30 +52,25 @@ function RegisterContent() {
       router.push('/checkout');
     } catch (error: any) {
       console.error('Erro no registro:', error.response?.data);
-      
+
       // Handle validation errors
       if (error.response?.status === 400) {
         const errors = error.response.data;
-        
+
         // Show first error from each field
         const errorMessages = Object.entries(errors)
           .filter(([key]) => key !== 'message')
           .map(([field, fieldErrors]: [string, any]) => {
             const fieldName = field === 'email' ? 'E-mail' :
                            field === 'password' ? 'Senha' :
-                           field === 'company_cnpj' ? 'CNPJ' :
-                           field === 'phone' ? 'Telefone' :
-                           field === 'first_name' ? 'Nome' :
-                           field === 'last_name' ? 'Sobrenome' :
-                           field === 'company_name' ? 'Empresa' :
-                           field === 'company_type' ? 'Tipo de empresa' :
-                           field === 'business_sector' ? 'Setor' : field;
-            
+                           field === 'phone' ? 'WhatsApp' :
+                           field === 'first_name' ? 'Nome completo' : field;
+
             const errorText = Array.isArray(fieldErrors) ? fieldErrors[0] : fieldErrors;
             return `${fieldName}: ${errorText}`;
           })
           .join('\n');
-        
+
         if (errorMessages) {
           toast.error(errorMessages);
         } else {
@@ -123,53 +112,34 @@ function RegisterContent() {
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="firstName">Nome</Label>
-                <Input
-                  id="firstName"
-                  type="text"
-                  placeholder="João"
-                  {...register('first_name', {
-                    required: 'Nome é obrigatório',
-                  })}
-                  autoComplete="given-name"
-                />
-                {errors.first_name && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {errors.first_name.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="lastName">Sobrenome</Label>
-                <Input
-                  id="lastName"
-                  type="text"
-                  placeholder="Silva"
-                  {...register('last_name', {
-                    required: 'Sobrenome é obrigatório',
-                  })}
-                  autoComplete="family-name"
-                />
-                {errors.last_name && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {errors.last_name.message}
-                  </p>
-                )}
-              </div>
+            <div>
+              <Label htmlFor="firstName">Nome completo</Label>
+              <Input
+                id="firstName"
+                type="text"
+                placeholder="João Silva"
+                {...register('first_name', {
+                  required: 'Nome completo é obrigatório',
+                })}
+                autoComplete="name"
+              />
+              {errors.first_name && (
+                <p className="text-sm text-red-500 mt-1">
+                  {errors.first_name.message}
+                </p>
+              )}
             </div>
             <div>
-              <Label htmlFor="email">E-mail</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="nome@exemplo.com"
                 {...register('email', {
-                  required: 'E-mail é obrigatório',
+                  required: 'Email é obrigatório',
                   pattern: {
                     value: /\S+@\S+\.\S+/,
-                    message: 'Endereço de e-mail inválido',
+                    message: 'Endereço de email inválido',
                   },
                 })}
                 autoComplete="email"
@@ -181,125 +151,29 @@ function RegisterContent() {
               )}
             </div>
             <div>
-              <Label htmlFor="companyName">Nome da Empresa</Label>
+              <Label htmlFor="phone">WhatsApp</Label>
               <Input
-                id="companyName"
-                type="text"
-                placeholder="Minha Empresa Ltda"
-                {...register('company_name', {
-                  required: 'Nome da empresa é obrigatório',
+                id="phone"
+                type="tel"
+                placeholder="(11) 99999-9999"
+                value={phoneValue}
+                {...register('phone', {
+                  required: 'WhatsApp é obrigatório',
+                  validate: (value) => validatePhone(value) || 'WhatsApp inválido',
                 })}
-                autoComplete="organization"
+                onChange={(e) => {
+                  const masked = phoneMask(e.target.value);
+                  setPhoneValue(masked);
+                  setValue('phone', masked);
+                }}
+                maxLength={15}
+                autoComplete="tel"
               />
-              {errors.company_name && (
+              {errors.phone && (
                 <p className="text-sm text-red-500 mt-1">
-                  {errors.company_name.message}
+                  {errors.phone.message}
                 </p>
               )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="companyCnpj">CNPJ</Label>
-                <Input
-                  id="companyCnpj"
-                  type="text"
-                  placeholder="00.000.000/0000-00"
-                  value={cnpjValue}
-                  {...register('company_cnpj', {
-                    required: 'CNPJ é obrigatório',
-                    validate: (value) => validateCNPJ(value) || 'CNPJ inválido',
-                  })}
-                  onChange={(e) => {
-                    const masked = cnpjMask(e.target.value);
-                    setCnpjValue(masked);
-                    setValue('company_cnpj', masked);
-                  }}
-                  maxLength={18}
-                />
-                {errors.company_cnpj && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {errors.company_cnpj.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="phone">Telefone</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="(11) 99999-9999"
-                  value={phoneValue}
-                  {...register('phone', {
-                    required: 'Telefone é obrigatório',
-                    validate: (value) => validatePhone(value) || 'Telefone inválido',
-                  })}
-                  onChange={(e) => {
-                    const masked = phoneMask(e.target.value);
-                    setPhoneValue(masked);
-                    setValue('phone', masked);
-                  }}
-                  maxLength={15}
-                  autoComplete="tel"
-                />
-                {errors.phone && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {errors.phone.message}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="companyType">Tipo de Empresa</Label>
-                <select
-                  id="companyType"
-                  {...register('company_type', {
-                    required: 'Tipo de empresa é obrigatório',
-                  })}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="">Selecione o tipo</option>
-                  <option value="mei">MEI</option>
-                  <option value="me">Microempresa</option>
-                  <option value="epp">Empresa de Pequeno Porte</option>
-                  <option value="ltda">Limitada</option>
-                  <option value="sa">Sociedade Anônima</option>
-                  <option value="other">Outros</option>
-                </select>
-                {errors.company_type && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {errors.company_type.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="businessSector">Setor de Atividade</Label>
-                <select
-                  id="businessSector"
-                  {...register('business_sector', {
-                    required: 'Setor de atividade é obrigatório',
-                  })}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="">Selecione o setor</option>
-                  <option value="retail">Comércio</option>
-                  <option value="services">Serviços</option>
-                  <option value="industry">Indústria</option>
-                  <option value="technology">Tecnologia</option>
-                  <option value="healthcare">Saúde</option>
-                  <option value="education">Educação</option>
-                  <option value="food">Alimentação</option>
-                  <option value="construction">Construção</option>
-                  <option value="automotive">Automotivo</option>
-                  <option value="agriculture">Agricultura</option>
-                  <option value="other">Outros</option>
-                </select>
-                {errors.business_sector && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {errors.business_sector.message}
-                  </p>
-                )}
-              </div>
             </div>
             <div>
               <Label htmlFor="password">Senha</Label>
@@ -363,38 +237,6 @@ function RegisterContent() {
                 </div>
               )}
             </div>
-            <div>
-              <Label htmlFor="password2">Confirmar Senha</Label>
-              <div className="relative">
-                <Input
-                  id="password2"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  placeholder="Confirme sua senha"
-                  {...register('password2', {
-                    required: 'Por favor, confirme sua senha',
-                    validate: (value) =>
-                      value === password || 'As senhas não coincidem',
-                  })}
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showConfirmPassword ? (
-                    <EyeSlashIcon className="h-5 w-5" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5" />
-                  )}
-                </button>
-              </div>
-              {errors.password2 && (
-                <p className="text-sm text-red-500 mt-1">
-                  {errors.password2.message}
-                </p>
-              )}
-            </div>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
@@ -406,7 +248,7 @@ function RegisterContent() {
             {isLoading ? (
               <LoadingSpinner />
             ) : (
-              'Criar Conta e Iniciar Trial'
+              'COMEÇAR TESTE DE 7 DIAS'
             )}
           </Button>
           <p className="text-sm text-center text-muted-foreground">

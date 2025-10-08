@@ -34,16 +34,10 @@ export interface LoginCredentials {
 }
 
 export interface RegisterData {
-  email: string;
-  password: string;
-  password2: string;
   first_name: string;
-  last_name: string;
-  company_name: string;
-  company_cnpj: string;
-  company_type: string;
-  business_sector: string;
+  email: string;
   phone: string;
+  password: string;
 }
 
 export interface LoginResponse {

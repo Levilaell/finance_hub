@@ -601,7 +601,7 @@ export default function Home() {
               Experimente 7 Dias Grátis
             </h2>
             <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Não precisa de cartão de crédito. Cancele quando quiser, sem burocracia.
+              Cancele quando quiser, sem burocracia.
             </p>
             <div className="grid gap-6 md:grid-cols-3 mb-8 text-left">
               <div className="flex items-start gap-3">
@@ -611,13 +611,7 @@ export default function Home() {
                   <p className="text-sm text-muted-foreground">Teste todas as funcionalidades sem compromisso</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3">
-                <CheckCircleIcon className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
-                <div>
-                  <h3 className="font-bold text-foreground mb-1">Sem Cartão</h3>
-                  <p className="text-sm text-muted-foreground">Não pedimos cartão de crédito no cadastro</p>
-                </div>
-              </div>
+
               <div className="flex items-start gap-3">
                 <CheckCircleIcon className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
                 <div>
