@@ -611,17 +611,17 @@ export default function Home() {
             <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
               Cancele quando quiser, sem burocracia.
             </p>
-            <div className="grid gap-6 md:grid-cols-3 mb-8 text-left">
-              <div className="flex items-start gap-3">
-                <CheckCircleIcon className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
+            <div className="grid gap-6 md:grid-cols-2 mb-8 max-w-3xl mx-auto">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <CheckCircleIcon className="h-6 w-6 text-primary flex-shrink-0" />
                 <div>
                   <h3 className="font-bold text-foreground mb-1">7 Dias Grátis</h3>
                   <p className="text-sm text-muted-foreground">Teste todas as funcionalidades sem compromisso</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
-                <CheckCircleIcon className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
+              <div className="flex flex-col items-center gap-3 text-center">
+                <CheckCircleIcon className="h-6 w-6 text-primary flex-shrink-0" />
                 <div>
                   <h3 className="font-bold text-foreground mb-1">Cancele a Qualquer Momento</h3>
                   <p className="text-sm text-muted-foreground">Um clique para cancelar, sem taxas ou multas</p>
