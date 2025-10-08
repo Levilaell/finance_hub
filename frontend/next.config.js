@@ -44,7 +44,7 @@ const nextConfig = {
               [
                 "connect-src 'self'",
                 isDev ? "http://localhost:8000" : "",
-                "https://*.pluggy.ai https://api.pluggy.ai https://financehub-production.up.railway.app https://api.stripe.com https://www.facebook.com https://*.facebook.com"
+                "https://*.pluggy.ai https://api.pluggy.ai https://financehub-production.up.railway.app https://api.stripe.com https://www.facebook.com https://*.facebook.com https://*.facebook.net https://*.run.app"
               ].filter(Boolean).join(' '),
               // Frame sources: Pluggy + Stripe
               "frame-src 'self' https://*.pluggy.ai https://connect.pluggy.ai https://js.stripe.com https://*.stripe.com",
