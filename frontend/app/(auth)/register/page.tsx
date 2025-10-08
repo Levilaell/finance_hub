@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -15,13 +15,20 @@ import { useAuthStore } from '@/store/auth-store';
 import { RegisterData } from '@/types';
 import { EyeIcon, EyeSlashIcon, CheckIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 import { validatePhone, phoneMask } from '@/utils/validation';
-import { trackLead } from '@/lib/meta-pixel';
+import { trackLead, trackViewContent } from '@/lib/meta-pixel';
 
 function RegisterContent() {
   const router = useRouter();
   const { register: registerUser, isLoading } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [phoneValue, setPhoneValue] = useState('');
+
+  useEffect(() => {
+    trackViewContent({
+      content_name: 'Register Page',
+      content_category: 'Registration',
+    });
+  }, []);
 
   const {
     register,

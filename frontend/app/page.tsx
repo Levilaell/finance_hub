@@ -18,10 +18,18 @@ import {
   XMarkIcon,
   Bars3Icon
 } from "@heroicons/react/24/outline";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { trackViewContent } from "@/lib/meta-pixel";
 
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    trackViewContent({
+      content_name: 'Home Page',
+      content_category: 'Landing Page',
+    });
+  }, []);
 
   return (
     <main className="min-h-screen bg-background">
