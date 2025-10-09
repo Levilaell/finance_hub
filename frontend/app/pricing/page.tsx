@@ -1,15 +1,23 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CheckIcon, SparklesIcon, BanknotesIcon, StarIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { trackViewContent } from '@/lib/meta-pixel';
 
 function PricingContent() {
   const router = useRouter();
+
+  useEffect(() => {
+    trackViewContent({
+      content_name: 'Pricing Page',
+      content_category: 'Pricing',
+    });
+  }, []);
 
   const handleSelectPlan = () => {
     router.push('/register');

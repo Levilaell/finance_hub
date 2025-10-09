@@ -23,7 +23,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className="dark">
-      <head>
+      <body className={inter.className}>
         <noscript>
           <img
             height="1"
@@ -33,8 +33,6 @@ export default function RootLayout({
             alt=""
           />
         </noscript>
-      </head>
-      <body className={inter.className}>
         <PixelTracker />
         <Providers>{children}</Providers>
       </body>
