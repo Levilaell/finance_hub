@@ -45,11 +45,11 @@ function RegisterContent() {
       });
 
       toast.success('Cadastro realizado com sucesso!', {
-        description: 'Agora vamos configurar seu pagamento.',
+        description: 'Seu trial de 7 dias começou. Aproveite!',
         duration: 5000,
       });
 
-      router.push('/checkout');
+      router.push('/dashboard');
     } catch (error: any) {
       console.error('Erro no registro:', error.response?.data);
 
@@ -105,7 +105,7 @@ function RegisterContent() {
           <CreditCardIcon className="h-4 w-4" />
           <AlertDescription>
             <strong>7 dias de trial grátis:</strong> Teste todos os recursos sem compromisso.
-            Após o cadastro, você adicionará um cartão de crédito para ativar o trial.
+            Nenhum cartão de crédito necessário para começar.
           </AlertDescription>
         </Alert>
       </CardHeader>
