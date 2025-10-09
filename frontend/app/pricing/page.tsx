@@ -236,7 +236,7 @@ function PricingContent() {
 
             <div className="glass rounded-lg p-6 hover-lift transition-all duration-300">
               <h3 className="font-semibold text-lg mb-3 text-white">
-                É seguro conectar minhas contas bancárias?
+                É seguro conectar minhas contas bancárias? 
               </h3>
               <p className="text-white/80">
                 Absolutamente. Usamos Open Banking, a tecnologia oficial regulamentada pelo Banco Central.
