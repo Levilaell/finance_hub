@@ -280,19 +280,6 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Banking Stability Warning Banner */}
-      <div className="bg-amber-50/10 border border-amber-500/20 rounded-lg p-3">
-        <div className="flex items-start gap-3">
-          <ExclamationTriangleIcon className="h-5 w-5 text-amber-400 mt-0.5 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-amber-100 leading-relaxed">
-              <span className="font-medium">Aviso:</span> Alguns bancos podem não funcionar corretamente devido a manutenções, 
-              atualizações de segurança ou mudanças nos processos de autenticação. Caso encontre dificuldades, 
-              tente novamente em alguns minutos ou entre em contato com o seu banco, se necessário.
-            </p>
-          </div>
-        </div>
-      </div>  
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
