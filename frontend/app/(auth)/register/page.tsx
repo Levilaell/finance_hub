@@ -255,7 +255,7 @@ function RegisterContent() {
             {isLoading ? (
               <LoadingSpinner />
             ) : (
-              'COMEÇAR TESTE DE 7 DIAS'
+              'Iniciar Teste de 7 Dias'
             )}
           </Button>
           <p className="text-sm text-center text-muted-foreground">
