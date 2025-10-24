@@ -12,14 +12,18 @@ export type SyncStatus = {
 };
 
 const POLLING_INTERVAL = 3000; // 3 seconds
-const MAX_POLLING_TIME = 60000; // 60 seconds timeout
+const MAX_POLLING_TIME = 180000; // 3 minutes timeout (webhooks can take time)
 
-const getProgressMessage = (executionStatus: string | null, status: string | null): string => {
+const getProgressMessage = (
+  executionStatus: string | null,
+  status: string | null,
+  elapsedTime?: number
+): string => {
   // Map execution status to user-friendly messages
   const executionMessages: Record<string, string> = {
     'LOGIN_IN_PROGRESS': 'Conectando ao banco...',
     'ACCOUNTS_IN_PROGRESS': 'Carregando contas...',
-    'TRANSACTIONS_IN_PROGRESS': 'Sincronizando transações...',
+    'TRANSACTIONS_IN_PROGRESS': 'Sincronizando transações... Isso pode levar alguns minutos.',
     'SUCCESS': 'Sincronização concluída com sucesso!',
     'PARTIAL_SUCCESS': 'Sincronização parcialmente concluída',
     'ERROR': 'Erro na sincronização',
@@ -32,11 +36,13 @@ const getProgressMessage = (executionStatus: string | null, status: string | nul
 
   // Fallback to status-based messages
   const statusMessages: Record<string, string> = {
-    'UPDATING': 'Sincronizando dados...',
+    'UPDATING': elapsedTime && elapsedTime > 30000
+      ? 'Aguardando dados do banco... Isso pode demorar alguns minutos.'
+      : 'Sincronizando dados...',
     'UPDATED': 'Sincronização concluída!',
     'LOGIN_ERROR': 'Erro no login - verifique suas credenciais',
     'WAITING_USER_INPUT': 'Aguardando autenticação adicional',
-    'OUTDATED': 'Dados desatualizados',
+    'OUTDATED': 'Dados desatualizados - tente sincronizar novamente',
     'ERROR': 'Erro na sincronização',
   };
 
@@ -75,11 +81,16 @@ export const useSyncStatus = (connectionId: string | null) => {
 
     try {
       const statusResponse = await bankingService.checkConnectionStatus(connectionId);
+      const elapsed = Date.now() - startTimeRef.current;
 
-      const message = getProgressMessage(statusResponse.execution_status, statusResponse.status);
+      const message = getProgressMessage(
+        statusResponse.execution_status,
+        statusResponse.status,
+        elapsed
+      );
       const isComplete = statusResponse.sync_complete;
       const hasError = statusResponse.requires_action ||
-                       ['ERROR', 'LOGIN_ERROR', 'OUTDATED'].includes(statusResponse.status);
+                       ['ERROR', 'LOGIN_ERROR'].includes(statusResponse.status);
 
       setSyncStatus({
         isPolling: !isComplete && !hasError,
@@ -98,13 +109,13 @@ export const useSyncStatus = (connectionId: string | null) => {
       }
 
       // Check for timeout
-      const elapsed = Date.now() - startTimeRef.current;
       if (elapsed >= MAX_POLLING_TIME) {
         setSyncStatus(prev => ({
           ...prev,
           isPolling: false,
           hasError: true,
-          message: 'Tempo limite excedido. Tente novamente.',
+          message: 'A sincronização está demorando mais que o esperado. Aguarde alguns minutos e recarregue a página, ou tente novamente mais tarde.',
+          errorMessage: 'Os dados podem estar sendo processados. Verifique novamente em alguns minutos.',
         }));
         stopPolling();
         return true;
@@ -118,6 +129,7 @@ export const useSyncStatus = (connectionId: string | null) => {
         isPolling: false,
         hasError: true,
         message: 'Erro ao verificar status da sincronização',
+        errorMessage: 'Tente recarregar a página ou sincronizar novamente.',
       }));
       stopPolling();
       return true;
@@ -152,11 +164,16 @@ export const useSyncStatus = (connectionId: string | null) => {
     const checkStatusNow = async () => {
       try {
         const statusResponse = await bankingService.checkConnectionStatus(targetConnectionId);
+        const elapsed = Date.now() - startTimeRef.current;
 
-        const message = getProgressMessage(statusResponse.execution_status, statusResponse.status);
+        const message = getProgressMessage(
+          statusResponse.execution_status,
+          statusResponse.status,
+          elapsed
+        );
         const isComplete = statusResponse.sync_complete;
         const hasError = statusResponse.requires_action ||
-                         ['ERROR', 'LOGIN_ERROR', 'OUTDATED'].includes(statusResponse.status);
+                         ['ERROR', 'LOGIN_ERROR'].includes(statusResponse.status);
 
         setSyncStatus({
           isPolling: !isComplete && !hasError,
@@ -168,6 +185,18 @@ export const useSyncStatus = (connectionId: string | null) => {
           errorMessage: statusResponse.error_message,
         });
 
+        // Check for timeout
+        if (elapsed >= MAX_POLLING_TIME) {
+          setSyncStatus(prev => ({
+            ...prev,
+            isPolling: false,
+            hasError: true,
+            message: 'A sincronização está demorando mais que o esperado. Aguarde alguns minutos e recarregue a página, ou tente novamente mais tarde.',
+            errorMessage: 'Os dados podem estar sendo processados. Verifique novamente em alguns minutos.',
+          }));
+          return true;
+        }
+
         return isComplete || hasError;
       } catch (error) {
         console.error('[useSyncStatus] Error in checkStatusNow:', error);
@@ -176,6 +205,7 @@ export const useSyncStatus = (connectionId: string | null) => {
           isPolling: false,
           hasError: true,
           message: 'Erro ao verificar status da sincronização',
+          errorMessage: 'Tente recarregar a página ou sincronizar novamente.',
         }));
         return true;
       }

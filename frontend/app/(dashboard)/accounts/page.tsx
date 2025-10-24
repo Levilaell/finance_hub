@@ -14,6 +14,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { BankAccountCard } from '@/components/banking/bank-account-card';
 import { PluggyConnectWidget } from '@/components/banking/pluggy-connect-widget';
+import { SyncToast } from '@/components/ui/sync-toast';
 import {
   Dialog,
   DialogContent,
@@ -71,10 +72,10 @@ export default function AccountsPage() {
 
     if (syncStatus.isPolling) {
       // Update toast with current progress
-      toast.loading(syncStatus.message, { id: 'sync-progress' });
+      toast.loading(syncStatus.message, { id: 'sync-progress', duration: Infinity });
     } else if (syncStatus.isComplete) {
       // Sync completed successfully
-      toast.success(syncStatus.message, { id: 'sync-progress' });
+      toast.success(syncStatus.message, { id: 'sync-progress', duration: 4000 });
       setSyncingConnectionId(null);
 
       // Reload data after a short delay to ensure backend has processed
@@ -82,8 +83,18 @@ export default function AccountsPage() {
         fetchData();
       }, 1500);
     } else if (syncStatus.hasError) {
-      // Sync failed
-      toast.error(syncStatus.errorMessage || syncStatus.message, { id: 'sync-progress' });
+      // Sync failed - show custom toast with detailed error info
+      toast.error(
+        <SyncToast
+          message={syncStatus.message}
+          errorMessage={syncStatus.errorMessage}
+          type="error"
+        />,
+        {
+          id: 'sync-progress',
+          duration: 10000, // Show error longer so user can read it
+        }
+      );
       setSyncingConnectionId(null);
     }
   }, [syncStatus, syncingConnectionId]);
