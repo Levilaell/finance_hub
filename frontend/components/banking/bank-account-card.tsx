@@ -10,18 +10,22 @@ import {
   BuildingLibraryIcon,
   TrashIcon,
   EyeIcon,
+  ExclamationTriangleIcon,
+  LinkIcon,
 } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface BankAccountCardProps {
   account: BankAccount;
+  connectionStatus?: string;  // Status from BankConnection (LOGIN_ERROR, UPDATED, etc)
   onSync?: () => void;
+  onReconnect?: () => void;
   onView?: () => void;
   onDelete?: () => void;
 }
 
-export function BankAccountCard({ account, onSync, onView, onDelete }: BankAccountCardProps) {
+export function BankAccountCard({ account, connectionStatus, onSync, onReconnect, onView, onDelete }: BankAccountCardProps) {
   const getAccountTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       CHECKING: 'Conta Corrente',
@@ -116,6 +120,23 @@ export function BankAccountCard({ account, onSync, onView, onDelete }: BankAccou
           )}
         </div>
 
+        {/* Connection Error Warning */}
+        {connectionStatus === 'LOGIN_ERROR' && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <ExclamationTriangleIcon className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-900">
+                  Credenciais expiradas
+                </p>
+                <p className="text-xs text-red-700 mt-1">
+                  Reconecte sua conta para continuar sincronizando
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Last Update and Actions */}
         <div className="pt-3 border-t space-y-3">
           <p className="text-sm text-muted-foreground">
@@ -128,27 +149,43 @@ export function BankAccountCard({ account, onSync, onView, onDelete }: BankAccou
           </p>
 
           <div className="flex gap-2">
-            {onSync && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onSync}
-                className="flex-1"
-              >
-                <ArrowPathIcon className="h-4 w-4 mr-1.5" />
-                Sincronizar
-              </Button>
-            )}
-            {onView && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onView}
-                className="flex-1"
-              >
-                <EyeIcon className="h-4 w-4 mr-1.5" />
-                Transações
-              </Button>
+            {connectionStatus === 'LOGIN_ERROR' ? (
+              onReconnect && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={onReconnect}
+                  className="flex-1 bg-red-600 hover:bg-red-700"
+                >
+                  <LinkIcon className="h-4 w-4 mr-1.5" />
+                  Reconectar
+                </Button>
+              )
+            ) : (
+              <>
+                {onSync && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onSync}
+                    className="flex-1"
+                  >
+                    <ArrowPathIcon className="h-4 w-4 mr-1.5" />
+                    Sincronizar
+                  </Button>
+                )}
+                {onView && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onView}
+                    className="flex-1"
+                  >
+                    <EyeIcon className="h-4 w-4 mr-1.5" />
+                    Transações
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </div>

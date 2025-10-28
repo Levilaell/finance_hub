@@ -354,6 +354,33 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=True, methods=['get'])
+    def reconnect_token(self, request, pk=None):
+        """
+        Get a connect token for reconnecting/updating an existing connection.
+        This is used when LOGIN_ERROR or credential issues occur.
+        GET /api/banking/connections/{id}/reconnect_token/
+        """
+        connection = self.get_object()
+
+        try:
+            client = PluggyClient()
+            token = client._get_connect_token(item_id=connection.pluggy_item_id)
+
+            expires_at = timezone.now() + timedelta(minutes=30)
+            return Response({
+                'token': token,
+                'expires_at': expires_at,
+                'item_id': connection.pluggy_item_id,
+                'connection_id': str(connection.id)
+            })
+        except Exception as e:
+            logger.error(f"Error getting reconnect token: {e}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     @action(detail=False, methods=['get'])
     def connect_token(self, request):
         """

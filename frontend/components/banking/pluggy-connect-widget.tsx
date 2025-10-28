@@ -12,6 +12,7 @@ const PluggyConnect = dynamic(
 
 interface PluggyConnectWidgetProps {
   connectToken: string;
+  updateItemId?: string;  // Optional: for updating existing connections
   onSuccess: (itemId: string) => void;
   onError?: (error: any) => void;
   onClose: () => void;
@@ -19,6 +20,7 @@ interface PluggyConnectWidgetProps {
 
 export function PluggyConnectWidget({
   connectToken,
+  updateItemId,
   onSuccess,
   onError,
   onClose,
@@ -32,7 +34,10 @@ export function PluggyConnectWidget({
   }, []);
 
   const handleSuccess = (response: any) => {
-    toast.success('Banco conectado com sucesso!');
+    const successMessage = updateItemId
+      ? 'Credenciais atualizadas com sucesso!'
+      : 'Banco conectado com sucesso!';
+    toast.success(successMessage);
 
     // Pluggy returns itemId in the response
     const itemId = response.itemId || response.item?.id;
@@ -47,7 +52,10 @@ export function PluggyConnectWidget({
 
   const handleError = (error: any) => {
     console.error('Pluggy error:', error);
-    toast.error('Erro ao conectar banco');
+    const errorMessage = updateItemId
+      ? 'Erro ao atualizar credenciais'
+      : 'Erro ao conectar banco';
+    toast.error(errorMessage);
     if (onError) onError(error);
   };
 
@@ -64,6 +72,7 @@ export function PluggyConnectWidget({
       ) : (
         <PluggyConnect
           connectToken={connectToken}
+          updateItem={updateItemId}
           onSuccess={handleSuccess}
           onError={handleError}
         />

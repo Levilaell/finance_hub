@@ -100,6 +100,12 @@ class BankingService {
     );
   }
 
+  async getReconnectToken(connectionId: string): Promise<ConnectTokenResponse & { item_id: string }> {
+    return apiClient.get<ConnectTokenResponse & { item_id: string }>(
+      `/api/banking/connections/${connectionId}/reconnect_token/`
+    );
+  }
+
   // Bank Accounts
   async getAccounts(): Promise<BankAccount[]> {
     const response = await apiClient.get<PaginatedResponse<BankAccount>>(

@@ -39,6 +39,7 @@ export default function AccountsPage() {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [showPluggyWidget, setShowPluggyWidget] = useState(false);
   const [connectToken, setConnectToken] = useState<string | null>(null);
+  const [updateItemId, setUpdateItemId] = useState<string | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState<BankAccount | null>(null);
@@ -147,6 +148,40 @@ export default function AccountsPage() {
   const handleWidgetClose = () => {
     setShowPluggyWidget(false);
     setConnectToken(null);
+    setUpdateItemId(null);
+  };
+
+  // Handle reconnection
+  const handleReconnectAccount = async (connectionId: string) => {
+    try {
+      const response = await bankingService.getReconnectToken(connectionId);
+      setConnectToken(response.token);
+      setUpdateItemId(response.item_id);
+      setShowPluggyWidget(true);
+    } catch (error) {
+      toast.error('Erro ao obter token de reconexão');
+      console.error(error);
+    }
+  };
+
+  // Handle successful reconnection
+  const handleReconnectionSuccess = async (itemId: string) => {
+    try {
+      toast.success('Conta reconectada com sucesso! Atualizando dados...');
+
+      // Close widget
+      setShowPluggyWidget(false);
+      setConnectToken(null);
+      setUpdateItemId(null);
+
+      // Wait a bit then refresh
+      setTimeout(async () => {
+        await fetchData();
+      }, 2000);
+    } catch (error: any) {
+      console.error('Error after reconnection:', error);
+      toast.error('Conta reconectada, mas houve erro ao atualizar dados');
+    }
   };
 
   // Sync account transactions
@@ -315,15 +350,23 @@ export default function AccountsPage() {
       {/* Main Content */}
       {hasAccounts ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {accounts.map((account) => (
-            <BankAccountCard
-              key={account.id}
-              account={account}
-              onSync={() => handleSyncAccount(account.id)}
-              onView={() => setSelectedAccountId(account.id)}
-              onDelete={() => handleDeleteAccount(account.id)}
-            />
-          ))}
+          {accounts.map((account) => {
+            // Find the connection for this account to get its status
+            const connection = connections.find(c => c.id === account.connection_id);
+            const connectionStatus = connection?.status;
+
+            return (
+              <BankAccountCard
+                key={account.id}
+                account={account}
+                connectionStatus={connectionStatus}
+                onSync={() => handleSyncAccount(account.id)}
+                onReconnect={() => handleReconnectAccount(account.connection_id)}
+                onView={() => setSelectedAccountId(account.id)}
+                onDelete={() => handleDeleteAccount(account.id)}
+              />
+            );
+          })}
         </div>
       ) : (
         <EmptyState
@@ -344,7 +387,8 @@ export default function AccountsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
           <PluggyConnectWidget
             connectToken={connectToken}
-            onSuccess={handleConnectionSuccess}
+            updateItemId={updateItemId || undefined}
+            onSuccess={updateItemId ? handleReconnectionSuccess : handleConnectionSuccess}
             onClose={handleWidgetClose}
           />
         </div>
