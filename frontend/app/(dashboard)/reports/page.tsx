@@ -974,14 +974,14 @@ export default function ReportsPage() {
               <ResponsiveContainer width="100%" height={400}>
                 <LineChart
                   data={monthlyData.map((item, index) => {
-                    const projection = cashFlowProjection.find(p => p.month === item.month);
+                    const projection = cashFlowProjection.find(p => p.month.includes(item.mes.substring(0, 3)));
                     return {
-                      month: item.month,
-                      realizado: item.income + item.expenses,
+                      month: item.mes,
+                      realizado: item.receitas - item.despesas,
                       previsto: projection ? projection.net : 0,
-                      receitas_realizadas: item.income,
+                      receitas_realizadas: item.receitas,
                       receitas_previstas: projection?.receivable || 0,
-                      despesas_realizadas: Math.abs(item.expenses),
+                      despesas_realizadas: item.despesas,
                       despesas_previstas: projection?.payable || 0
                     };
                   })}
