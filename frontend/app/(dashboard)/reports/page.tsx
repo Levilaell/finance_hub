@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { bankingService } from '@/services/banking.service';
-import { Transaction, FinancialSummary } from '@/types/banking';
+import { billsService } from '@/services/bills.service';
+import { Transaction, FinancialSummary, CashFlowProjection } from '@/types/banking';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -64,6 +65,7 @@ export default function ReportsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
+  const [cashFlowProjection, setCashFlowProjection] = useState<CashFlowProjection[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>({
     label: 'Mês atual',
     startDate: startOfMonth(new Date()),
@@ -125,17 +127,19 @@ export default function ReportsPage() {
           filters.date_to = selectedPeriod.endDate.toISOString().split('T')[0];
         }
 
-        const [transactionsData, summaryData] = await Promise.all([
+        const [transactionsData, summaryData, cashFlowData] = await Promise.all([
           bankingService.getTransactions(filters),
           bankingService.getTransactionsSummary(
             filters.date_from,
             filters.date_to
-          )
+          ),
+          billsService.getCashFlowProjection()
         ]);
 
         if (!cancelled) {
           setTransactions(transactionsData);
           setSummary(summaryData);
+          setCashFlowProjection(cashFlowData);
         }
       } catch (error) {
         if (!cancelled) {
@@ -899,6 +903,164 @@ export default function ReportsPage() {
             ) : (
               <div className="py-8 text-center text-white/60">
                 <p>Nenhuma despesa categorizada no período</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Gráficos de Fluxo de Caixa - Contas a Pagar/Receber */}
+      <div className="grid grid-cols-1 gap-6">
+        {/* Fluxo de Caixa Projetado (próximos 12 meses) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Fluxo de Caixa Projetado (Próximos 12 Meses)</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Previsão baseada em contas a pagar e receber
+            </p>
+          </CardHeader>
+          <CardContent>
+            {cashFlowProjection.length > 0 ? (
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={cashFlowProjection}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                  <XAxis
+                    dataKey="month"
+                    stroke="rgba(255,255,255,0.5)"
+                    tick={{ fill: 'rgba(255,255,255,0.7)' }}
+                  />
+                  <YAxis
+                    stroke="rgba(255,255,255,0.5)"
+                    tick={{ fill: 'rgba(255,255,255,0.7)' }}
+                    tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: any) => [formatCurrency(value), '']}
+                    labelFormatter={(label) => {
+                      const item = cashFlowProjection.find(d => d.month === label);
+                      return item ? item.month_name : label;
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="receivable" name="A Receber" fill="#10b981" />
+                  <Bar dataKey="payable" name="A Pagar" fill="#ef4444" />
+                  <Bar dataKey="net" name="Resultado" fill="#3b82f6" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="py-8 text-center text-white/60">
+                <p>Nenhuma projeção disponível</p>
+                <p className="text-sm mt-2">Crie contas a pagar/receber para visualizar o fluxo de caixa projetado</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Gráfico Comparativo: Previsto vs Realizado */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Previsto vs Realizado</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Comparação entre contas a pagar/receber e transações bancárias
+            </p>
+          </CardHeader>
+          <CardContent>
+            {monthlyData.length > 0 && cashFlowProjection.length > 0 ? (
+              <ResponsiveContainer width="100%" height={400}>
+                <LineChart
+                  data={monthlyData.map((item, index) => {
+                    const projection = cashFlowProjection.find(p => p.month === item.month);
+                    return {
+                      month: item.month,
+                      realizado: item.income + item.expenses,
+                      previsto: projection ? projection.net : 0,
+                      receitas_realizadas: item.income,
+                      receitas_previstas: projection?.receivable || 0,
+                      despesas_realizadas: Math.abs(item.expenses),
+                      despesas_previstas: projection?.payable || 0
+                    };
+                  })}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                  <XAxis
+                    dataKey="month"
+                    stroke="rgba(255,255,255,0.5)"
+                    tick={{ fill: 'rgba(255,255,255,0.7)' }}
+                  />
+                  <YAxis
+                    stroke="rgba(255,255,255,0.5)"
+                    tick={{ fill: 'rgba(255,255,255,0.7)' }}
+                    tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: any) => [formatCurrency(value), '']}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="realizado"
+                    name="Resultado Realizado"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="previsto"
+                    name="Resultado Previsto"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="receitas_realizadas"
+                    name="Receitas Realizadas"
+                    stroke="#10b981"
+                    strokeWidth={1}
+                    opacity={0.5}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="receitas_previstas"
+                    name="Receitas Previstas"
+                    stroke="#10b981"
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
+                    opacity={0.5}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="despesas_realizadas"
+                    name="Despesas Realizadas"
+                    stroke="#ef4444"
+                    strokeWidth={1}
+                    opacity={0.5}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="despesas_previstas"
+                    name="Despesas Previstas"
+                    stroke="#ef4444"
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
+                    opacity={0.5}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="py-8 text-center text-white/60">
+                <p>Dados insuficientes para comparação</p>
+                <p className="text-sm mt-2">Crie contas e registre transações para visualizar a comparação</p>
               </div>
             )}
           </CardContent>

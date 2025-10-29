@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { bankingService } from '@/services/banking.service';
+import { billsService } from '@/services/bills.service';
 import {
   FinancialSummary,
   Transaction,
   BankAccount,
-  CategorySummary
+  CategorySummary,
+  BillsSummary
 } from '@/types/banking';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -34,6 +36,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
+  const [billsSummary, setBillsSummary] = useState<BillsSummary | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [topCategories, setTopCategories] = useState<CategorySummary | null>(null);
@@ -52,14 +55,16 @@ export default function DashboardPage() {
     setIsLoading(true);
     try {
       // Fetch all data in parallel
-      const [summaryData, transactionsData, accountsData, categoriesData] = await Promise.all([
+      const [summaryData, billsSummaryData, transactionsData, accountsData, categoriesData] = await Promise.all([
         bankingService.getFinancialSummary(),
+        billsService.getSummary(),
         bankingService.getTransactions({ limit: 5 }),
         bankingService.getAccounts(),
         bankingService.getCategorySummary()
       ]);
 
       setSummary(summaryData);
+      setBillsSummary(billsSummaryData);
       setRecentTransactions(transactionsData);
       setAccounts(accountsData);
       setTopCategories(categoriesData);
@@ -74,6 +79,16 @@ export default function DashboardPage() {
         period_end: endOfMonth(new Date()).toISOString(),
         accounts_count: 0,
         transactions_count: 0
+      });
+      setBillsSummary({
+        total_receivable: 0,
+        total_receivable_month: 0,
+        total_payable: 0,
+        total_payable_month: 0,
+        total_overdue: 0,
+        overdue_count: 0,
+        receivable_count: 0,
+        payable_count: 0
       });
     } finally {
       setIsLoading(false);
@@ -194,6 +209,54 @@ export default function DashboardPage() {
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {summary?.transactions_count || 0} transações
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Bills Cards - Contas a Pagar/Receber */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">A Receber (Mês)</CardTitle>
+            <ArrowTrendingUpIcon className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {formatCurrency(billsSummary?.total_receivable_month || 0)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {billsSummary?.receivable_count || 0} conta{billsSummary?.receivable_count !== 1 ? 's' : ''} pendente{billsSummary?.receivable_count !== 1 ? 's' : ''}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">A Pagar (Mês)</CardTitle>
+            <ArrowTrendingDownIcon className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              {formatCurrency(billsSummary?.total_payable_month || 0)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {billsSummary?.payable_count || 0} conta{billsSummary?.payable_count !== 1 ? 's' : ''} pendente{billsSummary?.payable_count !== 1 ? 's' : ''}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Atrasadas</CardTitle>
+            <DocumentTextIcon className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">
+              {formatCurrency(billsSummary?.total_overdue || 0)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {billsSummary?.overdue_count || 0} conta{billsSummary?.overdue_count !== 1 ? 's' : ''} atrasada{billsSummary?.overdue_count !== 1 ? 's' : ''}
             </p>
           </CardContent>
         </Card>

@@ -265,6 +265,138 @@ class Category(models.Model):
         return f"{self.name} ({self.get_type_display()})"
 
 
+class Bill(models.Model):
+    """
+    Represents accounts payable and receivable.
+    These are bills/invoices that are not yet reflected in bank transactions.
+    """
+    TYPE_CHOICES = [
+        ('payable', 'A Pagar'),
+        ('receivable', 'A Receber'),
+    ]
+
+    STATUS_CHOICES = [
+        ('pending', 'Pendente'),
+        ('partially_paid', 'Parcialmente Pago'),
+        ('paid', 'Pago'),
+        ('cancelled', 'Cancelado'),
+    ]
+
+    RECURRENCE_CHOICES = [
+        ('once', 'Uma vez'),
+        ('monthly', 'Mensal'),
+        ('weekly', 'Semanal'),
+        ('yearly', 'Anual'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bills')
+
+    # Bill details
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    description = models.CharField(max_length=500)
+    amount = models.DecimalField(max_digits=15, decimal_places=2)
+    amount_paid = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
+    currency_code = models.CharField(max_length=3, default='BRL')
+
+    # Dates
+    due_date = models.DateField(db_index=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    # Status
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+
+    # Categorization
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='bills'
+    )
+
+    # Recurrence
+    recurrence = models.CharField(max_length=20, choices=RECURRENCE_CHOICES, default='once')
+    parent_bill = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='installments',
+        help_text='For recurring bills, links to the original bill'
+    )
+    installment_number = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Installment number for recurring bills'
+    )
+
+    # Customer/Supplier
+    customer_supplier = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text='Name of customer (for receivables) or supplier (for payables)'
+    )
+
+    # Notes
+    notes = models.TextField(blank=True)
+
+    # Link to bank transaction (when paid through bank)
+    linked_transaction = models.ForeignKey(
+        Transaction,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='linked_bills'
+    )
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['due_date', '-created_at']
+        indexes = [
+            models.Index(fields=['user', 'type', 'status']),
+            models.Index(fields=['user', 'due_date']),
+            models.Index(fields=['status', 'due_date']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_type_display()} - {self.description} ({self.amount})"
+
+    @property
+    def is_overdue(self):
+        """Check if bill is overdue."""
+        if self.status in ['paid', 'cancelled']:
+            return False
+        return timezone.now().date() > self.due_date
+
+    @property
+    def amount_remaining(self):
+        """Calculate remaining amount to be paid."""
+        return self.amount - self.amount_paid
+
+    @property
+    def payment_percentage(self):
+        """Calculate payment percentage."""
+        if self.amount == 0:
+            return 0
+        return (self.amount_paid / self.amount) * 100
+
+    def update_status(self):
+        """Update status based on amount_paid."""
+        if self.amount_paid >= self.amount:
+            self.status = 'paid'
+            if not self.paid_at:
+                self.paid_at = timezone.now()
+        elif self.amount_paid > 0:
+            self.status = 'partially_paid'
+        else:
+            self.status = 'pending'
+        self.save()
+
+
 class SyncLog(models.Model):
     """
     Logs for synchronization operations.

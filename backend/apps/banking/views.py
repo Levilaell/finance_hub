@@ -13,14 +13,15 @@ from django.db.models import Sum, Count, Min, Max
 
 from .models import (
     Connector, BankConnection, BankAccount,
-    Transaction, SyncLog, Category
+    Transaction, SyncLog, Category, Bill
 )
 from .serializers import (
     ConnectorSerializer, BankConnectionSerializer,
     BankAccountSerializer, TransactionSerializer,
     CreateConnectionSerializer, TransactionFilterSerializer,
     SyncStatusSerializer, ConnectTokenSerializer,
-    SummarySerializer, CategorySerializer
+    SummarySerializer, CategorySerializer, BillSerializer,
+    BillFilterSerializer, RegisterPaymentSerializer, BillsSummarySerializer
 )
 from .services import (
     ConnectorService, BankConnectionService,
@@ -675,3 +676,194 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
         category.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class BillViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing bills (accounts payable/receivable).
+    """
+    serializer_class = BillSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
+
+    def get_queryset(self):
+        """Get bills for the current user with filters."""
+        queryset = Bill.objects.filter(user=self.request.user)
+
+        # Apply filters
+        filter_serializer = BillFilterSerializer(data=self.request.query_params)
+        if filter_serializer.is_valid():
+            filters = filter_serializer.validated_data
+
+            if 'type' in filters:
+                queryset = queryset.filter(type=filters['type'])
+            if 'status' in filters:
+                queryset = queryset.filter(status=filters['status'])
+            if 'date_from' in filters:
+                queryset = queryset.filter(due_date__gte=filters['date_from'])
+            if 'date_to' in filters:
+                queryset = queryset.filter(due_date__lte=filters['date_to'])
+            if 'category' in filters:
+                queryset = queryset.filter(category_id=filters['category'])
+            if 'is_overdue' in filters and filters['is_overdue']:
+                today = timezone.now().date()
+                queryset = queryset.filter(
+                    due_date__lt=today
+                ).exclude(status__in=['paid', 'cancelled'])
+
+        return queryset.select_related('category').order_by('due_date', '-created_at')
+
+    def perform_create(self, serializer):
+        """Assign current user when creating a bill."""
+        serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def register_payment(self, request, pk=None):
+        """
+        Register a payment for a bill.
+        POST /api/banking/bills/{id}/register_payment/
+        Body: { "amount": 100.00, "notes": "..." }
+        """
+        bill = self.get_object()
+        serializer = RegisterPaymentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        payment_amount = serializer.validated_data['amount']
+        notes = serializer.validated_data.get('notes', '')
+
+        # Validate payment amount
+        if payment_amount > bill.amount_remaining:
+            return Response(
+                {'error': f'Payment amount ({payment_amount}) exceeds remaining amount ({bill.amount_remaining})'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Update bill
+        bill.amount_paid += payment_amount
+        if notes:
+            bill.notes = f"{bill.notes}\n{notes}" if bill.notes else notes
+        bill.update_status()
+
+        return Response(BillSerializer(bill).data)
+
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """
+        Get bills summary.
+        GET /api/banking/bills/summary/
+        """
+        from calendar import monthrange
+
+        # Get current month range
+        utc_now = timezone.now()
+        from django.conf import settings
+        import pytz
+        local_tz = pytz.timezone(settings.TIME_ZONE)
+        local_now = utc_now.astimezone(local_tz)
+
+        current_month_start = local_now.replace(day=1)
+        last_day = monthrange(local_now.year, local_now.month)[1]
+        current_month_end = local_now.replace(day=last_day, hour=23, minute=59, second=59)
+
+        # Get all bills for user
+        bills = Bill.objects.filter(user=request.user)
+
+        # Calculate totals
+        receivable_bills = bills.filter(type='receivable').exclude(status='cancelled')
+        payable_bills = bills.filter(type='payable').exclude(status='cancelled')
+
+        # Total receivable (pending + partially paid)
+        total_receivable = receivable_bills.exclude(status='paid').aggregate(
+            total=Sum('amount') - Sum('amount_paid')
+        )['total'] or 0
+
+        # Total receivable this month
+        total_receivable_month = receivable_bills.filter(
+            due_date__gte=current_month_start.date(),
+            due_date__lte=current_month_end.date()
+        ).exclude(status='paid').aggregate(
+            total=Sum('amount') - Sum('amount_paid')
+        )['total'] or 0
+
+        # Total payable (pending + partially paid)
+        total_payable = payable_bills.exclude(status='paid').aggregate(
+            total=Sum('amount') - Sum('amount_paid')
+        )['total'] or 0
+
+        # Total payable this month
+        total_payable_month = payable_bills.filter(
+            due_date__gte=current_month_start.date(),
+            due_date__lte=current_month_end.date()
+        ).exclude(status='paid').aggregate(
+            total=Sum('amount') - Sum('amount_paid')
+        )['total'] or 0
+
+        # Overdue bills (both types)
+        today = local_now.date()
+        overdue_bills = bills.filter(
+            due_date__lt=today,
+        ).exclude(status__in=['paid', 'cancelled'])
+
+        total_overdue = overdue_bills.aggregate(
+            total=Sum('amount') - Sum('amount_paid')
+        )['total'] or 0
+
+        summary_data = {
+            'total_receivable': total_receivable,
+            'total_receivable_month': total_receivable_month,
+            'total_payable': total_payable,
+            'total_payable_month': total_payable_month,
+            'total_overdue': total_overdue,
+            'overdue_count': overdue_bills.count(),
+            'receivable_count': receivable_bills.exclude(status='paid').count(),
+            'payable_count': payable_bills.exclude(status='paid').count(),
+        }
+
+        serializer = BillsSummarySerializer(summary_data)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def cash_flow_projection(self, request):
+        """
+        Get cash flow projection for the next 12 months.
+        GET /api/banking/bills/cash_flow_projection/
+        """
+        from dateutil.relativedelta import relativedelta
+
+        today = timezone.now().date()
+        projections = []
+
+        # Get next 12 months
+        for i in range(12):
+            month_start = (today + relativedelta(months=i)).replace(day=1)
+            month_end = (month_start + relativedelta(months=1)) - relativedelta(days=1)
+
+            # Receivables for this month
+            receivable = Bill.objects.filter(
+                user=request.user,
+                type='receivable',
+                due_date__gte=month_start,
+                due_date__lte=month_end
+            ).exclude(status='cancelled').aggregate(
+                total=Sum('amount') - Sum('amount_paid')
+            )['total'] or 0
+
+            # Payables for this month
+            payable = Bill.objects.filter(
+                user=request.user,
+                type='payable',
+                due_date__gte=month_start,
+                due_date__lte=month_end
+            ).exclude(status='cancelled').aggregate(
+                total=Sum('amount') - Sum('amount_paid')
+            )['total'] or 0
+
+            projections.append({
+                'month': month_start.strftime('%Y-%m'),
+                'month_name': month_start.strftime('%B %Y'),
+                'receivable': float(receivable),
+                'payable': float(payable),
+                'net': float(receivable - payable)
+            })
+
+        return Response(projections)

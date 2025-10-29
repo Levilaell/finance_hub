@@ -22,6 +22,7 @@ import {
   Lock,
   Package,
   BookOpen,
+  FileTextIcon,
 } from "lucide-react";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
 
@@ -32,7 +33,8 @@ interface MainLayoutProps {
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Transações", href: "/transactions", icon: Receipt },
-  { name: "Contas", href: "/accounts", icon: Wallet },
+  { name: "Contas Bancárias", href: "/accounts", icon: Wallet },
+  { name: "Contas", href: "/bills", icon: FileTextIcon },
   { name: "Categorias", href: "/categories", icon: Tags },
   { name: "Estoque", href: "/estoque", icon: Package, comingSoon: true },
   { name: "Insights", href: "/ai-insights", icon: Sparkles, comingSoon: true },

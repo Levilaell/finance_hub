@@ -202,3 +202,87 @@ export interface PluggyConnectConfig {
   onError?: (error: Error) => void;
   onExit?: () => void;
 }
+
+// Bill Types
+export type BillType = 'payable' | 'receivable';
+
+export type BillStatus = 'pending' | 'partially_paid' | 'paid' | 'cancelled';
+
+export type BillRecurrence = 'once' | 'monthly' | 'weekly' | 'yearly';
+
+// Bill
+export interface Bill {
+  id: string;
+  type: BillType;
+  description: string;
+  amount: number;
+  amount_paid: number;
+  amount_remaining: number;
+  payment_percentage: number;
+  currency_code: string;
+  due_date: string;
+  paid_at?: string;
+  status: BillStatus;
+  is_overdue: boolean;
+  category?: string;
+  category_name?: string;
+  category_color?: string;
+  category_icon?: string;
+  recurrence: BillRecurrence;
+  parent_bill?: string;
+  installment_number?: number;
+  customer_supplier?: string;
+  notes?: string;
+  linked_transaction?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Bill Request
+export interface BillRequest {
+  type: BillType;
+  description: string;
+  amount: number;
+  due_date: string;
+  category?: string;
+  recurrence?: BillRecurrence;
+  customer_supplier?: string;
+  notes?: string;
+}
+
+// Register Payment Request
+export interface RegisterPaymentRequest {
+  amount: number;
+  notes?: string;
+}
+
+// Bills Summary
+export interface BillsSummary {
+  total_receivable: number;
+  total_receivable_month: number;
+  total_payable: number;
+  total_payable_month: number;
+  total_overdue: number;
+  overdue_count: number;
+  receivable_count: number;
+  payable_count: number;
+}
+
+// Bill Filter
+export interface BillFilter {
+  type?: BillType;
+  status?: BillStatus;
+  date_from?: string;
+  date_to?: string;
+  category?: string;
+  is_overdue?: boolean;
+}
+
+// Cash Flow Projection
+export interface CashFlowProjection {
+  month: string;
+  month_name: string;
+  receivable: number;
+  payable: number;
+  net: number;
+}
