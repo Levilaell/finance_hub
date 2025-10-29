@@ -121,7 +121,7 @@ export function BankAccountCard({ account, connectionStatus, onSync, onReconnect
         </div>
 
         {/* Connection Error Warning */}
-        {connectionStatus === 'LOGIN_ERROR' && (
+        {(connectionStatus === 'LOGIN_ERROR' || connectionStatus === 'ERROR') && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-start gap-2">
               <ExclamationTriangleIcon className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -149,7 +149,7 @@ export function BankAccountCard({ account, connectionStatus, onSync, onReconnect
           </p>
 
           <div className="flex gap-2">
-            {connectionStatus === 'LOGIN_ERROR' ? (
+            {(connectionStatus === 'LOGIN_ERROR' || connectionStatus === 'ERROR') ? (
               onReconnect && (
                 <Button
                   variant="default"
