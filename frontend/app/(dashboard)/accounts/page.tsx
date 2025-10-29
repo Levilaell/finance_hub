@@ -97,6 +97,7 @@ export default function AccountsPage() {
         bankingService.getAccounts(),
         bankingService.getConnections(),
       ]);
+      console.log('[AccountsPage] Connections loaded:', connectionsData);
       setAccounts(accountsData);
       setConnections(connectionsData);
     } catch (error) {
@@ -354,6 +355,8 @@ export default function AccountsPage() {
             // Find the connection for this account to get its status
             const connection = connections.find(c => c.id === account.connection_id);
             const connectionStatus = connection?.status;
+
+            console.log(`[AccountsPage] Account ${account.id}: connection=${account.connection_id}, status=${connectionStatus}`);
 
             return (
               <BankAccountCard
