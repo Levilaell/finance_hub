@@ -355,6 +355,7 @@ export default function AccountsPage() {
             // Find the connection for this account to get its status
             const connection = connections.find(c => c.id === account.connection_id);
             const connectionStatus = connection?.status;
+            const connectionStatusDetail = connection?.status_detail;
 
             console.log(`[AccountsPage] Account ${account.id}: connection=${account.connection_id}, status=${connectionStatus}`);
 
@@ -363,6 +364,7 @@ export default function AccountsPage() {
                 key={account.id}
                 account={account}
                 connectionStatus={connectionStatus}
+                connectionStatusDetail={connectionStatusDetail}
                 onSync={() => handleSyncAccount(account.id)}
                 onReconnect={() => handleReconnectAccount(account.connection_id)}
                 onView={() => setSelectedAccountId(account.id)}

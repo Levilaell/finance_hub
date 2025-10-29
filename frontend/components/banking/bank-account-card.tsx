@@ -19,13 +19,14 @@ import { ptBR } from 'date-fns/locale';
 interface BankAccountCardProps {
   account: BankAccount;
   connectionStatus?: string;  // Status from BankConnection (LOGIN_ERROR, UPDATED, etc)
+  connectionStatusDetail?: any;  // Status detail from BankConnection
   onSync?: () => void;
   onReconnect?: () => void;
   onView?: () => void;
   onDelete?: () => void;
 }
 
-export function BankAccountCard({ account, connectionStatus, onSync, onReconnect, onView, onDelete }: BankAccountCardProps) {
+export function BankAccountCard({ account, connectionStatus, connectionStatusDetail, onSync, onReconnect, onView, onDelete }: BankAccountCardProps) {
   const getAccountTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       CHECKING: 'Conta Corrente',
@@ -127,10 +128,12 @@ export function BankAccountCard({ account, connectionStatus, onSync, onReconnect
               <ExclamationTriangleIcon className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-red-900">
-                  Credenciais expiradas
+                  {connectionStatusDetail?.code === 'USER_AUTHORIZATION_REVOKED'
+                    ? 'Permissões revogadas'
+                    : 'Credenciais expiradas'}
                 </p>
                 <p className="text-xs text-red-700 mt-1">
-                  Reconecte sua conta para continuar sincronizando
+                  {connectionStatusDetail?.message || 'Reconecte sua conta para continuar sincronizando'}
                 </p>
               </div>
             </div>
