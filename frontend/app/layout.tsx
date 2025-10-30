@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+import { GoogleTagManager } from '@next/third-parties/google'
 import './globals.css'
 import { Providers } from './providers'
 import PixelTracker from '@/components/PixelTracker'
@@ -23,6 +24,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className="dark">
+      <GoogleTagManager gtmId="GTM-K6CD5ZNP" />
       <body className={inter.className}>
         <noscript>
           <img
