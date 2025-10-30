@@ -45,6 +45,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ChartHelpTooltip } from '@/components/ui/chart-help-tooltip';
 
 interface PeriodFilter {
   label: string;
@@ -651,7 +652,10 @@ export default function ReportsPage() {
         {/* Gráfico de Evolução Mensal */}
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle>Receitas vs Despesas</CardTitle>
+            <CardTitle className="flex items-center">
+              Receitas vs Despesas
+              <ChartHelpTooltip content="Compara o total de receitas (verde) e despesas (vermelho) mês a mês. Use para identificar meses de maior gasto e entender o padrão de entrada e saída de recursos ao longo do tempo." />
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {monthlyData.length > 0 ? (
@@ -684,7 +688,10 @@ export default function ReportsPage() {
         {/* Gráfico de Receitas por Categoria */}
         <Card>
           <CardHeader>
-            <CardTitle>Receitas por Categoria</CardTitle>
+            <CardTitle className="flex items-center">
+              Receitas por Categoria
+              <ChartHelpTooltip content="Mostra a distribuição das suas receitas por categoria. Cada fatia representa o percentual de uma categoria no total das entradas. Útil para identificar suas principais fontes de renda." />
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {incomeCategoryData.length > 0 ? (
@@ -725,7 +732,10 @@ export default function ReportsPage() {
         {/* Gráfico de Despesas por Categoria */}
         <Card>
           <CardHeader>
-            <CardTitle>Despesas por Categoria</CardTitle>
+            <CardTitle className="flex items-center">
+              Despesas por Categoria
+              <ChartHelpTooltip content="Exibe a distribuição dos seus gastos por categoria. Cada fatia mostra o percentual de uma categoria no total das despesas. Fundamental para identificar onde você mais gasta e oportunidades de economia." />
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {categoryData.length > 0 ? (
@@ -766,7 +776,10 @@ export default function ReportsPage() {
         {/* Gráfico de Saldo ao Longo do Tempo */}
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle>Fluxo de Caixa Acumulado</CardTitle>
+            <CardTitle className="flex items-center">
+              Fluxo de Caixa Acumulado
+              <ChartHelpTooltip content="Mostra a evolução do seu saldo ao longo do tempo, somando receitas e subtraindo despesas de forma acumulativa. A linha subindo indica crescimento financeiro, enquanto descendo indica consumo de recursos. Útil para visualizar a tendência geral das suas finanças." />
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {dailyBalanceData.length > 0 ? (
@@ -914,7 +927,10 @@ export default function ReportsPage() {
         {/* Fluxo de Caixa Projetado (próximos 12 meses) */}
         <Card>
           <CardHeader>
-            <CardTitle>Fluxo de Caixa Projetado (Próximos 12 Meses)</CardTitle>
+            <CardTitle className="flex items-center">
+              Fluxo de Caixa Projetado (Próximos 12 Meses)
+              <ChartHelpTooltip content="Projeção futura baseada nas suas contas a pagar (vermelho) e a receber (verde) já cadastradas. O resultado (azul) mostra o saldo esperado por mês. Use para planejamento financeiro e identificar meses críticos ou oportunidades de investimento." />
+            </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
               Previsão baseada em contas a pagar e receber
             </p>
@@ -964,7 +980,10 @@ export default function ReportsPage() {
         {/* Gráfico Comparativo: Previsto vs Realizado */}
         <Card>
           <CardHeader>
-            <CardTitle>Previsto vs Realizado</CardTitle>
+            <CardTitle className="flex items-center">
+              Previsto vs Realizado
+              <ChartHelpTooltip content="Compara o que você planejou (linhas tracejadas) com o que realmente aconteceu (linhas sólidas) nas suas finanças. Linhas verdes são receitas, vermelhas são despesas. A diferença entre previsto e realizado ajuda a avaliar a precisão do seu planejamento financeiro." />
+            </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
               Comparação entre contas a pagar/receber e transações bancárias
             </p>
