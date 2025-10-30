@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { bankingService } from '@/services/banking.service';
@@ -67,6 +67,7 @@ export default function ReportsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [cashFlowProjection, setCashFlowProjection] = useState<CashFlowProjection[]>([]);
+  const [actualCashFlow, setActualCashFlow] = useState<CashFlowProjection[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>({
     label: 'Mês atual',
     startDate: startOfMonth(new Date()),
@@ -128,19 +129,21 @@ export default function ReportsPage() {
           filters.date_to = selectedPeriod.endDate.toISOString().split('T')[0];
         }
 
-        const [transactionsData, summaryData, cashFlowData] = await Promise.all([
+        const [transactionsData, summaryData, cashFlowData, actualFlowData] = await Promise.all([
           bankingService.getTransactions(filters),
           bankingService.getTransactionsSummary(
             filters.date_from,
             filters.date_to
           ),
-          billsService.getCashFlowProjection()
+          billsService.getCashFlowProjection(),
+          billsService.getActualCashFlow()
         ]);
 
         if (!cancelled) {
           setTransactions(transactionsData);
           setSummary(summaryData);
           setCashFlowProjection(cashFlowData);
+          setActualCashFlow(actualFlowData);
         }
       } catch (error) {
         if (!cancelled) {
@@ -160,7 +163,8 @@ export default function ReportsPage() {
     };
   }, [isAuthenticated, router, selectedPeriod.label]);
 
-  const applyCustomPeriod = () => {
+  // Otimização: useCallback para memoizar funções
+  const applyCustomPeriod = useCallback(() => {
     if (!customStartDate || !customEndDate) {
       toast.error('Selecione data inicial e final');
       return;
@@ -181,7 +185,7 @@ export default function ReportsPage() {
     });
     setShowCustomPeriod(false);
     toast.success('Período personalizado aplicado');
-  };
+  }, [customStartDate, customEndDate]);
 
   const generatePDF = async (reportType: ReportType) => {
     const doc = new jsPDF();
@@ -347,8 +351,8 @@ export default function ReportsPage() {
     toast.success('PDF gerado com sucesso!');
   };
 
-  // Processar dados para gráficos
-  const getCategoryData = () => {
+  // Processar dados para gráficos - Otimização: useMemo para evitar recálculos
+  const categoryData = useMemo(() => {
     if (!transactions || transactions.length === 0) {
       return [];
     }
@@ -364,15 +368,13 @@ export default function ReportsPage() {
       }
     });
 
-    const result = Object.entries(categoryMap)
+    return Object.entries(categoryMap)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([name, value]) => ({ name, value }));
+  }, [transactions]);
 
-    return result;
-  };
-
-  const getIncomeCategoryData = () => {
+  const incomeCategoryData = useMemo(() => {
     if (!transactions || transactions.length === 0) {
       return [];
     }
@@ -387,15 +389,13 @@ export default function ReportsPage() {
       }
     });
 
-    const result = Object.entries(categoryMap)
+    return Object.entries(categoryMap)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([name, value]) => ({ name, value }));
+  }, [transactions]);
 
-    return result;
-  };
-
-  const getMonthlyData = () => {
+  const monthlyData = useMemo(() => {
     if (!transactions || transactions.length === 0) return [];
 
     const monthMap: Record<string, { receitas: number; despesas: number }> = {};
@@ -415,18 +415,16 @@ export default function ReportsPage() {
       }
     });
 
-    const result = Object.entries(monthMap)
+    return Object.entries(monthMap)
       .map(([mes, data]) => ({
         mes,
         receitas: data.receitas,
         despesas: data.despesas
       }))
       .slice(-12);
+  }, [transactions]);
 
-    return result;
-  };
-
-  const getDailyBalanceData = () => {
+  const dailyBalanceData = useMemo(() => {
     if (!transactions || transactions.length === 0) return [];
 
     const dailyMap: Record<string, number> = {};
@@ -448,12 +446,10 @@ export default function ReportsPage() {
         dailyMap[day] = runningBalance;
       });
 
-    const result = Object.entries(dailyMap)
+    return Object.entries(dailyMap)
       .map(([dia, saldo]) => ({ dia, saldo }))
       .slice(-30);
-
-    return result;
-  };
+  }, [transactions]);
 
   if (!isAuthenticated || isLoading) {
     return (
@@ -463,10 +459,6 @@ export default function ReportsPage() {
     );
   }
 
-  const categoryData = getCategoryData();
-  const incomeCategoryData = getIncomeCategoryData();
-  const monthlyData = getMonthlyData();
-  const dailyBalanceData = getDailyBalanceData();
   // Expenses come as negative from API, balance is already calculated
   const monthlyResult = summary?.balance || 0;
 
@@ -985,22 +977,22 @@ export default function ReportsPage() {
               <ChartHelpTooltip content="Compara o que você planejou (linhas tracejadas) com o que realmente aconteceu (linhas sólidas) nas suas finanças. Linhas verdes são receitas, vermelhas são despesas. A diferença entre previsto e realizado ajuda a avaliar a precisão do seu planejamento financeiro." />
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Comparação entre contas a pagar/receber e transações bancárias
+              Comparação entre contas previstas e pagas em /bills (não inclui transações bancárias)
             </p>
           </CardHeader>
           <CardContent>
-            {monthlyData.length > 0 && cashFlowProjection.length > 0 ? (
+            {actualCashFlow.length > 0 && cashFlowProjection.length > 0 ? (
               <ResponsiveContainer width="100%" height={400}>
                 <LineChart
-                  data={monthlyData.map((item, index) => {
-                    const projection = cashFlowProjection.find(p => p.month.includes(item.mes.substring(0, 3)));
+                  data={actualCashFlow.map((actualItem) => {
+                    const projection = cashFlowProjection.find(p => p.month === actualItem.month);
                     return {
-                      month: item.mes,
-                      realizado: item.receitas - item.despesas,
+                      month: actualItem.month_name,
+                      realizado: actualItem.net,
                       previsto: projection ? projection.net : 0,
-                      receitas_realizadas: item.receitas,
+                      receitas_realizadas: actualItem.receivable_paid || actualItem.receivable,
                       receitas_previstas: projection?.receivable || 0,
-                      despesas_realizadas: item.despesas,
+                      despesas_realizadas: actualItem.payable_paid || actualItem.payable,
                       despesas_previstas: projection?.payable || 0
                     };
                   })}
@@ -1028,14 +1020,14 @@ export default function ReportsPage() {
                   <Line
                     type="monotone"
                     dataKey="realizado"
-                    name="Resultado Realizado"
+                    name="Resultado Realizado (Contas)"
                     stroke="#10b981"
                     strokeWidth={2}
                   />
                   <Line
                     type="monotone"
                     dataKey="previsto"
-                    name="Resultado Previsto"
+                    name="Resultado Previsto (Contas)"
                     stroke="#3b82f6"
                     strokeWidth={2}
                     strokeDasharray="5 5"
@@ -1043,7 +1035,7 @@ export default function ReportsPage() {
                   <Line
                     type="monotone"
                     dataKey="receitas_realizadas"
-                    name="Receitas Realizadas"
+                    name="Receitas Pagas"
                     stroke="#10b981"
                     strokeWidth={1}
                     opacity={0.5}
@@ -1060,7 +1052,7 @@ export default function ReportsPage() {
                   <Line
                     type="monotone"
                     dataKey="despesas_realizadas"
-                    name="Despesas Realizadas"
+                    name="Despesas Pagas"
                     stroke="#ef4444"
                     strokeWidth={1}
                     opacity={0.5}
@@ -1079,7 +1071,7 @@ export default function ReportsPage() {
             ) : (
               <div className="py-8 text-center text-white/60">
                 <p>Dados insuficientes para comparação</p>
-                <p className="text-sm mt-2">Crie contas e registre transações para visualizar a comparação</p>
+                <p className="text-sm mt-2">Crie contas em /bills para visualizar a comparação entre previsto e realizado</p>
               </div>
             )}
           </CardContent>

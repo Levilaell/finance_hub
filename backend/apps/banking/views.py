@@ -432,11 +432,16 @@ class BankAccountViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        # Otimização: select_related para evitar N+1 queries
         return BankAccount.objects.filter(
             connection__user=self.request.user,
             connection__is_active=True,
             is_active=True
-        ).select_related('connection__connector')
+        ).select_related(
+            'connection',
+            'connection__connector',
+            'connection__user'
+        )
 
     @action(detail=True, methods=['post'])
     def sync_transactions(self, request, pk=None):
@@ -482,11 +487,16 @@ class TransactionViewSet(viewsets.ModelViewSet):
         all_transactions = Transaction.objects.all()
         logger.info(f"Total transactions in DB: {all_transactions.count()}")
 
-        # Agora com filtro de usuário
+        # Agora com filtro de usuário - Otimização: select_related para evitar N+1 queries
         queryset = Transaction.objects.filter(
             account__connection__user=self.request.user,
             account__connection__is_active=True
-        ).select_related('account')
+        ).select_related(
+            'account',
+            'account__connection',
+            'account__connection__connector',
+            'user_category'
+        )
 
         logger.info(f"Transactions for user {self.request.user.id}: {queryset.count()}")
 
@@ -688,7 +698,8 @@ class BillViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Get bills for the current user with filters."""
-        queryset = Bill.objects.filter(user=self.request.user)
+        # Otimização: select_related para evitar N+1 queries
+        queryset = Bill.objects.filter(user=self.request.user).select_related('category', 'user')
 
         # Apply filters
         filter_serializer = BillFilterSerializer(data=self.request.query_params)
@@ -827,43 +838,110 @@ class BillViewSet(viewsets.ModelViewSet):
         """
         Get cash flow projection for the next 12 months.
         GET /api/banking/bills/cash_flow_projection/
+        Otimizado: busca todas as bills de uma vez e processa em Python
+        """
+        from dateutil.relativedelta import relativedelta
+        from decimal import Decimal
+
+        today = timezone.now().date()
+
+        # Calcular range de 12 meses
+        start_date = today
+        end_date = (today + relativedelta(months=12))
+
+        # Otimização: Uma única query para todas as bills dos próximos 12 meses
+        bills = Bill.objects.filter(
+            user=request.user,
+            due_date__gte=start_date,
+            due_date__lt=end_date
+        ).exclude(status='cancelled').values(
+            'type',
+            'due_date',
+            'amount',
+            'amount_paid'
+        )
+
+        # Criar estrutura de meses
+        months_data = {}
+        for i in range(12):
+            month_start = (today + relativedelta(months=i)).replace(day=1)
+            month_key = month_start.strftime('%Y-%m')
+            months_data[month_key] = {
+                'month': month_key,
+                'month_name': month_start.strftime('%B %Y'),
+                'receivable': Decimal('0'),
+                'payable': Decimal('0'),
+            }
+
+        # Processar bills em Python (mais rápido que 48 queries SQL)
+        for bill in bills:
+            month_key = bill['due_date'].strftime('%Y-%m')
+            if month_key in months_data:
+                remaining = bill['amount'] - bill['amount_paid']
+                if bill['type'] == 'receivable':
+                    months_data[month_key]['receivable'] += remaining
+                else:
+                    months_data[month_key]['payable'] += remaining
+
+        # Converter para lista ordenada
+        projections = []
+        for month_key in sorted(months_data.keys()):
+            data = months_data[month_key]
+            projections.append({
+                'month': data['month'],
+                'month_name': data['month_name'],
+                'receivable': float(data['receivable']),
+                'payable': float(data['payable']),
+                'net': float(data['receivable'] - data['payable'])
+            })
+
+        return Response(projections)
+
+    @action(detail=False, methods=['get'])
+    def actual_cash_flow(self, request):
+        """
+        Get actual cash flow based on bill payments for the last 12 months.
+        GET /api/banking/bills/actual_cash_flow/
+
+        Returns monthly data showing what was actually paid/received from bills.
         """
         from dateutil.relativedelta import relativedelta
 
         today = timezone.now().date()
-        projections = []
+        actual_data = []
 
-        # Get next 12 months
-        for i in range(12):
-            month_start = (today + relativedelta(months=i)).replace(day=1)
+        # Get last 12 months
+        for i in range(11, -1, -1):
+            month_start = (today - relativedelta(months=i)).replace(day=1)
             month_end = (month_start + relativedelta(months=1)) - relativedelta(days=1)
 
-            # Receivables for this month
-            receivable = Bill.objects.filter(
+            # Get bills that were paid (fully or partially) in this month
+            receivable_bills = Bill.objects.filter(
                 user=request.user,
                 type='receivable',
                 due_date__gte=month_start,
                 due_date__lte=month_end
-            ).exclude(status='cancelled').aggregate(
-                total=Sum('amount') - Sum('amount_paid')
-            )['total'] or 0
+            ).exclude(status='cancelled')
 
-            # Payables for this month
-            payable = Bill.objects.filter(
+            # Sum the amount_paid (what was actually received)
+            receivable_paid = receivable_bills.aggregate(total=Sum('amount_paid'))['total'] or 0
+
+            payable_bills = Bill.objects.filter(
                 user=request.user,
                 type='payable',
                 due_date__gte=month_start,
                 due_date__lte=month_end
-            ).exclude(status='cancelled').aggregate(
-                total=Sum('amount') - Sum('amount_paid')
-            )['total'] or 0
+            ).exclude(status='cancelled')
 
-            projections.append({
+            # Sum the amount_paid (what was actually paid)
+            payable_paid = payable_bills.aggregate(total=Sum('amount_paid'))['total'] or 0
+
+            actual_data.append({
                 'month': month_start.strftime('%Y-%m'),
-                'month_name': month_start.strftime('%B %Y'),
-                'receivable': float(receivable),
-                'payable': float(payable),
-                'net': float(receivable - payable)
+                'month_name': month_start.strftime('%b/%y'),
+                'receivable_paid': float(receivable_paid),
+                'payable_paid': float(payable_paid),
+                'net': float(receivable_paid - payable_paid)
             })
 
-        return Response(projections)
+        return Response(actual_data)
