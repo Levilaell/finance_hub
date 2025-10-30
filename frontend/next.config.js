@@ -33,18 +33,18 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              // Script sources: Pluggy + Stripe + Meta Pixel (unsafe-inline needed for third-party widgets)
+              // Script sources: Pluggy + Stripe + Meta Pixel + GTM (unsafe-inline needed for third-party widgets)
               isDev
-                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.pluggy.ai https://*.pluggy.ai https://js.stripe.com https://connect.facebook.net"
-                : "script-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai https://js.stripe.com https://connect.facebook.net",
+                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.pluggy.ai https://*.pluggy.ai https://js.stripe.com https://connect.facebook.net https://www.googletagmanager.com"
+                : "script-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai https://js.stripe.com https://connect.facebook.net https://www.googletagmanager.com",
               "style-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai",
-              "img-src 'self' data: blob: https://*.pluggy.ai https://*.pluggycdn.com https://lh3.googleusercontent.com https://www.facebook.com",
+              "img-src 'self' data: blob: https://*.pluggy.ai https://*.pluggycdn.com https://lh3.googleusercontent.com https://www.facebook.com https://www.googletagmanager.com",
               "font-src 'self' data:",
-              // Connect sources: API + Pluggy + Stripe + Meta Pixel (localhost only in dev)
+              // Connect sources: API + Pluggy + Stripe + Meta Pixel + GTM (localhost only in dev)
               [
                 "connect-src 'self'",
                 isDev ? "http://localhost:8000" : "",
-                "https://*.pluggy.ai https://api.pluggy.ai https://financehub-production.up.railway.app https://api.stripe.com https://www.facebook.com https://*.facebook.com https://*.facebook.net https://*.run.app"
+                "https://*.pluggy.ai https://api.pluggy.ai https://financehub-production.up.railway.app https://api.stripe.com https://www.facebook.com https://*.facebook.com https://*.facebook.net https://*.run.app https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com"
               ].filter(Boolean).join(' '),
               // Frame sources: Pluggy + Stripe
               "frame-src 'self' https://*.pluggy.ai https://connect.pluggy.ai https://js.stripe.com https://*.stripe.com",
