@@ -76,6 +76,13 @@ class BillsService {
     );
   }
 
+  // Actual Cash Flow (what was paid/received)
+  async getActualCashFlow(): Promise<CashFlowProjection[]> {
+    return apiClient.get<CashFlowProjection[]>(
+      "/api/banking/bills/actual_cash_flow/"
+    );
+  }
+
   // Utility methods
   getStatusColor(status: string): string {
     const colors: Record<string, string> = {

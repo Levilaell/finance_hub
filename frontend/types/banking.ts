@@ -285,4 +285,7 @@ export interface CashFlowProjection {
   receivable: number;
   payable: number;
   net: number;
+  // For actual cash flow (what was paid)
+  receivable_paid?: number;
+  payable_paid?: number;
 }

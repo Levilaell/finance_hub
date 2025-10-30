@@ -217,7 +217,7 @@ export default function BillsPage() {
     pending: filteredBills.filter(b => b.status === 'pending').length,
     partially_paid: filteredBills.filter(b => b.status === 'partially_paid').length,
     overdue: filteredBills.filter(b => b.is_overdue).length,
-    totalAmount: filteredBills.reduce((sum, b) => sum + b.amount_remaining, 0)
+    totalAmount: filteredBills.reduce((sum, b) => sum + (b.amount_remaining || 0), 0)
   };
 
   return (
