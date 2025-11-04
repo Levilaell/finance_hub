@@ -49,7 +49,7 @@ export default function ComoUsarPage() {
             <div className="space-y-3 text-gray-300">
               <p>Para começar a sincronizar suas transações automaticamente:</p>
               <ol className="list-decimal list-inside space-y-2 ml-2">
-                <li>Acesse a aba <strong className="text-white">Contas</strong> no menu lateral</li>
+                <li>Acesse a aba <strong className="text-white">Contas Bancárias</strong> no menu lateral</li>
                 <li>Clique no botão <strong className="text-white">Conectar Banco</strong></li>
                 <li>Uma janela da Pluggy será aberta com a lista de bancos disponíveis</li>
                 <li>Selecione seu banco e siga as instruções na tela:
