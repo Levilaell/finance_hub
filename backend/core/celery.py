@@ -4,13 +4,21 @@ Celery configuration for CaixaHub
 import os
 from celery import Celery
 from celery.schedules import crontab
+from decouple import config
 
 # Set the default Django settings module
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
 
+# Get Redis URL from environment
+REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
+
 app = Celery('caixahub')
 
-# Load configuration from Django settings with 'CELERY_' prefix
+# Explicit broker and backend configuration
+app.conf.broker_url = REDIS_URL
+app.conf.result_backend = REDIS_URL
+
+# Load other configuration from Django settings with 'CELERY_' prefix
 app.config_from_object('django.conf:settings', namespace='CELERY')
 
 # Auto-discover tasks in all installed apps
