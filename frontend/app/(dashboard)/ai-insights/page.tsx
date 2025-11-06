@@ -4,23 +4,51 @@ import { useEffect, useState } from 'react';
 import { Sparkles, Clock, Calendar, RefreshCw, History } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { aiInsightsService, AIInsight, AIInsightConfig } from '@/services/ai-insights.service';
 import { HealthScoreCard } from './components/HealthScoreCard';
 import { InsightCard } from './components/InsightCard';
 import { PredictionsCard } from './components/PredictionsCard';
-import { EnableInsightsModal } from './components/EnableInsightsModal';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Link from 'next/link';
+
+const companyTypes = [
+  { value: 'mei', label: 'MEI' },
+  { value: 'me', label: 'Microempresa' },
+  { value: 'epp', label: 'Empresa de Pequeno Porte' },
+  { value: 'ltda', label: 'Limitada' },
+  { value: 'sa', label: 'Sociedade Anônima' },
+  { value: 'other', label: 'Outros' },
+];
+
+const businessSectors = [
+  { value: 'retail', label: 'Comércio' },
+  { value: 'services', label: 'Serviços' },
+  { value: 'industry', label: 'Indústria' },
+  { value: 'technology', label: 'Tecnologia' },
+  { value: 'healthcare', label: 'Saúde' },
+  { value: 'education', label: 'Educação' },
+  { value: 'food', label: 'Alimentação' },
+  { value: 'construction', label: 'Construção' },
+  { value: 'automotive', label: 'Automotivo' },
+  { value: 'agriculture', label: 'Agricultura' },
+  { value: 'other', label: 'Outros' },
+];
 
 export default function AIInsightsPage() {
   const [config, setConfig] = useState<AIInsightConfig | null>(null);
   const [latestInsight, setLatestInsight] = useState<AIInsight | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showEnableModal, setShowEnableModal] = useState(false);
   const [canEnable, setCanEnable] = useState(false);
+
+  // Form state
+  const [companyType, setCompanyType] = useState('');
+  const [businessSector, setBusinessSector] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -31,21 +59,17 @@ export default function AIInsightsPage() {
     setError(null);
 
     try {
-      // Check if can enable
       const canEnableResponse = await aiInsightsService.canEnable();
       setCanEnable(canEnableResponse.can_enable);
 
-      // Get config
       const configData = await aiInsightsService.getConfig();
       setConfig(configData);
 
-      // If enabled, get latest insight
       if (configData.is_enabled) {
         try {
           const insight = await aiInsightsService.getLatest();
           setLatestInsight(insight);
         } catch (err: any) {
-          // No insights yet - that's okay
           if (err.response?.status !== 404) {
             throw err;
           }
@@ -59,11 +83,29 @@ export default function AIInsightsPage() {
     }
   };
 
-  const handleEnableSuccess = () => {
-    // Reload after enabling
-    setTimeout(() => {
-      loadData();
-    }, 2000); // Give backend time to generate first insight
+  const handleActivate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!companyType || !businessSector) {
+      setError('Por favor, preencha todos os campos');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await aiInsightsService.enable({ company_type: companyType, business_sector: businessSector });
+
+      // Reload after a delay to give backend time to generate
+      setTimeout(() => {
+        loadData();
+      }, 2000);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao habilitar insights');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isLoading) {
@@ -74,122 +116,133 @@ export default function AIInsightsPage() {
     );
   }
 
-  // Not enabled - show activation screen
+  // Not enabled - show activation form
   if (!config?.is_enabled) {
     return (
-      <>
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Insights com IA</h1>
-              <p className="text-muted-foreground mt-1">
-                Análises inteligentes das suas finanças
-              </p>
-            </div>
-          </div>
-
-          {/* Coming Soon Section */}
-          <div className="flex items-center justify-center min-h-[500px]">
-            <div className="text-center space-y-6 max-w-2xl px-4">
-              {/* Icon */}
-              <div className="flex justify-center">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-xl opacity-50 animate-pulse"></div>
-                  <div className="relative bg-gradient-to-br from-blue-500 to-purple-500 rounded-full p-6">
-                    <Sparkles className="h-16 w-16 text-white" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Title */}
-              <div className="space-y-2">
-                <h2 className="text-4xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
-                  Ative Agora
-                </h2>
-                <p className="text-xl text-muted-foreground">
-                  Obtenha insights poderosos gerados por IA
-                </p>
-              </div>
-
-              {/* Description */}
-              <div className="space-y-4 text-left">
-                <p className="text-muted-foreground">
-                  Com Insights com IA, você terá acesso a:
-                </p>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="flex items-start gap-3 p-4 rounded-lg border bg-card">
-                    <div className="text-2xl">🎯</div>
-                    <div>
-                      <h3 className="font-medium mb-1">Score de Saúde Financeira</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Avaliação de 0 a 10 da situação da empresa
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-4 rounded-lg border bg-card">
-                    <div className="text-2xl">🚨</div>
-                    <div>
-                      <h3 className="font-medium mb-1">Alertas Inteligentes</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Notificações sobre padrões incomuns
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-4 rounded-lg border bg-card">
-                    <div className="text-2xl">💡</div>
-                    <div>
-                      <h3 className="font-medium mb-1">Recomendações Personalizadas</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Sugestões para otimizar suas finanças
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 p-4 rounded-lg border bg-card">
-                    <div className="text-2xl">📈</div>
-                    <div>
-                      <h3 className="font-medium mb-1">Previsões Financeiras</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Análise preditiva do fluxo de caixa
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* CTA */}
-              <div className="pt-4">
-                {canEnable ? (
-                  <Button
-                    size="lg"
-                    onClick={() => setShowEnableModal(true)}
-                    className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
-                  >
-                    <Sparkles className="mr-2 h-5 w-5" />
-                    Ativar Insights com IA
-                  </Button>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      Configure sua empresa em <Link href="/settings" className="text-blue-600 hover:underline">Configurações</Link> para ativar.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Insights com IA</h1>
+            <p className="text-muted-foreground mt-1">
+              Análises inteligentes das suas finanças
+            </p>
           </div>
         </div>
 
-        <EnableInsightsModal
-          open={showEnableModal}
-          onClose={() => setShowEnableModal(false)}
-          onSuccess={handleEnableSuccess}
-        />
-      </>
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="bg-gradient-to-br from-blue-500 to-purple-500 rounded-full p-3">
+                  <Sparkles className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-2xl">Ative os Insights com IA</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Preencha as informações abaixo para começar
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleActivate} className="space-y-6">
+                {/* Company Type */}
+                <div className="space-y-2">
+                  <Label htmlFor="company_type">Tipo de Empresa</Label>
+                  <Select value={companyType} onValueChange={setCompanyType}>
+                    <SelectTrigger id="company_type">
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companyTypes.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Business Sector */}
+                <div className="space-y-2">
+                  <Label htmlFor="business_sector">Setor de Atuação</Label>
+                  <Select value={businessSector} onValueChange={setBusinessSector}>
+                    <SelectTrigger id="business_sector">
+                      <SelectValue placeholder="Selecione o setor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {businessSectors.map((sector) => (
+                        <SelectItem key={sector.value} value={sector.value}>
+                          {sector.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Error Message */}
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-sm text-red-600">{error}</p>
+                  </div>
+                )}
+
+                {/* Info */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-900 mb-2">O que você terá acesso:</h4>
+                  <ul className="space-y-2 text-sm text-blue-800">
+                    <li className="flex items-center gap-2">
+                      <span>🎯</span>
+                      <span>Score de Saúde Financeira (0-10)</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span>🚨</span>
+                      <span>Alertas sobre riscos financeiros</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span>💡</span>
+                      <span>Recomendações personalizadas</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span>📈</span>
+                      <span>Previsões de fluxo de caixa</span>
+                    </li>
+                  </ul>
+                  <p className="text-xs text-blue-600 mt-3">
+                    ℹ️ Sua primeira análise será gerada em alguns instantes após ativar.
+                  </p>
+                </div>
+
+                {/* Submit Button */}
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                  size="lg"
+                  disabled={isSubmitting || !canEnable}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <LoadingSpinner />
+                      <span className="ml-2">Ativando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-5 w-5" />
+                      Ativar Insights com IA
+                    </>
+                  )}
+                </Button>
+
+                {!canEnable && (
+                  <p className="text-sm text-center text-muted-foreground">
+                    Configure sua empresa em <Link href="/settings" className="text-blue-600 hover:underline">Configurações</Link> para ativar.
+                  </p>
+                )}
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     );
   }
 
