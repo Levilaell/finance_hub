@@ -33,6 +33,7 @@ django-ratelimit==4.1.0
 
 # External API Clients
 requests==2.31.0
+openai==1.12.0
 
 # PDF & Excel Generation
 reportlab==4.1.0
