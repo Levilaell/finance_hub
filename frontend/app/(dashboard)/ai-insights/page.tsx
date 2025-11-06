@@ -218,7 +218,7 @@ export default function AIInsightsPage() {
                   type="submit"
                   className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
                   size="lg"
-                  disabled={isSubmitting || !canEnable}
+                  disabled={isSubmitting}
                 >
                   {isSubmitting ? (
                     <>
@@ -232,12 +232,6 @@ export default function AIInsightsPage() {
                     </>
                   )}
                 </Button>
-
-                {!canEnable && (
-                  <p className="text-sm text-center text-muted-foreground">
-                    Configure sua empresa em <Link href="/settings" className="text-blue-600 hover:underline">Configurações</Link> para ativar.
-                  </p>
-                )}
               </form>
             </CardContent>
           </Card>
