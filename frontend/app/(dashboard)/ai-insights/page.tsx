@@ -75,19 +75,22 @@ export default function AIInsightsPage() {
 
       const configData = await aiInsightsService.getConfig();
       setConfig(configData);
+      console.log('[AI Insights] Config loaded:', configData);
 
       if (configData.is_enabled) {
         try {
           const insight = await aiInsightsService.getLatest();
+          console.log('[AI Insights] Latest insight loaded:', insight);
           setLatestInsight(insight);
         } catch (err: any) {
+          console.log('[AI Insights] No insight found yet, status:', err.response?.status);
           if (err.response?.status !== 404) {
             throw err;
           }
         }
       }
     } catch (err: any) {
-      console.error('Error loading AI insights:', err);
+      console.error('[AI Insights] Error loading:', err);
       setError(err.response?.data?.error || 'Erro ao carregar insights');
     } finally {
       setIsLoading(false);
@@ -268,6 +271,9 @@ export default function AIInsightsPage() {
                 <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                 <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                 <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+              <div className="pt-2 text-xs text-muted-foreground">
+                <p>Abra o console do navegador (F12) para ver logs de debug</p>
               </div>
             </CardContent>
           </Card>
