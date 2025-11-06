@@ -133,8 +133,8 @@ export default function AIInsightsPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center gap-3 mb-2">
-                <div className="bg-primary rounded-full p-3">
-                  <Sparkles className="h-6 w-6 text-primary-foreground" />
+                <div className="bg-gradient-to-br from-blue-500 to-purple-500 rounded-full p-3">
+                  <Sparkles className="h-6 w-6 text-white" />
                 </div>
                 <div>
                   <CardTitle className="text-2xl">Ative os Insights com IA</CardTitle>
@@ -188,9 +188,9 @@ export default function AIInsightsPage() {
                 )}
 
                 {/* Info */}
-                <div className="bg-muted/50 border border-border rounded-lg p-4">
-                  <h4 className="font-semibold mb-2">O que você terá acesso:</h4>
-                  <ul className="space-y-2 text-sm text-muted-foreground">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-900 mb-2">O que você terá acesso:</h4>
+                  <ul className="space-y-2 text-sm text-blue-800">
                     <li className="flex items-center gap-2">
                       <span>🎯</span>
                       <span>Score de Saúde Financeira (0-10)</span>
@@ -208,7 +208,7 @@ export default function AIInsightsPage() {
                       <span>Previsões de fluxo de caixa</span>
                     </li>
                   </ul>
-                  <p className="text-xs text-muted-foreground mt-3">
+                  <p className="text-xs text-blue-600 mt-3">
                     ℹ️ Sua primeira análise será gerada em alguns instantes após ativar.
                   </p>
                 </div>
@@ -216,7 +216,7 @@ export default function AIInsightsPage() {
                 {/* Submit Button */}
                 <Button
                   type="submit"
-                  className="w-full"
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
                   size="lg"
                   disabled={isSubmitting}
                 >
@@ -256,8 +256,8 @@ export default function AIInsightsPage() {
         <div className="flex items-center justify-center min-h-[500px]">
           <Card className="max-w-md">
             <CardContent className="pt-6 text-center space-y-4">
-              <div className="bg-muted rounded-full p-4 w-16 h-16 mx-auto flex items-center justify-center">
-                <Clock className="h-8 w-8" />
+              <div className="bg-blue-100 rounded-full p-4 w-16 h-16 mx-auto flex items-center justify-center">
+                <Clock className="h-8 w-8 text-blue-600" />
               </div>
               <div>
                 <h3 className="text-lg font-semibold mb-2">Gerando sua primeira análise</h3>
@@ -407,7 +407,7 @@ export default function AIInsightsPage() {
             <ul className="space-y-3">
               {latestInsight.recommendations.map((recommendation, index) => (
                 <li key={index} className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 bg-muted text-foreground rounded-full flex items-center justify-center text-sm font-semibold">
+                  <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-semibold">
                     {index + 1}
                   </span>
                   <span className="text-muted-foreground">{recommendation}</span>

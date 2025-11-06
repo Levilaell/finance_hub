@@ -72,7 +72,7 @@ export function HealthScoreCard({ score, status, scoreChange }: HealthScoreCardP
               <div className="text-gray-500">2.5-5</div>
             </div>
             <div>
-              <div className={`font-semibold ${score > 5 && score <= 7.5 ? 'text-primary' : 'text-gray-400'}`}>
+              <div className={`font-semibold ${score > 5 && score <= 7.5 ? 'text-blue-600' : 'text-gray-400'}`}>
                 Bom
               </div>
               <div className="text-gray-500">5-7.5</div>
