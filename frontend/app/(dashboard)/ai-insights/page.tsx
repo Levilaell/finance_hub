@@ -54,6 +54,17 @@ export default function AIInsightsPage() {
     loadData();
   }, []);
 
+  // Polling effect: check for new insight every 5 seconds if enabled but no insight yet
+  useEffect(() => {
+    if (config?.is_enabled && !latestInsight && !isLoading) {
+      const interval = setInterval(() => {
+        loadData();
+      }, 5000); // Poll every 5 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [config?.is_enabled, latestInsight, isLoading]);
+
   const loadData = async () => {
     setIsLoading(true);
     setError(null);
@@ -97,13 +108,10 @@ export default function AIInsightsPage() {
     try {
       await aiInsightsService.enable({ company_type: companyType, business_sector: businessSector });
 
-      // Reload after a delay to give backend time to generate
-      setTimeout(() => {
-        loadData();
-      }, 2000);
+      // Reload config immediately to show "generating" state
+      loadData();
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao habilitar insights');
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -244,19 +252,23 @@ export default function AIInsightsPage() {
         <div className="flex items-center justify-center min-h-[500px]">
           <Card className="max-w-md">
             <CardContent className="pt-6 text-center space-y-4">
-              <div className="bg-blue-100 rounded-full p-4 w-16 h-16 mx-auto flex items-center justify-center">
-                <Clock className="h-8 w-8 text-blue-600" />
+              <div className="bg-muted rounded-full p-4 w-16 h-16 mx-auto flex items-center justify-center">
+                <RefreshCw className="h-8 w-8 animate-spin text-primary" />
               </div>
               <div>
                 <h3 className="text-lg font-semibold mb-2">Gerando sua primeira análise</h3>
                 <p className="text-sm text-muted-foreground">
-                  Estamos analisando seus dados financeiros. Isso pode levar alguns instantes.
+                  Estamos analisando seus dados financeiros. A página atualizará automaticamente quando pronto.
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Isso pode levar de 10 a 30 segundos...
                 </p>
               </div>
-              <Button onClick={loadData} variant="outline">
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Atualizar
-              </Button>
+              <div className="flex items-center justify-center gap-1">
+                <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
             </CardContent>
           </Card>
         </div>

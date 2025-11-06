@@ -37,7 +37,7 @@ const navigation = [
   { name: "Contas", href: "/bills", icon: FileTextIcon },
   { name: "Categorias", href: "/categories", icon: Tags },
   { name: "Estoque", href: "/estoque", icon: Package, comingSoon: true },
-  { name: "Insights", href: "/ai-insights", icon: Sparkles, comingSoon: true },
+  { name: "Insights", href: "/ai-insights", icon: Sparkles },
   { name: "Relatórios", href: "/reports", icon: FileText },
   { name: "Como Usar", href: "/how-to-use", icon: BookOpen },
   { name: "Configurações", href: "/settings", icon: Settings },
