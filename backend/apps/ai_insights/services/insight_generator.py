@@ -117,7 +117,8 @@ class InsightGenerator:
             'Excelente': 'excellent',
             'Bom': 'good',
             'Regular': 'regular',
-            'Ruim': 'poor'
+            'Ruim': 'poor',
+            'Crítico': 'poor'  # Map Crítico to poor
         }
 
         # Separate insights by type

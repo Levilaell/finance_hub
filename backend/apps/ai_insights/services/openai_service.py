@@ -91,7 +91,7 @@ Analise a saúde financeira desta PME e forneça insights acionáveis em portugu
 **FORMATO DE RESPOSTA (JSON válido):**
 {{
   "health_score": 7.5,
-  "health_status": "Bom",
+  "health_status": "Excelente|Bom|Regular|Ruim",
   "summary": "Resumo executivo da análise (2-3 frases)",
   "insights": [
     {{
@@ -205,11 +205,16 @@ Retorne APENAS o JSON, sem texto adicional antes ou depois."""
             logger.error(f'Invalid health_score: {score}')
             return False
 
-        # Validate health_status
-        valid_statuses = ['Excelente', 'Bom', 'Regular', 'Ruim']
-        if insights.get('health_status') not in valid_statuses:
-            logger.error(f"Invalid health_status: {insights.get('health_status')}")
+        # Validate health_status (map Crítico to Ruim)
+        valid_statuses = ['Excelente', 'Bom', 'Regular', 'Ruim', 'Crítico']
+        status = insights.get('health_status')
+        if status not in valid_statuses:
+            logger.error(f"Invalid health_status: {status}")
             return False
+
+        # Normalize Crítico to Ruim for consistency
+        if status == 'Crítico':
+            insights['health_status'] = 'Ruim'
 
         # Validate insights structure
         if not isinstance(insights.get('insights'), list):
