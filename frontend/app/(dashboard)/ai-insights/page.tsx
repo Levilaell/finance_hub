@@ -190,26 +190,14 @@ export default function AIInsightsPage() {
                 {/* Info */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <h4 className="font-semibold text-blue-900 mb-2">O que você terá acesso:</h4>
-                  <ul className="space-y-2 text-sm text-blue-800">
-                    <li className="flex items-center gap-2">
-                      <span>🎯</span>
-                      <span>Score de Saúde Financeira (0-10)</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span>🚨</span>
-                      <span>Alertas sobre riscos financeiros</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span>💡</span>
-                      <span>Recomendações personalizadas</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span>📈</span>
-                      <span>Previsões de fluxo de caixa</span>
-                    </li>
+                  <ul className="space-y-2 text-sm text-blue-800 list-disc list-inside">
+                    <li>Score de Saúde Financeira (0-10)</li>
+                    <li>Alertas sobre riscos financeiros</li>
+                    <li>Recomendações personalizadas</li>
+                    <li>Previsões de fluxo de caixa</li>
                   </ul>
                   <p className="text-xs text-blue-600 mt-3">
-                    ℹ️ Sua primeira análise será gerada em alguns instantes após ativar.
+                    Sua primeira análise será gerada em alguns instantes após ativar.
                   </p>
                 </div>
 
