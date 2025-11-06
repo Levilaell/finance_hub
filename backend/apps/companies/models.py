@@ -99,7 +99,9 @@ class Company(models.Model):
             raise ValidationError({'cnpj': 'CNPJ inválido'})
     
     def save(self, *args, **kwargs):
-        self.full_clean()
+        # Skip validation if explicitly requested (for AI insights placeholder creation)
+        if not kwargs.pop('skip_validation', False):
+            self.full_clean()
         super().save(*args, **kwargs)
     
     def _validate_cnpj(self, cnpj):

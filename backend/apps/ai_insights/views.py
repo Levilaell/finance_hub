@@ -68,22 +68,33 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
         Enable AI insights for the user.
         Requires company_type and business_sector.
         """
+        from apps.companies.models import Company
+
         serializer = EnableAIInsightsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Check if user has a company
-        if not hasattr(request.user, 'company') or request.user.company is None:
-            return Response(
-                {'error': 'Usuário não possui empresa cadastrada'},
-                status=status.HTTP_400_BAD_REQUEST
+        # Get or create company
+        if hasattr(request.user, 'company') and request.user.company is not None:
+            company = request.user.company
+            # Update company info
+            company.company_type = serializer.validated_data['company_type']
+            company.business_sector = serializer.validated_data['business_sector']
+            company.save(update_fields=['company_type', 'business_sector', 'updated_at'])
+        else:
+            # Create minimal company for AI insights
+            # Use email as company name and generate a placeholder CNPJ
+            import random
+            placeholder_cnpj = f"{random.randint(10, 99)}.{random.randint(100, 999)}.{random.randint(100, 999)}/{random.randint(1000, 9999)}-{random.randint(10, 99)}"
+
+            # Create without validation since CNPJ is placeholder
+            company = Company(
+                owner=request.user,
+                name=f"Empresa de {request.user.email.split('@')[0]}",
+                cnpj=placeholder_cnpj,
+                company_type=serializer.validated_data['company_type'],
+                business_sector=serializer.validated_data['business_sector']
             )
-
-        company = request.user.company
-
-        # Update company info
-        company.company_type = serializer.validated_data['company_type']
-        company.business_sector = serializer.validated_data['business_sector']
-        company.save()
+            company.save(skip_validation=True)
 
         # Enable AI insights
         config, created = AIInsightConfig.objects.get_or_create(user=request.user)
