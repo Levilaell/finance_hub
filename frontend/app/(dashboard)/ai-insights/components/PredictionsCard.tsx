@@ -33,7 +33,7 @@ export function PredictionsCard({ predictions }: PredictionsCardProps) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-blue-500" />
+          <TrendingUp className="h-5 w-5" />
           Previsões
         </CardTitle>
       </CardHeader>
@@ -44,7 +44,7 @@ export function PredictionsCard({ predictions }: PredictionsCardProps) {
             <div className="text-sm text-muted-foreground mb-1">
               Fluxo de Caixa Previsto (Próximo Mês)
             </div>
-            <div className="text-3xl font-bold text-blue-600">
+            <div className={`text-3xl font-bold ${predictions.next_month_cash_flow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {formatCurrency(predictions.next_month_cash_flow)}
             </div>
           </div>
@@ -59,7 +59,7 @@ export function PredictionsCard({ predictions }: PredictionsCardProps) {
 
           {/* Reasoning */}
           {predictions.reasoning && (
-            <div className="border-l-4 border-blue-500 pl-4 py-2 bg-muted/20 rounded-r-lg">
+            <div className="border-l-4 border-primary pl-4 py-2 bg-muted/20 rounded-r-lg">
               <p className="text-xs font-medium text-muted-foreground mb-1">
                 📊 Justificativa:
               </p>
