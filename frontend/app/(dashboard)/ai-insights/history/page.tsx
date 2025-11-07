@@ -67,29 +67,33 @@ export default function HistoryPage() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {insights.map((insight) => (
+          {insights.map((insight) => {
+            const numericScore = typeof insight.health_score === 'string' ? parseFloat(insight.health_score) : insight.health_score;
+            const numericScoreChange = insight.score_change !== null && typeof insight.score_change === 'string' ? parseFloat(insight.score_change) : insight.score_change;
+
+            return (
             <Card key={insight.id} className={insight.has_error ? 'border-red-200 bg-red-50/30' : ''}>
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between">
                   {/* Left Side - Main Info */}
                   <div className="flex-1">
                     <div className="flex items-center gap-4 mb-2">
-                      <div className="text-3xl font-bold">{insight.health_score.toFixed(1)}</div>
+                      <div className="text-3xl font-bold">{numericScore.toFixed(1)}</div>
                       <div>
                         <div className={`px-3 py-1 rounded-full text-sm font-semibold inline-block ${
                           aiInsightsService.getHealthStatusBgColor(insight.health_status)
                         } ${aiInsightsService.getHealthStatusColor(insight.health_status)}`}>
                           {aiInsightsService.getHealthStatusLabel(insight.health_status)}
                         </div>
-                        {insight.score_change !== null && (
+                        {numericScoreChange !== null && (
                           <div className="flex items-center gap-1 mt-1">
-                            {insight.score_change >= 0 ? (
+                            {numericScoreChange >= 0 ? (
                               <TrendingUp className="h-4 w-4 text-green-500" />
                             ) : (
                               <TrendingDown className="h-4 w-4 text-red-500" />
                             )}
-                            <span className={`text-sm ${insight.score_change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {insight.score_change >= 0 ? '+' : ''}{insight.score_change.toFixed(1)}
+                            <span className={`text-sm ${numericScoreChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {numericScoreChange >= 0 ? '+' : ''}{numericScoreChange.toFixed(1)}
                             </span>
                           </div>
                         )}
@@ -136,7 +140,8 @@ export default function HistoryPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+          );
+          })}
         </div>
       )}
     </div>

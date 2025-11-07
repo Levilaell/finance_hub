@@ -16,6 +16,10 @@ export function HealthScoreCard({ score, status, scoreChange }: HealthScoreCardP
   const statusColor = aiInsightsService.getHealthStatusColor(status);
   const statusBgColor = aiInsightsService.getHealthStatusBgColor(status);
 
+  // Ensure score is a number (backend sends Decimal as string)
+  const numericScore = typeof score === 'string' ? parseFloat(score) : score;
+  const numericScoreChange = scoreChange !== null && typeof scoreChange === 'string' ? parseFloat(scoreChange) : scoreChange;
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* Health Status */}
@@ -29,16 +33,16 @@ export function HealthScoreCard({ score, status, scoreChange }: HealthScoreCardP
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-4xl font-bold">{score.toFixed(1)}/10</div>
-          {scoreChange !== null && (
+          <div className="text-4xl font-bold">{numericScore.toFixed(1)}/10</div>
+          {numericScoreChange !== null && (
             <div className="flex items-center gap-2 mt-2">
-              {scoreChange >= 0 ? (
+              {numericScoreChange >= 0 ? (
                 <TrendingUp className="h-4 w-4 text-green-500" />
               ) : (
                 <TrendingDown className="h-4 w-4 text-red-500" />
               )}
-              <span className={`text-sm ${scoreChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {scoreChange >= 0 ? '+' : ''}{scoreChange.toFixed(1)} pontos vs mês anterior
+              <span className={`text-sm ${numericScoreChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {numericScoreChange >= 0 ? '+' : ''}{numericScoreChange.toFixed(1)} pontos vs mês anterior
               </span>
             </div>
           )}
@@ -54,31 +58,31 @@ export function HealthScoreCard({ score, status, scoreChange }: HealthScoreCardP
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Pontuação</span>
-              <span className="font-bold">{score.toFixed(1)}/10</span>
+              <span className="font-bold">{numericScore.toFixed(1)}/10</span>
             </div>
-            <Progress value={score * 10} className="h-3" />
+            <Progress value={numericScore * 10} className="h-3" />
           </div>
           <div className="grid grid-cols-4 gap-2 text-xs text-center">
             <div>
-              <div className={`font-semibold ${score <= 2.5 ? 'text-red-600' : 'text-gray-400'}`}>
+              <div className={`font-semibold ${numericScore <= 2.5 ? 'text-red-600' : 'text-gray-400'}`}>
                 Ruim
               </div>
               <div className="text-gray-500">0-2.5</div>
             </div>
             <div>
-              <div className={`font-semibold ${score > 2.5 && score <= 5 ? 'text-yellow-600' : 'text-gray-400'}`}>
+              <div className={`font-semibold ${numericScore > 2.5 && numericScore <= 5 ? 'text-yellow-600' : 'text-gray-400'}`}>
                 Regular
               </div>
               <div className="text-gray-500">2.5-5</div>
             </div>
             <div>
-              <div className={`font-semibold ${score > 5 && score <= 7.5 ? 'text-blue-600' : 'text-gray-400'}`}>
+              <div className={`font-semibold ${numericScore > 5 && numericScore <= 7.5 ? 'text-blue-600' : 'text-gray-400'}`}>
                 Bom
               </div>
               <div className="text-gray-500">5-7.5</div>
             </div>
             <div>
-              <div className={`font-semibold ${score > 7.5 ? 'text-green-600' : 'text-gray-400'}`}>
+              <div className={`font-semibold ${numericScore > 7.5 ? 'text-green-600' : 'text-gray-400'}`}>
                 Excelente
               </div>
               <div className="text-gray-500">7.5-10</div>
