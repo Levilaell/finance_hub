@@ -37,7 +37,7 @@ const navigation = [
   { name: "Contas", href: "/bills", icon: FileTextIcon },
   { name: "Categorias", href: "/categories", icon: Tags },
   { name: "Estoque", href: "/estoque", icon: Package, comingSoon: true },
-  { name: "Insights", href: "/ai-insights", icon: Sparkles },
+  { name: "Insights", href: "/ai-insights", icon: Sparkles, beta: true },
   { name: "Relatórios", href: "/reports", icon: FileText },
   { name: "Como Usar", href: "/how-to-use", icon: BookOpen },
   { name: "Configurações", href: "/settings", icon: Settings },
@@ -127,6 +127,11 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <span className="text-xs text-yellow-500 font-medium whitespace-nowrap">Em breve</span>
                     </div>
                   )}
+                  {item.beta && (
+                    <span className="ml-auto px-1.5 py-0.5 text-[10px] font-semibold bg-blue-500/20 text-blue-400 rounded uppercase flex-shrink-0">
+                      Beta
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -194,6 +199,11 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <Lock className="h-3.5 w-3.5 text-yellow-500" />
                       <span className="text-xs text-yellow-500 font-medium whitespace-nowrap">Em breve</span>
                     </div>
+                  )}
+                  {item.beta && (
+                    <span className="ml-auto px-1.5 py-0.5 text-[10px] font-semibold bg-blue-500/20 text-blue-400 rounded uppercase flex-shrink-0">
+                      Beta
+                    </span>
                   )}
                 </Link>
               );
