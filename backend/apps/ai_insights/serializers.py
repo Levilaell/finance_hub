@@ -39,7 +39,10 @@ class AIInsightListSerializer(serializers.ModelSerializer):
             'score_change',
             'is_recent',
             'has_error',
-            'error_message'
+            'error_message',
+            'alerts',
+            'opportunities',
+            'recommendations'
         ]
 
 

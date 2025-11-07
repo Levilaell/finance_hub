@@ -124,15 +124,15 @@ export default function HistoryPage() {
                   {!insight.has_error && (
                     <div className="flex gap-6 text-center">
                       <div>
-                        <div className="text-2xl font-bold text-red-600">{insight.alerts.length}</div>
+                        <div className="text-2xl font-bold text-red-600">{insight.alerts?.length || 0}</div>
                         <div className="text-xs text-muted-foreground">Alertas</div>
                       </div>
                       <div>
-                        <div className="text-2xl font-bold text-yellow-600">{insight.opportunities.length}</div>
+                        <div className="text-2xl font-bold text-yellow-600">{insight.opportunities?.length || 0}</div>
                         <div className="text-xs text-muted-foreground">Oportunidades</div>
                       </div>
                       <div>
-                        <div className="text-2xl font-bold text-blue-600">{insight.recommendations.length}</div>
+                        <div className="text-2xl font-bold text-blue-600">{insight.recommendations?.length || 0}</div>
                         <div className="text-xs text-muted-foreground">Dicas</div>
                       </div>
                     </div>
