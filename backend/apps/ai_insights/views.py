@@ -119,6 +119,25 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
             })
 
     @action(detail=False, methods=['post'])
+    def regenerate(self, request):
+        """Force regenerate insight for the user."""
+        try:
+            config = AIInsightConfig.objects.get(user=request.user, is_enabled=True)
+
+            # Trigger new generation
+            generate_insight_for_user.delay(request.user.id)
+
+            return Response({
+                'message': 'Regeneração iniciada. Aguarde alguns instantes.'
+            })
+
+        except AIInsightConfig.DoesNotExist:
+            return Response(
+                {'error': 'Insights com IA não estão habilitados'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=['post'])
     def disable(self, request):
         """Disable AI insights for the user."""
         try:

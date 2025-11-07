@@ -110,6 +110,13 @@ class AIInsightsService {
   }
 
   /**
+   * Force regenerate insight
+   */
+  async regenerate(): Promise<{ message: string }> {
+    return apiClient.post('/api/ai-insights/insights/regenerate/');
+  }
+
+  /**
    * Get latest insight
    */
   async getLatest(): Promise<AIInsight> {

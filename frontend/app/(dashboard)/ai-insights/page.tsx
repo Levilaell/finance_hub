@@ -48,6 +48,7 @@ export default function AIInsightsPage() {
   const [companyType, setCompanyType] = useState('');
   const [businessSector, setBusinessSector] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -116,6 +117,22 @@ export default function AIInsightsPage() {
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao habilitar insights');
       setIsSubmitting(false);
+    }
+  };
+
+  const handleRegenerate = async () => {
+    setIsRegenerating(true);
+    setError(null);
+
+    try {
+      await aiInsightsService.regenerate();
+      console.log('[AI Insights] Regeneration triggered');
+      // Keep polling
+    } catch (err: any) {
+      console.error('[AI Insights] Regeneration error:', err);
+      setError(err.response?.data?.error || 'Erro ao forçar regeneração');
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
@@ -275,6 +292,23 @@ export default function AIInsightsPage() {
               <div className="pt-2 text-xs text-muted-foreground">
                 <p>Abra o console do navegador (F12) para ver logs de debug</p>
               </div>
+              <Button
+                onClick={handleRegenerate}
+                variant="outline"
+                disabled={isRegenerating}
+              >
+                {isRegenerating ? (
+                  <>
+                    <LoadingSpinner />
+                    <span className="ml-2">Tentando novamente...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Tentar Novamente
+                  </>
+                )}
+              </Button>
             </CardContent>
           </Card>
         </div>
