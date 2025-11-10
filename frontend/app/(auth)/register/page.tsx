@@ -112,7 +112,6 @@ function RegisterContent() {
           <CreditCardIcon className="h-4 w-4" />
           <AlertDescription>
             <strong>7 dias de trial grátis:</strong> Teste todos os recursos sem compromisso.
-            Nenhum cartão de crédito necessário para começar.
           </AlertDescription>
         </Alert>
       </CardHeader>
