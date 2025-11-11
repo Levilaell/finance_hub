@@ -46,6 +46,17 @@ def pluggy_webhook_handler(request):
     """
     Handle webhooks from Pluggy.
     Ref: https://docs.pluggy.ai/reference/webhooks-list
+
+    IMPORTANT: Pluggy requires 2XX response within 5 seconds or retries up to 3 times.
+    - This handler responds immediately (200 OK) and processes synchronously
+    - Idempotency is handled via eventId caching (7 days)
+    - Failed webhooks (after 3 retries) are lost and won't be re-sent
+
+    Best practices:
+    1. Always respond with 2XX quickly
+    2. Use eventId for deduplication
+    3. Processing happens synchronously but should be fast
+    4. For heavy operations, consider async tasks in the future
     """
     # Log incoming webhook
     logger.info(f"Webhook received - Headers: {dict(request.headers)}")
@@ -67,11 +78,15 @@ def pluggy_webhook_handler(request):
         logger.debug(f"Webhook payload: {payload}")
 
         # Idempotency: Check if event was already processed
+        # Ref: https://docs.pluggy.ai/docs/webhooks (use eventId for deduplication)
         if event_id:
             cache_key = f"pluggy_event_{event_id}"
             if cache.get(cache_key):
-                logger.info(f"Event {event_id} already processed, skipping (idempotency)")
-                return JsonResponse({'status': 'ok', 'processed': False})
+                logger.info(
+                    f"Duplicate webhook detected - Event {event_id} ({event_type}) already processed. "
+                    f"Skipping to prevent duplicate processing (idempotency). Item: {item_id}"
+                )
+                return JsonResponse({'status': 'ok', 'processed': False, 'reason': 'duplicate'})
 
             # Mark event as processed (expires in 7 days)
             cache.set(cache_key, True, timeout=60*60*24*7)
@@ -93,7 +108,9 @@ def pluggy_webhook_handler(request):
             handle_transactions_created(item_id, payload)
         elif event_type == 'transactions/updated':
             handle_transactions_updated(item_id, payload)
-        elif event_type == 'connector/status_update':
+        elif event_type == 'transactions/deleted':
+            handle_transactions_deleted(item_id, payload)
+        elif event_type == 'connector/status_updated':
             handle_connector_status(payload)
         else:
             logger.warning(f"Unknown webhook event type: {event_type}")
@@ -234,14 +251,31 @@ def handle_item_mfa(item_id: str, payload: dict):
 def handle_connector_status(payload: dict):
     """
     Handle connector status update events.
+    This is triggered when a connector's status changes (ONLINE, UNSTABLE, OFFLINE).
+    Ref: https://docs.pluggy.ai/docs/webhooks
     """
     connector_id = payload.get('connectorId')
-    status_info = payload.get('status')
+    data = payload.get('data', {})
+    status = data.get('status')
 
-    logger.info(f"Connector {connector_id} status update: {status_info}")
+    logger.info(f"Connector {connector_id} status changed to: {status}")
 
-    # TODO: Implement connector status tracking if needed
-    # This could be used to notify users about bank maintenance, outages, etc.
+    # Log connector status for monitoring
+    # This can be used to track bank maintenance, outages, etc.
+    # Status values: ONLINE, UNSTABLE, OFFLINE
+
+    if status == 'OFFLINE':
+        logger.warning(f"Connector {connector_id} is OFFLINE - bank may be unavailable")
+    elif status == 'UNSTABLE':
+        logger.warning(f"Connector {connector_id} is UNSTABLE - connection issues may occur")
+    else:
+        logger.info(f"Connector {connector_id} is back {status}")
+
+    # TODO: Optionally notify users about their affected connections
+    # For example, if a user has connections using this connector, we could:
+    # 1. Update connection status to reflect connector issues
+    # 2. Send notification to user about potential sync delays
+    # 3. Disable auto-sync until connector is back online
 
 
 def handle_item_login_succeeded(item_id: str, payload: dict):
@@ -329,3 +363,36 @@ def handle_transactions_updated(item_id: str, payload: dict):
         logger.warning(f"Connection not found for item {item_id}")
     except Exception as e:
         logger.error(f"Error handling transactions update: {e}")
+
+
+def handle_transactions_deleted(item_id: str, payload: dict):
+    """
+    Handle transactions deleted events.
+    This is triggered when transactions are deleted by the financial institution.
+    Ref: https://docs.pluggy.ai/docs/webhooks
+    """
+    try:
+        from .models import Transaction
+
+        connection = BankConnection.objects.get(pluggy_item_id=item_id)
+        transaction_ids = payload.get('transactionIds', [])
+
+        if not transaction_ids:
+            logger.warning(f"No transaction IDs provided in delete event for item {item_id}")
+            return
+
+        # Delete transactions by their Pluggy IDs
+        deleted_count = Transaction.objects.filter(
+            pluggy_transaction_id__in=transaction_ids,
+            account__connection=connection
+        ).delete()[0]
+
+        logger.info(
+            f"Deleted {deleted_count} transactions for connection {connection.id}. "
+            f"Transaction IDs: {transaction_ids}"
+        )
+
+    except BankConnection.DoesNotExist:
+        logger.warning(f"Connection not found for item {item_id}")
+    except Exception as e:
+        logger.error(f"Error handling transactions deletion: {e}")
