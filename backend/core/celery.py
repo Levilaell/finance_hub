@@ -51,17 +51,21 @@ def debug_task(self):
 
 # Explicitly import task modules to ensure they are registered
 # This is needed because autodiscover_tasks() may not work in all deployment scenarios
-@app.on_after_configure.connect
-def setup_periodic_tasks_and_imports(*args, **kwargs):
-    """Import task modules after Celery is configured."""
-    _ = (args, kwargs)  # Suppress unused warnings
-    # Import banking tasks to ensure they are registered
+@app.on_after_finalize.connect
+def setup_task_imports(**_kwargs):
+    """Import task modules after Celery is fully configured."""
+    # Import after Django is ready
+    import django
+    if not django.apps.apps.ready:
+        django.setup()
+
+    # Now safe to import task modules
+    # Import is intentional - registers tasks with Celery
     try:
         import apps.banking.tasks  # noqa: F401
     except ImportError:
         pass
 
-    # Import ai_insights tasks
     try:
         import apps.ai_insights.tasks  # noqa: F401
     except ImportError:
