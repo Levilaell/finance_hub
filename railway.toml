@@ -1,0 +1,19 @@
+# Railway Configuration for Finance Hub
+# This file defines multiple services for the project
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "cd backend && pip install -r requirements.txt"
+
+# Web service (Django + Gunicorn)
+[deploy]
+startCommand = "cd backend && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT"
+healthcheckPath = "/api/health/"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+# Note: Railway now uses multiple services in the dashboard
+# You need to create a separate "Worker" service in Railway dashboard
+# with the following command:
+# cd backend && celery -A core worker --loglevel=info --concurrency=2
