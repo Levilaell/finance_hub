@@ -22,6 +22,7 @@ app.conf.result_backend = REDIS_URL
 app.config_from_object('django.conf:settings', namespace='CELERY')
 
 # Auto-discover tasks in all installed apps
+# This will automatically find tasks.py in all installed Django apps
 app.autodiscover_tasks()
 
 # Configure periodic tasks
@@ -46,3 +47,22 @@ app.conf.timezone = 'America/Sao_Paulo'
 def debug_task(self):
     """Debug task for testing Celery."""
     print(f'Request: {self.request!r}')
+
+
+# Explicitly import task modules to ensure they are registered
+# This is needed because autodiscover_tasks() may not work in all deployment scenarios
+@app.on_after_configure.connect
+def setup_periodic_tasks_and_imports(*args, **kwargs):
+    """Import task modules after Celery is configured."""
+    _ = (args, kwargs)  # Suppress unused warnings
+    # Import banking tasks to ensure they are registered
+    try:
+        import apps.banking.tasks  # noqa: F401
+    except ImportError:
+        pass
+
+    # Import ai_insights tasks
+    try:
+        import apps.ai_insights.tasks  # noqa: F401
+    except ImportError:
+        pass
