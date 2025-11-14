@@ -19,7 +19,6 @@ import {
   ChevronDown,
   Bell,
   Sparkles,
-  Lock,
   BookOpen,
   FileTextIcon,
 } from "lucide-react";
@@ -112,19 +111,12 @@ export function MainLayout({ children }: MainLayoutProps) {
                     "flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300 relative",
                     isActive
                       ? "bg-white/10 text-white border border-white/20"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                    item.comingSoon && "opacity-75"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                   onClick={() => setSidebarOpen(false)}
                 >
                   <item.icon className="h-5 w-5 flex-shrink-0" />
                   <span className="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{item.name}</span>
-                  {item.comingSoon && (
-                    <div className="ml-auto flex items-center gap-1 flex-shrink-0">
-                      <Lock className="h-3.5 w-3.5 text-yellow-500" />
-                      <span className="text-xs text-yellow-500 font-medium whitespace-nowrap">Em breve</span>
-                    </div>
-                  )}
                   {item.beta && (
                     <span className="ml-auto px-1.5 py-0.5 text-[10px] font-semibold bg-blue-500/20 text-blue-400 rounded uppercase flex-shrink-0">
                       Beta
@@ -186,18 +178,11 @@ export function MainLayout({ children }: MainLayoutProps) {
                     "flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300 relative",
                     isActive
                       ? "bg-white/10 text-white border border-white/20"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                    item.comingSoon && "opacity-75"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
                   <item.icon className="h-5 w-5 flex-shrink-0" />
                   <span className="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{item.name}</span>
-                  {item.comingSoon && (
-                    <div className="ml-auto flex items-center gap-1 flex-shrink-0">
-                      <Lock className="h-3.5 w-3.5 text-yellow-500" />
-                      <span className="text-xs text-yellow-500 font-medium whitespace-nowrap">Em breve</span>
-                    </div>
-                  )}
                   {item.beta && (
                     <span className="ml-auto px-1.5 py-0.5 text-[10px] font-semibold bg-blue-500/20 text-blue-400 rounded uppercase flex-shrink-0">
                       Beta
