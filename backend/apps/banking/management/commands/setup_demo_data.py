@@ -7,6 +7,7 @@ from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from apps.banking.models import BankAccount, BankConnection, Connector, Transaction, Category
+from apps.banking.services import get_category_translations, get_category_icon
 from decimal import Decimal
 import uuid
 from datetime import datetime, timedelta
@@ -93,49 +94,70 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'{"="*60}\n'))
 
     def _create_categories(self, user):
-        """Create realistic categories using Pluggy standard categories"""
-        # Using real Pluggy categories from pluggy_categories.json
-        categories_data = {
+        """Create realistic categories using Pluggy standard categories with translations"""
+        # Load translations from pluggy_categories.json
+        translations = get_category_translations()
+
+        # Using real Pluggy categories
+        pluggy_categories = {
             'income': [
-                {'name': 'Salary', 'translated': 'Salário', 'color': '#10b981', 'icon': '💰'},
-                {'name': 'Entrepreneurial activities', 'translated': 'Atividades de empreendedorismo', 'color': '#059669', 'icon': '💼'},
-                {'name': 'Non-recurring income', 'translated': 'Renda não-recorrente', 'color': '#34d399', 'icon': '💵'},
+                'Salary',
+                'Entrepreneurial activities',
+                'Non-recurring income',
             ],
             'expense': [
-                {'name': 'Groceries', 'translated': 'Supermercado', 'color': '#f59e0b', 'icon': '🛒'},
-                {'name': 'Food and drinks', 'translated': 'Alimentos e bebidas', 'color': '#ef4444', 'icon': '🍽️'},
-                {'name': 'Shopping', 'translated': 'Compras', 'color': '#ec4899', 'icon': '🛍️'},
-                {'name': 'Rent', 'translated': 'Aluguel', 'color': '#6366f1', 'icon': '🏢'},
-                {'name': 'Electricity', 'translated': 'Eletricidade', 'color': '#facc15', 'icon': '💡'},
-                {'name': 'Water', 'translated': 'Água', 'color': '#3b82f6', 'icon': '💧'},
-                {'name': 'Internet', 'translated': 'Internet', 'color': '#8b5cf6', 'icon': '📡'},
-                {'name': 'Mobile', 'translated': 'Celular', 'color': '#7c3aed', 'icon': '📱'},
-                {'name': 'Services', 'translated': 'Serviços', 'color': '#64748b', 'icon': '⚙️'},
-                {'name': 'Taxes', 'translated': 'Impostos', 'color': '#475569', 'icon': '🏛️'},
-                {'name': 'Bank fees', 'translated': 'Taxas bancárias', 'color': '#94a3b8', 'icon': '🏦'},
-                {'name': 'Transportation', 'translated': 'Transporte', 'color': '#14b8a6', 'icon': '🚗'},
-                {'name': 'Healthcare', 'translated': 'Saúde', 'color': '#10b981', 'icon': '🏥'},
-                {'name': 'Other', 'translated': 'Outros', 'color': '#cbd5e1', 'icon': '➖'},
+                'Groceries',
+                'Food and drinks',
+                'Shopping',
+                'Rent',
+                'Electricity',
+                'Water',
+                'Internet',
+                'Mobile',
+                'Services',
+                'Taxes',
+                'Bank fees',
+                'Transportation',
+                'Healthcare',
+                'Other',
             ]
         }
 
+        # Color palette for categories
+        colors = {
+            'income': ['#10b981', '#059669', '#34d399', '#6ee7b7'],
+            'expense': ['#f59e0b', '#ef4444', '#ec4899', '#6366f1', '#facc15', '#3b82f6',
+                       '#8b5cf6', '#7c3aed', '#64748b', '#475569', '#94a3b8', '#14b8a6',
+                       '#10b981', '#cbd5e1']
+        }
+
         categories = {}
-        for cat_type, cats in categories_data.items():
-            for cat_data in cats:
-                # Use translated name for better UX
+        for cat_type, cat_names in pluggy_categories.items():
+            for idx, english_name in enumerate(cat_names):
+                # Get Portuguese translation
+                portuguese_name = translations.get(english_name, english_name)
+
+                # Get icon from services
+                icon = get_category_icon(portuguese_name)
+
+                # Get color from palette
+                color = colors[cat_type][idx % len(colors[cat_type])]
+
+                # Create category with Portuguese name
                 category, created = Category.objects.get_or_create(
                     user=user,
-                    name=cat_data['translated'],
+                    name=portuguese_name,
                     type=cat_type,
                     defaults={
-                        'color': cat_data['color'],
-                        'icon': cat_data['icon'],
+                        'color': color,
+                        'icon': icon,
                         'is_system': True
                     }
                 )
-                # Store by both English and Portuguese names
-                categories[cat_data['name']] = category
-                categories[cat_data['translated']] = category
+
+                # Store by both English and Portuguese names for easy lookup
+                categories[english_name] = category
+                categories[portuguese_name] = category
 
         return categories
 
