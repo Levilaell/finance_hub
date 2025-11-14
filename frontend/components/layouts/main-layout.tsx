@@ -20,7 +20,6 @@ import {
   Bell,
   Sparkles,
   Lock,
-  Package,
   BookOpen,
   FileTextIcon,
 } from "lucide-react";
@@ -36,7 +35,6 @@ const navigation = [
   { name: "Contas Bancárias", href: "/accounts", icon: Wallet },
   { name: "Contas", href: "/bills", icon: FileTextIcon },
   { name: "Categorias", href: "/categories", icon: Tags },
-  { name: "Estoque", href: "/estoque", icon: Package, comingSoon: true },
   { name: "Insights", href: "/ai-insights", icon: Sparkles, beta: true },
   { name: "Relatórios", href: "/reports", icon: FileText },
   { name: "Como Usar", href: "/how-to-use", icon: BookOpen },
