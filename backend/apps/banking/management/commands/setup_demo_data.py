@@ -93,44 +93,39 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'{"="*60}\n'))
 
     def _create_categories(self, user):
-        """Create realistic categories for retail business"""
+        """Create realistic categories using Pluggy standard categories"""
+        # Using real Pluggy categories from pluggy_categories.json
         categories_data = {
             'income': [
-                {'name': 'Vendas à Vista', 'color': '#10b981', 'icon': '💵'},
-                {'name': 'Vendas Cartão Débito', 'color': '#059669', 'icon': '💳'},
-                {'name': 'Vendas Cartão Crédito', 'color': '#047857', 'icon': '💳'},
-                {'name': 'Vendas Pix', 'color': '#34d399', 'icon': '📱'},
-                {'name': 'Vendas Online', 'color': '#6ee7b7', 'icon': '🛒'},
-                {'name': 'Outras Receitas', 'color': '#86efac', 'icon': '➕'},
+                {'name': 'Salary', 'translated': 'Salário', 'color': '#10b981', 'icon': '💰'},
+                {'name': 'Entrepreneurial activities', 'translated': 'Atividades de empreendedorismo', 'color': '#059669', 'icon': '💼'},
+                {'name': 'Non-recurring income', 'translated': 'Renda não-recorrente', 'color': '#34d399', 'icon': '💵'},
             ],
             'expense': [
-                {'name': 'Compra de Mercadorias', 'color': '#f59e0b', 'icon': '📦'},
-                {'name': 'Fornecedores', 'color': '#d97706', 'icon': '🏭'},
-                {'name': 'Aluguel', 'color': '#6366f1', 'icon': '🏢'},
-                {'name': 'Energia Elétrica', 'color': '#facc15', 'icon': '💡'},
-                {'name': 'Água', 'color': '#3b82f6', 'icon': '💧'},
-                {'name': 'Internet/Telefone', 'color': '#8b5cf6', 'icon': '📡'},
-                {'name': 'Salários', 'color': '#ef4444', 'icon': '👥'},
-                {'name': 'Encargos Trabalhistas', 'color': '#dc2626', 'icon': '📋'},
-                {'name': 'Contador', 'color': '#64748b', 'icon': '🧮'},
-                {'name': 'Marketing', 'color': '#ec4899', 'icon': '📢'},
-                {'name': 'Manutenção', 'color': '#f97316', 'icon': '🔧'},
-                {'name': 'Limpeza', 'color': '#06b6d4', 'icon': '🧹'},
-                {'name': 'Impostos', 'color': '#475569', 'icon': '🏛️'},
-                {'name': 'Taxas Bancárias', 'color': '#94a3b8', 'icon': '🏦'},
-                {'name': 'Embalagens', 'color': '#a3e635', 'icon': '📦'},
-                {'name': 'Transporte/Frete', 'color': '#14b8a6', 'icon': '🚚'},
-                {'name': 'Equipamentos', 'color': '#84cc16', 'icon': '⚙️'},
-                {'name': 'Outras Despesas', 'color': '#cbd5e1', 'icon': '➖'},
+                {'name': 'Groceries', 'translated': 'Supermercado', 'color': '#f59e0b', 'icon': '🛒'},
+                {'name': 'Food and drinks', 'translated': 'Alimentos e bebidas', 'color': '#ef4444', 'icon': '🍽️'},
+                {'name': 'Shopping', 'translated': 'Compras', 'color': '#ec4899', 'icon': '🛍️'},
+                {'name': 'Rent', 'translated': 'Aluguel', 'color': '#6366f1', 'icon': '🏢'},
+                {'name': 'Electricity', 'translated': 'Eletricidade', 'color': '#facc15', 'icon': '💡'},
+                {'name': 'Water', 'translated': 'Água', 'color': '#3b82f6', 'icon': '💧'},
+                {'name': 'Internet', 'translated': 'Internet', 'color': '#8b5cf6', 'icon': '📡'},
+                {'name': 'Mobile', 'translated': 'Celular', 'color': '#7c3aed', 'icon': '📱'},
+                {'name': 'Services', 'translated': 'Serviços', 'color': '#64748b', 'icon': '⚙️'},
+                {'name': 'Taxes', 'translated': 'Impostos', 'color': '#475569', 'icon': '🏛️'},
+                {'name': 'Bank fees', 'translated': 'Taxas bancárias', 'color': '#94a3b8', 'icon': '🏦'},
+                {'name': 'Transportation', 'translated': 'Transporte', 'color': '#14b8a6', 'icon': '🚗'},
+                {'name': 'Healthcare', 'translated': 'Saúde', 'color': '#10b981', 'icon': '🏥'},
+                {'name': 'Other', 'translated': 'Outros', 'color': '#cbd5e1', 'icon': '➖'},
             ]
         }
 
         categories = {}
         for cat_type, cats in categories_data.items():
             for cat_data in cats:
+                # Use translated name for better UX
                 category, created = Category.objects.get_or_create(
                     user=user,
-                    name=cat_data['name'],
+                    name=cat_data['translated'],
                     type=cat_type,
                     defaults={
                         'color': cat_data['color'],
@@ -138,7 +133,9 @@ class Command(BaseCommand):
                         'is_system': True
                     }
                 )
+                # Store by both English and Portuguese names
                 categories[cat_data['name']] = category
+                categories[cat_data['translated']] = category
 
         return categories
 
@@ -276,18 +273,18 @@ class Command(BaseCommand):
             num_sales = random.randint(8, 15) if date.weekday() in [4, 5] else random.randint(4, 10)
 
             for _ in range(num_sales):
-                # Random sale type
+                # Random sale type - Using Pluggy categories
                 sale_type = random.choices(
                     [
-                        ('Vendas Pix', 'PIX', (15.00, 450.00)),
-                        ('Vendas Cartão Débito', 'Cartão Débito', (20.00, 380.00)),
-                        ('Vendas Cartão Crédito', 'Cartão Crédito', (30.00, 650.00)),
-                        ('Vendas à Vista', 'Dinheiro', (10.00, 250.00)),
+                        ('Entrepreneurial activities', 'PIX', (15.00, 450.00)),
+                        ('Entrepreneurial activities', 'Cartão Débito', (20.00, 380.00)),
+                        ('Entrepreneurial activities', 'Cartão Crédito', (30.00, 650.00)),
+                        ('Entrepreneurial activities', 'Dinheiro', (10.00, 250.00)),
                     ],
                     weights=[35, 30, 25, 10]
                 )[0]
 
-                category_name, payment_method, amount_range = sale_type
+                pluggy_category, payment_method, amount_range = sale_type
                 amount = Decimal(str(round(random.uniform(*amount_range), 2)))
 
                 # Random time during business hours (8h - 20h)
@@ -303,10 +300,10 @@ class Command(BaseCommand):
                     amount=amount,
                     currency_code='BRL',
                     date=transaction_date,
-                    pluggy_category=category_name,
+                    pluggy_category=pluggy_category,
                     merchant_name=f'Venda PDV',
                     merchant_category='Sales',
-                    user_category=categories.get(category_name),
+                    user_category=categories.get(pluggy_category),
                 )
                 transactions_created += 1
 
@@ -334,10 +331,10 @@ class Command(BaseCommand):
                 amount=amount,
                 currency_code='BRL',
                 date=date,
-                pluggy_category='Compra de Mercadorias',
+                pluggy_category='Groceries',
                 merchant_name=supplier,
-                merchant_category='Inventory',
-                user_category=categories.get('Compra de Mercadorias'),
+                merchant_category='Groceries',
+                user_category=categories.get('Groceries'),
             )
             transactions_created += 1
 
@@ -356,10 +353,10 @@ class Command(BaseCommand):
                 amount=Decimal('2800.00'),
                 currency_code='BRL',
                 date=date,
-                pluggy_category='Aluguel',
+                pluggy_category='Rent',
                 merchant_name='Imobiliária Centro',
                 merchant_category='Rent',
-                user_category=categories.get('Aluguel'),
+                user_category=categories.get('Rent'),
             )
             transactions_created += 1
 
@@ -379,10 +376,10 @@ class Command(BaseCommand):
                 amount=amount,
                 currency_code='BRL',
                 date=date,
-                pluggy_category='Energia Elétrica',
+                pluggy_category='Electricity',
                 merchant_name='CPFL Energia',
                 merchant_category='Utilities',
-                user_category=categories.get('Energia Elétrica'),
+                user_category=categories.get('Electricity'),
             )
             transactions_created += 1
 
@@ -401,10 +398,10 @@ class Command(BaseCommand):
                 amount=Decimal('299.90'),
                 currency_code='BRL',
                 date=date,
-                pluggy_category='Internet/Telefone',
+                pluggy_category='Internet',
                 merchant_name='Vivo Empresarial',
-                merchant_category='Utilities',
-                user_category=categories.get('Internet/Telefone'),
+                merchant_category='Telecommunications',
+                user_category=categories.get('Internet'),
             )
             transactions_created += 1
 
@@ -424,10 +421,10 @@ class Command(BaseCommand):
                 amount=amount,
                 currency_code='BRL',
                 date=date,
-                pluggy_category='Água',
+                pluggy_category='Water',
                 merchant_name='Sabesp',
                 merchant_category='Utilities',
-                user_category=categories.get('Água'),
+                user_category=categories.get('Water'),
             )
             transactions_created += 1
 
@@ -454,10 +451,10 @@ class Command(BaseCommand):
                     amount=salary,
                     currency_code='BRL',
                     date=date,
-                    pluggy_category='Salários',
+                    pluggy_category='Salary',
                     merchant_name=employee,
                     merchant_category='Payroll',
-                    user_category=categories.get('Salários'),
+                    user_category=categories.get('Salary'),
                 )
                 transactions_created += 1
 
@@ -482,10 +479,10 @@ class Command(BaseCommand):
                     amount=valor,
                     currency_code='BRL',
                     date=date,
-                    pluggy_category='Encargos Trabalhistas',
+                    pluggy_category='Taxes',
                     merchant_name='Receita Federal',
                     merchant_category='Taxes',
-                    user_category=categories.get('Encargos Trabalhistas'),
+                    user_category=categories.get('Taxes'),
                 )
                 transactions_created += 1
 
@@ -504,10 +501,10 @@ class Command(BaseCommand):
                 amount=Decimal('450.00'),
                 currency_code='BRL',
                 date=date,
-                pluggy_category='Contador',
+                pluggy_category='Services',
                 merchant_name='Contabilidade Silva',
                 merchant_category='Services',
-                user_category=categories.get('Contador'),
+                user_category=categories.get('Services'),
             )
             transactions_created += 1
 
@@ -527,22 +524,22 @@ class Command(BaseCommand):
                 amount=amount,
                 currency_code='BRL',
                 date=date,
-                pluggy_category='Impostos',
+                pluggy_category='Taxes',
                 merchant_name='Receita Federal',
                 merchant_category='Taxes',
-                user_category=categories.get('Impostos'),
+                user_category=categories.get('Taxes'),
             )
             transactions_created += 1
 
-        # 10. Despesas variadas (aleatórias)
+        # 10. Despesas variadas (aleatórias) - Using Pluggy categories
         variable_expenses = [
-            ('Marketing', 'Google Ads', (200.00, 800.00)),
-            ('Marketing', 'Facebook Ads', (150.00, 500.00)),
-            ('Manutenção', 'Manutenção Ar Condicionado', (180.00, 450.00)),
-            ('Limpeza', 'Produtos de Limpeza', (120.00, 280.00)),
-            ('Embalagens', 'Sacolas e Embalagens', (150.00, 350.00)),
-            ('Taxas Bancárias', 'Taxa Manutenção Conta', (35.00, 85.00)),
-            ('Transporte/Frete', 'Frete Mercadorias', (180.00, 450.00)),
+            ('Shopping', 'Google Ads', (200.00, 800.00)),
+            ('Shopping', 'Facebook Ads', (150.00, 500.00)),
+            ('Services', 'Manutenção Ar Condicionado', (180.00, 450.00)),
+            ('Shopping', 'Produtos de Limpeza', (120.00, 280.00)),
+            ('Shopping', 'Sacolas e Embalagens', (150.00, 350.00)),
+            ('Bank fees', 'Taxa Manutenção Conta', (35.00, 85.00)),
+            ('Transportation', 'Frete Mercadorias', (180.00, 450.00)),
         ]
 
         for _ in range(random.randint(15, 25)):
