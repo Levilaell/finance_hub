@@ -105,10 +105,34 @@ LOGGING = {
             'backupCount': 20,
             'formatter': 'json',
         },
+        'webhook_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOGS_DIR / 'webhooks.log'),
+            'maxBytes': 1024 * 1024 * 10,  # 10MB
+            'backupCount': 5,
+            'formatter': 'detailed',
+        },
+        'webhook_errors': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOGS_DIR / 'webhook_errors.log'),
+            'maxBytes': 1024 * 1024 * 20,  # 20MB
+            'backupCount': 10,
+            'formatter': 'detailed',
+        },
+        'celery_errors': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOGS_DIR / 'celery_errors.log'),
+            'maxBytes': 1024 * 1024 * 20,  # 20MB
+            'backupCount': 10,
+            'formatter': 'detailed',
+        },
     },
     'root': {
         'level': 'INFO',
-        'handlers': ['console', 'file'],
+        'handlers': ['console', 'file', 'error_file'],
     },
     'loggers': {
         'django': {
@@ -122,17 +146,32 @@ LOGGING = {
             'propagate': False,
         },
         'apps.banking': {
-            'handlers': ['console', 'banking_file'],
+            'handlers': ['console', 'banking_file', 'error_file'],
             'level': 'DEBUG',
             'propagate': False,
         },
         'apps.banking.pluggy_client': {
-            'handlers': ['console', 'pluggy_file'],
+            'handlers': ['console', 'pluggy_file', 'error_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'apps.banking.webhooks': {
+            'handlers': ['console', 'webhook_file', 'webhook_errors'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'apps.banking.tasks': {
+            'handlers': ['console', 'webhook_file', 'webhook_errors'],
             'level': 'DEBUG',
             'propagate': False,
         },
         'celery': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'file', 'celery_errors'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'celery.task': {
+            'handlers': ['console', 'file', 'celery_errors'],
             'level': 'INFO',
             'propagate': False,
         },
