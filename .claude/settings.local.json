@@ -1,7 +1,23 @@
 {
   "permissions": {
     "allow": [
-      "Bash(NUL)"
+      "Bash(NUL)",
+      "Bash(railway logs:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(railway status:*)",
+      "Bash(python -c:*)",
+      "Bash(if [ -d \"venv/Scripts\" ])",
+      "Bash(then source venv/Scripts/activate)",
+      "Bash(elif [ -d \"venv/bin\" ])",
+      "Bash(then source venv/bin/activate)",
+      "Bash(else echo \"Virtual environment not found\")",
+      "Bash(fi)",
+      "Bash(venv/Scripts/python:*)",
+      "Bash(venv/Scripts/celery:*)",
+      "Bash(git push:*)",
+      "Bash(git push)",
+      "Bash(nul)"
     ],
     "deny": [],
     "ask": []
