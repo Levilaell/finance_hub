@@ -146,35 +146,48 @@ class Command(BaseCommand):
         """Get or create fake bank connectors"""
         banks_data = [
             {
+                'pluggy_id': 999001,
                 'name': 'Banco do Brasil',
+                'institution_name': 'Banco do Brasil S.A.',
+                'institution_url': 'https://www.bb.com.br',
                 'logo_url': 'https://logo.clearbit.com/bb.com.br',
                 'primary_color': '#FFED00',
-                'institution_type': 'PERSONAL_BANK',
+                'type': 'PERSONAL_BANK',
             },
             {
+                'pluggy_id': 999002,
                 'name': 'Itaú Unibanco',
+                'institution_name': 'Itaú Unibanco S.A.',
+                'institution_url': 'https://www.itau.com.br',
                 'logo_url': 'https://logo.clearbit.com/itau.com.br',
                 'primary_color': '#EC7000',
-                'institution_type': 'PERSONAL_BANK',
+                'type': 'PERSONAL_BANK',
             },
             {
+                'pluggy_id': 999003,
                 'name': 'Bradesco',
+                'institution_name': 'Banco Bradesco S.A.',
+                'institution_url': 'https://www.bradesco.com.br',
                 'logo_url': 'https://logo.clearbit.com/bradesco.com.br',
                 'primary_color': '#CC092F',
-                'institution_type': 'PERSONAL_BANK',
+                'type': 'PERSONAL_BANK',
             },
         ]
 
         connectors = []
         for bank_data in banks_data:
             connector, created = Connector.objects.get_or_create(
-                name=bank_data['name'],
+                pluggy_id=bank_data['pluggy_id'],
                 defaults={
-                    'pluggy_connector_id': f'fake_{bank_data["name"].lower().replace(" ", "_")}',
+                    'name': bank_data['name'],
+                    'institution_name': bank_data['institution_name'],
+                    'institution_url': bank_data['institution_url'],
                     'logo_url': bank_data['logo_url'],
                     'primary_color': bank_data['primary_color'],
-                    'institution_type': bank_data['institution_type'],
+                    'type': bank_data['type'],
+                    'country': 'BR',
                     'is_active': True,
+                    'is_sandbox': True,  # Mark as sandbox/demo
                 }
             )
             connectors.append(connector)
