@@ -6,6 +6,10 @@ from urllib.parse import urlparse
 from django.core.exceptions import ImproperlyConfigured
 from .base import *
 
+# Initialize Sentry for error tracking
+from core.sentry import init_sentry
+init_sentry()
+
 # Security
 DEBUG = False
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
