@@ -28,6 +28,8 @@ from .services import (
     TransactionService
 )
 from .pluggy_client import PluggyClient
+from apps.authentication.models import UserActivityLog
+from apps.authentication.signals import get_client_ip
 
 
 class ConnectorViewSet(viewsets.ReadOnlyModelViewSet):
@@ -105,6 +107,18 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
                     item_id=request.data['pluggy_item_id']
                 )
                 logger.info(f"Connection created successfully: {connection.id}")
+
+                # Log activity
+                UserActivityLog.log_event(
+                    user=request.user,
+                    event_type='bank_connection_created',
+                    ip_address=get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    connection_id=str(connection.id),
+                    connector_name=connection.connector.name,
+                    pluggy_item_id=request.data['pluggy_item_id']
+                )
+
                 return Response(
                     BankConnectionSerializer(connection).data,
                     status=status.HTTP_201_CREATED
@@ -128,6 +142,18 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
                     connector_id=serializer.validated_data['connector_id'],
                     credentials=serializer.validated_data['credentials']
                 )
+
+                # Log activity
+                UserActivityLog.log_event(
+                    user=request.user,
+                    event_type='bank_connection_created',
+                    ip_address=get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    connection_id=str(connection.id),
+                    connector_name=connection.connector.name,
+                    connector_id=serializer.validated_data['connector_id']
+                )
+
                 return Response(
                     BankConnectionSerializer(connection).data,
                     status=status.HTTP_201_CREATED
@@ -153,7 +179,20 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
         connection = self.get_object()
         service = BankConnectionService()
 
+        # Store connection info before deletion
+        connection_id = str(connection.id)
+        connector_name = connection.connector.name
+
         if service.delete_connection(connection):
+            # Log activity
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='bank_connection_deleted',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                connection_id=connection_id,
+                connector_name=connector_name
+            )
             return Response(status=status.HTTP_204_NO_CONTENT)
         else:
             return Response(
@@ -172,6 +211,19 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
 
         try:
             updated_connection = service.update_connection_status(connection)
+
+            # Log activity
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='bank_connection_updated',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                connection_id=str(connection.id),
+                connector_name=connection.connector.name,
+                action='refresh_status',
+                new_status=updated_connection.status
+            )
+
             return Response(BankConnectionSerializer(updated_connection).data)
         except Exception as e:
             return Response(
@@ -188,13 +240,49 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
         connection = self.get_object()
         service = BankConnectionService()
 
+        # Log sync started
+        UserActivityLog.log_event(
+            user=request.user,
+            event_type='sync_started',
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            connection_id=str(connection.id),
+            connector_name=connection.connector.name,
+            sync_type='accounts'
+        )
+
         try:
             count = service.sync_accounts(connection)
+
+            # Log sync completed
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='sync_completed',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                connection_id=str(connection.id),
+                connector_name=connection.connector.name,
+                sync_type='accounts',
+                records_synced=count
+            )
+
             return Response({
                 'message': f'Synced {count} accounts',
                 'count': count
             })
         except Exception as e:
+            # Log sync failed
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='sync_failed',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                connection_id=str(connection.id),
+                connector_name=connection.connector.name,
+                sync_type='accounts',
+                error=str(e)
+            )
+
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -213,9 +301,33 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
         connection = self.get_object()
         service = BankConnectionService()
 
+        # Log sync started
+        UserActivityLog.log_event(
+            user=request.user,
+            event_type='sync_started',
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            connection_id=str(connection.id),
+            connector_name=connection.connector.name,
+            sync_type='transactions'
+        )
+
         try:
             # Trigger manual sync
             sync_status = service.trigger_manual_sync(connection)
+
+            # Log sync status
+            if sync_status['status'] in ['UPDATED', 'UPDATING']:
+                UserActivityLog.log_event(
+                    user=request.user,
+                    event_type='sync_completed',
+                    ip_address=get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    connection_id=str(connection.id),
+                    connector_name=connection.connector.name,
+                    sync_type='transactions',
+                    sync_status=sync_status['status']
+                )
 
             # Return sync initiation status immediately
             return Response({
@@ -229,6 +341,19 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
         except ValueError as e:
             # Handle MFA or credential errors
             error_msg = str(e)
+
+            # Log sync failed
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='sync_failed',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                connection_id=str(connection.id),
+                connector_name=connection.connector.name,
+                sync_type='transactions',
+                error=error_msg
+            )
+
             if 'MFA required' in error_msg:
                 return Response({
                     'error': error_msg,
@@ -247,6 +372,18 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
                     'status': 'ERROR'
                 }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
+            # Log sync failed
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='sync_failed',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                connection_id=str(connection.id),
+                connector_name=connection.connector.name,
+                sync_type='transactions',
+                error=str(e)
+            )
+
             return Response(
                 {'error': str(e), 'status': 'ERROR'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
