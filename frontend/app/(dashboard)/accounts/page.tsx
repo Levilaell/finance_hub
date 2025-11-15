@@ -97,7 +97,6 @@ export default function AccountsPage() {
         bankingService.getAccounts(),
         bankingService.getConnections(),
       ]);
-      console.log('[AccountsPage] Connections loaded:', connectionsData);
       setAccounts(accountsData);
       setConnections(connectionsData);
     } catch (error) {
@@ -221,7 +220,7 @@ export default function AccountsPage() {
       startPolling(account.connection_id);
 
     } catch (error: any) {
-      console.error('[AccountsPage] Error syncing account:', error);
+      console.error('Error syncing account:', error);
       toast.error('Erro ao iniciar sincronização', { id: 'sync-progress' });
       setSyncingConnectionId(null);
     }
@@ -356,8 +355,6 @@ export default function AccountsPage() {
             const connection = connections.find(c => c.id === account.connection_id);
             const connectionStatus = connection?.status;
             const connectionStatusDetail = connection?.status_detail;
-
-            console.log(`[AccountsPage] Account ${account.id}: connection=${account.connection_id}, status=${connectionStatus}`);
 
             return (
               <BankAccountCard
