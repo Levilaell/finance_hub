@@ -21,8 +21,15 @@ def get_client_ip(request):
 @receiver(user_logged_in)
 def log_user_login(sender, request, user, **kwargs):
     """
-    Log user login events
+    Log user login events (excluding admin logins)
     """
+    # Skip logging for admin logins
+    if request.path.startswith('/admin'):
+        # Only update IP, don't log the event
+        user.last_login_ip = get_client_ip(request)
+        user.save(update_fields=['last_login_ip'])
+        return
+
     UserActivityLog.log_event(
         user=user,
         event_type='login',
@@ -38,8 +45,12 @@ def log_user_login(sender, request, user, **kwargs):
 @receiver(user_logged_out)
 def log_user_logout(sender, request, user, **kwargs):
     """
-    Log user logout events
+    Log user logout events (excluding admin logouts)
     """
+    # Skip logging for admin logouts
+    if request.path.startswith('/admin'):
+        return
+
     if user:  # user can be None if not authenticated
         UserActivityLog.log_event(
             user=user,
