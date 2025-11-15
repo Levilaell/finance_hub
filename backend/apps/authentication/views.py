@@ -10,10 +10,10 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 
-from .models import User
+from .models import User, UserActivityLog
 from .serializers import (
-    RegisterSerializer, 
-    LoginSerializer, 
+    RegisterSerializer,
+    LoginSerializer,
     UserSerializer,
     TokenResponseSerializer
 )
@@ -27,19 +27,29 @@ def register_view(request):
     POST /api/auth/register/
     """
     serializer = RegisterSerializer(data=request.data)
-    
+
     if serializer.is_valid():
         # Criar usuário
         user = serializer.save()
-        
+
         # Gerar tokens JWT automaticamente
         refresh = RefreshToken.for_user(user)
         access_token = refresh.access_token
-        
+
         # Atualizar último login
         user.last_login = timezone.now()
-        user.save(update_fields=['last_login'])
-        
+        user.last_login_ip = get_client_ip(request)
+        user.save(update_fields=['last_login', 'last_login_ip'])
+
+        # Log registration and automatic login
+        UserActivityLog.log_event(
+            user=user,
+            event_type='login',
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            login_method='registration'
+        )
+
         return Response({
             'message': 'Usuário criado com sucesso!',
             'user': UserSerializer(user).data,
@@ -48,7 +58,7 @@ def register_view(request):
                 'refresh': str(refresh),
             }
         }, status=status.HTTP_201_CREATED)
-    
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -60,20 +70,29 @@ def login_view(request):
     POST /api/auth/login/
     """
     serializer = LoginSerializer(data=request.data, context={'request': request})
-    
+
     if serializer.is_valid():
         user = serializer.validated_data['user']
-        
+
         # Gerar tokens JWT
         refresh = RefreshToken.for_user(user)
         access_token = refresh.access_token
-        
+
         # Atualizar último login
         user.last_login = timezone.now()
         # Opcional: salvar IP do usuário
         user.last_login_ip = get_client_ip(request)
         user.save(update_fields=['last_login', 'last_login_ip'])
-        
+
+        # Log login activity
+        UserActivityLog.log_event(
+            user=user,
+            event_type='login',
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            login_method='jwt_api'
+        )
+
         return Response({
             'message': 'Login realizado com sucesso!',
             'user': UserSerializer(user).data,
@@ -82,7 +101,7 @@ def login_view(request):
                 'refresh': str(refresh),
             }
         }, status=status.HTTP_200_OK)
-    
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
