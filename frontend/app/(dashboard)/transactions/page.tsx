@@ -52,9 +52,6 @@ export default function TransactionsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatingTransactionId, setUpdatingTransactionId] = useState<string | null>(null);
-  const [currentBackendPage, setCurrentBackendPage] = useState(1);
-  const [hasMorePages, setHasMorePages] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,6 +61,10 @@ export default function TransactionsPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50; // 50 transações por página
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -75,69 +76,24 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     applyFilters();
+    setCurrentPage(1); // Reset to first page when filters change
   }, [transactions, searchTerm, selectedAccount, selectedType, selectedCategory, startDate, endDate]);
-
-  // Infinite scroll detection
-  useEffect(() => {
-    const handleScroll = () => {
-      if (isLoadingMore || !hasMorePages) return;
-
-      const scrollHeight = document.documentElement.scrollHeight;
-      const scrollTop = document.documentElement.scrollTop;
-      const clientHeight = document.documentElement.clientHeight;
-
-      // Load more when user is 300px from bottom
-      if (scrollHeight - scrollTop - clientHeight < 300) {
-        loadMoreTransactions();
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isLoadingMore, hasMorePages, currentBackendPage]);
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
       const [transactionsData, accountsData, categoriesData] = await Promise.all([
-        bankingService.getTransactions({ page_size: 100, page: 1 }),
+        bankingService.getTransactions(), // Carrega todas as transações em batches
         bankingService.getAccounts(),
         bankingService.getCategories(),
       ]);
       setTransactions(transactionsData);
       setAccounts(accountsData);
       setCategories(categoriesData);
-      setCurrentBackendPage(1);
-      setHasMorePages(transactionsData.length === 100); // If we got 100, there might be more
     } catch (error) {
       console.error('Error fetching transactions:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const loadMoreTransactions = async () => {
-    if (isLoadingMore || !hasMorePages) return;
-
-    setIsLoadingMore(true);
-    try {
-      const nextPage = currentBackendPage + 1;
-      const moreTransactions = await bankingService.getTransactions({
-        page_size: 100,
-        page: nextPage
-      });
-
-      if (moreTransactions.length > 0) {
-        setTransactions(prev => [...prev, ...moreTransactions]);
-        setCurrentBackendPage(nextPage);
-        setHasMorePages(moreTransactions.length === 100);
-      } else {
-        setHasMorePages(false);
-      }
-    } catch (error) {
-      console.error('Error loading more transactions:', error);
-    } finally {
-      setIsLoadingMore(false);
     }
   };
 
@@ -346,7 +302,18 @@ export default function TransactionsPage() {
 
   const balance = totalIncome - totalExpenses;
 
-  // No pagination needed with infinite scroll - show all filtered transactions
+  // Paginação local (client-side) - performance otimizada
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
+
+  const goToPage = (page: number) => {
+    const newPage = Math.max(1, Math.min(page, totalPages));
+    setCurrentPage(newPage);
+    // Scroll to top when changing pages
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   if (!isAuthenticated || !user || isLoading) {
     return (
@@ -537,6 +504,11 @@ export default function TransactionsPage() {
           <CardTitle>
             {filteredTransactions.length} {filteredTransactions.length === 1 ? 'Transação' : 'Transações'}
           </CardTitle>
+          {totalPages > 1 && (
+            <div className="text-sm text-muted-foreground">
+              Página {currentPage} de {totalPages}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {filteredTransactions.length > 0 ? (
@@ -566,7 +538,7 @@ export default function TransactionsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredTransactions.map((transaction) => (
+                    {paginatedTransactions.map((transaction) => (
                       <tr
                         key={transaction.id}
                         className="border-b border-white/5 hover:bg-white/5 transition-colors"
@@ -717,22 +689,72 @@ export default function TransactionsPage() {
                 </table>
               </div>
 
-              {/* Infinite Scroll Loading Indicator */}
-              {isLoadingMore && (
-                <div className="flex justify-center items-center py-8 border-t border-white/10">
-                  <LoadingSpinner />
-                  <span className="ml-3 text-sm text-muted-foreground">
-                    Carregando mais transações...
-                  </span>
-                </div>
-              )}
-
-              {/* End of list indicator */}
-              {!hasMorePages && filteredTransactions.length > 0 && (
-                <div className="text-center py-8 border-t border-white/10">
-                  <p className="text-sm text-muted-foreground">
-                    Você chegou ao final da lista
-                  </p>
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/10">
+                  <div className="text-sm text-muted-foreground">
+                    Mostrando {startIndex + 1} a {Math.min(endIndex, filteredTransactions.length)} de{' '}
+                    {filteredTransactions.length} transações
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => goToPage(1)}
+                      disabled={currentPage === 1}
+                    >
+                      Primeira
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => goToPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      Anterior
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNumber;
+                        if (totalPages <= 5) {
+                          pageNumber = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNumber = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNumber = totalPages - 4 + i;
+                        } else {
+                          pageNumber = currentPage - 2 + i;
+                        }
+                        return (
+                          <Button
+                            key={pageNumber}
+                            variant={currentPage === pageNumber ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => goToPage(pageNumber)}
+                            className="w-10"
+                          >
+                            {pageNumber}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => goToPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Próxima
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => goToPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Última
+                    </Button>
+                  </div>
                 </div>
               )}
             </>
