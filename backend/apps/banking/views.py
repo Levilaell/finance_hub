@@ -1041,44 +1041,66 @@ class BillViewSet(viewsets.ModelViewSet):
         GET /api/banking/bills/actual_cash_flow/
 
         Returns monthly data showing what was actually paid/received from bills.
+        Uses paid_at field to determine when bills were paid (for fully paid bills).
+        For partial payments, we show them in the due_date month as we don't track
+        individual payment dates.
         """
         from dateutil.relativedelta import relativedelta
 
-        today = timezone.now().date()
+        today = timezone.now()
         actual_data = []
 
         # Get last 12 months
         for i in range(11, -1, -1):
-            month_start = (today - relativedelta(months=i)).replace(day=1)
-            month_end = (month_start + relativedelta(months=1)) - relativedelta(days=1)
+            month_start = (today - relativedelta(months=i)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            month_end = (month_start + relativedelta(months=1)) - relativedelta(microseconds=1)
 
-            # Get bills that were paid (fully or partially) in this month
-            receivable_bills = Bill.objects.filter(
+            # Get bills that were PAID in this month (using paid_at for fully paid bills)
+            # For status=paid, use paid_at; for partially_paid, use due_date as fallback
+            receivable_fully_paid = Bill.objects.filter(
                 user=request.user,
                 type='receivable',
-                due_date__gte=month_start,
-                due_date__lte=month_end
-            ).exclude(status='cancelled')
+                status='paid',
+                paid_at__gte=month_start,
+                paid_at__lte=month_end
+            ).aggregate(total=Sum('amount'))['total'] or 0
 
-            # Sum the amount_paid (what was actually received)
-            receivable_paid = receivable_bills.aggregate(total=Sum('amount_paid'))['total'] or 0
+            # For partially paid bills in this month (use due_date as we don't track partial payment dates)
+            receivable_partial = Bill.objects.filter(
+                user=request.user,
+                type='receivable',
+                status='partially_paid',
+                due_date__gte=month_start.date(),
+                due_date__lte=month_end.date()
+            ).aggregate(total=Sum('amount_paid'))['total'] or 0
 
-            payable_bills = Bill.objects.filter(
+            receivable_paid = float(receivable_fully_paid) + float(receivable_partial)
+
+            # Same for payables
+            payable_fully_paid = Bill.objects.filter(
                 user=request.user,
                 type='payable',
-                due_date__gte=month_start,
-                due_date__lte=month_end
-            ).exclude(status='cancelled')
+                status='paid',
+                paid_at__gte=month_start,
+                paid_at__lte=month_end
+            ).aggregate(total=Sum('amount'))['total'] or 0
 
-            # Sum the amount_paid (what was actually paid)
-            payable_paid = payable_bills.aggregate(total=Sum('amount_paid'))['total'] or 0
+            payable_partial = Bill.objects.filter(
+                user=request.user,
+                type='payable',
+                status='partially_paid',
+                due_date__gte=month_start.date(),
+                due_date__lte=month_end.date()
+            ).aggregate(total=Sum('amount_paid'))['total'] or 0
+
+            payable_paid = float(payable_fully_paid) + float(payable_partial)
 
             actual_data.append({
                 'month': month_start.strftime('%Y-%m'),
                 'month_name': month_start.strftime('%b/%y'),
-                'receivable_paid': float(receivable_paid),
-                'payable_paid': float(payable_paid),
-                'net': float(receivable_paid - payable_paid)
+                'receivable_paid': receivable_paid,
+                'payable_paid': payable_paid,
+                'net': receivable_paid - payable_paid
             })
 
         return Response(actual_data)
