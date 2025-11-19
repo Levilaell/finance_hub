@@ -17,7 +17,7 @@ User = get_user_model()
 class Command(BaseCommand):
     help = 'Populate a bank account with realistic test transactions'
 
-    # Realistic transaction templates
+    # Realistic transaction templates for PERSONAL accounts
     TRANSACTION_TEMPLATES = {
         'Food & Dining': {
             'type': 'DEBIT',
@@ -165,6 +165,122 @@ class Command(BaseCommand):
         },
     }
 
+    # Retail business transaction templates
+    RETAIL_TEMPLATES = {
+        'Sales': {
+            'type': 'CREDIT',
+            'merchants': [
+                'Venda PDV - Débito',
+                'Venda PDV - Crédito',
+                'Venda PDV - Pix',
+                'Venda PDV - Dinheiro',
+                'Stone - Vendas Cartão',
+                'Cielo - Vendas Cartão',
+                'PagSeguro - Vendas Online',
+                'Mercado Pago - Recebimento',
+                'Ifood - Repasse Vendas',
+                'Rappi - Recebimento',
+            ],
+            'amount_range': (25.00, 850.00),
+            'frequency': 0.45,  # 45% - Principal receita
+        },
+        'Inventory Purchase': {
+            'type': 'DEBIT',
+            'merchants': [
+                'Fornecedor Atacado Central',
+                'Distribuidora Alimentos Ltda',
+                'Martins Atacado',
+                'Makro Atacadista',
+                'Assaí Atacadista',
+                'Fornecedor Bebidas Sul',
+                'Indústria Produtos Ltda',
+                'Importadora ABC',
+            ],
+            'amount_range': (500.00, 5000.00),
+            'frequency': 0.15,  # 15% - Compra de estoque
+        },
+        'Rent & Facilities': {
+            'type': 'DEBIT',
+            'merchants': [
+                'Aluguel Loja - Imobiliária',
+                'Condomínio Shopping Center',
+                'CPFL Energia Comercial',
+                'Sabesp Conta Comercial',
+                'Vivo Empresarial Internet',
+                'Limpeza e Conservação',
+                'Segurança Patrimonial',
+            ],
+            'amount_range': (200.00, 3500.00),
+            'frequency': 0.08,  # 8% - Custos fixos
+        },
+        'Employee Salaries': {
+            'type': 'DEBIT',
+            'merchants': [
+                'Folha de Pagamento',
+                'Salário Funcionário',
+                'INSS Empresa',
+                'FGTS Depósito',
+                'Vale Transporte',
+                'Vale Refeição Sodexo',
+                'Plano de Saúde Unimed',
+            ],
+            'amount_range': (1200.00, 4500.00),
+            'frequency': 0.10,  # 10% - Folha de pagamento
+        },
+        'Marketing & Advertising': {
+            'type': 'DEBIT',
+            'merchants': [
+                'Google Ads',
+                'Facebook Ads',
+                'Instagram Ads',
+                'Gráfica Rápida - Panfletos',
+                'Banner e Faixas',
+                'Agência Marketing Digital',
+                'Ifood - Taxa Publicidade',
+            ],
+            'amount_range': (50.00, 1200.00),
+            'frequency': 0.06,  # 6% - Marketing
+        },
+        'Operational Expenses': {
+            'type': 'DEBIT',
+            'merchants': [
+                'Embalagens e Sacolas',
+                'Material de Limpeza',
+                'Papelaria e Escritório',
+                'Manutenção Equipamentos',
+                'Contador Serviços',
+                'Advogado Consultoria',
+                'Taxas Bancárias',
+                'Taxa Maquininha Cartão',
+            ],
+            'amount_range': (30.00, 800.00),
+            'frequency': 0.08,  # 8% - Despesas operacionais
+        },
+        'Tax Payments': {
+            'type': 'DEBIT',
+            'merchants': [
+                'Simples Nacional - DAS',
+                'ISS Prefeitura',
+                'ICMS Estado',
+                'PIS/COFINS',
+                'Impostos Diversos',
+            ],
+            'amount_range': (300.00, 2500.00),
+            'frequency': 0.05,  # 5% - Impostos
+        },
+        'Bank Transfers': {
+            'type': 'DEBIT',
+            'merchants': [
+                'TED - Fornecedor',
+                'Pix - Pagamento',
+                'Transferência Banco',
+                'Saque Caixa',
+            ],
+            'amount_range': (100.00, 3000.00),
+            'frequency': 0.03,  # 3% - Transferências
+        },
+    }
+
     def add_arguments(self, parser):
         parser.add_argument(
             '--account-id',
@@ -193,6 +309,13 @@ class Command(BaseCommand):
             action='store_true',
             help='Delete existing test transactions before creating new ones'
         )
+        parser.add_argument(
+            '--mode',
+            type=str,
+            choices=['personal', 'retail'],
+            default='personal',
+            help='Transaction mode: personal (default) or retail business'
+        )
 
     def handle(self, *args, **options):
         account_id = options.get('account_id')
@@ -200,6 +323,7 @@ class Command(BaseCommand):
         count = options.get('count')
         days_back = options.get('days_back')
         clear_existing = options.get('clear_existing')
+        mode = options.get('mode')
 
         # Get target account
         account = None
@@ -236,12 +360,14 @@ class Command(BaseCommand):
 
         user = account.connection.user
 
+        mode_label = 'RETAIL BUSINESS' if mode == 'retail' else 'PERSONAL'
         self.stdout.write(
             self.style.WARNING(
                 f'\nTarget Account: {account.name} ({account.type})'
             )
         )
         self.stdout.write(f'User: {user.email}')
+        self.stdout.write(f'Mode: {mode_label}')
         self.stdout.write(f'Transactions to create: {count}')
         self.stdout.write(f'Date range: {days_back} days back\n')
 
@@ -259,11 +385,11 @@ class Command(BaseCommand):
 
         # Ensure categories exist
         self.stdout.write('Checking categories...')
-        self._ensure_categories(user)
+        self._ensure_categories(user, mode)
 
         # Create transactions
         self.stdout.write(f'\nCreating {count} test transactions...\n')
-        created_count = self._create_transactions(account, user, count, days_back)
+        created_count = self._create_transactions(account, user, count, days_back, mode)
 
         self.stdout.write(
             self.style.SUCCESS(
@@ -274,25 +400,58 @@ class Command(BaseCommand):
         # Show summary
         self._show_summary(account)
 
-    def _ensure_categories(self, user):
+    def _ensure_categories(self, user, mode='personal'):
         """Ensure all necessary categories exist for the user"""
-        from apps.banking.management.commands.create_default_categories import Command as CategoriesCommand
+        if mode == 'retail':
+            # Create retail-specific categories
+            retail_categories = {
+                'income': [
+                    {'name': 'Sales', 'color': '#10b981', 'icon': '💰'},
+                ],
+                'expense': [
+                    {'name': 'Inventory Purchase', 'color': '#f59e0b', 'icon': '📦'},
+                    {'name': 'Rent & Facilities', 'color': '#6366f1', 'icon': '🏢'},
+                    {'name': 'Employee Salaries', 'color': '#ef4444', 'icon': '👥'},
+                    {'name': 'Marketing & Advertising', 'color': '#ec4899', 'icon': '📢'},
+                    {'name': 'Operational Expenses', 'color': '#8b5cf6', 'icon': '⚙️'},
+                    {'name': 'Tax Payments', 'color': '#64748b', 'icon': '🏛️'},
+                    {'name': 'Bank Transfers', 'color': '#06b6d4', 'icon': '🔄'},
+                ]
+            }
 
-        categories_cmd = CategoriesCommand()
-        for category_type, categories in categories_cmd.DEFAULT_CATEGORIES.items():
-            for cat_data in categories:
-                category, created = Category.objects.get_or_create(
-                    user=user,
-                    name=cat_data['name'],
-                    type=category_type,
-                    defaults={
-                        'color': cat_data['color'],
-                        'icon': cat_data['icon'],
-                        'is_system': True
-                    }
-                )
-                if created:
-                    self.stdout.write(f"  + Created category: {cat_data['name']}")
+            for category_type, categories in retail_categories.items():
+                for cat_data in categories:
+                    category, created = Category.objects.get_or_create(
+                        user=user,
+                        name=cat_data['name'],
+                        type=category_type,
+                        defaults={
+                            'color': cat_data['color'],
+                            'icon': cat_data['icon'],
+                            'is_system': True
+                        }
+                    )
+                    if created:
+                        self.stdout.write(f"  + Created category: {cat_data['name']}")
+        else:
+            # Use default personal categories
+            from apps.banking.management.commands.create_default_categories import Command as CategoriesCommand
+
+            categories_cmd = CategoriesCommand()
+            for category_type, categories in categories_cmd.DEFAULT_CATEGORIES.items():
+                for cat_data in categories:
+                    category, created = Category.objects.get_or_create(
+                        user=user,
+                        name=cat_data['name'],
+                        type=category_type,
+                        defaults={
+                            'color': cat_data['color'],
+                            'icon': cat_data['icon'],
+                            'is_system': True
+                        }
+                    )
+                    if created:
+                        self.stdout.write(f"  + Created category: {cat_data['name']}")
 
     def _create_transactions(self, account, user, count, days_back):
         """Create realistic test transactions"""

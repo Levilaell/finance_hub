@@ -174,6 +174,7 @@ export interface TransactionFilter {
   category?: string;
   limit?: number;
   offset?: number;
+  page?: number;
 }
 
 // Category Summary
