@@ -175,6 +175,7 @@ export interface TransactionFilter {
   limit?: number;
   offset?: number;
   page?: number;
+  page_size?: number;
 }
 
 // Category Summary
