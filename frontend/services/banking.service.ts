@@ -130,36 +130,17 @@ class BankingService {
 
   // Transactions
   async getTransactions(filters?: TransactionFilter): Promise<Transaction[]> {
-    // Se não houver limite especificado, buscar todas as transações
-    if (!filters?.limit) {
-      const allTransactions: Transaction[] = [];
-      let page = 1;
-      let hasMore = true;
+    // Performance otimização: buscar apenas uma página por vez
+    // Se não houver limite especificado, usar um padrão razoável
+    const params = {
+      ...filters,
+      page_size: filters?.limit || 1000, // Limite padrão de 1000 transações
+      page: filters?.page || 1
+    };
 
-      while (hasMore) {
-        const response = await apiClient.get<PaginatedResponse<Transaction>>(
-          "/api/banking/transactions/",
-          { ...filters, page }
-        );
-
-        allTransactions.push(...response.results);
-        hasMore = response.next !== null && response.next !== undefined;
-        page++;
-
-        // Proteção contra loop infinito
-        if (page > 100) {
-          console.warn('⚠️ Limite de 100 páginas atingido');
-          break;
-        }
-      }
-
-      return allTransactions;
-    }
-
-    // Com limite especificado, buscar apenas uma página
     const response = await apiClient.get<PaginatedResponse<Transaction>>(
       "/api/banking/transactions/",
-      filters
+      params
     );
     return response.results;
   }
