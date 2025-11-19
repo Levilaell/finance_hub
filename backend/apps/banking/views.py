@@ -464,7 +464,8 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
             # Determine sync state
             is_syncing = item_status == 'UPDATING'
             sync_complete = item_status == 'UPDATED' and execution_status == 'SUCCESS'
-            requires_action = item_status in ['WAITING_USER_INPUT', 'LOGIN_ERROR']
+            # Support both WAITING_USER_INPUT (docs) and WAITING_USER_ACTION (actual API)
+            requires_action = item_status in ['WAITING_USER_INPUT', 'WAITING_USER_ACTION', 'LOGIN_ERROR']
 
             response_data = {
                 'status': item_status,
@@ -477,13 +478,20 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
             }
 
             # Add MFA info if waiting for user input
-            if item_status == 'WAITING_USER_INPUT':
+            # Support both status names (docs vs actual API)
+            if item_status in ['WAITING_USER_INPUT', 'WAITING_USER_ACTION']:
                 response_data['mfa_required'] = True
                 response_data['parameter'] = item.get('parameter', {})
 
             # Add error info if needed
             if item_status in ['LOGIN_ERROR', 'ERROR', 'OUTDATED']:
-                response_data['error_message'] = item.get('statusDetail', {}).get('message', 'Unknown error')
+                status_detail = item.get('statusDetail')
+                if isinstance(status_detail, dict):
+                    response_data['error_message'] = status_detail.get('message', 'Unknown error')
+                elif isinstance(status_detail, str):
+                    response_data['error_message'] = status_detail
+                else:
+                    response_data['error_message'] = 'Unknown error'
 
             return Response(response_data)
         except Exception as e:

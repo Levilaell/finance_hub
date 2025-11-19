@@ -243,7 +243,7 @@ export default function AccountsPage() {
         return;
       }
 
-      // Check if MFA was successful (status changed from WAITING_USER_INPUT)
+      // Check if MFA was successful (status changed from WAITING_USER_INPUT/WAITING_USER_ACTION)
       if (statusResponse.status === 'UPDATED') {
         clearInterval(interval);
         setMfaPollingInterval(null);
