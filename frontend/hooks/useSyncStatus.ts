@@ -76,7 +76,7 @@ export const useSyncStatus = (connectionId: string | null) => {
     try {
       const statusResponse = await bankingService.checkConnectionStatus(connectionId);
 
-      const message = getProgressMessage(statusResponse.execution_status, statusResponse.status);
+      const message = getProgressMessage(statusResponse.execution_status || null, statusResponse.status);
       const isComplete = statusResponse.sync_complete;
       const hasError = statusResponse.requires_action ||
                        ['ERROR', 'LOGIN_ERROR', 'OUTDATED'].includes(statusResponse.status);
@@ -84,7 +84,7 @@ export const useSyncStatus = (connectionId: string | null) => {
       setSyncStatus({
         isPolling: !isComplete && !hasError,
         status: statusResponse.status,
-        executionStatus: statusResponse.execution_status,
+        executionStatus: statusResponse.execution_status || null,
         message,
         isComplete,
         hasError,
@@ -153,7 +153,7 @@ export const useSyncStatus = (connectionId: string | null) => {
       try {
         const statusResponse = await bankingService.checkConnectionStatus(targetConnectionId);
 
-        const message = getProgressMessage(statusResponse.execution_status, statusResponse.status);
+        const message = getProgressMessage(statusResponse.execution_status || null, statusResponse.status);
         const isComplete = statusResponse.sync_complete;
         const hasError = statusResponse.requires_action ||
                          ['ERROR', 'LOGIN_ERROR', 'OUTDATED'].includes(statusResponse.status);
@@ -161,7 +161,7 @@ export const useSyncStatus = (connectionId: string | null) => {
         setSyncStatus({
           isPolling: !isComplete && !hasError,
           status: statusResponse.status,
-          executionStatus: statusResponse.execution_status,
+          executionStatus: statusResponse.execution_status || null,
           message,
           isComplete,
           hasError,

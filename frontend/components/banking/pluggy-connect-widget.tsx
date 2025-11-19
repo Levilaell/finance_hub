@@ -49,13 +49,14 @@ export function PluggyConnectWidget({
     return () => clearTimeout(timer);
   }, []);
 
-  const handleSuccess = (response: { item: PluggyItem; itemId: string }) => {
+  const handleSuccess = (response: any) => {
     const successMessage = updateItemId
       ? 'Credenciais atualizadas com sucesso!'
       : 'Banco conectado com sucesso!';
     toast.success(successMessage);
 
     // Pluggy returns itemId in the response
+    // Response can be { item: Item } or { item: Item, itemId: string }
     const itemId = response.itemId || response.item?.id;
     if (!itemId) {
       console.error('No itemId in Pluggy response:', response);
@@ -75,12 +76,15 @@ export function PluggyConnectWidget({
     if (onError) onError(error);
   };
 
-  const handleEvent = (event: PluggyConnectEventPayload) => {
+  const handleEvent = (event: any) => {
     // Handle MFA events
     // Ref: https://docs.pluggy.ai/docs/environments-and-configurations
     console.log('Pluggy event:', event);
 
-    switch (event.event) {
+    // Event payload structure from react-pluggy-connect library
+    const eventType = event.event;
+
+    switch (eventType) {
       case 'SUBMITTED_LOGIN':
         toast.info('Credenciais enviadas, validando...', { duration: 2000 });
         break;
@@ -106,7 +110,7 @@ export function PluggyConnectWidget({
 
     // Call custom onEvent handler if provided
     if (onEvent) {
-      onEvent(event);
+      onEvent(event as PluggyConnectEventPayload);
     }
   };
 
