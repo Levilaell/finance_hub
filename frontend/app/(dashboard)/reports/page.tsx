@@ -131,17 +131,41 @@ export default function ReportsPage() {
 
         const [transactionsData, summaryData, cashFlowData, actualFlowData] = await Promise.all([
           bankingService.getTransactions(filters),
-          bankingService.getTransactionsSummary(
-            filters.date_from,
-            filters.date_to
-          ),
+          // Se "Todas" (sem filtros de data), o backend retorna mês atual
+          // Nesse caso, vamos calcular o summary localmente depois
+          filters.date_from || filters.date_to
+            ? bankingService.getTransactionsSummary(filters.date_from, filters.date_to)
+            : Promise.resolve(null),
           billsService.getCashFlowProjection(),
           billsService.getActualCashFlow()
         ]);
 
         if (!cancelled) {
           setTransactions(transactionsData);
-          setSummary(summaryData);
+
+          // Se summaryData é null (período "Todas"), calcular localmente
+          if (summaryData === null) {
+            const income = transactionsData
+              .filter(t => t.is_income)
+              .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+            const expenses = transactionsData
+              .filter(t => t.is_expense)
+              .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+            setSummary({
+              income,
+              expenses: -expenses, // Negativo como o backend retorna
+              balance: income - expenses,
+              period_start: '',
+              period_end: '',
+              accounts_count: 0,
+              transactions_count: transactionsData.length
+            });
+          } else {
+            setSummary(summaryData);
+          }
+
           setCashFlowProjection(cashFlowData);
           setActualCashFlow(actualFlowData);
         }
