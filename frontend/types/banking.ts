@@ -28,6 +28,7 @@ export type ConnectionStatus =
   | 'UPDATED'
   | 'LOGIN_ERROR'
   | 'WAITING_USER_INPUT'
+  | 'WAITING_USER_ACTION'
   | 'OUTDATED'
   | 'ERROR';
 
