@@ -79,10 +79,10 @@ export function PluggyConnectWidget({
   const handleEvent = (event: any) => {
     // Handle MFA events
     // Ref: https://docs.pluggy.ai/docs/environments-and-configurations
-    console.log('Pluggy event:', event);
 
     // Event payload structure from react-pluggy-connect library
     const eventType = event.event;
+    console.log('Pluggy event:', eventType, event);
 
     switch (eventType) {
       case 'SUBMITTED_LOGIN':

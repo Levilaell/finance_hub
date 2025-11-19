@@ -487,8 +487,11 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
 
             return Response(response_data)
         except Exception as e:
+            import traceback
+            logger.error(f"Error in check_status for connection {connection.id}: {str(e)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return Response(
-                {'error': str(e)},
+                {'error': str(e), 'detail': 'Check server logs for more information'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

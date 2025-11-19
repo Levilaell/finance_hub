@@ -113,7 +113,8 @@ def pluggy_webhook_handler(request):
         elif event_type == 'item/deleted':
             tasks.process_item_deleted.delay(item_id, payload)
             task_dispatched = True
-        elif event_type == 'item/waiting_user_input':
+        elif event_type == 'item/waiting_user_input' or event_type == 'item/waiting_user_action':
+            # Note: Pluggy API docs say 'item/waiting_user_input' but actual webhooks use 'item/waiting_user_action'
             tasks.process_item_mfa.delay(item_id, payload)
             task_dispatched = True
         elif event_type == 'item/login_succeeded':
