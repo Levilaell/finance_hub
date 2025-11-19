@@ -106,6 +106,21 @@ export function PluggyConnectWidget({
           console.log('Instituição selecionada:', event.connector.name);
         }
         break;
+
+      case 'ITEM_RESPONSE':
+        // Log item status to debug MFA flow
+        if (event.item) {
+          const itemStatus = event.item.status;
+          const executionStatus = event.item.executionStatus;
+          console.log(`Item status: ${itemStatus}, executionStatus: ${executionStatus}`);
+
+          // Check if MFA is required
+          if (itemStatus === 'WAITING_USER_ACTION' || itemStatus === 'WAITING_USER_INPUT') {
+            console.log('MFA REQUIRED - Item parameter:', event.item.parameter);
+            toast.info('Aguardando autenticação adicional...', { duration: 3000 });
+          }
+        }
+        break;
     }
 
     // Call custom onEvent handler if provided
