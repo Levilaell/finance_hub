@@ -112,12 +112,33 @@ export function PluggyConnectWidget({
         if (event.item) {
           const itemStatus = event.item.status;
           const executionStatus = event.item.executionStatus;
-          console.log(`Item status: ${itemStatus}, executionStatus: ${executionStatus}`);
+          const parameter = event.item.parameter;
+
+          console.log(`[ITEM_RESPONSE] status: ${itemStatus}, executionStatus: ${executionStatus}`);
+
+          // Always log parameter if present (even if not waiting)
+          if (parameter) {
+            console.log('[ITEM_RESPONSE] Parameter detected:', JSON.stringify(parameter, null, 2));
+          }
 
           // Check if MFA is required
           if (itemStatus === 'WAITING_USER_ACTION' || itemStatus === 'WAITING_USER_INPUT') {
-            console.log('MFA REQUIRED - Item parameter:', event.item.parameter);
-            toast.info('Aguardando autenticação adicional...', { duration: 3000 });
+            console.log('[MFA REQUIRED] Status requires user action');
+            console.log('[MFA REQUIRED] Parameter:', parameter);
+
+            if (parameter?.type === 'image') {
+              toast.info('Escaneie o QR Code no app do banco', { duration: 5000 });
+            } else if (parameter) {
+              toast.info(`Aguardando autenticação adicional: ${parameter.label || 'MFA'}`, { duration: 3000 });
+            } else {
+              toast.info('Aguardando aprovação no app do banco...', { duration: 5000 });
+            }
+          }
+
+          // Check for USER_AUTHORIZATION_PENDING in executionStatus
+          if (executionStatus === 'USER_AUTHORIZATION_PENDING') {
+            console.log('[AUTH PENDING] User needs to authorize in app');
+            toast.info('Aprove a conexão no aplicativo do seu banco', { duration: 5000, id: 'auth-pending' });
           }
         }
         break;
