@@ -36,6 +36,7 @@ const getProgressMessage = (executionStatus: string | null, status: string | nul
     'UPDATED': 'Sincronização concluída!',
     'LOGIN_ERROR': 'Erro no login - verifique suas credenciais',
     'WAITING_USER_INPUT': 'Aguardando autenticação adicional',
+    'WAITING_USER_ACTION': 'Aguardando autenticação adicional',
     'OUTDATED': 'Dados desatualizados',
     'ERROR': 'Erro na sincronização',
   };

@@ -258,7 +258,7 @@ export default function AccountsPage() {
       }
 
       // Check if still waiting
-      if (statusResponse.status === 'WAITING_USER_INPUT') {
+      if (statusResponse.status === 'WAITING_USER_INPUT' || statusResponse.status === 'WAITING_USER_ACTION') {
         // Still waiting, continue polling
         return;
       }
@@ -331,7 +331,7 @@ export default function AccountsPage() {
         // Check status to see if it's MFA or credentials error
         const statusResponse = await checkConnectionForMFA(account.connection_id);
 
-        if (statusResponse?.status === 'WAITING_USER_INPUT' && statusResponse.parameter) {
+        if ((statusResponse?.status === 'WAITING_USER_INPUT' || statusResponse?.status === 'WAITING_USER_ACTION') && statusResponse.parameter) {
           // MFA is required - show MFA prompt
           setMfaConnectionId(account.connection_id);
           setMfaParameter(statusResponse.parameter);
