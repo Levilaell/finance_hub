@@ -130,7 +130,34 @@ class BankingService {
 
   // Transactions
   async getTransactions(filters?: TransactionFilter): Promise<Transaction[]> {
-    // Performance otimização: buscar todas as transações em batches
+    // Performance otimização: estratégia inteligente baseada nos filtros
+
+    // 1. Se tem limit específico, fazer apenas 1 requisição
+    if (filters?.limit) {
+      const response = await apiClient.get<PaginatedResponse<Transaction>>(
+        "/api/banking/transactions/",
+        {
+          ...filters,
+          page_size: filters.limit,
+          page: filters.page || 1
+        }
+      );
+      return response.results;
+    }
+
+    // 2. Se tem filtros de data, fazer 1 requisição grande (assume que período filtrado tem menos dados)
+    if (filters?.date_from || filters?.date_to) {
+      const response = await apiClient.get<PaginatedResponse<Transaction>>(
+        "/api/banking/transactions/",
+        {
+          ...filters,
+          page_size: 5000 // Grande o suficiente para pegar período filtrado
+        }
+      );
+      return response.results;
+    }
+
+    // 3. Sem filtros: buscar todas as transações em batches (para /transactions page)
     const allTransactions: Transaction[] = [];
     let page = 1;
     let hasMore = true;
