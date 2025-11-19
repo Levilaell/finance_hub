@@ -4,3 +4,4 @@
 
 export { BankAccountCard } from './bank-account-card';
 export { PluggyConnectWidget } from './pluggy-connect-widget';
+export { MFAPrompt } from './mfa-prompt';

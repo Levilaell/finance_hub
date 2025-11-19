@@ -6,14 +6,15 @@ import { toast } from 'sonner';
 
 import { useAuthStore } from '@/store/auth-store';
 import { bankingService } from '@/services/banking.service';
-import { BankAccount, BankConnection } from '@/types/banking';
+import { BankAccount, BankConnection, MFAParameter, ConnectionStatusResponse } from '@/types/banking';
 import { useSyncStatus } from '@/hooks/useSyncStatus';
 
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { BankAccountCard } from '@/components/banking/bank-account-card';
-import { PluggyConnectWidget } from '@/components/banking/pluggy-connect-widget';
+import { PluggyConnectWidget, MFAPrompt } from '@/components/banking';
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,12 @@ export default function AccountsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [syncingConnectionId, setSyncingConnectionId] = useState<string | null>(null);
   const { syncStatus, startPolling, stopPolling } = useSyncStatus(syncingConnectionId);
+
+  // MFA State
+  const [mfaConnectionId, setMfaConnectionId] = useState<string | null>(null);
+  const [mfaParameter, setMfaParameter] = useState<MFAParameter | null>(null);
+  const [showMfaPrompt, setShowMfaPrompt] = useState(false);
+  const [mfaPollingInterval, setMfaPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
   // Check authentication
   useEffect(() => {
@@ -184,6 +191,123 @@ export default function AccountsPage() {
     }
   };
 
+  // Check connection status for MFA
+  const checkConnectionForMFA = useCallback(async (connectionId: string): Promise<ConnectionStatusResponse | null> => {
+    try {
+      const statusResponse = await bankingService.checkConnectionStatus(connectionId);
+      return statusResponse;
+    } catch (error) {
+      console.error('Error checking connection status:', error);
+      return null;
+    }
+  }, []);
+
+  // Handle MFA submission
+  const handleMFASubmit = async (mfaValue: string) => {
+    if (!mfaConnectionId || !mfaParameter) return;
+
+    try {
+      // Send MFA code
+      await bankingService.sendMFA(mfaConnectionId, mfaValue, mfaParameter.name);
+
+      toast.success('Código MFA enviado! Aguardando validação...');
+      setShowMfaPrompt(false);
+
+      // Start polling for status change after MFA
+      startMFAPolling(mfaConnectionId);
+    } catch (error: any) {
+      console.error('Error sending MFA:', error);
+      throw new Error(error.response?.data?.error || 'Erro ao enviar código MFA');
+    }
+  };
+
+  // Start polling for MFA status
+  const startMFAPolling = (connectionId: string) => {
+    // Clear any existing interval
+    if (mfaPollingInterval) {
+      clearInterval(mfaPollingInterval);
+    }
+
+    let pollCount = 0;
+    const maxPolls = 40; // 40 * 3s = 2 minutes max
+
+    const interval = setInterval(async () => {
+      pollCount++;
+
+      const statusResponse = await checkConnectionForMFA(connectionId);
+
+      if (!statusResponse) {
+        clearInterval(interval);
+        setMfaPollingInterval(null);
+        toast.error('Erro ao verificar status da conexão');
+        return;
+      }
+
+      // Check if MFA was successful (status changed from WAITING_USER_INPUT)
+      if (statusResponse.status === 'UPDATED') {
+        clearInterval(interval);
+        setMfaPollingInterval(null);
+        setMfaConnectionId(null);
+        setMfaParameter(null);
+        toast.success('Autenticação concluída com sucesso!');
+
+        // Start sync polling
+        setSyncingConnectionId(connectionId);
+        startPolling(connectionId);
+        return;
+      }
+
+      // Check if still waiting
+      if (statusResponse.status === 'WAITING_USER_INPUT') {
+        // Still waiting, continue polling
+        return;
+      }
+
+      // Check for errors
+      if (statusResponse.status === 'LOGIN_ERROR' || statusResponse.status === 'ERROR') {
+        clearInterval(interval);
+        setMfaPollingInterval(null);
+        toast.error(statusResponse.error_message || 'Erro na autenticação');
+        setMfaConnectionId(null);
+        setMfaParameter(null);
+        return;
+      }
+
+      // Check for timeout
+      if (pollCount >= maxPolls) {
+        clearInterval(interval);
+        setMfaPollingInterval(null);
+        toast.error('Timeout ao aguardar validação MFA');
+        setMfaConnectionId(null);
+        setMfaParameter(null);
+        return;
+      }
+    }, 3000); // Poll every 3 seconds
+
+    setMfaPollingInterval(interval);
+  };
+
+  // Cancel MFA
+  const handleMFACancel = () => {
+    setShowMfaPrompt(false);
+    setMfaConnectionId(null);
+    setMfaParameter(null);
+
+    if (mfaPollingInterval) {
+      clearInterval(mfaPollingInterval);
+      setMfaPollingInterval(null);
+    }
+  };
+
+  // Cleanup MFA polling on unmount
+  useEffect(() => {
+    return () => {
+      if (mfaPollingInterval) {
+        clearInterval(mfaPollingInterval);
+      }
+    };
+  }, [mfaPollingInterval]);
+
   // Sync account transactions
   const handleSyncAccount = useCallback(async (accountId: string) => {
     try {
@@ -202,6 +326,31 @@ export default function AccountsPage() {
 
       // Check if requires action (MFA, credentials, etc)
       if (response.requires_action) {
+        toast.dismiss('sync-progress');
+
+        // Check status to see if it's MFA or credentials error
+        const statusResponse = await checkConnectionForMFA(account.connection_id);
+
+        if (statusResponse?.status === 'WAITING_USER_INPUT' && statusResponse.parameter) {
+          // MFA is required - show MFA prompt
+          setMfaConnectionId(account.connection_id);
+          setMfaParameter(statusResponse.parameter);
+          setShowMfaPrompt(true);
+          setSyncingConnectionId(null);
+          toast.info('Autenticação adicional necessária');
+          return;
+        }
+
+        if (statusResponse?.status === 'LOGIN_ERROR' || statusResponse?.status === 'OUTDATED') {
+          // Credentials error - suggest reconnection
+          setSyncingConnectionId(null);
+          toast.error(
+            'Credenciais inválidas ou expiradas. Por favor, reconecte sua conta.',
+            { id: 'sync-progress', duration: 5000 }
+          );
+          return;
+        }
+
         toast.error('Ação necessária: verifique suas credenciais ou autenticação', { id: 'sync-progress' });
         setSyncingConnectionId(null);
         return;
@@ -443,6 +592,22 @@ export default function AccountsPage() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MFA Prompt Dialog */}
+      <Dialog open={showMfaPrompt} onOpenChange={(open) => !open && handleMFACancel()}>
+        <DialogContent className="bg-gray-900 border-gray-800">
+          {mfaParameter && mfaConnectionId && (
+            <MFAPrompt
+              parameter={mfaParameter}
+              onSubmit={handleMFASubmit}
+              onCancel={handleMFACancel}
+              institutionName={
+                connections.find(c => c.id === mfaConnectionId)?.connector.name || 'Banco'
+              }
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

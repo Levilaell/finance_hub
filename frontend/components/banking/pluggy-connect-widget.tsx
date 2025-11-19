@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import type { PluggyConnectEventPayload, PluggyItem } from '@/types/banking';
 
 const PluggyConnect = dynamic(
   () => import('react-pluggy-connect').then((mod) => mod.PluggyConnect),
@@ -12,18 +13,33 @@ const PluggyConnect = dynamic(
 
 interface PluggyConnectWidgetProps {
   connectToken: string;
-  updateItemId?: string;  // Optional: for updating existing connections
+  updateItemId?: string;  // Optional: for updating existing connections (reconnection)
   onSuccess: (itemId: string) => void;
   onError?: (error: any) => void;
   onClose: () => void;
+  onEvent?: (event: PluggyConnectEventPayload) => void; // Optional: for tracking MFA events
 }
 
+/**
+ * Pluggy Connect Widget Component
+ * Ref: https://docs.pluggy.ai/docs/environments-and-configurations
+ *
+ * This widget handles:
+ * - Credential validation
+ * - Multi-factor authentication (MFA) automatically
+ * - Error handling per institution
+ *
+ * The widget automatically detects and handles MFA requirements:
+ * - For 1-step MFA: User provides token upfront
+ * - For 2-step MFA: Widget shows field after login when WAITING_USER_INPUT
+ */
 export function PluggyConnectWidget({
   connectToken,
   updateItemId,
   onSuccess,
   onError,
   onClose,
+  onEvent,
 }: PluggyConnectWidgetProps) {
   const [isReady, setIsReady] = useState(false);
 
@@ -33,7 +49,7 @@ export function PluggyConnectWidget({
     return () => clearTimeout(timer);
   }, []);
 
-  const handleSuccess = (response: any) => {
+  const handleSuccess = (response: { item: PluggyItem; itemId: string }) => {
     const successMessage = updateItemId
       ? 'Credenciais atualizadas com sucesso!'
       : 'Banco conectado com sucesso!';
@@ -50,7 +66,7 @@ export function PluggyConnectWidget({
     onSuccess(itemId);
   };
 
-  const handleError = (error: any) => {
+  const handleError = (error: { message: string; data?: any }) => {
     console.error('Pluggy error:', error);
     const errorMessage = updateItemId
       ? 'Erro ao atualizar credenciais'
@@ -59,8 +75,39 @@ export function PluggyConnectWidget({
     if (onError) onError(error);
   };
 
-  const handleExit = () => {
-    onClose();
+  const handleEvent = (event: PluggyConnectEventPayload) => {
+    // Handle MFA events
+    // Ref: https://docs.pluggy.ai/docs/environments-and-configurations
+    console.log('Pluggy event:', event);
+
+    switch (event.event) {
+      case 'SUBMITTED_LOGIN':
+        toast.info('Credenciais enviadas, validando...', { duration: 2000 });
+        break;
+
+      case 'SUBMITTED_MFA':
+        toast.info('Código MFA enviado, validando...', { duration: 3000 });
+        break;
+
+      case 'LOGIN_MFA_SUCCESS':
+        toast.success('Autenticação MFA aprovada!', { duration: 2000 });
+        break;
+
+      case 'LOGIN_SUCCESS':
+        toast.success('Login realizado com sucesso!', { duration: 2000 });
+        break;
+
+      case 'SELECTED_INSTITUTION':
+        if (event.connector) {
+          console.log('Instituição selecionada:', event.connector.name);
+        }
+        break;
+    }
+
+    // Call custom onEvent handler if provided
+    if (onEvent) {
+      onEvent(event);
+    }
   };
 
   return (
@@ -75,6 +122,8 @@ export function PluggyConnectWidget({
           updateItem={updateItemId}
           onSuccess={handleSuccess}
           onError={handleError}
+          onEvent={handleEvent}
+          language="pt"
         />
       )}
     </div>

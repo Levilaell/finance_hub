@@ -17,7 +17,9 @@ import {
   CategorySummary,
   PaginatedResponse,
   Category,
-  CategoryRequest
+  CategoryRequest,
+  SendMFARequest,
+  ConnectionStatusResponse
 } from "@/types/banking";
 
 class BankingService {
@@ -80,17 +82,33 @@ class BankingService {
     );
   }
 
-  async checkConnectionStatus(id: string): Promise<{
-    status: string;
-    execution_status: string;
-    is_syncing: boolean;
-    sync_complete: boolean;
-    requires_action: boolean;
-    error_message?: string;
-    last_updated_at: string;
-  }> {
-    return apiClient.get(
+  async checkConnectionStatus(id: string): Promise<ConnectionStatusResponse> {
+    return apiClient.get<ConnectionStatusResponse>(
       `/api/banking/connections/${id}/check_status/`
+    );
+  }
+
+  /**
+   * Send MFA (Multi-Factor Authentication) code for a connection
+   * Ref: https://docs.pluggy.ai/reference/items-send-mfa
+   *
+   * @param connectionId - The bank connection ID
+   * @param mfaValue - The MFA code/token value (e.g., "123456")
+   * @param parameterName - Optional parameter name from the MFA parameter object (defaults to 'token')
+   * @returns Updated connection status
+   */
+  async sendMFA(connectionId: string, mfaValue: string, parameterName?: string): Promise<{
+    message: string;
+    status: string;
+  }> {
+    const payload: SendMFARequest = {
+      mfa_value: mfaValue,
+      parameter_name: parameterName
+    };
+
+    return apiClient.post(
+      `/api/banking/connections/${connectionId}/send_mfa/`,
+      payload
     );
   }
 

@@ -197,12 +197,119 @@ export interface PaginatedResponse<T> {
   previous?: string;
 }
 
-// Pluggy Connect Config
+// Pluggy MFA Parameter (from Item response when WAITING_USER_INPUT)
+// Ref: https://docs.pluggy.ai/docs/connect-an-account
+export interface MFAParameter {
+  name: string; // Field name to use when sending MFA (e.g., "token", "sms")
+  label: string; // User-friendly label (e.g., "Token SMS")
+  type: 'number' | 'text' | 'select'; // Input type
+  placeholder?: string; // Example format
+  validation?: string; // Regex pattern for validation
+  validationMessage?: string; // Error message for invalid input
+  expiresAt?: string; // ISO 8601 timestamp when MFA expires
+  options?: Array<{ label: string; value: string }>; // For select type
+}
+
+// Execution Status (from Pluggy API Item response)
+// Ref: https://docs.pluggy.ai/docs/item-lifecycle
+export type ExecutionStatus =
+  // In-progress states
+  | 'CREATED'
+  | 'LOGIN_IN_PROGRESS'
+  | 'LOGIN_MFA_IN_PROGRESS'
+  | 'ACCOUNTS_IN_PROGRESS'
+  | 'CREDITCARDS_IN_PROGRESS'
+  | 'TRANSACTIONS_IN_PROGRESS'
+  | 'INVESTMENTS_IN_PROGRESS'
+  | 'IDENTITY_IN_PROGRESS'
+  | 'MERGING'
+  | 'WAITING_USER_INPUT'
+  | 'USER_AUTHORIZATION_PENDING'
+  // Final states
+  | 'SUCCESS'
+  | 'PARTIAL_SUCCESS'
+  | 'ERROR'
+  | 'INVALID_CREDENTIALS'
+  | 'SITE_NOT_AVAILABLE'
+  | 'ACCOUNT_LOCKED'
+  | 'CONNECTION_ERROR';
+
+// Pluggy Connect Widget Event Types
+// Ref: https://docs.pluggy.ai/docs/environments-and-configurations
+export type PluggyConnectEvent =
+  | 'SUBMITTED_CONSENT'
+  | 'SUBMITTED_LOGIN'
+  | 'SUBMITTED_MFA'
+  | 'SELECTED_INSTITUTION'
+  | 'LOGIN_SUCCESS'
+  | 'LOGIN_MFA_SUCCESS'
+  | 'LOGIN_STEP_COMPLETED'
+  | 'ITEM_RESPONSE';
+
+// Pluggy Connect Event Payload
+export type PluggyConnectEventPayload = {
+  event: PluggyConnectEvent;
+  timestamp: number;
+  connector?: Connector | null; // For SELECTED_INSTITUTION
+  item?: PluggyItem | null; // For LOGIN_SUCCESS, LOGIN_MFA_SUCCESS, etc
+};
+
+// Pluggy Item (from API response)
+export interface PluggyItem {
+  id: string;
+  connector: {
+    id: number;
+    name: string;
+  };
+  status: ConnectionStatus;
+  executionStatus: ExecutionStatus;
+  createdAt: string;
+  updatedAt?: string;
+  lastUpdatedAt?: string;
+  error?: {
+    code: string;
+    message: string;
+  } | null;
+  parameter?: MFAParameter | null; // Present when status is WAITING_USER_INPUT
+}
+
+// Pluggy Connect Widget Props
+// Ref: https://docs.pluggy.ai/docs/environments-and-configurations
 export interface PluggyConnectConfig {
-  token: string;
-  onSuccess?: (itemId: string) => void;
-  onError?: (error: Error) => void;
-  onExit?: () => void;
+  connectToken: string;
+  updateItem?: string; // Item ID to update (for reconnection)
+  includeSandbox?: boolean;
+  selectedConnectorId?: number;
+  connectorTypes?: Array<'PERSONAL_BANK' | 'BUSINESS_BANK' | 'INVESTMENT' | 'CREDIT'>;
+  countries?: string[]; // ISO country codes
+  products?: string[];
+  language?: 'en' | 'es' | 'pt';
+  theme?: 'light' | 'dark';
+  onSuccess?: (data: { item: PluggyItem; itemId: string }) => void;
+  onError?: (error: { message: string; data?: any }) => void;
+  onOpen?: () => void;
+  onClose?: () => void;
+  onEvent?: (event: PluggyConnectEventPayload) => void;
+}
+
+// Send MFA Request
+export interface SendMFARequest {
+  mfa_value: string; // The MFA code/token value
+  parameter_name?: string; // Optional, defaults to 'token' in backend
+}
+
+// Check Status Response (extended with MFA info)
+export interface ConnectionStatusResponse {
+  status: ConnectionStatus;
+  status_detail?: Record<string, any>;
+  execution_status?: ExecutionStatus;
+  last_updated_at: string;
+  is_syncing: boolean;
+  sync_complete: boolean;
+  requires_action: boolean;
+  mfa_required?: boolean;
+  parameter?: MFAParameter; // MFA parameter details when WAITING_USER_INPUT
+  error_message?: string;
 }
 
 // Bill Types
