@@ -217,12 +217,22 @@ export default function BillsPage() {
     pending: filteredBills.filter(b => b.status === 'pending').length,
     partially_paid: filteredBills.filter(b => b.status === 'partially_paid').length,
     overdue: filteredBills.filter(b => b.is_overdue).length,
-    totalAmount: filteredBills.reduce((sum, b) => {
-      const amount = typeof b.amount_remaining === 'string'
-        ? parseFloat(b.amount_remaining)
-        : b.amount_remaining;
-      return sum + (isNaN(amount) ? 0 : amount);
-    }, 0)
+    totalPayable: filteredBills
+      .filter(b => b.type === 'payable')
+      .reduce((sum, b) => {
+        const amount = typeof b.amount_remaining === 'string'
+          ? parseFloat(b.amount_remaining)
+          : b.amount_remaining;
+        return sum + (isNaN(amount) ? 0 : amount);
+      }, 0),
+    totalReceivable: filteredBills
+      .filter(b => b.type === 'receivable')
+      .reduce((sum, b) => {
+        const amount = typeof b.amount_remaining === 'string'
+          ? parseFloat(b.amount_remaining)
+          : b.amount_remaining;
+        return sum + (isNaN(amount) ? 0 : amount);
+      }, 0)
   };
 
   return (
@@ -395,7 +405,7 @@ export default function BillsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -412,9 +422,9 @@ export default function BillsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Pendentes</p>
-                <p className="text-2xl font-bold text-yellow-500">{stats.pending}</p>
+                <p className="text-2xl font-bold text-orange-500">{stats.pending}</p>
               </div>
-              <ClockIcon className="h-8 w-8 text-yellow-500" />
+              <ClockIcon className="h-8 w-8 text-orange-500" />
             </div>
           </CardContent>
         </Card>
@@ -433,8 +443,18 @@ export default function BillsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Valor Total</p>
-                <p className="text-xl font-bold">{formatCurrency(stats.totalAmount)}</p>
+                <p className="text-sm text-muted-foreground">A Pagar</p>
+                <p className="text-xl font-bold text-red-600">{formatCurrency(stats.totalPayable)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">A Receber</p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(stats.totalReceivable)}</p>
               </div>
             </div>
           </CardContent>
