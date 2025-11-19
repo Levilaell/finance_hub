@@ -96,7 +96,7 @@ class BillsService {
 
   getStatusBadgeClass(status: string): string {
     const classes: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
+      pending: 'bg-orange-600 text-white',
       partially_paid: 'bg-blue-100 text-blue-800',
       paid: 'bg-green-100 text-green-800',
       cancelled: 'bg-gray-100 text-gray-800',
