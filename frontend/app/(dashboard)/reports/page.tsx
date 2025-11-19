@@ -80,8 +80,8 @@ export default function ReportsPage() {
   const periods: PeriodFilter[] = [
     {
       label: 'Todas',
-      startDate: new Date('2020-01-01'), // Far enough back to get all transactions
-      endDate: new Date()
+      startDate: null, // Sem filtros de data - carrega todas as transações
+      endDate: null
     },
     {
       label: 'Mês atual',
