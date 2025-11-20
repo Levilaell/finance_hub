@@ -79,8 +79,11 @@ export const useSyncStatus = (connectionId: string | null) => {
 
       const message = getProgressMessage(statusResponse.execution_status || null, statusResponse.status);
       const isComplete = statusResponse.sync_complete;
-      const hasError = statusResponse.requires_action ||
-                       ['ERROR', 'LOGIN_ERROR', 'OUTDATED'].includes(statusResponse.status);
+
+      // Only treat real errors as errors, not waiting states
+      // WAITING_USER_ACTION/INPUT should continue polling (user may be approving in app)
+      const hasError = ['ERROR', 'LOGIN_ERROR', 'OUTDATED'].includes(statusResponse.status);
+      const isWaitingUserAction = ['WAITING_USER_INPUT', 'WAITING_USER_ACTION'].includes(statusResponse.status);
 
       setSyncStatus({
         isPolling: !isComplete && !hasError,
@@ -92,10 +95,15 @@ export const useSyncStatus = (connectionId: string | null) => {
         errorMessage: statusResponse.error_message,
       });
 
-      // Stop polling if complete or error
+      // Stop polling if complete or error (but not if waiting for user action)
       if (isComplete || hasError) {
         stopPolling();
         return true; // Indicates polling should stop
+      }
+
+      // Continue polling if waiting for user action (they may be approving in app)
+      if (isWaitingUserAction) {
+        return false; // Continue polling
       }
 
       // Check for timeout
@@ -156,8 +164,10 @@ export const useSyncStatus = (connectionId: string | null) => {
 
         const message = getProgressMessage(statusResponse.execution_status || null, statusResponse.status);
         const isComplete = statusResponse.sync_complete;
-        const hasError = statusResponse.requires_action ||
-                         ['ERROR', 'LOGIN_ERROR', 'OUTDATED'].includes(statusResponse.status);
+
+        // Only treat real errors as errors, not waiting states
+        const hasError = ['ERROR', 'LOGIN_ERROR', 'OUTDATED'].includes(statusResponse.status);
+        const isWaitingUserAction = ['WAITING_USER_INPUT', 'WAITING_USER_ACTION'].includes(statusResponse.status);
 
         setSyncStatus({
           isPolling: !isComplete && !hasError,
@@ -168,6 +178,16 @@ export const useSyncStatus = (connectionId: string | null) => {
           hasError,
           errorMessage: statusResponse.error_message,
         });
+
+        // Stop polling if complete or error (but not if waiting for user action)
+        if (isComplete || hasError) {
+          return true;
+        }
+
+        // Continue polling if waiting for user action
+        if (isWaitingUserAction) {
+          return false;
+        }
 
         return isComplete || hasError;
       } catch (error) {

@@ -54,6 +54,7 @@ class BankConnection(models.Model):
         ('UPDATED', 'Updated'),
         ('LOGIN_ERROR', 'Login Error'),
         ('WAITING_USER_INPUT', 'Waiting User Input'),
+        ('WAITING_USER_ACTION', 'Waiting User Action'),  # Actual API uses this instead of WAITING_USER_INPUT
         ('OUTDATED', 'Outdated'),
         ('ERROR', 'Error'),
     ]

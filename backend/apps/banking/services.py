@@ -694,13 +694,14 @@ class BankConnectionService:
             logger.info(f"Current item status: {current_status}")
 
             # Handle different status scenarios
-            if current_status == 'WAITING_USER_INPUT':
-                # MFA is required
+            # Support both WAITING_USER_INPUT (docs) and WAITING_USER_ACTION (actual API)
+            if current_status in ['WAITING_USER_INPUT', 'WAITING_USER_ACTION']:
+                # MFA or user action is required (e.g., approve in bank app)
                 parameter = current_item.get('parameter', {})
-                logger.warning(f"Item requires MFA. Parameter: {parameter}")
+                logger.warning(f"Item requires user action. Status: {current_status}, Parameter: {parameter}")
                 return {
                     'status': 'MFA_REQUIRED',
-                    'message': 'Multi-factor authentication required',
+                    'message': 'Multi-factor authentication or approval required',
                     'parameter': parameter,
                     'item_status': current_status
                 }

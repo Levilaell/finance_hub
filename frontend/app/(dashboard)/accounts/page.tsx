@@ -331,14 +331,27 @@ export default function AccountsPage() {
         // Check status to see if it's MFA or credentials error
         const statusResponse = await checkConnectionForMFA(account.connection_id);
 
-        if ((statusResponse?.status === 'WAITING_USER_INPUT' || statusResponse?.status === 'WAITING_USER_ACTION') && statusResponse.parameter) {
-          // MFA is required - show MFA prompt
-          setMfaConnectionId(account.connection_id);
-          setMfaParameter(statusResponse.parameter);
-          setShowMfaPrompt(true);
-          setSyncingConnectionId(null);
-          toast.info('Autenticação adicional necessária');
-          return;
+        if (statusResponse?.status === 'WAITING_USER_INPUT' || statusResponse?.status === 'WAITING_USER_ACTION') {
+          // User action is required
+          if (statusResponse.parameter && Object.keys(statusResponse.parameter).length > 0) {
+            // MFA with parameter - show MFA prompt for user to enter code
+            setMfaConnectionId(account.connection_id);
+            setMfaParameter(statusResponse.parameter);
+            setShowMfaPrompt(true);
+            setSyncingConnectionId(null);
+            toast.info('Autenticação adicional necessária');
+            return;
+          } else {
+            // No parameter - likely needs approval in bank app (e.g., Inter direct connector)
+            toast.dismiss('sync-progress');
+            toast.info(
+              'Aprove a sincronização no aplicativo do seu banco. Aguardando aprovação...',
+              { id: 'sync-progress', duration: 30000 }
+            );
+            // Continue polling - don't stop sync, user needs time to approve
+            startPolling(account.connection_id);
+            return;
+          }
         }
 
         if (statusResponse?.status === 'LOGIN_ERROR' || statusResponse?.status === 'OUTDATED') {

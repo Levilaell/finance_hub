@@ -134,21 +134,33 @@ def process_item_deleted(self, item_id: str, payload: dict):
 @shared_task(bind=True)
 def process_item_mfa(self, item_id: str, payload: dict):
     """
-    Process MFA required webhook asynchronously.
+    Process MFA/user action required webhook asynchronously.
+    Handles both 'item/waiting_user_input' and 'item/waiting_user_action' events.
     """
     try:
-        logger.info(f"[TASK] Processing MFA requirement for item {item_id}")
+        logger.info(f"[TASK] Processing MFA/user action requirement for item {item_id}")
+        logger.info(f"[TASK] Payload: {payload}")
 
         connection = BankConnection.objects.get(pluggy_item_id=item_id)
-        connection.status = 'WAITING_USER_INPUT'
+
+        # Determine the correct status from event type
+        # Pluggy sends 'item/waiting_user_input' or 'item/waiting_user_action'
+        event_type = payload.get('event', '')
+        if event_type == 'item/waiting_user_action':
+            status = 'WAITING_USER_ACTION'
+        else:
+            status = 'WAITING_USER_INPUT'
+
+        connection.status = status
         connection.status_detail = {
             'mfa_required': True,
             'parameter': payload.get('parameter'),
-            'message': payload.get('message', 'MFA required')
+            'message': payload.get('message', 'User action required'),
+            'event_type': event_type
         }
         connection.save()
 
-        logger.info(f"[TASK] MFA required for connection {connection.id}")
+        logger.info(f"[TASK] User action required for connection {connection.id}. Status: {status}, Parameter: {payload.get('parameter')}")
 
         # TODO: Implement notification to user about MFA requirement
         # This could be done via email, push notification, or in-app notification
