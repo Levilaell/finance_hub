@@ -81,7 +81,7 @@ export default function LandingAPage() {
               >
                 <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card">
                   <Image
-                    src="/landing-images/dashboard-hero.png"
+                    src="/landing-images/hero-a.png"
                     alt="Dashboard CaixaHub - Visão Unificada de Contas"
                     width={1200}
                     height={675}
@@ -275,11 +275,14 @@ export default function LandingAPage() {
                   Sem o CaixaHub: precisa abrir 4 apps diferentes para saber quanto tem.
                   Com o CaixaHub: vê tudo consolidado, sabe de qual conta saiu cada pagamento.
                 </p>
-                <div className="relative rounded-lg overflow-hidden border border-border/50 bg-muted/30 aspect-video flex items-center justify-center mb-4">
-                  <div className="text-center space-y-4">
-                    <div className="text-6xl">📊</div>
-                    <p className="text-muted-foreground">Dashboard com múltiplas contas integradas</p>
-                  </div>
+                <div className="relative rounded-lg overflow-hidden border border-border/50 bg-card mb-4">
+                  <Image
+                    src="/landing-images/contas-a.png"
+                    alt="Dashboard com múltiplas contas integradas"
+                    width={1200}
+                    height={675}
+                    className="w-full h-auto"
+                  />
                 </div>
                 <p className="text-center text-sm text-muted-foreground mb-6">
                   4 contas, 127 transações, tudo rastreado e categorizado automaticamente
