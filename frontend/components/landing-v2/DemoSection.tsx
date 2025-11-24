@@ -20,10 +20,10 @@ export const DemoSection = () => {
         >
           <div className="text-center mb-12">
             <h2 className="text-4xl lg:text-5xl font-bold mb-6">
-              Veja o CaixaHub em Ação
+              Apenas alguns cliques
             </h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-              Descubra como é simples organizar todo o seu caixa em poucos cliques
+              Descubra como é simples organizar todo o seu caixa
             </p>
           </div>
 

@@ -44,18 +44,18 @@ export default function Home() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-4">
-              <Link href="/pricing" className="text-sm font-medium px-3 text-foreground/80 hover:text-primary transition-colors">
+              <a href="#pricing" className="text-sm font-medium px-3 text-foreground/80 hover:text-primary transition-colors">
                 Preços
-              </Link>
+              </a>
               <Button asChild variant="outline" className="flex h-10 min-w-[100px] items-center justify-center rounded-lg px-5 text-sm font-medium transition-colors">
                 <Link href="/login">
                   Login
                 </Link>
               </Button>
               <Button asChild className="flex h-10 min-w-[120px] items-center justify-center rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition-transform hover:scale-105">
-                <Link href="/pricing">
+                <a href="#pricing">
                   Comece Agora
-                </Link>
+                </a>
               </Button>
             </div>
 
@@ -76,22 +76,22 @@ export default function Home() {
           {/* Mobile Navigation */}
           {mobileMenuOpen && (
             <div className="md:hidden mt-4 pb-4 flex flex-col gap-3 border-t border-primary/20 pt-4">
-              <Link
-                href="/pricing"
+              <a
+                href="#pricing"
                 className="text-sm font-medium px-3 py-2 text-foreground/80 hover:text-primary transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Preços
-              </Link>
+              </a>
               <Button asChild variant="outline" className="w-full h-10 justify-center rounded-lg text-sm font-medium">
                 <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                   Login
                 </Link>
               </Button>
               <Button asChild className="w-full h-10 justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-                <Link href="/pricing" onClick={() => setMobileMenuOpen(false)}>
+                <a href="#pricing" onClick={() => setMobileMenuOpen(false)}>
                   Comece Agora
-                </Link>
+                </a>
               </Button>
             </div>
           )}
@@ -139,10 +139,10 @@ export default function Home() {
                 size="lg"
                 className="h-14 px-8 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_30px_rgba(74,170,123,0.3)] hover:shadow-[0_0_40px_rgba(74,170,123,0.5)] transition-all duration-300 group"
               >
-                <Link href="/pricing" className="flex items-center gap-2">
+                <a href="#pricing" className="flex items-center gap-2">
                   Comece Grátis
                   <ArrowRightIcon className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
+                </a>
               </Button>
               <Button
                 asChild
@@ -150,9 +150,9 @@ export default function Home() {
                 size="lg"
                 className="h-14 px-8 text-lg font-semibold border-2 hover:bg-primary/5"
               >
-                <Link href="/pricing">
+                <a href="#pricing">
                   Ver Preços
-                </Link>
+                </a>
               </Button>
             </div>
 
@@ -161,10 +161,6 @@ export default function Home() {
               <div className="flex items-center gap-2">
                 <CheckCircleIcon className="h-5 w-5 text-primary" />
                 <span>7 dias grátis</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircleIcon className="h-5 w-5 text-primary" />
-                <span>Sem cartão de crédito</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircleIcon className="h-5 w-5 text-primary" />
@@ -477,7 +473,7 @@ export default function Home() {
           </div>
           <div className="mt-12 flex justify-center">
             <Button asChild className="flex h-12 min-w-[200px] items-center justify-center rounded-lg bg-primary px-8 text-base font-bold text-primary-foreground shadow-lg transition-transform hover:scale-105">
-              <Link href="/pricing">
+              <Link href="#pricing">
                 Começar Agora - É Grátis
               </Link>
             </Button>
@@ -576,6 +572,58 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Pricing Section */}
+      <section id="pricing" className="w-full bg-muted/30 py-16 sm:py-24 lg:py-32">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="max-w-2xl mx-auto">
+            <Card className="p-10 relative overflow-hidden border-primary/50">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -translate-y-16 translate-x-16" />
+
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-medium mb-4">
+                  <SparklesIcon className="w-4 h-4" />
+                  Oferta Especial
+                </div>
+                <h2 className="text-5xl font-bold mb-4">
+                  R$ 97<span className="text-2xl text-muted-foreground">/mês</span>
+                </h2>
+              </div>
+
+              <div className="space-y-4 mb-8">
+                {[
+                  "Conexão ilimitada com bancos",
+                  "Integração de múltiplas contas",
+                  "Rastreio de origem de transações",
+                  "Categorização automática por IA",
+                  "Dashboard consolidado",
+                  "Relatórios em Excel/CSV",
+                  "Suporte via WhatsApp"
+                ].map((feature, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <CheckCircleIcon className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                    <p className="text-foreground/90">{feature}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-4">
+                <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6" asChild>
+                  <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                    Começar Trial de 7 Dias
+                  </a>
+                </Button>
+                <p className="text-center text-sm text-muted-foreground">
+                  7 dias grátis • Cancele quando quiser
+                </p>
+                <p className="text-center text-base text-foreground font-medium">
+                  R$ 97/mês para automatizar 100% do seu financeiro
+                </p>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Risk Reversal Section */}
       <section className="w-full bg-background py-16 sm:py-24 lg:py-32">
         <div className="container mx-auto px-4 md:px-6">
@@ -605,7 +653,7 @@ export default function Home() {
               </div>
             </div>
             <Button asChild size="lg" className="h-14 min-w-[240px] text-lg font-bold shadow-xl hover:scale-105 transition-transform">
-              <Link href="/pricing">
+              <Link href="#pricing">
                 Começar Teste Grátis
                 <ArrowRightIcon className="ml-2 h-5 w-5" />
               </Link>
@@ -673,7 +721,7 @@ export default function Home() {
               Não viu seu tipo de negócio aqui? O CaixaHub funciona para qualquer varejo!
             </p>
             <Button asChild variant="outline" size="lg">
-              <Link href="/pricing">
+              <Link href="#pricing">
                 Começar Agora
               </Link>
             </Button>
@@ -770,7 +818,7 @@ export default function Home() {
             Junte-se a milhares de empresas brasileiras que confiam no CaixaHub para simplificar sua gestão financeira.
           </p>
           <Button asChild className="mt-4 flex h-12 min-w-[200px] items-center justify-center rounded-lg bg-primary px-8 text-base font-bold text-primary-foreground shadow-lg transition-transform hover:scale-105">
-            <Link href="/pricing">
+            <Link href="#pricing">
               Experimente de Graça
             </Link>
           </Button>
@@ -785,7 +833,7 @@ export default function Home() {
               <Link href="#produto" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                 Produto
               </Link>
-              <Link href="/pricing" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              <Link href="#pricing" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                 Preços
               </Link>
               <a href="https://wa.me/5517992679645" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary transition-colors">
