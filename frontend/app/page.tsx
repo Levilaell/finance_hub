@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   BanknotesIcon,
@@ -13,7 +12,6 @@ import {
   ClockIcon,
   CheckCircleIcon,
   ArrowRightIcon,
-  StarIcon,
   SparklesIcon,
   XMarkIcon,
   Bars3Icon
@@ -101,29 +99,99 @@ export default function Home() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative flex min-h-[60vh] items-center justify-center px-4 py-20 text-center sm:min-h-[70vh] md:px-6 lg:min-h-[80vh] lg:py-32">
-        <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 bg-background/70"></div>
-          <Image
-            className="h-full w-full object-cover opacity-20"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDi_u3qm17_dO8TwD6XLqj6IzDb-lniDY0KdaUqk4cDlWDxqQ6iu3jJ3gN1XKrY_YNGsy2mj9CPOahTbBwjS2bBSOwqKTBeIY3KBLU62hiEWXmCFxtfIygDXzegyRohRKkzbB7VTAgfaHr1IOCREbiZ_R5B3wvDokVjxYxJMSBtrBqSiwhFDTPNKxUi34yZg6eR6lShgsGIBClkEqRxdj87LQZdyRZVZNSWGy5gpdY0r1LD51kqxxlkI3G7ms2hATGo_w2Sr4lYzQNF"
-            alt="Background"
-            fill
-            priority
-          />
+      <section className="relative overflow-hidden px-4 py-20 sm:py-28 lg:py-36">
+        {/* Animated background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-background via-primary/5 to-background">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,_rgba(74,170,123,0.15)_0%,_transparent_50%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,_rgba(74,170,123,0.1)_0%,_transparent_50%)]" />
         </div>
-        <div className="relative z-10 flex flex-col items-center gap-6">
-          <h1 className="text-4xl font-extrabold tracking-tighter text-white sm:text-5xl md:text-6xl lg:text-7xl">
-            O Sistema Financeiro que Trabalha Sozinho.
-          </h1>
-          <p className="max-w-3xl text-base text-white/90 sm:text-lg md:text-xl">
-            Conecte seu banco em 5 minutos e deixe nossa IA automatizar suas finanças. CaixaHub é automação financeira sem esforço para o pequeno e médio varejista brasileiro.
-          </p>
-          <Button asChild className="flex h-12 min-w-[160px] items-center justify-center rounded-lg bg-primary px-8 text-base font-bold text-primary-foreground shadow-lg transition-transform hover:scale-105">
-            <Link href="/pricing">
-              Comece Grátis
-            </Link>
-          </Button>
+
+        {/* Floating decorative elements */}
+        <div className="absolute top-20 left-10 h-32 w-32 rounded-full bg-primary/10 blur-3xl animate-pulse" />
+        <div className="absolute bottom-20 right-10 h-40 w-40 rounded-full bg-primary/5 blur-3xl animate-pulse delay-1000" />
+
+        <div className="container mx-auto relative z-10">
+          <div className="max-w-5xl mx-auto text-center">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 mb-8 border border-primary/20">
+              <SparklesIcon className="h-4 w-4 text-primary animate-pulse" />
+              <span className="text-sm font-medium text-primary">IA + Open Banking = Automação Total</span>
+            </div>
+
+            {/* Main heading with gradient */}
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
+              <span className="block text-foreground">O Sistema Financeiro</span>
+              <span className="block mt-2 bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent">
+                que Trabalha Sozinho
+              </span>
+            </h1>
+
+            {/* Description */}
+            <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground mb-8 max-w-3xl mx-auto leading-relaxed">
+              Conecte seu banco em <span className="font-bold text-primary">5 minutos</span> e deixe nossa IA automatizar suas finanças.
+              Automação financeira sem esforço para o pequeno e médio varejista brasileiro.
+            </p>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+              <Button
+                asChild
+                size="lg"
+                className="h-14 px-8 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_30px_rgba(74,170,123,0.3)] hover:shadow-[0_0_40px_rgba(74,170,123,0.5)] transition-all duration-300 group"
+              >
+                <Link href="/pricing" className="flex items-center gap-2">
+                  Comece Grátis
+                  <ArrowRightIcon className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="h-14 px-8 text-lg font-semibold border-2 hover:bg-primary/5"
+              >
+                <Link href="/pricing">
+                  Ver Preços
+                </Link>
+              </Button>
+            </div>
+
+            {/* Trust indicators */}
+            <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-8 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <CheckCircleIcon className="h-5 w-5 text-primary" />
+                <span>7 dias grátis</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircleIcon className="h-5 w-5 text-primary" />
+                <span>Sem cartão de crédito</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircleIcon className="h-5 w-5 text-primary" />
+                <span>Cancele quando quiser</span>
+              </div>
+            </div>
+
+            {/* Stats bar */}
+            <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+              <div className="bg-card/50 backdrop-blur-sm rounded-xl p-6 border border-primary/10">
+                <div className="text-3xl font-bold text-primary mb-1">2 min</div>
+                <div className="text-sm text-muted-foreground">Setup inicial</div>
+              </div>
+              <div className="bg-card/50 backdrop-blur-sm rounded-xl p-6 border border-primary/10">
+                <div className="text-3xl font-bold text-primary mb-1">99%</div>
+                <div className="text-sm text-muted-foreground">Precisão da IA</div>
+              </div>
+              <div className="bg-card/50 backdrop-blur-sm rounded-xl p-6 border border-primary/10">
+                <div className="text-3xl font-bold text-primary mb-1">15h</div>
+                <div className="text-sm text-muted-foreground">Economizadas/mês</div>
+              </div>
+              <div className="bg-card/50 backdrop-blur-sm rounded-xl p-6 border border-primary/10">
+                <div className="text-3xl font-bold text-primary mb-1">24/7</div>
+                <div className="text-sm text-muted-foreground">Sincronização</div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
