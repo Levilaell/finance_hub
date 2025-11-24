@@ -267,7 +267,7 @@ export default function LandingV1Page() {
               className="max-w-4xl mx-auto"
             >
               <h2 className="text-4xl lg:text-5xl font-bold mb-8 text-center">
-                Exemplo: Loja de roupas com 300 transações/mês
+                Exemplo: Loja de roupas com 2884 transações/mês
               </h2>
               <Card className="p-8">
                 <p className="text-lg text-muted-foreground mb-6 leading-relaxed">
@@ -286,7 +286,7 @@ export default function LandingV1Page() {
                   />
                 </div>
                 <p className="text-center text-sm text-muted-foreground mb-6">
-                  300 transações categorizadas automaticamente todo mês
+                  Todas as transações categorizadas automaticamente todo mês
                 </p>
                 <div className="text-center">
                   <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
