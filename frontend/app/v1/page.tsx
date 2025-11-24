@@ -81,7 +81,7 @@ export default function LandingV1Page() {
               >
                 <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card">
                   <Image
-                    src="/landing-images/relatorios-financeiros.png"
+                    src="/landing-images/hero-a.png"
                     alt="Dashboard CaixaHub - Relatórios Financeiros Automatizados"
                     width={1200}
                     height={675}
@@ -276,11 +276,14 @@ export default function LandingV1Page() {
                   Com o CaixaHub: tudo categorizado automaticamente, relatório pronto em 2 cliques.
                   Dono recuperou seus finais de semana.
                 </p>
-                <div className="relative rounded-lg overflow-hidden border border-border/50 bg-muted/30 aspect-video flex items-center justify-center mb-4">
-                  <div className="text-center space-y-4">
-                    <div className="text-6xl">📊 → ✅</div>
-                    <p className="text-muted-foreground">Antes (planilha caótica) vs Depois (dashboard limpo)</p>
-                  </div>
+                <div className="relative rounded-lg overflow-hidden border border-border/50 bg-card mb-4">
+                  <Image
+                    src="/landing-images/transactions.png"
+                    alt="Transações categorizadas automaticamente"
+                    width={1200}
+                    height={675}
+                    className="w-full h-auto"
+                  />
                 </div>
                 <p className="text-center text-sm text-muted-foreground mb-6">
                   300 transações categorizadas automaticamente todo mês
