@@ -8,16 +8,12 @@ export const Footer = () => {
           </div>
           
           <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
-            <a href="#" className="hover:text-primary transition-colors duration-300">
+            <a href="/privacy" className="hover:text-primary transition-colors duration-300">
               Política de Privacidade
             </a>
             <span>|</span>
-            <a href="#" className="hover:text-primary transition-colors duration-300">
+            <a href="/terms" className="hover:text-primary transition-colors duration-300">
               Termos de Uso
-            </a>
-            <span>|</span>
-            <a href="#" className="hover:text-primary transition-colors duration-300">
-              Suporte
             </a>
           </div>
 

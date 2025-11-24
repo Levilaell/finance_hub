@@ -46,7 +46,7 @@ export const TestimonialsSection = () => {
               transition={{ duration: 0.6, delay: index * 0.2 }}
             >
               <Card className="p-8 bg-card border-border/50 h-full relative">
-                <Quote className="absolute top-6 right-6 w-12 h-12 text-primary/10" />
+                <Quote className="absolute top-6 right-6 w-12 h-12 text-primary/30" />
                 
                 <div className="relative z-10">
                   <p className="text-lg text-foreground/90 mb-8 leading-relaxed italic">

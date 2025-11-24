@@ -56,7 +56,7 @@ export const HowItWorksSection = () => {
               transition={{ duration: 0.6, delay: index * 0.2 }}
             >
               <Card className="p-8 bg-card border-border/50 h-full relative overflow-hidden group hover:border-primary/50 transition-all duration-300">
-                <div className="absolute top-4 right-4 text-6xl font-bold text-primary/10 group-hover:text-primary/20 transition-colors duration-300">
+                <div className="absolute top-4 right-4 text-6xl font-bold text-primary/30 group-hover:text-primary/40 transition-colors duration-300">
                   {step.number}
                 </div>
                 
