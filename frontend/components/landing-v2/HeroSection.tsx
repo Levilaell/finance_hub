@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
+import Image from "next/image";
 
 export const HeroSection = () => {
   const benefits = [
@@ -71,13 +72,17 @@ export const HeroSection = () => {
             transition={{ duration: 0.7, delay: 0.3 }}
             className="relative"
           >
-            <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-muted/30 aspect-video flex items-center justify-center">
-              <div className="text-center space-y-4">
-                <div className="text-7xl">📊</div>
-                <p className="text-muted-foreground text-lg">Dashboard do CaixaHub</p>
-              </div>
+            <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card">
+              <Image
+                src="/landing-images/hero-a.png"
+                alt="Dashboard do CaixaHub - Visão Unificada de Contas"
+                width={1200}
+                height={675}
+                className="w-full h-auto"
+                priority
+              />
             </div>
-            
+
             {/* Decorative glow */}
             <div className="absolute -inset-4 bg-primary/10 blur-3xl -z-10 rounded-full" />
           </motion.div>
