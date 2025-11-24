@@ -326,12 +326,12 @@ export default function CategoriesPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="bg-gray-900 border-gray-800">
+        <DialogContent className="bg-card border-border">
           <DialogHeader>
             <DialogTitle className="text-white">
               {editingCategory ? 'Editar Categoria' : 'Nova Categoria'}
             </DialogTitle>
-            <DialogDescription className="text-gray-400">
+            <DialogDescription className="text-muted-foreground">
               {editingCategory
                 ? 'Altere os dados da categoria'
                 : 'Crie uma nova categoria personalizada'}
@@ -447,10 +447,10 @@ export default function CategoriesPage() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="bg-gray-900 border-gray-800">
+        <DialogContent className="bg-card border-border">
           <DialogHeader>
             <DialogTitle className="text-white">Excluir Categoria</DialogTitle>
-            <DialogDescription className="text-gray-400">
+            <DialogDescription className="text-muted-foreground">
               {deletingCategory && (
                 <>
                   Você tem certeza que deseja excluir a categoria{' '}

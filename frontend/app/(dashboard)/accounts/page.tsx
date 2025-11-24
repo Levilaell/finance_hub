@@ -398,10 +398,10 @@ export default function AccountsPage() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="bg-gray-900 border-gray-800">
+        <DialogContent className="bg-card border-border">
           <DialogHeader>
             <DialogTitle className="text-white">Desconectar conta bancária</DialogTitle>
-            <DialogDescription className="text-gray-400">
+            <DialogDescription className="text-muted-foreground">
               {accountToDelete && (
                 <>
                   Você tem certeza que deseja desconectar a conta <span className="font-semibold text-white">{accountToDelete.name}</span>?
@@ -424,7 +424,7 @@ export default function AccountsPage() {
               variant="outline"
               onClick={cancelDelete}
               disabled={isDeleting}
-              className="border-gray-700 text-gray-300 hover:bg-gray-800"
+              className="border-border text-muted-foreground hover:bg-muted"
             >
               Cancelar
             </Button>

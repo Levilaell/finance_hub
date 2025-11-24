@@ -40,7 +40,8 @@
       "Bash(then sed -i '1s/^/\"\"use client\"\";\\n\\n/' \"$file\")",
       "Bash(done)",
       "Bash(ls:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

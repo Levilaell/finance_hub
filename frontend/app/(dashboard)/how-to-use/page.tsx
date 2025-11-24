@@ -28,7 +28,7 @@ export default function ComoUsarPage() {
           <InformationCircleIcon className="h-6 w-6 text-blue-400 mt-0.5 flex-shrink-0" />
           <div>
             <h2 className="text-lg font-semibold text-white mb-2">Início Rápido</h2>
-            <p className="text-sm text-gray-300">
+            <p className="text-sm text-muted-foreground">
               Siga os passos abaixo para configurar sua conta e começar a acompanhar suas finanças automaticamente.
             </p>
           </div>
@@ -46,7 +46,7 @@ export default function ComoUsarPage() {
               <LinkIcon className="h-5 w-5 text-blue-400" />
               <h3 className="text-xl font-semibold text-white">Conecte sua Conta Bancária</h3>
             </div>
-            <div className="space-y-3 text-gray-300">
+            <div className="space-y-3 text-muted-foreground">
               <p>Para começar a sincronizar suas transações automaticamente:</p>
               <ol className="list-decimal list-inside space-y-2 ml-2">
                 <li>Acesse a aba <strong className="text-white">Contas Bancárias</strong> no menu lateral</li>
@@ -90,7 +90,7 @@ export default function ComoUsarPage() {
               <ArrowPathIcon className="h-5 w-5 text-purple-400" />
               <h3 className="text-xl font-semibold text-white">Sincronize suas Transações</h3>
             </div>
-            <div className="space-y-3 text-gray-300">
+            <div className="space-y-3 text-muted-foreground">
               <p>Após conectar sua conta, é hora de buscar suas transações:</p>
               <ol className="list-decimal list-inside space-y-2 ml-2">
                 <li>Na aba <strong className="text-white">Contas</strong>, localize o card da sua conta bancária</li>
@@ -129,7 +129,7 @@ export default function ComoUsarPage() {
               <ChartBarIcon className="h-5 w-5 text-green-400" />
               <h3 className="text-xl font-semibold text-white">Visualize seus Relatórios</h3>
             </div>
-            <div className="space-y-3 text-gray-300">
+            <div className="space-y-3 text-muted-foreground">
               <p>Agora você pode analisar suas finanças em diferentes abas:</p>
               <div className="space-y-3 ml-2">
                 <div>
@@ -165,7 +165,7 @@ export default function ComoUsarPage() {
               <TagIcon className="h-5 w-5 text-orange-400" />
               <h3 className="text-xl font-semibold text-white">Organize suas Categorias</h3>
             </div>
-            <div className="space-y-3 text-gray-300">
+            <div className="space-y-3 text-muted-foreground">
               <p>Personalize como suas transações são categorizadas:</p>
               <ol className="list-decimal list-inside space-y-2 ml-2">
                 <li>Acesse a aba <strong className="text-white">Categorias</strong></li>
@@ -182,7 +182,7 @@ export default function ComoUsarPage() {
       {/* Tips and Best Practices */}
       <div className="bg-gradient-to-r from-indigo-500/10 to-cyan-500/10 border border-indigo-500/20 rounded-lg p-6">
         <h2 className="text-xl font-semibold text-white mb-4">💡 Dicas e Boas Práticas</h2>
-        <ul className="space-y-2 text-gray-300">
+        <ul className="space-y-2 text-muted-foreground">
           <li className="flex items-start gap-2">
             <CheckCircleIcon className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
             <span><strong className="text-white">Sincronize regularmente:</strong> Mantenha seus dados atualizados sincronizando pelo menos 1x por semana</span>
@@ -205,10 +205,10 @@ export default function ComoUsarPage() {
       {/* Support */}
       <div className="bg-card border border-white/10 rounded-lg p-6">
         <h2 className="text-xl font-semibold text-white mb-3">🆘 Precisa de Ajuda?</h2>
-        <p className="text-gray-300">
+        <p className="text-muted-foreground">
           Se você tiver problemas ao conectar sua conta ou sincronizar transações:
         </p>
-        <ul className="mt-3 space-y-2 text-gray-300 ml-6 list-disc">
+        <ul className="mt-3 space-y-2 text-muted-foreground ml-6 list-disc">
           <li>Verifique se seu banco está em manutenção ou se há problemas temporários</li>
           <li>Tente desconectar e reconectar a conta</li>
           <li>Certifique-se de que suas credenciais estão corretas</li>

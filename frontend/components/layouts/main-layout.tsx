@@ -233,7 +233,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             <Menu className="h-5 w-5" />
           </Button>
           <div className="flex flex-1 items-center justify-end space-x-4">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" className="text-foreground">
               <Bell className="h-5 w-5" />
             </Button>
             <div className="relative">
@@ -241,10 +241,10 @@ export function MainLayout({ children }: MainLayoutProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-2 text-foreground"
               >
-                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center shadow-sm">
-                  <span className="text-sm font-medium text-blue-800">
+                <div className="h-8 w-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shadow-sm">
+                  <span className="text-sm font-medium text-primary">
                     {getUserInitials()}
                   </span>
                 </div>

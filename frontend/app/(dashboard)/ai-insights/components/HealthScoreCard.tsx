@@ -64,28 +64,28 @@ export function HealthScoreCard({ score, status, scoreChange }: HealthScoreCardP
           </div>
           <div className="grid grid-cols-4 gap-2 text-xs text-center">
             <div>
-              <div className={`font-semibold ${numericScore <= 2.5 ? 'text-red-600' : 'text-gray-400'}`}>
+              <div className={`font-semibold ${numericScore <= 2.5 ? 'text-red-600' : 'text-muted-foreground'}`}>
                 Ruim
               </div>
-              <div className="text-gray-500">0-2.5</div>
+              <div className="text-muted-foreground">0-2.5</div>
             </div>
             <div>
-              <div className={`font-semibold ${numericScore > 2.5 && numericScore <= 5 ? 'text-yellow-600' : 'text-gray-400'}`}>
+              <div className={`font-semibold ${numericScore > 2.5 && numericScore <= 5 ? 'text-yellow-600' : 'text-muted-foreground'}`}>
                 Regular
               </div>
-              <div className="text-gray-500">2.5-5</div>
+              <div className="text-muted-foreground">2.5-5</div>
             </div>
             <div>
-              <div className={`font-semibold ${numericScore > 5 && numericScore <= 7.5 ? 'text-blue-600' : 'text-gray-400'}`}>
+              <div className={`font-semibold ${numericScore > 5 && numericScore <= 7.5 ? 'text-blue-600' : 'text-muted-foreground'}`}>
                 Bom
               </div>
-              <div className="text-gray-500">5-7.5</div>
+              <div className="text-muted-foreground">5-7.5</div>
             </div>
             <div>
-              <div className={`font-semibold ${numericScore > 7.5 ? 'text-green-600' : 'text-gray-400'}`}>
+              <div className={`font-semibold ${numericScore > 7.5 ? 'text-green-600' : 'text-muted-foreground'}`}>
                 Excelente
               </div>
-              <div className="text-gray-500">7.5-10</div>
+              <div className="text-muted-foreground">7.5-10</div>
             </div>
           </div>
         </CardContent>

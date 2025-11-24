@@ -171,7 +171,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Configurações</h1>
-        <p className="text-gray-600">Gerencie suas configurações de conta e preferências</p>
+        <p className="text-muted-foreground">Gerencie suas configurações de conta e preferências</p>
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
@@ -217,7 +217,7 @@ export default function SettingsPage() {
                     disabled
                     className="bg-white/5 cursor-not-allowed"
                   />
-                  <p className="text-xs text-gray-500 mt-1">O email não pode ser alterado</p>
+                  <p className="text-xs text-muted-foreground mt-1">O email não pode ser alterado</p>
                 </div>
                 <div className="pt-4">
                   <Button
@@ -261,7 +261,7 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                     >
                       {showCurrentPassword ? (
                         <EyeSlashIcon className="h-5 w-5" />
@@ -295,7 +295,7 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                     >
                       {showNewPassword ? (
                         <EyeSlashIcon className="h-5 w-5" />
@@ -325,7 +325,7 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                     >
                       {showConfirmPassword ? (
                         <EyeSlashIcon className="h-5 w-5" />
@@ -368,7 +368,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   Adicione uma camada extra de segurança à sua conta habilitando a autenticação de dois fatores.
                 </p>
                 <div className="flex items-center justify-between">
@@ -376,7 +376,7 @@ export default function SettingsPage() {
                     <p className="font-medium">
                       Autenticação de Dois Fatores
                     </p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted-foreground">
                       Em breve - Estamos trabalhando para implementar esta funcionalidade
                     </p>
                   </div>
@@ -403,7 +403,7 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <div>
                   <p className="font-medium text-red-600">Excluir Conta</p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     Excluir permanentemente sua conta e todos os dados associados. Esta ação não pode ser desfeita.
                   </p>
                 </div>
