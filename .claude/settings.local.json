@@ -30,7 +30,17 @@
       "Bash(git stash:*)",
       "Bash(python manage.py shell:*)",
       "Bash(npm run build:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git clone:*)",
+      "Bash(xcopy /E /I temp_lp_v2srccomponents frontendcomponentslanding-v2)",
+      "Bash(xcopy /E /I temp_lp_v2srcassets frontendpubliclanding-v2)",
+      "Bash(for file in frontend/components/landing-v2/*.tsx)",
+      "Bash(do if grep -q \"motion\\|useState\\|useEffect\" \"$file\")",
+      "Bash(! grep -q \"\"\"use client\"\"\" \"$file\")",
+      "Bash(then sed -i '1s/^/\"\"use client\"\";\\n\\n/' \"$file\")",
+      "Bash(done)",
+      "Bash(ls:*)",
+      "Bash(cd:*)"
     ],
     "deny": [],
     "ask": []

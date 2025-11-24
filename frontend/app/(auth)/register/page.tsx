@@ -5,17 +5,20 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuthStore } from '@/store/auth-store';
 import { RegisterData } from '@/types';
-import { EyeIcon, EyeSlashIcon, CheckIcon, CreditCardIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { CheckIcon } from 'lucide-react';
 import { validatePhone, phoneMask } from '@/utils/validation';
 import { trackLead, trackViewContent } from '@/lib/meta-pixel';
+import { AuthHeader } from '@/components/landing-v2/AuthHeader';
+import { Footer } from '@/components/landing-v2/Footer';
 
 function RegisterContent() {
   const router = useRouter();
@@ -44,7 +47,6 @@ function RegisterContent() {
     try {
       await registerUser(data);
 
-      // Track lead conversion
       trackLead({
         content_name: 'Registration Form',
         value: 0,
@@ -60,11 +62,9 @@ function RegisterContent() {
     } catch (error: any) {
       console.error('Erro no registro:', error.response?.data);
 
-      // Handle validation errors
       if (error.response?.status === 400) {
         const errors = error.response.data;
 
-        // Show first error from each field
         const errorMessages = Object.entries(errors)
           .filter(([key]) => key !== 'message')
           .map(([field, fieldErrors]: [string, any]) => {
@@ -100,194 +100,277 @@ function RegisterContent() {
   ];
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle className="text-white text-center text-2xl font-bold">Criar uma Conta</CardTitle>
-        <CardDescription className="text-center text-muted-foreground">
-          Inicie seu trial gratuito de 7 dias
-        </CardDescription>
+    <div className="min-h-screen bg-background">
+      <AuthHeader />
 
-        {/* Trial Notice */}
-        <Alert className="mt-4">
-          <CreditCardIcon className="h-4 w-4" />
-          <AlertDescription>
-            <strong>7 dias de trial grátis:</strong> Teste todos os recursos sem compromisso.
-          </AlertDescription>
-        </Alert>
-      </CardHeader>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="firstName">Nome completo</Label>
-              <Input
-                id="firstName"
-                type="text"
-                placeholder="João Silva"
-                {...register('first_name', {
-                  required: 'Nome completo é obrigatório',
-                })}
-                autoComplete="name"
-              />
-              {errors.first_name && (
-                <p className="text-sm text-red-500 mt-1">
-                  {errors.first_name.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="nome@exemplo.com"
-                {...register('email', {
-                  required: 'Email é obrigatório',
-                  pattern: {
-                    value: /\S+@\S+\.\S+/,
-                    message: 'Endereço de email inválido',
-                  },
-                })}
-                autoComplete="email"
-              />
-              {errors.email && (
-                <p className="text-sm text-red-500 mt-1">
-                  {errors.email.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="phone">WhatsApp</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="(11) 99999-9999"
-                value={phoneValue}
-                {...register('phone', {
-                  required: 'WhatsApp é obrigatório',
-                  validate: (value) => validatePhone(value) || 'WhatsApp inválido',
-                })}
-                onChange={(e) => {
-                  const masked = phoneMask(e.target.value);
-                  setPhoneValue(masked);
-                  setValue('phone', masked);
-                }}
-                maxLength={15}
-                autoComplete="tel"
-              />
-              {errors.phone && (
-                <p className="text-sm text-red-500 mt-1">
-                  {errors.phone.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="password">Senha</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Crie uma senha forte"
-                  {...register('password', {
-                    required: 'Senha é obrigatória',
-                    validate: (value) => {
-                      const failedRequirements = passwordRequirements.filter(
-                        (req) => !req.regex.test(value)
-                      );
-                      if (failedRequirements.length > 0) {
-                        return `A senha deve ter: ${failedRequirements
-                          .map((req) => req.text.toLowerCase())
-                          .join(', ')}`;
-                      }
-                      return true;
-                    },
-                  })}
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? (
-                    <EyeSlashIcon className="h-5 w-5" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5" />
-                  )}
-                </button>
-              </div>
-              {errors.password && (
-                <p className="text-sm text-red-500 mt-1">
-                  {errors.password.message}
-                </p>
-              )}
-              {password && (
-                <div className="mt-2 space-y-1">
-                  {passwordRequirements.map((req, index) => (
-                    <div
-                      key={index}
-                      className={`flex items-center text-sm ${
-                        req.regex.test(password)
-                          ? 'text-green-600'
-                          : 'text-gray-400'
-                      }`}
-                    >
-                      <CheckIcon
-                        className={`h-4 w-4 mr-1 ${
-                          req.regex.test(password) ? 'visible' : 'invisible'
-                        }`}
-                      />
-                      {req.text}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col space-y-4">
-          <Button
-            type="submit"
-            className="w-full bg-white hover:bg-white/90 text-black font-medium"
-            disabled={isLoading}
+      <main className="container mx-auto px-4 pt-24 pb-20">
+        <Button
+          variant="ghost"
+          asChild
+          className="mb-8"
+        >
+          <Link href="/" className="flex items-center gap-2">
+            <ArrowLeftIcon className="w-4 h-4" />
+            Voltar
+          </Link>
+        </Button>
+
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 max-w-6xl mx-auto">
+          {/* Coluna Esquerda - Reforço de Valor */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6 }}
+            className="lg:pr-8 flex flex-col justify-center"
           >
-            {isLoading ? (
-              <LoadingSpinner />
-            ) : (
-              'Iniciar Teste de 7 Dias'
-            )}
-          </Button>
-          <p className="text-sm text-center text-muted-foreground">
-            Ao se cadastrar, você concorda com nossos{' '}
-            <Link href="/terms" className="text-white hover:text-white/80 hover:underline transition-colors">
-              Termos de Serviço
-            </Link>{' '}
-            e{' '}
-            <Link href="/privacy" className="text-white hover:text-white/80 hover:underline transition-colors">
-              Política de Privacidade
-            </Link>
-          </p>
-          <p className="text-sm text-center text-muted-foreground">
-            Já tem uma conta?{' '}
-            <Link href="/login" className="text-white hover:text-white/80 hover:underline transition-colors font-medium">
-              Entrar
-            </Link>
-          </p>
-        </CardFooter>
-      </form>
-    </Card>
+            <div className="bg-muted/30 rounded-2xl p-8 lg:p-10 border border-border/50">
+              <h2 className="text-3xl lg:text-4xl font-bold mb-8">
+                Falta pouco para organizar seu financeiro
+              </h2>
+
+              <div className="space-y-6 mb-8">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center mt-1">
+                    <CheckIcon className="w-4 h-4 text-green-500" strokeWidth={3} />
+                  </div>
+                  <p className="text-lg text-foreground">
+                    Configure em 5 minutos
+                  </p>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center mt-1">
+                    <CheckIcon className="w-4 h-4 text-green-500" strokeWidth={3} />
+                  </div>
+                  <p className="text-lg text-foreground">
+                    IA categoriza tudo automaticamente
+                  </p>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center mt-1">
+                    <CheckIcon className="w-4 h-4 text-green-500" strokeWidth={3} />
+                  </div>
+                  <p className="text-lg text-foreground">
+                    Veja seu fluxo de caixa em tempo real
+                  </p>
+                </div>
+              </div>
+
+              <div className="inline-flex items-center gap-2 px-4 py-3 bg-primary/10 rounded-full">
+                <span className="text-xl">✨</span>
+                <p className="text-sm font-semibold">
+                  7 dias grátis. Cancele quando quiser.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Coluna Direita - Formulário */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+          >
+            <Card className="p-8 lg:p-10">
+              <div className="mb-8">
+                <h1 className="text-3xl lg:text-4xl font-bold mb-3">
+                  Criar uma Conta
+                </h1>
+                <p className="text-muted-foreground text-lg mb-4">
+                  Inicie seu trial gratuito de 7 dias
+                </p>
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full">
+                  <p className="text-sm font-medium">
+                    7 dias de trial grátis: Teste todos os recursos sem compromisso.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">Nome completo</Label>
+                  <Input
+                    id="firstName"
+                    type="text"
+                    placeholder="João Silva"
+                    {...register('first_name', {
+                      required: 'Nome completo é obrigatório',
+                    })}
+                    autoComplete="name"
+                  />
+                  {errors.first_name && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.first_name.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="nome@exemplo.com"
+                    {...register('email', {
+                      required: 'Email é obrigatório',
+                      pattern: {
+                        value: /\S+@\S+\.\S+/,
+                        message: 'Endereço de email inválido',
+                      },
+                    })}
+                    autoComplete="email"
+                  />
+                  {errors.email && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.email.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">WhatsApp</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="(11) 99999-9999"
+                    value={phoneValue}
+                    {...register('phone', {
+                      required: 'WhatsApp é obrigatório',
+                      validate: (value) => validatePhone(value) || 'WhatsApp inválido',
+                    })}
+                    onChange={(e) => {
+                      const masked = phoneMask(e.target.value);
+                      setPhoneValue(masked);
+                      setValue('phone', masked);
+                    }}
+                    maxLength={15}
+                    autoComplete="tel"
+                  />
+                  {errors.phone && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.phone.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Senha</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Crie uma senha forte"
+                      {...register('password', {
+                        required: 'Senha é obrigatória',
+                        validate: (value) => {
+                          const failedRequirements = passwordRequirements.filter(
+                            (req) => !req.regex.test(value)
+                          );
+                          if (failedRequirements.length > 0) {
+                            return `A senha deve ter: ${failedRequirements
+                              .map((req) => req.text.toLowerCase())
+                              .join(', ')}`;
+                          }
+                          return true;
+                        },
+                      })}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? (
+                        <EyeSlashIcon className="h-5 w-5" />
+                      ) : (
+                        <EyeIcon className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                  {errors.password && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.password.message}
+                    </p>
+                  )}
+                  {password && (
+                    <div className="mt-2 space-y-1">
+                      {passwordRequirements.map((req, index) => (
+                        <div
+                          key={index}
+                          className={`flex items-center text-sm ${
+                            req.regex.test(password)
+                              ? 'text-green-600'
+                              : 'text-gray-400'
+                          }`}
+                        >
+                          <CheckIcon
+                            className={`h-4 w-4 mr-1 ${
+                              req.regex.test(password) ? 'visible' : 'invisible'
+                            }`}
+                          />
+                          {req.text}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <LoadingSpinner />
+                  ) : (
+                    'Começar Agora - É Grátis'
+                  )}
+                </Button>
+
+                <p className="text-center text-xs text-muted-foreground pt-2">
+                  Ao se cadastrar, você concorda com nossos{' '}
+                  <Link href="/terms" className="text-primary hover:underline">
+                    Termos de Serviço
+                  </Link>{' '}
+                  e{' '}
+                  <Link href="/privacy" className="text-primary hover:underline">
+                    Política de Privacidade
+                  </Link>
+                </p>
+
+                <div className="text-center pt-4 border-t border-border">
+                  <p className="text-muted-foreground text-sm">
+                    Já tem uma conta?{' '}
+                    <Link href="/login" className="text-primary hover:underline font-medium">
+                      Entrar
+                    </Link>
+                  </p>
+                </div>
+              </form>
+            </Card>
+          </motion.div>
+        </div>
+      </main>
+
+      <Footer />
+    </div>
   );
 }
 
 export default function RegisterPage() {
   return (
     <Suspense fallback={
-      <Card className="w-full max-w-md">
-        <CardContent className="flex flex-col items-center space-y-4 pt-6">
-          <LoadingSpinner />
-          <p className="text-sm text-muted-foreground">Carregando...</p>
-        </CardContent>
-      </Card>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md p-8">
+          <div className="flex flex-col items-center space-y-4">
+            <LoadingSpinner />
+            <p className="text-sm text-muted-foreground">Carregando...</p>
+          </div>
+        </Card>
+      </div>
     }>
       <RegisterContent />
     </Suspense>

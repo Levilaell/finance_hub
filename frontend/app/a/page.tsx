@@ -1,0 +1,501 @@
+"use client";
+
+import { Header } from "@/components/landing-v2/Header";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { CheckCircle2, X, Check, Building2, Bot, LayoutDashboard, Quote, Sparkles } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Footer } from "@/components/landing-v2/Footer";
+
+export default function LandingAPage() {
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="pt-20">
+        {/* Hero Section */}
+        <section className="relative min-h-screen flex items-center bg-background overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-muted/20" />
+
+          <div className="container mx-auto px-4 py-20 relative z-10">
+            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+                className="space-y-8"
+              >
+                <div className="space-y-6">
+                  <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight">
+                    Autônomo: você mistura dinheiro de várias contas e{" "}
+                    <span className="text-primary">não sabe de onde saiu cada real?</span>
+                  </h1>
+                  <p className="text-xl lg:text-2xl text-muted-foreground leading-relaxed">
+                    O CaixaHub integra todas as suas contas e mostra a origem de cada transação automaticamente
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {[
+                    "Veja todas as contas em um só lugar (PJ, PF, Nubank, qualquer banco)",
+                    "Rastreio completo: saiba exatamente de onde saiu e para onde foi",
+                    "Categorização automática por IA - zero trabalho manual"
+                  ].map((benefit, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
+                      className="flex items-start gap-3"
+                    >
+                      <CheckCircle2 className="w-6 h-6 text-primary flex-shrink-0 mt-1" />
+                      <p className="text-lg text-foreground/90">{benefit}</p>
+                    </motion.div>
+                  ))}
+                </div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.6 }}
+                >
+                  <Button
+                    size="lg"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg px-8 py-6 h-auto shadow-[0_0_30px_rgba(57,224,142,0.3)] hover:shadow-[0_0_40px_rgba(57,224,142,0.5)] transition-all duration-300"
+                    asChild
+                  >
+                    <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                      Organizar minhas contas agora
+                    </a>
+                  </Button>
+                </motion.div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.7, delay: 0.3 }}
+                className="relative"
+              >
+                <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-muted/30 aspect-video flex items-center justify-center">
+                  <div className="text-center space-y-4">
+                    <div className="text-7xl">💳</div>
+                    <p className="text-muted-foreground text-lg">Dashboard Unificado</p>
+                  </div>
+                </div>
+
+                <div className="absolute -inset-4 bg-primary/10 blur-3xl -z-10 rounded-full" />
+              </motion.div>
+            </div>
+          </div>
+        </section>
+
+        {/* Problem/Solution Section */}
+        <section className="py-24 bg-muted/30">
+          <div className="container mx-auto px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-16"
+            >
+              <h2 className="text-4xl lg:text-5xl font-bold mb-6">
+                Sua vida financeira está espalhada
+              </h2>
+            </motion.div>
+
+            <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6 }}
+              >
+                <Card className="p-8 h-full border-destructive/50 bg-destructive/5">
+                  <h3 className="text-2xl font-bold mb-6 text-destructive">SEM CAIXAHUB</h3>
+                  <div className="space-y-4">
+                    {[
+                      "Dinheiro espalhado em 3, 4, 5 contas diferentes",
+                      "Precisa entrar em cada app para ver saldo",
+                      "Não sabe de qual conta saiu aquele pagamento",
+                      "Perder horas juntando tudo na planilha"
+                    ].map((problem, index) => (
+                      <div key={index} className="flex items-start gap-3">
+                        <X className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                        <p className="text-foreground/80">{problem}</p>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+              >
+                <Card className="p-8 h-full border-primary/50 bg-primary/5">
+                  <h3 className="text-2xl font-bold mb-6 text-primary">COM CAIXAHUB</h3>
+                  <div className="space-y-4">
+                    {[
+                      "Todas as contas em um painel único",
+                      "Vê origem de cada transação automaticamente",
+                      "Rastreio total: de onde veio, para onde foi",
+                      "Categorização inteligente por IA"
+                    ].map((solution, index) => (
+                      <div key={index} className="flex items-start gap-3">
+                        <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                        <p className="text-foreground/80">{solution}</p>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </motion.div>
+            </div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="text-center mt-12"
+            >
+              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
+                <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                  Integrar minhas contas
+                </a>
+              </Button>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* How It Works Section */}
+        <section className="py-24 bg-background">
+          <div className="container mx-auto px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-16"
+            >
+              <h2 className="text-4xl lg:text-5xl font-bold mb-4">Como funciona</h2>
+              <p className="text-xl text-muted-foreground">De contas espalhadas para visão unificada</p>
+            </motion.div>
+
+            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-12">
+              {[
+                {
+                  number: 1,
+                  icon: Building2,
+                  title: "Conecte todas as suas contas",
+                  description: "Conta PJ, PF, Nubank, Inter, qualquer banco. Quantas contas quiser.",
+                  time: "2 minutos"
+                },
+                {
+                  number: 2,
+                  icon: Bot,
+                  title: "IA integra e categoriza tudo",
+                  description: "Sistema puxa transações de todas as contas e organiza automaticamente",
+                  time: "2 minutos"
+                },
+                {
+                  number: 3,
+                  icon: LayoutDashboard,
+                  title: "Veja tudo em um só lugar",
+                  description: "Dashboard mostra origem de cada transação, saldo total real, fluxo consolidado",
+                  time: "1 minuto"
+                }
+              ].map((step, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: index * 0.2 }}
+                >
+                  <Card className="p-8 h-full relative overflow-hidden">
+                    <div className="absolute top-4 right-4 text-6xl font-bold text-primary/10">
+                      {step.number}
+                    </div>
+                    <step.icon className="w-12 h-12 text-primary mb-4" />
+                    <h3 className="text-xl font-bold mb-3">{step.title}</h3>
+                    <p className="text-muted-foreground mb-4">{step.description}</p>
+                    <div className="inline-block px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
+                      {step.time}
+                    </div>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="text-center space-y-6"
+            >
+              <p className="text-2xl font-semibold text-foreground">
+                Total: 5 minutos para ter controle total
+              </p>
+              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
+                <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                  Começar agora - 7 dias grátis
+                </a>
+              </Button>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Use Case Section */}
+        <section className="py-24 bg-muted/30">
+          <div className="container mx-auto px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="max-w-4xl mx-auto"
+            >
+              <h2 className="text-4xl lg:text-5xl font-bold mb-8 text-center">
+                Exemplo: Consultor com conta PJ, PF e 2 bancos digitais
+              </h2>
+              <Card className="p-8">
+                <p className="text-lg text-muted-foreground mb-6 leading-relaxed">
+                  Recebe honorários na conta PJ (Itaú), transfere para PF (Nubank), paga contas pessoais no Inter, usa C6 para investimentos.
+                  Sem o CaixaHub: precisa abrir 4 apps diferentes para saber quanto tem.
+                  Com o CaixaHub: vê tudo consolidado, sabe de qual conta saiu cada pagamento.
+                </p>
+                <div className="relative rounded-lg overflow-hidden border border-border/50 bg-muted/30 aspect-video flex items-center justify-center mb-4">
+                  <div className="text-center space-y-4">
+                    <div className="text-6xl">📊</div>
+                    <p className="text-muted-foreground">Dashboard com múltiplas contas integradas</p>
+                  </div>
+                </div>
+                <p className="text-center text-sm text-muted-foreground mb-6">
+                  4 contas, 127 transações, tudo rastreado e categorizado automaticamente
+                </p>
+                <div className="text-center">
+                  <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
+                    <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                      Quero essa visão unificada
+                    </a>
+                  </Button>
+                </div>
+              </Card>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Testimonials Section */}
+        <section className="py-24 bg-background">
+          <div className="container mx-auto px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-16"
+            >
+              <h2 className="text-4xl lg:text-5xl font-bold">
+                Autônomos que organizaram suas contas
+              </h2>
+            </motion.div>
+
+            <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+              {[
+                {
+                  quote: "Eu tinha dinheiro em 5 contas. Não sabia meu saldo real. O CaixaHub me mostrou que eu tinha R$ 3.200 esquecidos em uma conta que nem lembrava.",
+                  name: "Rafael Oliveira",
+                  role: "Desenvolvedor Freelancer"
+                },
+                {
+                  quote: "Pagava assinaturas em 3 cartões diferentes. Descobri 2 que nem usava mais. O rastreio automático me fez economizar R$ 150/mês.",
+                  name: "Juliana Costa",
+                  role: "Designer Autônoma"
+                }
+              ].map((testimonial, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: index * 0.2 }}
+                >
+                  <Card className="p-8 h-full relative">
+                    <Quote className="w-10 h-10 text-primary/20 mb-4" />
+                    <p className="text-lg text-foreground/90 mb-6 leading-relaxed">
+                      "{testimonial.quote}"
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <Avatar>
+                        <AvatarFallback className="bg-primary/10 text-primary">
+                          {testimonial.name.split(' ').map(n => n[0]).join('')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-semibold">{testimonial.name}</p>
+                        <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                      </div>
+                    </div>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Pricing Section */}
+        <section id="pricing" className="py-24 bg-muted/30">
+          <div className="container mx-auto px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="max-w-2xl mx-auto"
+            >
+              <Card className="p-10 relative overflow-hidden border-primary/50">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -translate-y-16 translate-x-16" />
+
+                <div className="text-center mb-8">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-medium mb-4">
+                    <Sparkles className="w-4 h-4" />
+                    Oferta Especial
+                  </div>
+                  <h2 className="text-5xl font-bold mb-4">
+                    R$ 97<span className="text-2xl text-muted-foreground">/mês</span>
+                  </h2>
+                </div>
+
+                <div className="space-y-4 mb-8">
+                  {[
+                    "Conexão ilimitada com bancos",
+                    "Integração de múltiplas contas",
+                    "Rastreio de origem de transações",
+                    "Categorização automática por IA",
+                    "Dashboard consolidado",
+                    "Relatórios em Excel/CSV",
+                    "Suporte via WhatsApp"
+                  ].map((feature, index) => (
+                    <div key={index} className="flex items-start gap-3">
+                      <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                      <p className="text-foreground/90">{feature}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-4">
+                  <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6" asChild>
+                    <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                      Começar Trial de 7 Dias
+                    </a>
+                  </Button>
+                  <p className="text-center text-sm text-muted-foreground">
+                    7 dias grátis • Cancele quando quiser
+                  </p>
+                  <p className="text-center text-base text-foreground font-medium">
+                    Menos que um almoço por semana. E organiza sua vida toda.
+                  </p>
+                </div>
+              </Card>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* FAQ Section */}
+        <section className="py-24 bg-background">
+          <div className="container mx-auto px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-16"
+            >
+              <h2 className="text-4xl lg:text-5xl font-bold">Perguntas Frequentes</h2>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="max-w-3xl mx-auto"
+            >
+              <Accordion type="single" collapsible className="space-y-4">
+                {[
+                  {
+                    question: "Quantas contas posso conectar?",
+                    answer: "Ilimitadas. PJ, PF, todos os bancos que você usa."
+                  },
+                  {
+                    question: "É seguro conectar todas as minhas contas?",
+                    answer: "Sim. Open Banking certificado pelo Banco Central. Mesma tecnologia do Nubank."
+                  },
+                  {
+                    question: "Funciona com banco digital?",
+                    answer: "Sim. Nubank, Inter, C6, Neon, qualquer banco."
+                  },
+                  {
+                    question: "Mostra de qual conta saiu cada pagamento?",
+                    answer: "Exatamente. Rastreio completo de origem e destino de cada real."
+                  },
+                  {
+                    question: "Preciso mudar de banco?",
+                    answer: "Não. Continue usando seus bancos normalmente. CaixaHub só organiza."
+                  }
+                ].map((faq, index) => (
+                  <AccordionItem key={index} value={`item-${index}`} className="border rounded-lg px-6">
+                    <AccordionTrigger className="text-left text-lg font-semibold hover:no-underline">
+                      {faq.question}
+                    </AccordionTrigger>
+                    <AccordionContent className="text-muted-foreground">
+                      {faq.answer}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Final CTA Section */}
+        <section className="py-24 bg-gradient-to-br from-primary/20 via-background to-background relative overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,_rgba(74,170,123,0.1)_0%,_transparent_50%)]" />
+
+          <div className="container mx-auto px-4 relative z-10">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="max-w-4xl mx-auto text-center space-y-8"
+            >
+              <h2 className="text-5xl lg:text-6xl font-bold leading-tight">
+                Pare de abrir 5 apps para saber quanto tem
+              </h2>
+              <p className="text-2xl text-muted-foreground">
+                Todas as suas contas em um só lugar
+              </p>
+              <Button
+                size="lg"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground text-xl px-12 py-8 h-auto shadow-[0_0_30px_rgba(57,224,142,0.3)] hover:shadow-[0_0_40px_rgba(57,224,142,0.5)] transition-all duration-300"
+                asChild
+              >
+                <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                  Integrar Minhas Contas Agora
+                </a>
+              </Button>
+            </motion.div>
+          </div>
+        </section>
+      </main>
+      <Footer />
+    </div>
+  );
+}
