@@ -218,7 +218,7 @@ export default function LandingV1Page() {
                   transition={{ duration: 0.6, delay: index * 0.2 }}
                 >
                   <Card className="p-8 h-full relative overflow-hidden">
-                    <div className="absolute top-4 right-4 text-6xl font-bold text-primary/10">
+                    <div className="absolute top-4 right-4 text-6xl font-bold text-primary/30">
                       {step.number}
                     </div>
                     <step.icon className="w-12 h-12 text-primary mb-4" />
