@@ -274,11 +274,14 @@ export default function LandingV3Page() {
                   Tentou ContaAzul (complicado demais), Omie (precisa de contador para configurar), sistema local (trava toda hora).
                   Com o CaixaHub: conectou o banco em 5 minutos, tudo funcionou. Simples. Direto. Sem dor de cabeça.
                 </p>
-                <div className="relative rounded-lg overflow-hidden border border-border/50 bg-muted/30 aspect-video flex items-center justify-center mb-4">
-                  <div className="text-center space-y-4">
-                    <div className="text-6xl">🎯</div>
-                    <p className="text-muted-foreground">Interface limpa e intuitiva do CaixaHub</p>
-                  </div>
+                <div className="relative rounded-lg overflow-hidden border border-border/50 bg-card mb-4">
+                  <Image
+                    src="/landing-images/transactions.png"
+                    alt="Interface limpa e intuitiva do CaixaHub"
+                    width={1200}
+                    height={675}
+                    className="w-full h-auto"
+                  />
                 </div>
                 <p className="text-center text-sm text-muted-foreground mb-6">
                   Interface que você entende sem ler manual
