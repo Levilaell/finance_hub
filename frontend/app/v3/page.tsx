@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Footer } from "@/components/landing-v2/Footer";
+import Image from "next/image";
 
 export default function LandingV3Page() {
   return (
@@ -78,11 +79,15 @@ export default function LandingV3Page() {
                 transition={{ duration: 0.7, delay: 0.3 }}
                 className="relative"
               >
-                <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-muted/30 aspect-video flex items-center justify-center">
-                  <div className="text-center space-y-4">
-                    <div className="text-7xl">✨</div>
-                    <p className="text-muted-foreground text-lg">Interface Simples e Intuitiva</p>
-                  </div>
+                <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card">
+                  <Image
+                    src="/landing-images/hero-a.png"
+                    alt="Interface Simples e Intuitiva do CaixaHub"
+                    width={1200}
+                    height={675}
+                    className="w-full h-auto"
+                    priority
+                  />
                 </div>
 
                 <div className="absolute -inset-4 bg-primary/10 blur-3xl -z-10 rounded-full" />
