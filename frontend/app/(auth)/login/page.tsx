@@ -191,7 +191,7 @@ export default function LoginPage() {
           <div className="mt-8 text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full">
               <p className="text-sm font-medium">
-                7 dias grátis • Cancele quando quiser • Sem cartão de crédito
+                7 dias grátis • Cancele quando quiser
               </p>
             </div>
           </div>
