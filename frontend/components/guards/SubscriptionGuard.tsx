@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { subscriptionService } from '@/services/subscription.service';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { startStripeCheckout } from '@/utils/checkout';
 
 interface SubscriptionGuardProps {
   children: React.ReactNode;
@@ -41,8 +42,8 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
           // Trial já foi usado - não pode usar novamente
           router.push('/subscription/trial-used');
         } else {
-          // Sem subscription e trial disponível - redireciona para checkout
-          router.push('/checkout');
+          // Sem subscription e trial disponível - inicia checkout direto
+          await startStripeCheckout();
         }
       } else {
         // Subscription expirada/cancelada - redireciona para página de reativação
@@ -50,8 +51,8 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
       }
     } catch (error) {
       console.error('Error checking subscription:', error);
-      // Em caso de erro, redireciona para checkout
-      router.push('/checkout');
+      // Em caso de erro, inicia checkout direto
+      await startStripeCheckout();
     } finally {
       setChecking(false);
     }

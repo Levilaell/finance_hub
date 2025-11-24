@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { MainLayout } from '@/components/layouts/main-layout';
 import { subscriptionService } from '@/services/subscription.service';
+import { startStripeCheckout } from '@/utils/checkout';
 
 export default function DashboardLayout({
   children,
@@ -48,7 +49,7 @@ export default function DashboardLayout({
     }
 
     // Paths that don't require subscription check
-    const exemptPaths = ['/settings', '/checkout'];
+    const exemptPaths = ['/settings'];
     const isExempt = exemptPaths.some(path => pathname?.startsWith(path));
 
     if (isExempt) {
@@ -59,19 +60,19 @@ export default function DashboardLayout({
 
     // Check subscription
     subscriptionService.getStatus()
-      .then((status) => {
+      .then(async (status) => {
         if (status.status === 'trialing' || status.status === 'active') {
           setHasSubscription(true);
         } else if (status.status === 'none') {
-          router.push('/checkout');
+          await startStripeCheckout();
         } else {
           router.push('/subscription/expired');
         }
       })
-      .catch((error) => {
+      .catch(async (error) => {
         console.error('Error checking subscription:', error);
-        // Se der erro na verificação, redireciona para checkout
-        router.push('/checkout');
+        // Se der erro na verificação, inicia checkout direto
+        await startStripeCheckout();
       })
       .finally(() => {
         setCheckingSubscription(false);

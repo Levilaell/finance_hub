@@ -4,9 +4,19 @@ import { useRouter } from 'next/navigation';
 import { XCircleIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { startStripeCheckout } from '@/utils/checkout';
+import { useState } from 'react';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function CheckoutCancelPage() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  const handleRetry = async () => {
+    setLoading(true);
+    await startStripeCheckout();
+    setLoading(false);
+  };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -28,11 +38,19 @@ export default function CheckoutCancelPage() {
 
           <div className="space-y-3">
             <Button
-              onClick={() => router.push('/checkout')}
+              onClick={handleRetry}
               className="w-full"
               size="lg"
+              disabled={loading}
             >
-              Tentar Novamente
+              {loading ? (
+                <>
+                  <LoadingSpinner className="mr-2" />
+                  Redirecionando...
+                </>
+              ) : (
+                'Tentar Novamente'
+              )}
             </Button>
 
             <Button

@@ -19,6 +19,7 @@ import { validatePhone, phoneMask } from '@/utils/validation';
 import { trackLead, trackViewContent } from '@/lib/meta-pixel';
 import { AuthHeader } from '@/components/landing-v2/AuthHeader';
 import { Footer } from '@/components/landing-v2/Footer';
+import { startStripeCheckout } from '@/utils/checkout';
 
 function RegisterContent() {
   const router = useRouter();
@@ -54,11 +55,15 @@ function RegisterContent() {
       });
 
       toast.success('Cadastro realizado com sucesso!', {
-        description: 'Seu trial de 7 dias começou. Aproveite!',
-        duration: 5000,
+        description: 'Redirecionando para checkout...',
+        duration: 3000,
       });
 
-      router.push('/dashboard');
+      // Redirecionar direto para o checkout da Stripe
+      await startStripeCheckout(() => {
+        // Em caso de erro no checkout, redireciona para dashboard
+        router.push('/dashboard');
+      });
     } catch (error: any) {
       console.error('Erro no registro:', error.response?.data);
 
