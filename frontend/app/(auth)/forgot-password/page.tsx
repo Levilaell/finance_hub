@@ -52,10 +52,10 @@ export default function ForgotPasswordPage() {
 
   if (emailSent) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
         <AuthHeader />
 
-        <main className="container mx-auto px-4 pt-24 pb-20">
+        <main className="container mx-auto px-4 pt-24 pb-20 flex-1">
           <Button
             variant="ghost"
             asChild
@@ -124,10 +124,10 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <AuthHeader />
 
-      <main className="container mx-auto px-4 pt-24 pb-20">
+      <main className="container mx-auto px-4 pt-24 pb-20 flex-1">
         <Button
           variant="ghost"
           asChild
