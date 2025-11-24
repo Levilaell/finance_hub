@@ -111,11 +111,13 @@ export default function DashboardLayout({
   // If we have user data, show the protected content
   if (isAuthenticated && user) {
     return (
-      <MainLayout>
-        <div className="min-h-screen">
-          {children}
-        </div>
-      </MainLayout>
+      <div className="dark">
+        <MainLayout>
+          <div className="min-h-screen">
+            {children}
+          </div>
+        </MainLayout>
+      </div>
     );
   }
 
