@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Footer } from "@/components/landing-v2/Footer";
+import Image from "next/image";
 
 export default function LandingGPage() {
   return (
@@ -78,11 +79,15 @@ export default function LandingGPage() {
                 transition={{ duration: 0.7, delay: 0.3 }}
                 className="relative"
               >
-                <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-muted/30 aspect-video flex items-center justify-center">
-                  <div className="text-center space-y-4">
-                    <div className="text-7xl">📊</div>
-                    <p className="text-muted-foreground text-lg">Relatórios prontos para exportar</p>
-                  </div>
+                <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card">
+                  <Image
+                    src="/landing-images/hero-a.png"
+                    alt="Relatórios prontos para exportar"
+                    width={1200}
+                    height={675}
+                    className="w-full h-auto"
+                    priority
+                  />
                 </div>
 
                 <div className="absolute -inset-4 bg-primary/10 blur-3xl -z-10 rounded-full" />
@@ -269,11 +274,14 @@ export default function LandingGPage() {
                   Antes: pedia extratos de 8 contas, categorizava tudo manualmente, passava 3 dias montando relatório. Diretoria reclamava do atraso.
                   Com CaixaHub: sistema puxa tudo automaticamente, categoriza, gera relatório. Entrega em 30 minutos. Diretoria feliz, gestor mais feliz ainda.
                 </p>
-                <div className="relative rounded-lg overflow-hidden border border-border/50 bg-muted/30 aspect-video flex items-center justify-center mb-4">
-                  <div className="text-center space-y-4">
-                    <div className="text-6xl">📄</div>
-                    <p className="text-muted-foreground">Relatório exportado do CaixaHub</p>
-                  </div>
+                <div className="relative rounded-lg overflow-hidden border border-border/50 bg-card mb-4">
+                  <Image
+                    src="/landing-images/reports.png"
+                    alt="Relatório exportado do CaixaHub"
+                    width={1200}
+                    height={675}
+                    className="w-full h-auto"
+                  />
                 </div>
                 <p className="text-center text-sm text-muted-foreground mb-6">
                   Relatório de 8 contas, 450 transações, pronto para enviar
