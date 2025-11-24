@@ -184,11 +184,6 @@ function RegisterContent() {
                 <p className="text-muted-foreground text-lg mb-4">
                   Inicie seu trial gratuito de 7 dias
                 </p>
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full">
-                  <p className="text-sm font-medium">
-                    7 dias de trial grátis: Teste todos os recursos sem compromisso.
-                  </p>
-                </div>
               </div>
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
