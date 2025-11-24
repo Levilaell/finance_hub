@@ -71,12 +71,12 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <AuthHeader />
 
-      <main className="container mx-auto px-4 pt-32 pb-20 flex-1">
+      <main className="container mx-auto px-4 flex-1 flex items-center justify-center py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="max-w-2xl mx-auto"
+          className="w-full max-w-2xl"
         >
           <Button
             variant="ghost"

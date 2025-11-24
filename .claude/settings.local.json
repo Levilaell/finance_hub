@@ -41,7 +41,8 @@
       "Bash(done)",
       "Bash(ls:*)",
       "Bash(cd:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(timeout 120 npm run build)"
     ],
     "deny": [],
     "ask": []
