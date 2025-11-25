@@ -27,11 +27,11 @@ export const FinalCTASection = () => {
           <div className="pt-4">
             <Button
               size="lg"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground text-xl px-12 py-7 h-auto shadow-[0_0_40px_rgba(57,224,142,0.4)] hover:shadow-[0_0_50px_rgba(57,224,142,0.6)] transition-all duration-300"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg md:text-xl px-8 md:px-12 py-6 md:py-7 h-auto shadow-[0_0_40px_rgba(57,224,142,0.4)] hover:shadow-[0_0_50px_rgba(57,224,142,0.6)] transition-all duration-300"
               asChild
             >
               <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
-                Começar Agora - 7 Dias Grátis
+                Começar
               </a>
             </Button>
           </div>
