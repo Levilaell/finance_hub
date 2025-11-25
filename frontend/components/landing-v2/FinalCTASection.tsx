@@ -31,7 +31,7 @@ export const FinalCTASection = () => {
               asChild
             >
               <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
-                Começar
+                Começar Agora - 7 Dias Grátis
               </a>
             </Button>
           </div>

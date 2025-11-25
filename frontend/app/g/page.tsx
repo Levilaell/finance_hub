@@ -496,7 +496,7 @@ export default function LandingGPage() {
                 asChild
               >
                 <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
-                  Facilitar
+                  Facilitar Minha Vida Agora
                 </a>
               </Button>
             </motion.div>

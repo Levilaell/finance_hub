@@ -497,7 +497,7 @@ export default function LandingAPage() {
                 asChild
               >
                 <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
-                  Integrar Minhas Contas
+                  Integrar Minhas Contas Agora
                 </a>
               </Button>
             </motion.div>

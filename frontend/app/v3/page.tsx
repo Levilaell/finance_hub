@@ -496,7 +496,7 @@ export default function LandingV3Page() {
                 asChild
               >
                 <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
-                  Testar
+                  Testar CaixaHub Agora
                 </a>
               </Button>
             </motion.div>

@@ -498,7 +498,7 @@ export default function LandingV1Page() {
                 asChild
               >
                 <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
-                  Organizar
+                  Organizar meu caixa agora
                 </a>
               </Button>
             </motion.div>
