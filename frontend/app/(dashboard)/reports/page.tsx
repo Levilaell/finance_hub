@@ -499,7 +499,7 @@ export default function ReportsPage() {
         <div className="flex gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" className="text-white border-white/20 hover:bg-white/10">
                 <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
                 Exportar PDF
               </Button>

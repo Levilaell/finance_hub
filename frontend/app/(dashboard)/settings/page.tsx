@@ -170,7 +170,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Configurações</h1>
+        <h1 className="text-3xl font-bold text-white">Configurações</h1>
         <p className="text-muted-foreground">Gerencie suas configurações de conta e preferências</p>
       </div>
 

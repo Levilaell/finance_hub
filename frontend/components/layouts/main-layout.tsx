@@ -96,6 +96,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               variant="ghost"
               size="icon"
               onClick={() => setSidebarOpen(false)}
+              className="text-white"
             >
               <X className="h-5 w-5" />
             </Button>
@@ -134,7 +135,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </span>
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium">
+                <p className="text-sm font-medium text-white">
                   {getUserFullName()}
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -200,7 +201,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </span>
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium">
+                <p className="text-sm font-medium text-white">
                   {getUserFullName()}
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -227,7 +228,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden"
+            className="lg:hidden text-white"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="h-5 w-5" />

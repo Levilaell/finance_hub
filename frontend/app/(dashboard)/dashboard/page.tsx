@@ -138,6 +138,7 @@ export default function DashboardPage() {
           variant="outline"
           onClick={handleRefresh}
           disabled={isRefreshing}
+          className="text-white border-white/20 hover:bg-white/10"
         >
           {isRefreshing ? (
             <>

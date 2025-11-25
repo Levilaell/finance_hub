@@ -249,6 +249,7 @@ export default function BillsPage() {
           <Button
             variant="outline"
             onClick={() => setShowFilters(!showFilters)}
+            className="text-white border-white/20 hover:bg-white/10"
           >
             <FunnelIcon className="h-4 w-4 mr-2" />
             Filtros
@@ -257,6 +258,7 @@ export default function BillsPage() {
             variant="outline"
             onClick={handleRefresh}
             disabled={isRefreshing}
+            className="text-white border-white/20 hover:bg-white/10"
           >
             {isRefreshing ? (
               <ArrowPathIcon className="h-4 w-4 animate-spin" />

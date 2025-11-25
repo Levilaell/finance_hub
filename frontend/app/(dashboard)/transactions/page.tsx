@@ -337,6 +337,7 @@ export default function TransactionsPage() {
           <Button
             variant="outline"
             onClick={() => setShowFilters(!showFilters)}
+            className="text-white border-white/20 hover:bg-white/10"
           >
             <FunnelIcon className="h-4 w-4 mr-2" />
             Filtros
@@ -345,6 +346,7 @@ export default function TransactionsPage() {
             variant="outline"
             onClick={handleRefresh}
             disabled={isRefreshing}
+            className="text-white border-white/20 hover:bg-white/10"
           >
             {isRefreshing ? (
               <ArrowPathIcon className="h-4 w-4 animate-spin" />
@@ -354,7 +356,7 @@ export default function TransactionsPage() {
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" className="text-white border-white/20 hover:bg-white/10">
                 <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
                 Exportar
               </Button>
