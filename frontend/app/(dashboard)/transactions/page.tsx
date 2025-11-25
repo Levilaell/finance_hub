@@ -326,21 +326,21 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>
           <h1 className="text-3xl font-bold text-white">Transações</h1>
           <p className="text-white/70 mt-1">
             Todas as suas transações em um só lugar
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             onClick={() => setShowFilters(!showFilters)}
-            className="text-white border-white/20 hover:bg-white/10"
+            className="text-white border-white/20 hover:bg-white/10 flex-1 sm:flex-none"
           >
-            <FunnelIcon className="h-4 w-4 mr-2" />
-            Filtros
+            <FunnelIcon className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Filtros</span>
           </Button>
           <Button
             variant="outline"
@@ -356,9 +356,9 @@ export default function TransactionsPage() {
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="text-white border-white/20 hover:bg-white/10">
-                <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
-                Exportar
+              <Button variant="outline" className="text-white border-white/20 hover:bg-white/10 flex-1 sm:flex-none">
+                <ArrowDownTrayIcon className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Exportar</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

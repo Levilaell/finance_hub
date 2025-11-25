@@ -238,21 +238,21 @@ export default function BillsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>
           <h1 className="text-3xl font-bold text-white">Contas a Pagar/Receber</h1>
           <p className="text-white/70 mt-1">
             Gerencie suas contas pendentes
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             onClick={() => setShowFilters(!showFilters)}
-            className="text-white border-white/20 hover:bg-white/10"
+            className="text-white border-white/20 hover:bg-white/10 flex-1 sm:flex-none"
           >
-            <FunnelIcon className="h-4 w-4 mr-2" />
-            Filtros
+            <FunnelIcon className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Filtros</span>
           </Button>
           <Button
             variant="outline"
