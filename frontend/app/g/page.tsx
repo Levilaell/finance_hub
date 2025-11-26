@@ -67,7 +67,7 @@ export default function LandingGPage() {
                     className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg px-8 py-6 h-auto shadow-[0_0_30px_rgba(57,224,142,0.3)] hover:shadow-[0_0_40px_rgba(57,224,142,0.5)] transition-all duration-300"
                     asChild
                   >
-                    <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                    <a href="/register">
                       Acabar com a novela
                     </a>
                   </Button>
@@ -170,7 +170,7 @@ export default function LandingGPage() {
               className="text-center mt-12"
             >
               <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
-                <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                <a href="/register">
                   Facilitar minha vida
                 </a>
               </Button>
@@ -249,7 +249,7 @@ export default function LandingGPage() {
                 Configure uma vez. Relatórios prontos para sempre.
               </p>
               <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
-                <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                <a href="/register">
                   Testar agora - 7 dias grátis
                 </a>
               </Button>
@@ -289,7 +289,7 @@ export default function LandingGPage() {
                 </p>
                 <div className="text-center">
                   <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
-                    <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                    <a href="/register">
                       Quero relatórios prontos
                     </a>
                   </Button>
@@ -399,7 +399,7 @@ export default function LandingGPage() {
 
                 <div className="space-y-4">
                   <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6" asChild>
-                    <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                    <a href="/register">
                       Começar Trial de 7 Dias
                     </a>
                   </Button>
@@ -495,7 +495,7 @@ export default function LandingGPage() {
                 className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg md:text-xl px-8 md:px-12 py-6 md:py-8 h-auto shadow-[0_0_30px_rgba(57,224,142,0.3)] hover:shadow-[0_0_40px_rgba(57,224,142,0.5)] transition-all duration-300"
                 asChild
               >
-                <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                <a href="/register">
                   Facilitar Minha Vida Agora
                 </a>
               </Button>

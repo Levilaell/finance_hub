@@ -89,7 +89,7 @@ export const ProblemSolutionSection = () => {
             className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg px-8 py-6 h-auto shadow-[0_0_30px_rgba(74,170,123,0.3)] hover:shadow-[0_0_40px_rgba(74,170,123,0.5)] transition-all duration-300"
             asChild
           >
-            <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+            <a href="/register">
               Quero clareza do meu caixa
             </a>
           </Button>

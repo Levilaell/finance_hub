@@ -29,7 +29,7 @@ export const Header = () => {
               variant="ghost"
               asChild
             >
-              <a href="https://caixahub.com.br/login" target="_blank" rel="noopener noreferrer">
+              <a href="/login">
                 Login
               </a>
             </Button>

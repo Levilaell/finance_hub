@@ -598,7 +598,7 @@ export default function Home() {
 
               <div className="space-y-4">
                 <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6" asChild>
-                  <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                  <a href="/register">
                     Começar Trial de 7 Dias
                   </a>
                 </Button>

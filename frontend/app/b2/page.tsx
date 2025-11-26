@@ -66,7 +66,7 @@ export default function LandingB2Page() {
                     className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg px-8 py-6 h-auto shadow-[0_0_30px_rgba(57,224,142,0.3)] hover:shadow-[0_0_40px_rgba(57,224,142,0.5)] transition-all duration-300"
                     asChild
                   >
-                    <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                    <a href="/register">
                       Ter autonomia financeira agora
                     </a>
                   </Button>
@@ -197,7 +197,7 @@ export default function LandingB2Page() {
               className="text-center mt-12"
             >
               <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
-                <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                <a href="/register">
                   Ter autonomia agora
                 </a>
               </Button>
@@ -338,7 +338,7 @@ export default function LandingB2Page() {
 
                 <div className="space-y-4">
                   <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6" asChild>
-                    <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                    <a href="/register">
                       Começar Trial de 7 Dias
                     </a>
                   </Button>
@@ -431,7 +431,7 @@ export default function LandingB2Page() {
                 className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg md:text-xl px-8 md:px-12 py-6 md:py-8 h-auto shadow-[0_0_30px_rgba(57,224,142,0.3)] hover:shadow-[0_0_40px_rgba(57,224,142,0.5)] transition-all duration-300"
                 asChild
               >
-                <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                <a href="/register">
                   Começar agora - 7 dias grátis
                 </a>
               </Button>

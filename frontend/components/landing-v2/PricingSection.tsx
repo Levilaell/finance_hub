@@ -80,7 +80,7 @@ export const PricingSection = () => {
                   className="bg-primary hover:bg-primary/90 text-primary-foreground text-xl px-12 py-7 h-auto shadow-[0_0_30px_rgba(57,224,142,0.3)] hover:shadow-[0_0_40px_rgba(57,224,142,0.5)] transition-all duration-300 w-full md:w-auto"
                   asChild
                 >
-                  <a href="https://caixahub.com.br/register" target="_blank" rel="noopener noreferrer">
+                  <a href="/register">
                     Começar Trial de 7 Dias
                   </a>
                 </Button>
