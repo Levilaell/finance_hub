@@ -152,34 +152,7 @@ function RegisterContent() {
                 Falta pouco para organizar seu financeiro
               </h2>
 
-              <div className="space-y-6 mb-8">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center mt-1">
-                    <CheckIcon className="w-4 h-4 text-green-500" strokeWidth={3} />
-                  </div>
-                  <p className="text-lg text-foreground">
-                    Configure em 5 minutos
-                  </p>
-                </div>
 
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center mt-1">
-                    <CheckIcon className="w-4 h-4 text-green-500" strokeWidth={3} />
-                  </div>
-                  <p className="text-lg text-foreground">
-                    IA categoriza tudo automaticamente
-                  </p>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center mt-1">
-                    <CheckIcon className="w-4 h-4 text-green-500" strokeWidth={3} />
-                  </div>
-                  <p className="text-lg text-foreground">
-                    Veja seu fluxo de caixa em tempo real
-                  </p>
-                </div>
-              </div>
 
               <div className="inline-flex items-center gap-2 px-4 py-3 bg-primary/10 rounded-full">
                 <p className="text-sm font-semibold">
@@ -201,7 +174,7 @@ function RegisterContent() {
                   Criar uma Conta
                 </h1>
                 <p className="text-muted-foreground text-lg mb-4">
-                  Inicie seu trial gratuito de 7 dias
+                  Inicie seu teste gratuito de 7 dias
                 </p>
               </div>
 
