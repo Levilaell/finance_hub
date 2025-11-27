@@ -195,7 +195,7 @@ export default function LandingBPOPage() {
                   icon: CreditCard,
                   title: "Contas a Receber",
                   description: "Controle vendas a prazo, parcelas de clientes, receitas futuras. Saiba exatamente quanto vai entrar e quando.",
-                  image: null
+                  image: "/landing-images/bills.png"
                 },
                 {
                   icon: TrendingUp,
