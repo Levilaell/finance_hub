@@ -222,12 +222,13 @@ export default function LandingBPOPage() {
                     <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
                     <p className="text-muted-foreground mb-4">{feature.description}</p>
                     {feature.image && (
-                      <div className="relative rounded-lg overflow-hidden border border-border/50 mt-4 aspect-video">
+                      <div className="relative rounded-lg overflow-hidden border border-border/50 mt-4">
                         <Image
                           src={feature.image}
                           alt={feature.title}
-                          fill
-                          className="object-cover"
+                          width={400}
+                          height={225}
+                          className="w-full h-auto"
                         />
                       </div>
                     )}
