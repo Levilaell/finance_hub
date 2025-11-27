@@ -1,0 +1,3 @@
+Price ID,Product ID,Product Name,Product Statement Descriptor,Product Tax Code,Description,Created (UTC),Amount,Currency,Interval,Interval Count,Usage Type,Aggregate Usage,Billing Scheme,Trial Period Days,Tax Behavior
+price_1SXwA6AhSWJIUR4PV1BYoKLt,prod_TBiRqMqrapS7qo,Plano Pro,,,,2025-11-27 03:46,197.00,brl,month,1,licensed,,per_unit,,unspecified
+price_1SFL0AAhSWJIUR4PksUg3P2Z,prod_TBiRqMqrapS7qo,Plano Pro,,,,2025-10-06 20:27,97.00,brl,month,1,licensed,,per_unit,,unspecified

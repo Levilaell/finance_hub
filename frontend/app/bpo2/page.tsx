@@ -9,9 +9,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Footer } from "@/components/landing-v2/Footer";
 import Image from "next/image";
 
-// Price ID para o plano de R$197 - criar no Stripe Dashboard
-// TODO: Substituir pelo price_id real após criar no Stripe
-const PRICE_ID_197 = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_197 || "";
+// Price ID para o plano de R$197 (teste A/B)
+// Fallback para o price_id de produção caso a env var não esteja configurada
+const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4PV1BYoKLt";
 
 export default function LandingBPO2Page() {
   return (
@@ -65,7 +65,7 @@ export default function LandingBPO2Page() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.8 }}
-                  className="space-y-3"
+                  className="space-y-3 flex flex-col items-center lg:items-start"
                 >
                   <Button
                     size="lg"
