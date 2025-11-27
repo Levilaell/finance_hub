@@ -55,7 +55,12 @@ function RegisterContent() {
 
   const onSubmit = async (data: RegisterData) => {
     try {
-      await registerUser(data);
+      // Inclui price_id nos dados de registro para salvar no perfil
+      const registerData = {
+        ...data,
+        price_id: priceId || sessionStorage.getItem('checkout_price_id') || undefined,
+      };
+      await registerUser(registerData);
 
       trackLead({
         content_name: 'Registration Form',

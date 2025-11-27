@@ -24,6 +24,15 @@ class User(AbstractUser):
         default='America/Sao_Paulo'
     )
 
+    # Price ID para teste A/B - salvo no registro para usar no checkout
+    signup_price_id = models.CharField(
+        _('signup price ID'),
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text='Stripe Price ID da landing page onde o usuário se cadastrou'
+    )
+
     class Meta:
         db_table = 'users'
         verbose_name = _('User')

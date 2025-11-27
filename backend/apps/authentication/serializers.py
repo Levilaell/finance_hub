@@ -39,6 +39,13 @@ class RegisterSerializer(serializers.ModelSerializer):
         min_length=8,
         style={'input_type': 'password'}
     )
+    # Price ID para teste A/B (opcional)
+    price_id = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        help_text='Stripe Price ID da landing page de origem'
+    )
 
     class Meta:
         model = User
@@ -47,6 +54,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             'email',
             'phone',
             'password',
+            'price_id',
         )
 
     def validate_email(self, value):
@@ -64,8 +72,15 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """Criar apenas User (sem Company)"""
+        # Extrair price_id antes de criar usuário
+        price_id = validated_data.pop('price_id', None)
+
         # Gerar username a partir do email
         validated_data['username'] = validated_data['email']
+
+        # Salvar price_id no campo correto se fornecido
+        if price_id:
+            validated_data['signup_price_id'] = price_id
 
         # Criar User
         user = User.objects.create_user(**validated_data)

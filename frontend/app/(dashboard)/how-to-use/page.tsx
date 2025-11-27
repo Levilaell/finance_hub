@@ -8,213 +8,360 @@ import {
   CheckCircleIcon,
   InformationCircleIcon,
   ExclamationTriangleIcon,
+  DocumentTextIcon,
+  CogIcon,
+  SparklesIcon,
+  BanknotesIcon,
+  ArrowDownTrayIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 
 export default function ComoUsarPage() {
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
-      <div className="space-y-8">
+      <div className="space-y-8 pb-8">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-white">Como Usar o CaixaHub</h1>
           <p className="text-muted-foreground mt-1">
-            Guia completo para começar a gerenciar suas finanças
+            Guia completo para gerenciar suas finanças de forma simples
           </p>
         </div>
 
-      {/* Quick Start Guide */}
-      <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg p-6">
-        <div className="flex items-start gap-3">
-          <InformationCircleIcon className="h-6 w-6 text-blue-400 mt-0.5 flex-shrink-0" />
-          <div>
-            <h2 className="text-lg font-semibold text-white mb-2">Início Rápido</h2>
-            <p className="text-sm text-muted-foreground">
-              Siga os passos abaixo para configurar sua conta e começar a acompanhar suas finanças automaticamente.
-            </p>
+        {/* Quick Start Guide */}
+        <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg p-6">
+          <div className="flex items-start gap-3">
+            <InformationCircleIcon className="h-6 w-6 text-blue-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <h2 className="text-lg font-semibold text-white mb-2">Primeiros Passos</h2>
+              <p className="text-sm text-muted-foreground">
+                Conecte seu banco, sincronize suas transações e pronto! O CaixaHub organiza tudo automaticamente para você.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Step 1: Connect Bank */}
-      <div className="bg-card border border-white/10 rounded-lg p-6">
-        <div className="flex items-start gap-4">
-          <div className="h-10 w-10 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
-            <span className="text-lg font-bold text-blue-400">1</span>
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <LinkIcon className="h-5 w-5 text-blue-400" />
-              <h3 className="text-xl font-semibold text-white">Conecte sua Conta Bancária</h3>
+        {/* Step 1: Connect Bank */}
+        <div className="bg-card border border-white/10 rounded-lg p-6">
+          <div className="flex items-start gap-4">
+            <div className="h-10 w-10 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
+              <span className="text-lg font-bold text-blue-400">1</span>
             </div>
-            <div className="space-y-3 text-muted-foreground">
-              <p>Para começar a sincronizar suas transações automaticamente:</p>
-              <ol className="list-decimal list-inside space-y-2 ml-2">
-                <li>Acesse a aba <strong className="text-white">Contas Bancárias</strong> no menu lateral</li>
-                <li>Clique no botão <strong className="text-white">Conectar Banco</strong></li>
-                <li>Uma janela da Pluggy será aberta com a lista de bancos disponíveis</li>
-                <li>Selecione seu banco e siga as instruções na tela:
-                  <ul className="list-disc list-inside ml-6 mt-1 space-y-1 text-sm">
-                    <li><strong className="text-white">PIX/QR Code:</strong> Alguns bancos permitem conexão rápida escaneando um QR Code no app do banco</li>
-                    <li><strong className="text-white">Credenciais:</strong> Outros bancos solicitam suas credenciais de acesso (usuário e senha)</li>
-                    <li><strong className="text-white">Autenticação:</strong> Pode ser necessário confirmar via token, SMS ou app do banco</li>
-                  </ul>
-                </li>
-                <li>Aguarde a confirmação da conexão bem-sucedida</li>
-              </ol>
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3 mt-4">
-                <div className="flex gap-2">
-                  <ExclamationTriangleIcon className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium text-amber-300 mb-1">Importante sobre a conexão:</p>
-                    <ul className="space-y-1 text-amber-200/80">
-                      <li>• Alguns bancos podem estar temporariamente indisponíveis devido a manutenções</li>
-                      <li>• A conexão é 100% segura e criptografada via Open Banking regulamentado pelo Banco Central</li>
-                      <li>• Suas credenciais <strong>não são armazenadas</strong> pelo CaixaHub</li>
-                    </ul>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <LinkIcon className="h-5 w-5 text-blue-400" />
+                <h3 className="text-xl font-semibold text-white">Conecte sua Conta Bancária</h3>
+              </div>
+              <div className="space-y-3 text-muted-foreground">
+                <p>Para começar a sincronizar suas transações automaticamente:</p>
+                <ol className="list-decimal list-inside space-y-2 ml-2">
+                  <li>Acesse <strong className="text-white">Contas Bancárias</strong> no menu lateral</li>
+                  <li>Clique em <strong className="text-white">Conectar Banco</strong></li>
+                  <li>Selecione seu banco e siga as instruções</li>
+                  <li>Aguarde a confirmação da conexão</li>
+                </ol>
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3 mt-4">
+                  <div className="flex gap-2">
+                    <ExclamationTriangleIcon className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-amber-300 mb-1">Segurança</p>
+                      <ul className="space-y-1 text-amber-200/80">
+                        <li>Conexão via Open Banking regulamentado pelo Banco Central</li>
+                        <li>Suas credenciais <strong>nunca são armazenadas</strong></li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Step 2: Sync Transactions */}
-      <div className="bg-card border border-white/10 rounded-lg p-6">
-        <div className="flex items-start gap-4">
-          <div className="h-10 w-10 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center flex-shrink-0">
-            <span className="text-lg font-bold text-purple-400">2</span>
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <ArrowPathIcon className="h-5 w-5 text-purple-400" />
-              <h3 className="text-xl font-semibold text-white">Sincronize suas Transações</h3>
+        {/* Step 2: Sync Transactions */}
+        <div className="bg-card border border-white/10 rounded-lg p-6">
+          <div className="flex items-start gap-4">
+            <div className="h-10 w-10 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center flex-shrink-0">
+              <span className="text-lg font-bold text-purple-400">2</span>
             </div>
-            <div className="space-y-3 text-muted-foreground">
-              <p>Após conectar sua conta, é hora de buscar suas transações:</p>
-              <ol className="list-decimal list-inside space-y-2 ml-2">
-                <li>Na aba <strong className="text-white">Contas</strong>, localize o card da sua conta bancária</li>
-                <li>Clique no botão <strong className="text-white">Sincronizar</strong> no card da conta</li>
-                <li>O sistema buscará automaticamente suas transações recentes (geralmente até 90 dias)</li>
-                <li>Acompanhe o progresso da sincronização através das notificações</li>
-                <li>Quando concluído, suas transações aparecerão na aba <strong className="text-white">Transações</strong></li>
-              </ol>
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3 mt-4">
-                <div className="flex gap-2">
-                  <CheckCircleIcon className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium text-blue-300 mb-1">Dicas de sincronização:</p>
-                    <ul className="space-y-1 text-blue-200/80">
-                      <li>• Use <strong>Sincronizar Tudo</strong> para atualizar todas as contas de uma vez</li>
-                      <li>• A primeira sincronização pode demorar alguns minutos</li>
-                      <li>• Sincronizações seguintes são mais rápidas, buscando apenas novas transações</li>
-                      <li>• Recomendamos sincronizar pelo menos 1x por semana para manter os dados atualizados</li>
-                    </ul>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowPathIcon className="h-5 w-5 text-purple-400" />
+                <h3 className="text-xl font-semibold text-white">Sincronize suas Transações</h3>
+              </div>
+              <div className="space-y-3 text-muted-foreground">
+                <p>Após conectar, suas transações são importadas automaticamente:</p>
+                <ol className="list-decimal list-inside space-y-2 ml-2">
+                  <li>Clique em <strong className="text-white">Sincronizar</strong> no card da conta</li>
+                  <li>O sistema busca até 90 dias de transações</li>
+                  <li>As transações aparecem na aba <strong className="text-white">Transações</strong></li>
+                </ol>
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3 mt-4">
+                  <div className="flex gap-2">
+                    <CheckCircleIcon className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-blue-200/80">
+                      <strong className="text-blue-300">Dica:</strong> Use "Sincronizar Tudo" para atualizar todas as contas de uma vez
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Step 3: View Reports */}
-      <div className="bg-card border border-white/10 rounded-lg p-6">
-        <div className="flex items-start gap-4">
-          <div className="h-10 w-10 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center flex-shrink-0">
-            <span className="text-lg font-bold text-green-400">3</span>
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
+        {/* Features Section */}
+        <div className="border-t border-white/10 pt-8">
+          <h2 className="text-2xl font-bold text-white mb-6">Funcionalidades</h2>
+        </div>
+
+        {/* Dashboard */}
+        <div className="bg-card border border-white/10 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-10 w-10 rounded-lg bg-green-500/20 border border-green-500/30 flex items-center justify-center">
               <ChartBarIcon className="h-5 w-5 text-green-400" />
-              <h3 className="text-xl font-semibold text-white">Visualize seus Relatórios</h3>
             </div>
-            <div className="space-y-3 text-muted-foreground">
-              <p>Agora você pode analisar suas finanças em diferentes abas:</p>
-              <div className="space-y-3 ml-2">
-                <div>
-                  <h4 className="font-semibold text-white mb-1">📊 Dashboard</h4>
-                  <p className="text-sm">Visão geral das suas finanças com gráficos de receitas, despesas e saldo</p>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-white mb-1">💳 Transações</h4>
-                  <p className="text-sm">Lista completa de todas as suas movimentações com filtros por data, categoria e tipo</p>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-white mb-1">📈 Relatórios</h4>
-                  <p className="text-sm">Análises detalhadas por período, categoria e tendências de gastos</p>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-white mb-1">💰 Contas</h4>
-                  <p className="text-sm">Gerenciamento das suas contas conectadas, saldos e limites de crédito</p>
-                </div>
-              </div>
+            <h3 className="text-xl font-semibold text-white">Dashboard</h3>
+          </div>
+          <p className="text-muted-foreground mb-3">Visão completa das suas finanças em uma única tela:</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-green-400" />
+              <span>Saldo total e resultado mensal</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-green-400" />
+              <span>Receitas e despesas do mês</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-green-400" />
+              <span>Contas a receber/pagar/vencidas</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-green-400" />
+              <span>Últimas 7 transações</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-green-400" />
+              <span>Top 5 categorias de gastos</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-green-400" />
+              <span>Atalhos rápidos</span>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Step 4: Manage Categories */}
-      <div className="bg-card border border-white/10 rounded-lg p-6">
-        <div className="flex items-start gap-4">
-          <div className="h-10 w-10 rounded-full bg-orange-500/20 border border-orange-500/30 flex items-center justify-center flex-shrink-0">
-            <span className="text-lg font-bold text-orange-400">4</span>
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <TagIcon className="h-5 w-5 text-orange-400" />
-              <h3 className="text-xl font-semibold text-white">Organize suas Categorias</h3>
+        {/* Transactions */}
+        <div className="bg-card border border-white/10 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-10 w-10 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+              <BanknotesIcon className="h-5 w-5 text-blue-400" />
             </div>
-            <div className="space-y-3 text-muted-foreground">
-              <p>Personalize como suas transações são categorizadas:</p>
-              <ol className="list-decimal list-inside space-y-2 ml-2">
-                <li>Acesse a aba <strong className="text-white">Categorias</strong></li>
-                <li>O sistema já categoriza automaticamente a maioria das transações</li>
-                <li>Você pode recategorizar transações manualmente se necessário</li>
-                <li>Crie categorias personalizadas para melhor organização</li>
-                <li>Use as categorias para analisar seus gastos por área (alimentação, transporte, etc.)</li>
-              </ol>
+            <h3 className="text-xl font-semibold text-white">Transações</h3>
+          </div>
+          <p className="text-muted-foreground mb-3">Todas as suas movimentações organizadas:</p>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-blue-400" />
+              <span><strong className="text-white">Filtros:</strong> por conta, tipo, categoria e período</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-blue-400" />
+              <span><strong className="text-white">Busca:</strong> por descrição, categoria ou estabelecimento</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-blue-400" />
+              <span><strong className="text-white">Categorização:</strong> automática + edição manual</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-blue-400" />
+              <span><strong className="text-white">Exportar:</strong> CSV ou Excel</span>
+            </li>
+          </ul>
+        </div>
+
+        {/* Bills */}
+        <div className="bg-card border border-white/10 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-10 w-10 rounded-lg bg-orange-500/20 border border-orange-500/30 flex items-center justify-center">
+              <CalendarDaysIcon className="h-5 w-5 text-orange-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-white">Contas a Pagar/Receber</h3>
+          </div>
+          <p className="text-muted-foreground mb-3">Gerencie suas contas e compromissos financeiros:</p>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-orange-400" />
+              <span><strong className="text-white">Recorrência:</strong> única, semanal, mensal ou anual</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-orange-400" />
+              <span><strong className="text-white">Status:</strong> Pendente, Parcial ou Pago</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-orange-400" />
+              <span><strong className="text-white">Pagamentos parciais:</strong> registre valores pagos aos poucos</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-orange-400" />
+              <span><strong className="text-white">Filtros:</strong> por tipo, status e nome</span>
+            </li>
+          </ul>
+        </div>
+
+        {/* Categories */}
+        <div className="bg-card border border-white/10 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-10 w-10 rounded-lg bg-pink-500/20 border border-pink-500/30 flex items-center justify-center">
+              <TagIcon className="h-5 w-5 text-pink-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-white">Categorias</h3>
+          </div>
+          <p className="text-muted-foreground mb-3">Personalize a organização das suas transações:</p>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-pink-400" />
+              <span>Crie categorias personalizadas</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-pink-400" />
+              <span>Separe por tipo: Receitas vs Despesas</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-pink-400" />
+              <span>Escolha cor (16 opções) e emoji (24 opções)</span>
+            </li>
+          </ul>
+        </div>
+
+        {/* Reports */}
+        <div className="bg-card border border-white/10 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-10 w-10 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
+              <DocumentTextIcon className="h-5 w-5 text-cyan-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-white">Relatórios</h3>
+          </div>
+          <p className="text-muted-foreground mb-3">Análises detalhadas em 4 abas:</p>
+          <div className="space-y-3 text-sm">
+            <div className="bg-white/5 rounded-md p-3">
+              <h4 className="font-semibold text-white mb-1">Visão Geral</h4>
+              <p className="text-muted-foreground">Receitas vs Despesas mensal e Evolução do saldo</p>
+            </div>
+            <div className="bg-white/5 rounded-md p-3">
+              <h4 className="font-semibold text-white mb-1">Categorias</h4>
+              <p className="text-muted-foreground">Top gastos/receitas com gráficos de pizza</p>
+            </div>
+            <div className="bg-white/5 rounded-md p-3">
+              <h4 className="font-semibold text-white mb-1">Fluxo de Caixa</h4>
+              <p className="text-muted-foreground">Projeção 12 meses e Realizado vs Previsto</p>
+            </div>
+            <div className="bg-white/5 rounded-md p-3">
+              <h4 className="font-semibold text-white mb-1">Comparativo</h4>
+              <p className="text-muted-foreground">Análise período vs período anterior</p>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+            <ArrowDownTrayIcon className="h-4 w-4 text-cyan-400" />
+            <span><strong className="text-white">Exportar:</strong> PDF, Excel ou CSV</span>
+          </div>
+        </div>
+
+        {/* AI Insights */}
+        <div className="bg-card border border-white/10 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-10 w-10 rounded-lg bg-violet-500/20 border border-violet-500/30 flex items-center justify-center">
+              <SparklesIcon className="h-5 w-5 text-violet-400" />
+            </div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-xl font-semibold text-white">Insights IA</h3>
+              <span className="text-xs bg-violet-500/20 text-violet-300 px-2 py-0.5 rounded-full">Beta</span>
+            </div>
+          </div>
+          <p className="text-muted-foreground mb-3">Análise inteligente das suas finanças:</p>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-violet-400" />
+              <span>Score de saúde financeira (0-10)</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-violet-400" />
+              <span>Alertas e oportunidades de economia</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-violet-400" />
+              <span>Previsões e recomendações personalizadas</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-violet-400" />
+              <span>Histórico de insights anteriores</span>
+            </li>
+          </ul>
+        </div>
+
+        {/* Settings */}
+        <div className="bg-card border border-white/10 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-10 w-10 rounded-lg bg-gray-500/20 border border-gray-500/30 flex items-center justify-center">
+              <CogIcon className="h-5 w-5 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-white">Configuracoes</h3>
+          </div>
+          <p className="text-muted-foreground mb-3">Gerencie sua conta:</p>
+          <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-gray-400" />
+              <span>Editar perfil</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-gray-400" />
+              <span>Alterar senha</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-gray-400" />
+              <span>Gerenciar assinatura</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-gray-400" />
+              <span>Excluir conta</span>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Tips and Best Practices */}
-      <div className="bg-gradient-to-r from-indigo-500/10 to-cyan-500/10 border border-indigo-500/20 rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-white mb-4">💡 Dicas e Boas Práticas</h2>
-        <ul className="space-y-2 text-muted-foreground">
-          <li className="flex items-start gap-2">
-            <CheckCircleIcon className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
-            <span><strong className="text-white">Sincronize regularmente:</strong> Mantenha seus dados atualizados sincronizando pelo menos 1x por semana</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <CheckCircleIcon className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
-            <span><strong className="text-white">Revise as categorias:</strong> Verifique se as transações foram categorizadas corretamente</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <CheckCircleIcon className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
-            <span><strong className="text-white">Acompanhe o dashboard:</strong> Use o dashboard para ter uma visão rápida da sua saúde financeira</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <CheckCircleIcon className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
-            <span><strong className="text-white">Segurança:</strong> Todas as conexões são seguras e regulamentadas pelo Open Banking do Banco Central</span>
-          </li>
-        </ul>
-      </div>
+        {/* Tips */}
+        <div className="bg-gradient-to-r from-indigo-500/10 to-cyan-500/10 border border-indigo-500/20 rounded-lg p-6">
+          <h2 className="text-xl font-semibold text-white mb-4">Dicas</h2>
+          <ul className="space-y-2 text-muted-foreground">
+            <li className="flex items-start gap-2">
+              <CheckCircleIcon className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+              <span><strong className="text-white">Sincronize semanalmente</strong> para manter os dados atualizados</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircleIcon className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+              <span><strong className="text-white">Revise as categorias</strong> para relatórios mais precisos</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircleIcon className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+              <span><strong className="text-white">Use Contas a Pagar</strong> para não esquecer compromissos</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircleIcon className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+              <span><strong className="text-white">Confira os Insights IA</strong> para dicas de economia</span>
+            </li>
+          </ul>
+        </div>
 
-      {/* Support */}
-      <div className="bg-card border border-white/10 rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-white mb-3">🆘 Precisa de Ajuda?</h2>
-        <p className="text-muted-foreground">
-          Se você tiver problemas ao conectar sua conta ou sincronizar transações:
-        </p>
-        <ul className="mt-3 space-y-2 text-muted-foreground ml-6 list-disc">
-          <li>Verifique se seu banco está em manutenção ou se há problemas temporários</li>
-          <li>Tente desconectar e reconectar a conta</li>
-          <li>Certifique-se de que suas credenciais estão corretas</li>
-          <li>Aguarde alguns minutos entre tentativas de sincronização</li>
-        </ul>
-      </div>
+        {/* Support */}
+        <div className="bg-card border border-white/10 rounded-lg p-6">
+          <h2 className="text-xl font-semibold text-white mb-3">Precisa de Ajuda?</h2>
+          <p className="text-muted-foreground">
+            Se tiver problemas ao conectar sua conta ou sincronizar:
+          </p>
+          <ul className="mt-3 space-y-2 text-muted-foreground ml-6 list-disc text-sm">
+            <li>Verifique se seu banco esta disponivel</li>
+            <li>Tente desconectar e reconectar a conta</li>
+            <li>Aguarde alguns minutos entre tentativas</li>
+          </ul>
+        </div>
       </div>
     </div>
   );

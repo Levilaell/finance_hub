@@ -47,8 +47,12 @@ def create_checkout_session(request):
         # Get or create Stripe customer
         customer = get_or_create_customer(request.user)
 
-        # Get price ID
-        price_id = request.data.get('price_id', getattr(settings, 'STRIPE_DEFAULT_PRICE_ID', None))
+        # Get price ID: request > user signup > default
+        price_id = (
+            request.data.get('price_id') or
+            getattr(request.user, 'signup_price_id', None) or
+            getattr(settings, 'STRIPE_DEFAULT_PRICE_ID', None)
+        )
 
         if not price_id:
             return Response(

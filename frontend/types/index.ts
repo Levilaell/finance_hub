@@ -38,6 +38,7 @@ export interface RegisterData {
   email: string;
   phone: string;
   password: string;
+  price_id?: string; // Para teste A/B de preços
 }
 
 export interface LoginResponse {
