@@ -217,12 +217,12 @@ export default function LandingBPOPage() {
                   viewport={{ once: true }}
                   transition={{ duration: 0.6, delay: index * 0.1 }}
                 >
-                  <Card className="p-6 h-full">
+                  <Card className="p-6 h-full flex flex-col">
                     <feature.icon className="w-10 h-10 text-primary mb-4" />
                     <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                    <p className="text-muted-foreground mb-4">{feature.description}</p>
+                    <p className="text-muted-foreground mb-4 flex-grow">{feature.description}</p>
                     {feature.image && (
-                      <div className="relative rounded-lg overflow-hidden border border-border/50 mt-4">
+                      <div className="relative rounded-lg overflow-hidden border border-border/50 mt-auto">
                         <Image
                           src={feature.image}
                           alt={feature.title}
