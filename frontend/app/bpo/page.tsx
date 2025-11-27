@@ -200,13 +200,13 @@ export default function LandingBPOPage() {
                 {
                   icon: FileSpreadsheet,
                   title: "Relatórios Completos",
-                  description: "DRE, comparativo mensal, evolução de saldo, top categorias. Exporta PDF, Excel ou CSV pro seu contador.",
+                  description: "DRE, comparativo mensal, evolução de saldo, top categorias. Exporta PDF, Excel ou CSV pro seu contador. Tudo pronto em 2 cliques.",
                   image: "/landing-images/reports.png"
                 },
                 {
                   icon: Building2,
                   title: "Conexão Bancária Automática",
-                  description: "Conecta Nubank, Itaú, Bradesco, Inter e +100 bancos via Open Banking. Regulado pelo Banco Central. Seus dados seguros.",
+                  description: "Conecta Nubank, Itaú, Bradesco, Inter e +100 bancos via Open Banking. Regulado pelo Banco Central. Seus dados sempre seguros.",
                   image: "/landing-images/bank-connect.png"
                 }
               ].map((feature, index) => (
