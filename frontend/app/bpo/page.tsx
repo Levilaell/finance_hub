@@ -3,7 +3,7 @@
 import { Header } from "@/components/landing-v2/Header";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, X, Check, Building2, Bot, LayoutDashboard, FileSpreadsheet, Calendar, TrendingUp, CreditCard, Shield, Sparkles } from "lucide-react";
+import { CheckCircle2, X, Check, Building2, Bot, LayoutDashboard, FileSpreadsheet, Calendar, Shield, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Footer } from "@/components/landing-v2/Footer";
@@ -187,21 +187,9 @@ export default function LandingBPOPage() {
               {[
                 {
                   icon: Calendar,
-                  title: "Contas a Pagar",
-                  description: "Cadastre despesas fixas, parcelas, boletos. Com recorrência automática (semanal, mensal, anual). Nunca mais esqueça um vencimento.",
+                  title: "Contas a Pagar e Receber",
+                  description: "Cadastre despesas fixas, parcelas, boletos, vendas a prazo e receitas futuras. Com recorrência automática. Nunca mais esqueça um vencimento.",
                   image: "/landing-images/bills.png"
-                },
-                {
-                  icon: CreditCard,
-                  title: "Contas a Receber",
-                  description: "Controle vendas a prazo, parcelas de clientes, receitas futuras. Saiba exatamente quanto vai entrar e quando.",
-                  image: "/landing-images/bills.png"
-                },
-                {
-                  icon: TrendingUp,
-                  title: "Fluxo de Caixa Projetado",
-                  description: "Visão dos próximos 12 meses. Veja antes se vai faltar dinheiro. Compare previsto vs realizado.",
-                  image: "/landing-images/reports.png"
                 },
                 {
                   icon: Bot,
