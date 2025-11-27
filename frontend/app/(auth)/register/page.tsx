@@ -19,19 +19,28 @@ import { validatePhone, phoneMask } from '@/utils/validation';
 import { trackLead, trackViewContent } from '@/lib/meta-pixel';
 import { AuthHeader } from '@/components/landing-v2/AuthHeader';
 import { Footer } from '@/components/landing-v2/Footer';
-import { startStripeCheckout } from '@/utils/checkout';
+import { startStripeCheckout, getPriceIdFromUrl } from '@/utils/checkout';
 
 function RegisterContent() {
   const router = useRouter();
   const { register: registerUser, isLoading } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [phoneValue, setPhoneValue] = useState('');
+  const [priceId, setPriceId] = useState<string | null>(null);
 
   useEffect(() => {
     trackViewContent({
       content_name: 'Register Page',
       content_category: 'Registration',
     });
+
+    // Captura price_id da URL para teste A/B de preços
+    const urlPriceId = getPriceIdFromUrl();
+    if (urlPriceId) {
+      setPriceId(urlPriceId);
+      // Armazena em sessionStorage para usar no checkout
+      sessionStorage.setItem('checkout_price_id', urlPriceId);
+    }
   }, []);
 
   const {
@@ -60,9 +69,14 @@ function RegisterContent() {
       });
 
       // Redirecionar direto para o checkout da Stripe
-      await startStripeCheckout(() => {
-        // Em caso de erro no checkout, redireciona para dashboard
-        router.push('/dashboard');
+      // Usa price_id da URL (teste A/B) ou sessionStorage se disponível
+      const checkoutPriceId = priceId || sessionStorage.getItem('checkout_price_id') || undefined;
+      await startStripeCheckout({
+        priceId: checkoutPriceId,
+        onError: () => {
+          // Em caso de erro no checkout, redireciona para dashboard
+          router.push('/dashboard');
+        }
       });
     } catch (error: any) {
       console.error('Erro no registro:', error.response?.data);

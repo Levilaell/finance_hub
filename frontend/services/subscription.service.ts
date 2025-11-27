@@ -31,10 +31,11 @@ class SubscriptionService {
     return apiClient.get<SubscriptionStatus>("/api/subscriptions/status/");
   }
 
-  async createCheckoutSession(successUrl?: string, cancelUrl?: string) {
+  async createCheckoutSession(successUrl?: string, cancelUrl?: string, priceId?: string) {
     return apiClient.post<{ checkout_url: string; session_id: string }>("/api/subscriptions/checkout/", {
       success_url: successUrl,
       cancel_url: cancelUrl,
+      price_id: priceId,
     });
   }
 

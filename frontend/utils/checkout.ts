@@ -1,13 +1,25 @@
 import { subscriptionService } from '@/services/subscription.service';
 import { toast } from 'sonner';
 
+interface CheckoutOptions {
+  priceId?: string;
+  onError?: (error: any) => void;
+}
+
 /**
  * Inicia o checkout do Stripe e redireciona o usuário
- * @param onError - Callback opcional para tratamento de erro customizado
+ * @param options - Opções do checkout (priceId para teste A/B, onError callback)
  */
-export async function startStripeCheckout(onError?: (error: any) => void) {
+export async function startStripeCheckout(options?: CheckoutOptions | ((error: any) => void)) {
+  // Suporta tanto o formato antigo (só callback) quanto o novo (objeto de opções)
+  const opts: CheckoutOptions = typeof options === 'function' ? { onError: options } : (options || {});
+
   try {
-    const result = await subscriptionService.createCheckoutSession();
+    const result = await subscriptionService.createCheckoutSession(
+      undefined,
+      undefined,
+      opts.priceId
+    );
 
     if (result.checkout_url) {
       // Redireciona para Stripe Checkout hospedado
@@ -25,8 +37,17 @@ export async function startStripeCheckout(onError?: (error: any) => void) {
     });
 
     // Chama callback customizado se fornecido
-    if (onError) {
-      onError(error);
+    if (opts.onError) {
+      opts.onError(error);
     }
   }
+}
+
+/**
+ * Obtém o price_id da URL se existir
+ */
+export function getPriceIdFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('price_id');
 }
