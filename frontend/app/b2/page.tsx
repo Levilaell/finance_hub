@@ -81,7 +81,7 @@ export default function LandingB2Page() {
               >
                 <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card">
                   <Image
-                    src="/landing-images/hero-a.png"
+                    src="/landing-images/dashboard.png"
                     alt="Dashboard CaixaHub - Autonomia Financeira"
                     width={1200}
                     height={675}

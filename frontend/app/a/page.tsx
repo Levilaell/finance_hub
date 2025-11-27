@@ -82,7 +82,7 @@ export default function LandingAPage() {
               >
                 <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card">
                   <Image
-                    src="/landing-images/hero-a.png"
+                    src="/landing-images/dashboard.png"
                     alt="Dashboard CaixaHub - Visão Unificada de Contas"
                     width={1200}
                     height={675}
@@ -278,7 +278,7 @@ export default function LandingAPage() {
                 </p>
                 <div className="relative rounded-lg overflow-hidden border border-border/50 bg-card mb-4">
                   <Image
-                    src="/landing-images/contas-a.png"
+                    src="/landing-images/bank-accounts.png"
                     alt="Dashboard com múltiplas contas integradas"
                     width={1200}
                     height={675}

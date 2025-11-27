@@ -35,7 +35,7 @@ export const DemoSection = () => {
             className="relative rounded-2xl overflow-hidden border border-border shadow-2xl bg-card"
           >
             <Image
-              src="/landing-images/modal-pluggy.png"
+              src="/landing-images/bank-connect.png"
               alt="Demonstração do Dashboard CaixaHub - Modal de Integração Pluggy"
               width={1200}
               height={675}
