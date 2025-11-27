@@ -145,16 +145,35 @@ class BankingService {
       return response.results;
     }
 
-    // 2. Se tem filtros de data, fazer 1 requisição grande (assume que período filtrado tem menos dados)
+    // 2. Se tem filtros de data, buscar todas as páginas (max_page_size do backend é 1000)
     if (filters?.date_from || filters?.date_to) {
-      const response = await apiClient.get<PaginatedResponse<Transaction>>(
-        "/api/banking/transactions/",
-        {
-          ...filters,
-          page_size: 5000 // Grande o suficiente para pegar período filtrado
+      const allTransactions: Transaction[] = [];
+      let page = 1;
+      let hasMore = true;
+      const pageSize = 1000; // Máximo permitido pelo backend
+
+      while (hasMore) {
+        const response = await apiClient.get<PaginatedResponse<Transaction>>(
+          "/api/banking/transactions/",
+          {
+            ...filters,
+            page_size: pageSize,
+            page: page
+          }
+        );
+
+        allTransactions.push(...response.results);
+        hasMore = response.results.length === pageSize;
+        page++;
+
+        // Proteção contra loop infinito
+        if (page > 50) {
+          console.warn('⚠️ Limite de 50 páginas atingido (50.000 transações)');
+          break;
         }
-      );
-      return response.results;
+      }
+
+      return allTransactions;
     }
 
     // 3. Sem filtros: buscar todas as transações em batches (para /transactions page)
