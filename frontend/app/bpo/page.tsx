@@ -183,7 +183,7 @@ export default function LandingBPOPage() {
               </h2>
             </motion.div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
               {[
                 {
                   icon: Calendar,
@@ -206,7 +206,7 @@ export default function LandingBPOPage() {
                 {
                   icon: Building2,
                   title: "Conexão Bancária Automática",
-                  description: "Conecta Nubank, Itaú, Bradesco, Inter e +300 bancos via Open Banking. Regulado pelo Banco Central. Seus dados seguros.",
+                  description: "Conecta Nubank, Itaú, Bradesco, Inter e +100 bancos via Open Banking. Regulado pelo Banco Central. Seus dados seguros.",
                   image: "/landing-images/bank-connect.png"
                 }
               ].map((feature, index) => (
