@@ -325,8 +325,8 @@ export default function TermsOfService() {
               <Link href="/terms" className="hover:text-foreground">
                 Termos de Serviço
               </Link>
-              <Link href="/pricing" className="hover:text-foreground">
-                Planos
+              <Link href="/register" className="hover:text-foreground">
+                Começar
               </Link>
             </div>
             <div className="text-sm text-muted-foreground">

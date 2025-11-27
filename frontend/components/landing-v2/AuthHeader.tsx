@@ -23,7 +23,7 @@ export const AuthHeader = () => {
               <Link href="/login">Login</Link>
             </Button>
             <Button className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
-              <Link href="/pricing">Ver Planos</Link>
+              <Link href="/register">Começar Agora</Link>
             </Button>
           </div>
         </div>

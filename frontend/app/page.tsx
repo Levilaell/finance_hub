@@ -44,18 +44,15 @@ export default function Home() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-4">
-              <a href="#pricing" className="text-sm font-medium px-3 text-foreground/80 hover:text-primary transition-colors">
-                Preços
-              </a>
               <Button asChild variant="outline" className="flex h-10 min-w-[100px] items-center justify-center rounded-lg px-5 text-sm font-medium transition-colors">
                 <Link href="/login">
                   Login
                 </Link>
               </Button>
               <Button asChild className="flex h-10 min-w-[120px] items-center justify-center rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition-transform hover:scale-105">
-                <a href="#pricing">
+                <Link href="/register">
                   Comece Agora
-                </a>
+                </Link>
               </Button>
             </div>
 
@@ -76,22 +73,15 @@ export default function Home() {
           {/* Mobile Navigation */}
           {mobileMenuOpen && (
             <div className="md:hidden mt-4 pb-4 flex flex-col gap-3 border-t border-primary/20 pt-4">
-              <a
-                href="#pricing"
-                className="text-sm font-medium px-3 py-2 text-foreground/80 hover:text-primary transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Preços
-              </a>
               <Button asChild variant="outline" className="w-full h-10 justify-center rounded-lg text-sm font-medium">
                 <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                   Login
                 </Link>
               </Button>
               <Button asChild className="w-full h-10 justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-                <a href="#pricing" onClick={() => setMobileMenuOpen(false)}>
+                <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
                   Comece Agora
-                </a>
+                </Link>
               </Button>
             </div>
           )}
@@ -139,20 +129,10 @@ export default function Home() {
                 size="lg"
                 className="h-14 px-8 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_30px_rgba(74,170,123,0.3)] hover:shadow-[0_0_40px_rgba(74,170,123,0.5)] transition-all duration-300 group"
               >
-                <a href="#pricing" className="flex items-center gap-2">
+                <Link href="/register" className="flex items-center gap-2">
                   Comece Grátis
                   <ArrowRightIcon className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                </a>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="h-14 px-8 text-lg font-semibold border-2 hover:bg-primary/5"
-              >
-                <a href="#pricing">
-                  Ver Preços
-                </a>
+                </Link>
               </Button>
             </div>
 
@@ -473,7 +453,7 @@ export default function Home() {
           </div>
           <div className="mt-12 flex justify-center">
             <Button asChild className="flex h-12 min-w-[200px] items-center justify-center rounded-lg bg-primary px-8 text-base font-bold text-primary-foreground shadow-lg transition-transform hover:scale-105">
-              <Link href="#pricing">
+              <Link href="/register">
                 Começar Agora - É Grátis
               </Link>
             </Button>
@@ -643,7 +623,7 @@ export default function Home() {
               </div>
             </div>
             <Button asChild size="lg" className="h-14 min-w-[240px] text-lg font-bold shadow-xl hover:scale-105 transition-transform">
-              <Link href="#pricing">
+              <Link href="/register">
                 Começar Teste Grátis
                 <ArrowRightIcon className="ml-2 h-5 w-5" />
               </Link>
@@ -711,7 +691,7 @@ export default function Home() {
               Não viu seu tipo de negócio aqui? O CaixaHub funciona para qualquer varejo!
             </p>
             <Button asChild variant="outline" size="lg">
-              <Link href="#pricing">
+              <Link href="/register">
                 Começar Agora
               </Link>
             </Button>
@@ -808,7 +788,7 @@ export default function Home() {
             Junte-se a milhares de empresas brasileiras que confiam no CaixaHub para simplificar sua gestão financeira.
           </p>
           <Button asChild className="mt-4 flex h-12 min-w-[200px] items-center justify-center rounded-lg bg-primary px-8 text-base font-bold text-primary-foreground shadow-lg transition-transform hover:scale-105">
-            <Link href="#pricing">
+            <Link href="/register">
               Experimente de Graça
             </Link>
           </Button>
@@ -820,12 +800,6 @@ export default function Home() {
         <div className="container mx-auto max-w-5xl px-4 py-10 text-center sm:px-6">
           <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-              <Link href="#produto" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                Produto
-              </Link>
-              <Link href="#pricing" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                Preços
-              </Link>
               <a href="https://wa.me/5517992679645" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                 Contato
               </a>

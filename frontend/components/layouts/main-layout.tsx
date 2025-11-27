@@ -299,8 +299,8 @@ export function MainLayout({ children }: MainLayoutProps) {
                 <Link href="/privacy" className="hover:text-foreground transition-colors">
                   Política de Privacidade
                 </Link>
-                <Link href="/pricing" className="hover:text-foreground transition-colors">
-                  Plano
+                <Link href="/settings" className="hover:text-foreground transition-colors">
+                  Configurações
                 </Link>
               </div>
             </div>

@@ -54,7 +54,7 @@ export default function CheckoutCancelPage() {
             </Button>
 
             <Button
-              onClick={() => router.push('/pricing')}
+              onClick={() => router.push('/register')}
               variant="outline"
               className="w-full"
             >

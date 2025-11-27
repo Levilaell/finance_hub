@@ -63,7 +63,7 @@ export function SubscriptionManagement() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={() => window.location.href = '/pricing'}>
+          <Button onClick={() => window.location.href = '/register'}>
             Ver Planos
           </Button>
         </CardContent>
