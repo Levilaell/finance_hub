@@ -3,14 +3,15 @@
 import { Header } from "@/components/landing-v2/Header";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, X, Check, Building2, Bot, FileSpreadsheet, Quote, Sparkles } from "lucide-react";
+import { CheckCircle2, X, Check, Building2, Bot, LayoutDashboard, Clock, Zap, TrendingUp, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Footer } from "@/components/landing-v2/Footer";
 import Image from "next/image";
 
-export default function LandingGPage() {
+const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4PV1BYoKLt";
+
+export default function LandingTempoPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -28,20 +29,24 @@ export default function LandingGPage() {
                 className="space-y-8"
               >
                 <div className="space-y-6">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-destructive/10 text-destructive rounded-full text-sm font-medium">
+                    <Clock className="w-4 h-4" />
+                    32 horas por mês perdidas
+                  </div>
                   <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight">
-                    Gestor financeiro: cansado da{" "}
-                    <span className="text-primary">novela todo mês</span> de fechar relatório?
+                    Você está gastando 8 horas por semana{" "}
+                    <span className="text-primary">organizando planilha?</span>
                   </h1>
                   <p className="text-xl lg:text-2xl text-muted-foreground leading-relaxed">
-                    O CaixaHub entrega categorias prontas, extratos limpos, dados organizados. Você só exporta.
+                    BPO financeiro tradicional não resolve isso - ele só terceiriza a bagunça. O CaixaHub conecta no banco, categoriza tudo com IA e você só acompanha.
                   </p>
                 </div>
 
                 <div className="space-y-4">
                   {[
-                    "Categorização automática (sem revisar linha por linha)",
-                    "Extratos sempre limpos e atualizados",
-                    "Relatório pronto em 2 cliques (não em 2 dias)"
+                    "Setup em 5 minutos, não em dias",
+                    "Categorização automática por IA",
+                    "Relatórios prontos em 2 cliques"
                   ].map((benefit, index) => (
                     <motion.div
                       key={index}
@@ -60,17 +65,20 @@ export default function LandingGPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.6 }}
-                  className="flex justify-center lg:justify-start"
+                  className="space-y-3 flex flex-col items-center lg:items-start"
                 >
                   <Button
                     size="lg"
                     className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg px-8 py-6 h-auto shadow-[0_0_30px_rgba(57,224,142,0.3)] hover:shadow-[0_0_40px_rgba(57,224,142,0.5)] transition-all duration-300"
                     asChild
                   >
-                    <a href="/register">
-                      Acabar com a novela
+                    <a href={`/register?price_id=${PRICE_ID_197}`}>
+                      Recuperar meu tempo agora
                     </a>
                   </Button>
+                  <p className="text-sm text-muted-foreground">
+                    7 dias grátis • Cancele quando quiser
+                  </p>
                 </motion.div>
               </motion.div>
 
@@ -83,21 +91,20 @@ export default function LandingGPage() {
                 <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card">
                   <Image
                     src="/landing-images/dashboard.png"
-                    alt="Relatórios prontos para exportar"
+                    alt="Dashboard CaixaHub - Economize tempo"
                     width={1200}
                     height={675}
                     className="w-full h-auto"
                     priority
                   />
                 </div>
-
                 <div className="absolute -inset-4 bg-primary/10 blur-3xl -z-10 rounded-full" />
               </motion.div>
             </div>
           </div>
         </section>
 
-        {/* Problem/Solution Section */}
+        {/* Time Breakdown Section */}
         <section className="py-24 bg-muted/30">
           <div className="container mx-auto px-4">
             <motion.div
@@ -105,80 +112,59 @@ export default function LandingGPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
-              className="text-center mb-16"
+              className="max-w-4xl mx-auto"
             >
-              <h2 className="text-4xl lg:text-5xl font-bold mb-6">
-                Todo mês o mesmo pesadelo
+              <h2 className="text-4xl lg:text-5xl font-bold mb-12 text-center">
+                Pra onde vai seu tempo toda semana?
               </h2>
-            </motion.div>
 
-            <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
-              >
-                <Card className="p-8 h-full border-destructive/50 bg-destructive/5">
-                  <h3 className="text-2xl font-bold mb-6 text-destructive">SEM CAIXAHUB</h3>
-                  <div className="space-y-4">
-                    {[
-                      "Cobrar extratos de cada setor/conta",
-                      "Categorizar centenas de linhas manualmente",
-                      "Corrigir erros e inconsistências",
-                      "Trabalhar até meia-noite para entregar relatório"
-                    ].map((problem, index) => (
-                      <div key={index} className="flex items-start gap-3">
-                        <X className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-                        <p className="text-foreground/80">{problem}</p>
+              <div className="space-y-6">
+                {[
+                  { task: "Baixar extratos de cada banco", time: "1h", pain: true },
+                  { task: "Copiar e colar em planilha", time: "2h", pain: true },
+                  { task: "Categorizar transação por transação", time: "3h", pain: true },
+                  { task: "Montar relatório para ver como está o mês", time: "2h", pain: true },
+                  { task: "Descobrir de onde veio uma cobrança estranha", time: "∞", pain: true }
+                ].map((item, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <Card className="p-4 flex items-center justify-between border-destructive/30 bg-destructive/5">
+                      <div className="flex items-center gap-3">
+                        <X className="w-5 h-5 text-destructive" />
+                        <span className="text-foreground">{item.task}</span>
                       </div>
-                    ))}
-                  </div>
+                      <span className="text-destructive font-bold">{item.time}</span>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.5 }}
+                className="mt-12 text-center"
+              >
+                <Card className="p-8 border-primary/50 bg-primary/5 inline-block">
+                  <p className="text-2xl font-bold text-primary">
+                    Com o CaixaHub: 0 horas
+                  </p>
+                  <p className="text-muted-foreground mt-2">
+                    Tudo acontece automaticamente. Você só acompanha.
+                  </p>
                 </Card>
               </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-              >
-                <Card className="p-8 h-full border-primary/50 bg-primary/5">
-                  <h3 className="text-2xl font-bold mb-6 text-primary">COM CAIXAHUB</h3>
-                  <div className="space-y-4">
-                    {[
-                      "Sistema puxa extratos automaticamente",
-                      "IA categoriza tudo corretamente",
-                      "Dados sempre atualizados e limpos",
-                      "Exporta relatório formatado em 2 cliques"
-                    ].map((solution, index) => (
-                      <div key={index} className="flex items-start gap-3">
-                        <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                        <p className="text-foreground/80">{solution}</p>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              </motion.div>
-            </div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="text-center mt-12"
-            >
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
-                <a href="/register">
-                  Facilitar minha vida
-                </a>
-              </Button>
             </motion.div>
           </div>
         </section>
 
-        {/* How It Works Section */}
+        {/* What You Get Back Section */}
         <section className="py-24 bg-background">
           <div className="container mx-auto px-4">
             <motion.div
@@ -188,8 +174,62 @@ export default function LandingGPage() {
               transition={{ duration: 0.6 }}
               className="text-center mb-16"
             >
-              <h2 className="text-4xl lg:text-5xl font-bold mb-4">Como funciona</h2>
-              <p className="text-xl text-muted-foreground">De 3 dias de trabalho para 3 cliques</p>
+              <h2 className="text-4xl lg:text-5xl font-bold mb-4">
+                32 horas por mês de volta
+              </h2>
+              <p className="text-xl text-muted-foreground">
+                Tempo pra focar no que realmente importa: seu negócio
+              </p>
+            </motion.div>
+
+            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              {[
+                {
+                  icon: Zap,
+                  title: "Importação automática",
+                  description: "Conecta uma vez, banco sincroniza sozinho. Transações aparecem em tempo real, categorizadas."
+                },
+                {
+                  icon: Bot,
+                  title: "IA categoriza tudo",
+                  description: "Cada transação é classificada automaticamente. Você corrige uma vez, sistema aprende."
+                },
+                {
+                  icon: TrendingUp,
+                  title: "Relatórios instantâneos",
+                  description: "Dashboard sempre atualizado. Exporta Excel em 2 cliques quando precisar."
+                }
+              ].map((feature, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: index * 0.2 }}
+                >
+                  <Card className="p-8 h-full text-center">
+                    <feature.icon className="w-12 h-12 text-primary mx-auto mb-4" />
+                    <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
+                    <p className="text-muted-foreground">{feature.description}</p>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* How It Works Section */}
+        <section className="py-24 bg-muted/30">
+          <div className="container mx-auto px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-16"
+            >
+              <h2 className="text-4xl lg:text-5xl font-bold mb-4">De planilha caótica a dashboard organizado</h2>
+              <p className="text-xl text-muted-foreground">Em 5 minutos, não em 5 dias</p>
             </motion.div>
 
             <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-12">
@@ -197,23 +237,23 @@ export default function LandingGPage() {
                 {
                   number: 1,
                   icon: Building2,
-                  title: "Conecte contas da empresa",
-                  description: "Todas as contas bancárias, cartões corporativos, tudo",
+                  title: "Conecte seus bancos",
+                  description: "Selecione seu banco, faça login seguro via Open Banking. Pronto.",
                   time: "2 minutos"
                 },
                 {
                   number: 2,
                   icon: Bot,
-                  title: "IA categoriza automaticamente",
-                  description: "Despesas, receitas, fornecedores, tudo no lugar certo",
+                  title: "IA organiza tudo",
+                  description: "Transações são importadas e categorizadas automaticamente. Você não faz nada.",
                   time: "Automático"
                 },
                 {
                   number: 3,
-                  icon: FileSpreadsheet,
-                  title: "Exporte relatório pronto",
-                  description: "Excel, PDF, formato que seu diretor/contador precisa",
-                  time: "2 cliques"
+                  icon: LayoutDashboard,
+                  title: "Acompanhe sem esforço",
+                  description: "Dashboard mostra tudo: saldo, receitas, despesas. Relatórios prontos pra exportar.",
+                  time: "Sempre atualizado"
                 }
               ].map((step, index) => (
                 <motion.div
@@ -242,64 +282,23 @@ export default function LandingGPage() {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="text-center space-y-6"
-            >
-              <p className="text-2xl font-semibold text-foreground">
-                Configure uma vez. Relatórios prontos para sempre.
-              </p>
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
-                <a href="/register">
-                  Testar agora - 7 dias grátis
-                </a>
-              </Button>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* Use Case Section */}
-        <section className="py-24 bg-muted/30">
-          <div className="container mx-auto px-4">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
               className="max-w-4xl mx-auto"
             >
-              <h2 className="text-4xl lg:text-5xl font-bold mb-8 text-center">
-                Exemplo: Gestor financeiro de varejista com 8 lojas
-              </h2>
-              <Card className="p-8">
-                <p className="text-lg text-muted-foreground mb-6 leading-relaxed">
-                  Antes: pedia extratos de 8 contas, categorizava tudo manualmente, passava 3 dias montando relatório. Diretoria reclamava do atraso.
-                  Com CaixaHub: sistema puxa tudo automaticamente, categoriza, gera relatório. Entrega em 30 minutos. Diretoria feliz, gestor mais feliz ainda.
-                </p>
-                <div className="relative rounded-lg overflow-hidden border border-border/50 bg-card mb-4">
-                  <Image
-                    src="/landing-images/reports.png"
-                    alt="Relatório exportado do CaixaHub"
-                    width={1200}
-                    height={675}
-                    className="w-full h-auto"
-                  />
-                </div>
-                <p className="text-center text-sm text-muted-foreground mb-6">
-                  Relatório de 8 contas, 450 transações, pronto para enviar
-                </p>
-                <div className="text-center">
-                  <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
-                    <a href="/register">
-                      Quero relatórios prontos
-                    </a>
-                  </Button>
-                </div>
-              </Card>
+              <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-xl bg-card">
+                <Image
+                  src="/landing-images/transactions.png"
+                  alt="Transações categorizadas automaticamente"
+                  width={1200}
+                  height={675}
+                  className="w-full h-auto"
+                />
+              </div>
             </motion.div>
           </div>
         </section>
 
-        {/* Testimonials Section */}
+        {/* More Features Section */}
         <section className="py-24 bg-background">
           <div className="container mx-auto px-4">
             <motion.div
@@ -309,48 +308,28 @@ export default function LandingGPage() {
               transition={{ duration: 0.6 }}
               className="text-center mb-16"
             >
-              <h2 className="text-4xl lg:text-5xl font-bold">
-                Gestores que pararam de sofrer no fechamento
-              </h2>
+              <h2 className="text-4xl lg:text-5xl font-bold">E tem mais...</h2>
             </motion.div>
 
-            <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
               {[
-                {
-                  quote: "Antes eu passava 3 dias fechando o mês. Agora eu exporto o relatório do CaixaHub em 5 minutos. Minha vida mudou.",
-                  name: "Marcelo Santos",
-                  role: "Gestor Financeiro de Rede de Lojas"
-                },
-                {
-                  quote: "A diretoria reclamava que eu sempre entregava atrasado. Com CaixaHub entrego no primeiro dia útil do mês. Até pediram aumento pra mim.",
-                  name: "Fernanda Rocha",
-                  role: "Controller Financeiro"
-                }
-              ].map((testimonial, index) => (
+                "Consolidação de múltiplos bancos em um painel só",
+                "Contas a pagar e receber com lembretes",
+                "Fluxo de caixa projetado automaticamente",
+                "Relatórios DRE e comparativo mensal",
+                "Exportação para Excel, PDF e CSV",
+                "Suporte via WhatsApp"
+              ].map((feature, index) => (
                 <motion.div
                   key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, x: index % 2 === 0 ? -20 : 20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: index * 0.2 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  className="flex items-start gap-3"
                 >
-                  <Card className="p-8 h-full relative">
-                    <Quote className="w-10 h-10 text-primary/20 mb-4" />
-                    <p className="text-lg text-foreground/90 mb-6 leading-relaxed">
-                      "{testimonial.quote}"
-                    </p>
-                    <div className="flex items-center gap-4">
-                      <Avatar>
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {testimonial.name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-semibold">{testimonial.name}</p>
-                        <p className="text-sm text-muted-foreground">{testimonial.role}</p>
-                      </div>
-                    </div>
-                  </Card>
+                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <p className="text-foreground/90">{feature}</p>
                 </motion.div>
               ))}
             </div>
@@ -373,21 +352,21 @@ export default function LandingGPage() {
                 <div className="text-center mb-8">
                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-medium mb-4">
                     <Sparkles className="w-4 h-4" />
-                    Oferta Especial
+                    Economize 32h por mês
                   </div>
                   <h2 className="text-5xl font-bold mb-4">
-                    R$ 97<span className="text-2xl text-muted-foreground">/mês</span>
+                    R$ 197<span className="text-2xl text-muted-foreground">/mês</span>
                   </h2>
+                  <p className="text-muted-foreground">Menos de R$ 7 por dia. Quanto vale 1 hora do seu tempo?</p>
                 </div>
 
                 <div className="space-y-4 mb-8">
                   {[
                     "Conexão ilimitada com bancos",
-                    "Integração de múltiplas contas",
-                    "Rastreio de origem de transações",
                     "Categorização automática por IA",
-                    "Dashboard consolidado",
-                    "Relatórios em Excel/CSV",
+                    "Dashboard consolidado em tempo real",
+                    "Contas a pagar e receber",
+                    "Relatórios prontos para exportar",
                     "Suporte via WhatsApp"
                   ].map((feature, index) => (
                     <div key={index} className="flex items-start gap-3">
@@ -399,15 +378,12 @@ export default function LandingGPage() {
 
                 <div className="space-y-4">
                   <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6" asChild>
-                    <a href="/register">
-                      Começar Trial de 7 Dias
+                    <a href={`/register?price_id=${PRICE_ID_197}`}>
+                      Começar - 7 dias grátis
                     </a>
                   </Button>
                   <p className="text-center text-sm text-muted-foreground">
-                    7 dias grátis • Cancele quando quiser
-                  </p>
-                  <p className="text-center text-base text-foreground font-medium">
-                    R$ 97/mês para nunca mais sofrer no fechamento. Vale cada centavo.
+                    Teste grátis por 7 dias • Cancele quando quiser
                   </p>
                 </div>
               </Card>
@@ -438,24 +414,24 @@ export default function LandingGPage() {
               <Accordion type="single" collapsible className="space-y-4">
                 {[
                   {
-                    question: "As categorias são confiáveis?",
-                    answer: "Sim. IA aprende com o padrão da empresa. Taxa de acerto acima de 95%. Você pode ajustar se precisar."
+                    question: "Quanto tempo leva pra configurar?",
+                    answer: "5 minutos. Você conecta seus bancos via Open Banking e a IA já começa a categorizar. Não precisa importar arquivo, não precisa configurar nada."
                   },
                   {
-                    question: "Funciona para múltiplas unidades?",
-                    answer: "Sim. Conecta todas as contas de todas as lojas. Dashboard consolidado ou por unidade."
+                    question: "A categorização automática funciona bem?",
+                    answer: "Sim. Nossa IA foi treinada com milhões de transações brasileiras. Quando ela erra, você corrige uma vez e ela aprende."
                   },
                   {
-                    question: "Consigo exportar em formato específico?",
-                    answer: "Sim. Excel, CSV, PDF. Personalizável para o que contador/diretoria precisa."
+                    question: "Funciona com qual banco?",
+                    answer: "Mais de 300 instituições: Nubank, Itaú, Bradesco, Santander, Inter, C6, Sicoob, Sicredi, Caixa, BB e outros."
                   },
                   {
-                    question: "E se precisar de histórico?",
-                    answer: "Sistema mantém histórico completo. Acesso a qualquer período, exporta quando precisar."
+                    question: "É seguro conectar meu banco?",
+                    answer: "Sim. Usamos Open Banking regulado pelo Banco Central. Não armazenamos senhas. Ninguém acessa seu dinheiro - só leitura de transações."
                   },
                   {
-                    question: "Meu diretor confia nos dados?",
-                    answer: "Sim. Dados vêm direto do banco via Open Banking. Mais confiável que digitação manual."
+                    question: "Posso cancelar quando quiser?",
+                    answer: "Sim. Sem fidelidade, sem multa. Cancela direto no sistema em 2 cliques."
                   }
                 ].map((faq, index) => (
                   <AccordionItem key={index} value={`item-${index}`} className="border rounded-lg px-6">
@@ -485,20 +461,25 @@ export default function LandingGPage() {
               className="max-w-4xl mx-auto text-center space-y-8"
             >
               <h2 className="text-5xl lg:text-6xl font-bold leading-tight">
-                Nunca mais trabalhe até meia-noite para fechar relatório
+                Chega de perder tempo com planilha
               </h2>
               <p className="text-2xl text-muted-foreground">
-                Dados prontos. Relatórios formatados. Você só exporta.
+                Conecta, automatiza, e usa seu tempo pra fazer seu negócio crescer.
               </p>
-              <Button
-                size="lg"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg md:text-xl px-8 md:px-12 py-6 md:py-8 h-auto shadow-[0_0_30px_rgba(57,224,142,0.3)] hover:shadow-[0_0_40px_rgba(57,224,142,0.5)] transition-all duration-300"
-                asChild
-              >
-                <a href="/register">
-                  Facilitar Minha Vida Agora
-                </a>
-              </Button>
+              <div className="space-y-3">
+                <Button
+                  size="lg"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg md:text-xl px-8 md:px-12 py-6 md:py-8 h-auto shadow-[0_0_30px_rgba(57,224,142,0.3)] hover:shadow-[0_0_40px_rgba(57,224,142,0.5)] transition-all duration-300"
+                  asChild
+                >
+                  <a href={`/register?price_id=${PRICE_ID_197}`}>
+                    Recuperar meu tempo - 7 dias grátis
+                  </a>
+                </Button>
+                <p className="text-sm text-muted-foreground">
+                  R$ 197/mês após o teste. Cancele quando quiser.
+                </p>
+              </div>
             </motion.div>
           </div>
         </section>
