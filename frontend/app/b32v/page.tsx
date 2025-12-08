@@ -103,16 +103,19 @@ export default function LandingB32VPage() {
                 className="relative"
               >
                 <div
-                  className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card cursor-pointer group max-w-sm mx-auto"
+                  className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-black cursor-pointer group max-w-sm mx-auto aspect-[9/16]"
                   onClick={handlePlayClick}
                 >
                   <video
                     ref={videoRef}
-                    className="w-full h-auto"
+                    className="w-full h-full object-cover"
                     preload="auto"
                     playsInline
+                    muted
                     onEnded={handleVideoEnd}
                     onLoadedData={() => setIsVideoLoaded(true)}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
                   >
                     <source src="/videos/copy_1.mp4" type="video/mp4" />
                   </video>
