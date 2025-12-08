@@ -3,15 +3,16 @@
 import { Header } from "@/components/landing-v2/Header";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, X, Check, Building2, Bot, LayoutDashboard, Clock, Zap, AlertTriangle, Sparkles, CalendarClock } from "lucide-react";
+import { CheckCircle2, X, Check, Building2, Bot, LayoutDashboard, Sparkles, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Footer } from "@/components/landing-v2/Footer";
 import Image from "next/image";
 
+// Price ID para o plano de R$197 (teste A/B)
 const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4PV1BYoKLt";
 
-export default function LandingAtrasoPage() {
+export default function LandingA3Page() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -29,24 +30,20 @@ export default function LandingAtrasoPage() {
                 className="space-y-8"
               >
                 <div className="space-y-6">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-destructive/10 text-destructive rounded-full text-sm font-medium">
-                    <CalendarClock className="w-4 h-4" />
-                    30-60 dias de atraso
-                  </div>
                   <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight">
-                    Seu contador manda o financeiro do mês passado{" "}
-                    <span className="text-primary">no final do mês seguinte?</span>
+                    Seu tempo vale menos que{" "}
+                    <span className="text-primary">R$ 50 por hora?</span>
                   </h1>
                   <p className="text-xl lg:text-2xl text-muted-foreground leading-relaxed">
-                    Você toma decisão com dado velho. O CaixaHub te mostra o fluxo de caixa em tempo real - não daqui 30 dias.
+                    Se você gasta 8 horas por semana organizando financeiro, está "pagando" R$ 1.600/mês do seu próprio tempo. O CaixaHub faz isso em segundos por R$ 197/mês. Sobra tempo pra vender.
                   </p>
                 </div>
 
                 <div className="space-y-4">
                   {[
-                    "Dados atualizados em tempo real",
-                    "Fluxo de caixa projetado automaticamente",
-                    "Tome decisões com informação de hoje"
+                    "Categorização automática de todas as transações",
+                    "Consolidação de múltiplos bancos",
+                    "Relatórios prontos em 2 cliques"
                   ].map((benefit, index) => (
                     <motion.div
                       key={index}
@@ -65,7 +62,7 @@ export default function LandingAtrasoPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.6 }}
-                  className="space-y-3 flex flex-col items-center lg:items-start"
+                  className="flex justify-center lg:justify-start"
                 >
                   <Button
                     size="lg"
@@ -73,12 +70,9 @@ export default function LandingAtrasoPage() {
                     asChild
                   >
                     <a href={`/register?price_id=${PRICE_ID_197}`}>
-                      Ver meu financeiro agora
+                      Recuperar meu tempo
                     </a>
                   </Button>
-                  <p className="text-sm text-muted-foreground">
-                    7 dias grátis • Cancele quando quiser
-                  </p>
                 </motion.div>
               </motion.div>
 
@@ -91,13 +85,14 @@ export default function LandingAtrasoPage() {
                 <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card">
                   <Image
                     src="/landing-images/dashboard.png"
-                    alt="Dashboard em tempo real"
+                    alt="Dashboard CaixaHub - Economize seu tempo"
                     width={1200}
                     height={675}
                     className="w-full h-auto"
                     priority
                   />
                 </div>
+
                 <div className="absolute -inset-4 bg-primary/10 blur-3xl -z-10 rounded-full" />
               </motion.div>
             </div>
@@ -114,38 +109,47 @@ export default function LandingAtrasoPage() {
               transition={{ duration: 0.6 }}
               className="max-w-4xl mx-auto"
             >
-              <h2 className="text-4xl lg:text-5xl font-bold mb-12 text-center">
-                Você está dirigindo olhando pelo retrovisor
+              <h2 className="text-4xl lg:text-5xl font-bold mb-8 text-center">
+                A conta que você não está fazendo
               </h2>
 
-              <div className="grid md:grid-cols-2 gap-8 mb-12">
-                <Card className="p-8 border-destructive/30 bg-destructive/5">
-                  <AlertTriangle className="w-12 h-12 text-destructive mb-4" />
-                  <h3 className="text-2xl font-bold mb-4">O problema</h3>
-                  <div className="space-y-4 text-foreground/80">
-                    <p>Contador fecha o mês em 15-30 dias.</p>
-                    <p>Quando você recebe o relatório, já tomou 30 decisões às cegas.</p>
-                    <p>Aquela despesa que estourou? Você só descobre 45 dias depois.</p>
-                    <p className="font-semibold text-foreground">Isso não é gestão. É arqueologia financeira.</p>
+              <div className="text-xl text-muted-foreground leading-relaxed space-y-6">
+                <p>
+                  Você é empresário. Seu tempo deveria ir pra <strong className="text-foreground">vender, negociar, crescer</strong>.
+                </p>
+
+                <p className="text-foreground font-semibold">Mas toda semana você gasta horas:</p>
+
+                <div className="space-y-3">
+                  {[
+                    "Baixando extrato de cada banco",
+                    "Jogando na planilha",
+                    "Categorizando transação por transação",
+                    "Tentando entender o que entrou e saiu"
+                  ].map((problem, index) => (
+                    <div key={index} className="flex items-start gap-3">
+                      <X className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                      <p className="text-foreground/80">{problem}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <Card className="p-6 bg-destructive/5 border-destructive/30">
+                  <div className="space-y-3 text-center">
+                    <p className="text-lg">8 horas por semana × 4 semanas = <strong className="text-foreground">32 horas/mês</strong></p>
+                    <p className="text-lg">32 horas × R$ 50/hora = <strong className="text-destructive text-2xl">R$ 1.600/mês</strong></p>
                   </div>
                 </Card>
 
-                <Card className="p-8 border-primary/50 bg-primary/5">
-                  <Zap className="w-12 h-12 text-primary mb-4" />
-                  <h3 className="text-2xl font-bold mb-4">A solução</h3>
-                  <div className="space-y-4 text-foreground/80">
-                    <p>CaixaHub conecta no banco via Open Banking.</p>
-                    <p>Transações aparecem em tempo real, categorizadas.</p>
-                    <p>Dashboard sempre atualizado. Zero atraso.</p>
-                    <p className="font-semibold text-foreground">Você vê o que está acontecendo AGORA.</p>
-                  </div>
-                </Card>
+                <p className="text-foreground font-semibold text-center text-2xl pt-4">
+                  Você está "pagando" R$ 1.600 do seu tempo pra fazer trabalho de robô.
+                </p>
               </div>
             </motion.div>
           </div>
         </section>
 
-        {/* Timeline Comparison */}
+        {/* Problem/Solution Section */}
         <section className="py-24 bg-background">
           <div className="container mx-auto px-4">
             <motion.div
@@ -155,50 +159,77 @@ export default function LandingAtrasoPage() {
               transition={{ duration: 0.6 }}
               className="text-center mb-16"
             >
-              <h2 className="text-4xl lg:text-5xl font-bold mb-4">
-                Quando você descobre o que aconteceu?
+              <h2 className="text-4xl lg:text-5xl font-bold mb-6">
+                32 horas/mês vs 5 minutos/mês
               </h2>
             </motion.div>
 
-            <div className="max-w-4xl mx-auto">
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr>
-                      <th className="text-left p-4 bg-muted/50 rounded-tl-lg">Evento</th>
-                      <th className="text-center p-4 bg-destructive/10 text-destructive font-bold">Método tradicional</th>
-                      <th className="text-center p-4 bg-primary/10 text-primary font-bold rounded-tr-lg">CaixaHub</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+            <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6 }}
+              >
+                <Card className="p-8 h-full border-destructive/50 bg-destructive/5">
+                  <h3 className="text-2xl font-bold mb-2 text-destructive">FAZENDO SOZINHO</h3>
+                  <p className="text-destructive/80 mb-6 text-lg">32 horas por mês</p>
+                  <div className="space-y-4">
                     {[
-                      { event: "Cliente pagou uma fatura", traditional: "Vê no extrato em 2-3 dias", caixahub: "Instantâneo" },
-                      { event: "Despesa inesperada apareceu", traditional: "Descobre no fechamento do mês", caixahub: "Aparece na hora" },
-                      { event: "Categoria estourou orçamento", traditional: "30-45 dias depois", caixahub: "Alerta em tempo real" },
-                      { event: "Precisa do relatório mensal", traditional: "Pede e espera dias", caixahub: "2 cliques, pronto" },
-                      { event: "Quer saber o saldo atual", traditional: "Abre cada app de banco", caixahub: "Dashboard consolidado" }
-                    ].map((row, index) => (
-                      <motion.tr
-                        key={index}
-                        initial={{ opacity: 0, y: 10 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.3, delay: index * 0.1 }}
-                        className="border-b border-border/50"
-                      >
-                        <td className="p-4 font-medium text-foreground">{row.event}</td>
-                        <td className="p-4 text-center text-muted-foreground">{row.traditional}</td>
-                        <td className="p-4 text-center text-primary font-medium">{row.caixahub}</td>
-                      </motion.tr>
+                      "Seu tempo mais valioso",
+                      "Trabalho repetitivo e chato",
+                      "Erro humano garantido"
+                    ].map((problem, index) => (
+                      <div key={index} className="flex items-start gap-3">
+                        <X className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                        <p className="text-foreground/80">{problem}</p>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
+                </Card>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+              >
+                <Card className="p-8 h-full border-primary/50 bg-primary/5">
+                  <h3 className="text-2xl font-bold mb-2 text-primary">CAIXAHUB</h3>
+                  <p className="text-primary/80 mb-6 text-lg">5 minutos por mês • R$ 197/mês</p>
+                  <div className="space-y-4">
+                    {[
+                      "Só acompanha o dashboard",
+                      "IA não erra nem cansa"
+                    ].map((solution, index) => (
+                      <div key={index} className="flex items-start gap-3">
+                        <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                        <p className="text-foreground/80">{solution}</p>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </motion.div>
             </div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="text-center mt-12"
+            >
+              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
+                <a href={`/register?price_id=${PRICE_ID_197}`}>
+                  Recuperar meu tempo
+                </a>
+              </Button>
+            </motion.div>
           </div>
         </section>
 
-        {/* Features Section */}
+        {/* How It Works Section */}
         <section className="py-24 bg-muted/30">
           <div className="container mx-auto px-4">
             <motion.div
@@ -208,100 +239,31 @@ export default function LandingAtrasoPage() {
               transition={{ duration: 0.6 }}
               className="text-center mb-16"
             >
-              <h2 className="text-4xl lg:text-5xl font-bold mb-4">
-                Informação em tempo real muda tudo
-              </h2>
+              <h2 className="text-4xl lg:text-5xl font-bold mb-4">Automatize e use seu tempo pra crescer</h2>
             </motion.div>
 
-            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-              {[
-                {
-                  icon: Zap,
-                  title: "Transações instantâneas",
-                  description: "Cada movimentação aparece no momento que acontece. Sem esperar ninguém processar."
-                },
-                {
-                  icon: Clock,
-                  title: "Fluxo de caixa projetado",
-                  description: "Veja não só o que aconteceu, mas o que VAI acontecer. Contas a pagar e receber projetadas."
-                },
-                {
-                  icon: LayoutDashboard,
-                  title: "Dashboard sempre atual",
-                  description: "Abriu o sistema, está atualizado. Não precisa pedir relatório pra ninguém."
-                }
-              ].map((feature, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: index * 0.2 }}
-                >
-                  <Card className="p-8 h-full text-center">
-                    <feature.icon className="w-12 h-12 text-primary mx-auto mb-4" />
-                    <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                    <p className="text-muted-foreground">{feature.description}</p>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.6 }}
-              className="max-w-4xl mx-auto mt-12"
-            >
-              <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-xl bg-card">
-                <Image
-                  src="/landing-images/reports.png"
-                  alt="Relatórios em tempo real"
-                  width={1200}
-                  height={675}
-                  className="w-full h-auto"
-                />
-              </div>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* How It Works Section */}
-        <section className="py-24 bg-background">
-          <div className="container mx-auto px-4">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="text-center mb-16"
-            >
-              <h2 className="text-4xl lg:text-5xl font-bold mb-4">Como funciona</h2>
-            </motion.div>
-
-            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-12">
               {[
                 {
                   number: 1,
                   icon: Building2,
                   title: "Conecte seus bancos",
-                  description: "Open Banking seguro, regulado pelo Banco Central. Seus dados em tempo real.",
+                  description: "Open Banking seguro, regulado pelo Banco Central",
                   time: "2 minutos"
                 },
                 {
                   number: 2,
                   icon: Bot,
-                  title: "IA categoriza tudo",
-                  description: "Transações aparecem categorizadas automaticamente. Zero trabalho manual.",
+                  title: "IA categoriza automaticamente",
+                  description: "Cada transação é classificada: venda, despesa, fornecedor, imposto",
                   time: "Automático"
                 },
                 {
                   number: 3,
                   icon: LayoutDashboard,
-                  title: "Veja tudo em tempo real",
-                  description: "Dashboard mostra o que está acontecendo AGORA. Não o que aconteceu há 30 dias.",
-                  time: "Instantâneo"
+                  title: "Veja relatórios em tempo real",
+                  description: "Dashboard completo, exporta Excel, manda pro contador",
+                  time: "1 minuto"
                 }
               ].map((step, index) => (
                 <motion.div
@@ -328,46 +290,35 @@ export default function LandingAtrasoPage() {
           </div>
         </section>
 
-        {/* More Features Section */}
-        <section className="py-24 bg-muted/30">
+        {/* Clarity Section */}
+        <section className="py-24 bg-background">
           <div className="container mx-auto px-4">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
-              className="text-center mb-16"
+              className="max-w-4xl mx-auto"
             >
-              <h2 className="text-4xl lg:text-5xl font-bold">E mais...</h2>
+              <h2 className="text-4xl lg:text-5xl font-bold mb-8 text-center">
+                Tempo de empresário é pra vender
+              </h2>
+              <Card className="p-8">
+                <div className="text-xl text-muted-foreground leading-relaxed space-y-6">
+                  <p>
+                    O CaixaHub automatiza <strong className="text-foreground">organização financeira</strong>. Categorização, consolidação, relatórios.
+                  </p>
+                  <p className="text-foreground font-semibold text-2xl">
+                    O que você faz com as 32 horas que sobram todo mês? Fecha mais cliente, negocia melhor, descansa. Qualquer coisa é melhor que planilha.
+                  </p>
+                </div>
+              </Card>
             </motion.div>
-
-            <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-              {[
-                "Consolidação de múltiplas contas em um painel",
-                "Contas a pagar e receber com projeção de fluxo",
-                "Relatórios DRE e comparativo mensal",
-                "Exportação para Excel, PDF e CSV",
-                "Categorização automática por IA",
-                "Suporte via WhatsApp"
-              ].map((feature, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: index % 2 === 0 ? -20 : 20 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  className="flex items-start gap-3"
-                >
-                  <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <p className="text-foreground/90">{feature}</p>
-                </motion.div>
-              ))}
-            </div>
           </div>
         </section>
 
         {/* Pricing Section */}
-        <section id="pricing" className="py-24 bg-background">
+        <section id="pricing" className="py-24 bg-muted/30">
           <div className="container mx-auto px-4">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -381,22 +332,21 @@ export default function LandingAtrasoPage() {
 
                 <div className="text-center mb-8">
                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-medium mb-4">
-                    <Sparkles className="w-4 h-4" />
-                    Tempo real, não tempo velho
+                    <Clock className="w-4 h-4" />
+                    Recupere 32 horas por mês
                   </div>
                   <h2 className="text-5xl font-bold mb-4">
                     R$ 197<span className="text-2xl text-muted-foreground">/mês</span>
                   </h2>
-                  <p className="text-muted-foreground">Decisões baseadas em dados de hoje, não de 30 dias atrás</p>
+                  <p className="text-muted-foreground">vs 32 horas do seu tempo</p>
                 </div>
 
                 <div className="space-y-4 mb-8">
                   {[
-                    "Dados em tempo real",
                     "Conexão ilimitada com bancos",
                     "Categorização automática por IA",
-                    "Fluxo de caixa projetado",
-                    "Relatórios prontos em 2 cliques",
+                    "Dashboard consolidado",
+                    "Relatórios em Excel/CSV",
                     "Suporte via WhatsApp"
                   ].map((feature, index) => (
                     <div key={index} className="flex items-start gap-3">
@@ -409,11 +359,11 @@ export default function LandingAtrasoPage() {
                 <div className="space-y-4">
                   <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6" asChild>
                     <a href={`/register?price_id=${PRICE_ID_197}`}>
-                      Começar - 7 dias grátis
+                      Começar Trial de 7 Dias
                     </a>
                   </Button>
                   <p className="text-center text-sm text-muted-foreground">
-                    Teste grátis por 7 dias • Cancele quando quiser
+                    7 dias grátis • Cancele quando quiser
                   </p>
                 </div>
               </Card>
@@ -422,7 +372,7 @@ export default function LandingAtrasoPage() {
         </section>
 
         {/* FAQ Section */}
-        <section className="py-24 bg-muted/30">
+        <section className="py-24 bg-background">
           <div className="container mx-auto px-4">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -444,24 +394,24 @@ export default function LandingAtrasoPage() {
               <Accordion type="single" collapsible className="space-y-4">
                 {[
                   {
-                    question: "Quão 'tempo real' é o tempo real?",
-                    answer: "As transações aparecem assim que o banco as processa. Na maioria dos casos, em minutos. Muito melhor que esperar 30-45 dias pelo fechamento do contador."
+                    question: "Quanto tempo eu realmente economizo?",
+                    answer: "Depende de quantos bancos você tem e quantas transações processa. Mas a média é 6-10 horas por semana. O CaixaHub faz em segundos o que você faz em horas."
                   },
                   {
-                    question: "Isso substitui meu contador?",
-                    answer: "Não. O CaixaHub organiza seu financeiro operacional (caixa, transações, fluxo). Seu contador cuida de impostos e obrigações fiscais. A gente complementa - e ainda facilita o trabalho dele com relatórios prontos."
+                    question: "A categorização é realmente boa?",
+                    answer: "Sim. Nossa IA aprende com milhares de transações e melhora constantemente. Você pode ajustar categorias, e o sistema aprende com suas correções."
                   },
                   {
-                    question: "Funciona com qual banco?",
-                    answer: "Mais de 300 instituições: Nubank, Itaú, Bradesco, Santander, Inter, C6, Sicoob, Sicredi, Caixa, BB e outros."
+                    question: "E se eu gostar de fazer isso?",
+                    answer: "Então continua fazendo. Mas se você está lendo isso, provavelmente não gosta. E seu tempo vale mais vendendo do que categorizando extrato."
                   },
                   {
                     question: "É seguro?",
-                    answer: "Sim. Open Banking regulado pelo Banco Central. Não armazenamos senhas. Ninguém acessa seu dinheiro - só leitura de transações."
+                    answer: "Sim. Usamos Open Banking regulado pelo Banco Central. Não temos acesso à sua senha. A conexão é criptografada e você pode revogar a qualquer momento."
                   },
                   {
-                    question: "Posso exportar relatórios pro contador?",
-                    answer: "Sim. Exporta em PDF, Excel ou CSV. Seu contador recebe tudo organizado, categorizado, pronto pra usar."
+                    question: "Funciona com qualquer banco?",
+                    answer: "Funciona com mais de 100 bancos brasileiros: Itaú, Bradesco, Santander, Banco do Brasil, Nubank, Inter, C6, e muitos outros."
                   }
                 ].map((faq, index) => (
                   <AccordionItem key={index} value={`item-${index}`} className="border rounded-lg px-6">
@@ -491,25 +441,20 @@ export default function LandingAtrasoPage() {
               className="max-w-4xl mx-auto text-center space-y-8"
             >
               <h2 className="text-5xl lg:text-6xl font-bold leading-tight">
-                Chega de tomar decisão com dado velho
+                Seu tempo vale mais que planilha
               </h2>
               <p className="text-2xl text-muted-foreground">
-                Seu financeiro em tempo real. Não daqui 30 dias.
+                Pare de gastar horas em trabalho de robô. CaixaHub por R$ 197/mês.
               </p>
-              <div className="space-y-3">
-                <Button
-                  size="lg"
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg md:text-xl px-8 md:px-12 py-6 md:py-8 h-auto shadow-[0_0_30px_rgba(57,224,142,0.3)] hover:shadow-[0_0_40px_rgba(57,224,142,0.5)] transition-all duration-300"
-                  asChild
-                >
-                  <a href={`/register?price_id=${PRICE_ID_197}`}>
-                    Ver meu financeiro agora - 7 dias grátis
-                  </a>
-                </Button>
-                <p className="text-sm text-muted-foreground">
-                  R$ 197/mês após o teste. Cancele quando quiser.
-                </p>
-              </div>
+              <Button
+                size="lg"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg md:text-xl px-8 md:px-12 py-6 md:py-8 h-auto shadow-[0_0_30px_rgba(57,224,142,0.3)] hover:shadow-[0_0_40px_rgba(57,224,142,0.5)] transition-all duration-300"
+                asChild
+              >
+                <a href={`/register?price_id=${PRICE_ID_197}`}>
+                  Começar agora - 7 dias grátis
+                </a>
+              </Button>
             </motion.div>
           </div>
         </section>
