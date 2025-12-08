@@ -103,26 +103,25 @@ export default function LandingB32VPage() {
                 className="relative"
               >
                 <div
-                  className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card cursor-pointer group"
+                  className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card cursor-pointer group max-w-sm mx-auto"
                   onClick={handlePlayClick}
                 >
                   <video
                     ref={videoRef}
                     className="w-full h-auto"
-                    preload="metadata"
+                    preload="auto"
                     playsInline
                     onEnded={handleVideoEnd}
                     onLoadedData={() => setIsVideoLoaded(true)}
-                    poster="/landing-images/dashboard.png"
                   >
                     <source src="/videos/copy_1.mp4" type="video/mp4" />
                   </video>
 
                   {/* Play Button Overlay */}
                   {!isPlaying && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
-                      <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                        <Play className="w-8 h-8 text-primary-foreground ml-1" fill="currentColor" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
+                      <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                        <Play className="w-7 h-7 text-primary-foreground ml-1" fill="currentColor" />
                       </div>
                     </div>
                   )}
