@@ -19,6 +19,9 @@ import {
 import { useState, useEffect } from "react";
 import { trackViewContent } from "@/lib/meta-pixel";
 
+// Price ID para o plano de R$197
+const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4PV1BYoKLt";
+
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -50,7 +53,7 @@ export default function Home() {
                 </Link>
               </Button>
               <Button asChild className="flex h-10 min-w-[120px] items-center justify-center rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition-transform hover:scale-105">
-                <Link href="/register">
+                <Link href={`/register?price_id=${PRICE_ID_197}`}>
                   Comece Agora
                 </Link>
               </Button>
@@ -79,7 +82,7 @@ export default function Home() {
                 </Link>
               </Button>
               <Button asChild className="w-full h-10 justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-                <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
+                <Link href={`/register?price_id=${PRICE_ID_197}`} onClick={() => setMobileMenuOpen(false)}>
                   Comece Agora
                 </Link>
               </Button>
@@ -129,7 +132,7 @@ export default function Home() {
                 size="lg"
                 className="h-14 px-8 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_30px_rgba(74,170,123,0.3)] hover:shadow-[0_0_40px_rgba(74,170,123,0.5)] transition-all duration-300 group"
               >
-                <Link href="/register" className="flex items-center gap-2">
+                <Link href={`/register?price_id=${PRICE_ID_197}`} className="flex items-center gap-2">
                   Comece Grátis
                   <ArrowRightIcon className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
@@ -403,7 +406,7 @@ export default function Home() {
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckCircleIcon className="mt-1 h-5 w-5 text-primary flex-shrink-0" />
-                  <span className="text-muted-foreground">A partir de R$ 97/mês (ROI de 6x)</span>
+                  <span className="text-muted-foreground">A partir de R$ 197/mês</span>
                 </li>
               </ul>
             </div>
@@ -453,7 +456,7 @@ export default function Home() {
           </div>
           <div className="mt-12 flex justify-center">
             <Button asChild className="flex h-12 min-w-[200px] items-center justify-center rounded-lg bg-primary px-8 text-base font-bold text-primary-foreground shadow-lg transition-transform hover:scale-105">
-              <Link href="/register">
+              <Link href={`/register?price_id=${PRICE_ID_197}`}>
                 Começar Agora - É Grátis
               </Link>
             </Button>
@@ -555,7 +558,7 @@ export default function Home() {
                   Oferta Especial
                 </div>
                 <h2 className="text-5xl font-bold mb-4">
-                  R$ 97<span className="text-2xl text-muted-foreground">/mês</span>
+                  R$ 197<span className="text-2xl text-muted-foreground">/mês</span>
                 </h2>
               </div>
 
@@ -578,7 +581,7 @@ export default function Home() {
 
               <div className="space-y-4">
                 <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6" asChild>
-                  <a href="/register">
+                  <a href={`/register?price_id=${PRICE_ID_197}`}>
                     Começar Trial de 7 Dias
                   </a>
                 </Button>
@@ -586,7 +589,7 @@ export default function Home() {
                   7 dias grátis • Cancele quando quiser
                 </p>
                 <p className="text-center text-base text-foreground font-medium">
-                  R$ 97/mês para automatizar 100% do seu financeiro
+                  R$ 197/mês para automatizar 100% do seu financeiro
                 </p>
               </div>
             </Card>
@@ -623,7 +626,7 @@ export default function Home() {
               </div>
             </div>
             <Button asChild size="lg" className="h-14 min-w-[240px] text-lg font-bold shadow-xl hover:scale-105 transition-transform">
-              <Link href="/register">
+              <Link href={`/register?price_id=${PRICE_ID_197}`}>
                 Começar Teste Grátis
                 <ArrowRightIcon className="ml-2 h-5 w-5" />
               </Link>
@@ -691,7 +694,7 @@ export default function Home() {
               Não viu seu tipo de negócio aqui? O CaixaHub funciona para qualquer varejo!
             </p>
             <Button asChild variant="outline" size="lg">
-              <Link href="/register">
+              <Link href={`/register?price_id=${PRICE_ID_197}`}>
                 Começar Agora
               </Link>
             </Button>
@@ -788,7 +791,7 @@ export default function Home() {
             Junte-se a milhares de empresas brasileiras que confiam no CaixaHub para simplificar sua gestão financeira.
           </p>
           <Button asChild className="mt-4 flex h-12 min-w-[200px] items-center justify-center rounded-lg bg-primary px-8 text-base font-bold text-primary-foreground shadow-lg transition-transform hover:scale-105">
-            <Link href="/register">
+            <Link href={`/register?price_id=${PRICE_ID_197}`}>
               Experimente de Graça
             </Link>
           </Button>
