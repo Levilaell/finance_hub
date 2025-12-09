@@ -18,15 +18,17 @@ export default function LandingB32VPage() {
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
 
   const handlePlayClick = useCallback(() => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      video.play().catch((err) => {
+        console.log('Play error:', err);
+      });
+    } else {
+      video.pause();
     }
-  }, [isPlaying]);
+  }, []);
 
   const handleVideoEnd = useCallback(() => {
     setIsPlaying(false);
@@ -103,14 +105,14 @@ export default function LandingB32VPage() {
                 className="relative"
               >
                 <div
-                  className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-black cursor-pointer group max-w-sm mx-auto aspect-[9/16]"
-                  onClick={handlePlayClick}
+                  className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-black max-w-sm mx-auto aspect-[9/16]"
                 >
                   <video
                     ref={videoRef}
                     className="w-full h-full object-cover"
                     preload="auto"
                     playsInline
+                    controls
                     muted
                     onEnded={handleVideoEnd}
                     onLoadedData={() => setIsVideoLoaded(true)}
@@ -119,15 +121,6 @@ export default function LandingB32VPage() {
                   >
                     <source src="/videos/copy_1.mp4" type="video/mp4" />
                   </video>
-
-                  {/* Play Button Overlay */}
-                  {!isPlaying && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
-                      <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                        <Play className="w-7 h-7 text-primary-foreground ml-1" fill="currentColor" />
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 <div className="absolute -inset-4 bg-primary/10 blur-3xl -z-10 rounded-full" />
