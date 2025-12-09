@@ -3,7 +3,7 @@ Subscription API views
 """
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.conf import settings
 import stripe
@@ -196,6 +196,7 @@ def stripe_config(request):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def checkout_session_status(request):
     """
     Get subscription status from a Stripe Checkout Session ID.
