@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { trackEvent, META_EVENTS } from '@/lib/meta-pixel';
 
 function CheckoutSuccessContent() {
   const router = useRouter();
@@ -13,6 +14,7 @@ function CheckoutSuccessContent() {
   const [countdown, setCountdown] = useState(5);
   const [verifying, setVerifying] = useState(true);
   const [subscriptionActive, setSubscriptionActive] = useState(false);
+  const hasTrackedStartTrial = useRef(false);
 
   useEffect(() => {
     verifySubscription();
@@ -50,6 +52,19 @@ function CheckoutSuccessContent() {
 
   useEffect(() => {
     if (!verifying && subscriptionActive) {
+      // Track StartTrial event only once when trial is activated
+      const subscriptionType = sessionStorage.getItem('subscription_type');
+      const isTrial = subscriptionType === 'trialing';
+
+      if (isTrial && !hasTrackedStartTrial.current) {
+        hasTrackedStartTrial.current = true;
+        trackEvent(META_EVENTS.START_TRIAL, {
+          value: 197.00,
+          currency: 'BRL',
+          content_name: 'CaixaHub Trial 7 dias'
+        });
+      }
+
       // Auto redirect after 5 seconds
       const timer = setInterval(() => {
         setCountdown((prev) => {
