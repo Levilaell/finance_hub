@@ -36,8 +36,9 @@ function CheckoutSuccessContent() {
         return;
       }
 
-      // Use the new endpoint that doesn't require authentication
-      const response = await fetch(`/api/subscriptions/session-status/?session_id=${sessionId}`);
+      // Call backend directly (bypass Next.js proxy to avoid redirect issues)
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/api/subscriptions/session-status/?session_id=${sessionId}`);
 
       console.log('[verifySubscription] response.ok:', response.ok);
       console.log('[verifySubscription] response.status:', response.status);
