@@ -40,6 +40,27 @@ export default function LandingB32VPage() {
     return () => observer.disconnect();
   }, []);
 
+  // Unmute after first user interaction anywhere on page
+  useEffect(() => {
+    const enableSound = () => {
+      const video = videoRef.current;
+      if (video && video.muted) {
+        video.muted = false;
+        setIsMuted(false);
+      }
+      document.removeEventListener('click', enableSound);
+      document.removeEventListener('touchstart', enableSound);
+    };
+
+    document.addEventListener('click', enableSound);
+    document.addEventListener('touchstart', enableSound);
+
+    return () => {
+      document.removeEventListener('click', enableSound);
+      document.removeEventListener('touchstart', enableSound);
+    };
+  }, []);
+
   const toggleMute = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
