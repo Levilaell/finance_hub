@@ -3,35 +3,48 @@
 import { Header } from "@/components/landing-v2/Header";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, X, Check, Building2, Bot, LayoutDashboard, Sparkles, Play } from "lucide-react";
+import { CheckCircle2, X, Check, Building2, Bot, LayoutDashboard, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Footer } from "@/components/landing-v2/Footer";
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 
 // Price ID para o plano de R$197 (teste A/B)
 const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4PV1BYoKLt";
 
 export default function LandingB32VPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isVideoLoaded, setIsVideoLoaded] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isMuted, setIsMuted] = useState(true);
 
-  const handlePlayClick = useCallback(() => {
+  // Autoplay when video enters viewport
+  useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    const container = containerRef.current;
+    if (!video || !container) return;
 
-    if (video.paused) {
-      video.play().catch((err) => {
-        console.log('Play error:', err);
-      });
-    } else {
-      video.pause();
-    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            video.play().catch(() => {});
+          } else {
+            video.pause();
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
   }, []);
 
-  const handleVideoEnd = useCallback(() => {
-    setIsPlaying(false);
+  const toggleMute = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = !video.muted;
+    setIsMuted(video.muted);
   }, []);
 
   return (
@@ -105,6 +118,7 @@ export default function LandingB32VPage() {
                 className="relative"
               >
                 <div
+                  ref={containerRef}
                   className="relative rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-black max-w-sm mx-auto aspect-[9/16]"
                 >
                   <video
@@ -112,15 +126,24 @@ export default function LandingB32VPage() {
                     className="w-full h-full object-cover"
                     preload="auto"
                     playsInline
-                    controls
                     muted
-                    onEnded={handleVideoEnd}
-                    onLoadedData={() => setIsVideoLoaded(true)}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
+                    loop
                   >
                     <source src="/videos/copy_1.mp4" type="video/mp4" />
                   </video>
+
+                  {/* Mute/Unmute Button */}
+                  <button
+                    onClick={toggleMute}
+                    className="absolute bottom-4 right-4 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors"
+                    aria-label={isMuted ? "Ativar som" : "Desativar som"}
+                  >
+                    {isMuted ? (
+                      <VolumeX className="w-5 h-5 text-white" />
+                    ) : (
+                      <Volume2 className="w-5 h-5 text-white" />
+                    )}
+                  </button>
                 </div>
 
                 <div className="absolute -inset-4 bg-primary/10 blur-3xl -z-10 rounded-full" />
