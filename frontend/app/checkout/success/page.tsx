@@ -14,6 +14,7 @@ function CheckoutSuccessContent() {
   const [countdown, setCountdown] = useState(5);
   const [verifying, setVerifying] = useState(true);
   const [subscriptionActive, setSubscriptionActive] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const hasTrackedStartTrial = useRef(false);
 
   useEffect(() => {
@@ -34,9 +35,12 @@ function CheckoutSuccessContent() {
       if (response.ok) {
         const status = await response.json();
         const isActive = status.status === 'trialing' || status.status === 'active';
+
+        // Store subscription status in state AND sessionStorage
+        // Setting state first ensures useEffect has the correct value
+        setSubscriptionStatus(status.status);
         setSubscriptionActive(isActive);
 
-        // Store subscription status to show correct message
         if (isActive) {
           sessionStorage.setItem('subscription_type', status.status);
         }
@@ -51,10 +55,9 @@ function CheckoutSuccessContent() {
   };
 
   useEffect(() => {
-    if (!verifying && subscriptionActive) {
+    if (!verifying && subscriptionActive && subscriptionStatus) {
       // Track StartTrial event only once when trial is activated
-      const subscriptionType = sessionStorage.getItem('subscription_type');
-      const isTrial = subscriptionType === 'trialing';
+      const isTrial = subscriptionStatus === 'trialing';
 
       if (isTrial && !hasTrackedStartTrial.current) {
         hasTrackedStartTrial.current = true;
@@ -78,7 +81,7 @@ function CheckoutSuccessContent() {
 
       return () => clearInterval(timer);
     }
-  }, [router, verifying, subscriptionActive]);
+  }, [router, verifying, subscriptionActive, subscriptionStatus]);
 
   if (verifying) {
     return (
@@ -106,9 +109,8 @@ function CheckoutSuccessContent() {
     );
   }
 
-  const subscriptionType = sessionStorage.getItem('subscription_type');
-  const isReactivation = subscriptionType === 'active';
-  const isTrial = subscriptionType === 'trialing';
+  const isReactivation = subscriptionStatus === 'active';
+  const isTrial = subscriptionStatus === 'trialing';
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
