@@ -40,6 +40,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://cdn.pluggy.ai https://*.pluggy.ai",
               "img-src 'self' data: blob: https://*.pluggy.ai https://*.pluggycdn.com https://lh3.googleusercontent.com https://www.facebook.com https://www.googletagmanager.com",
               "font-src 'self' data:",
+              "media-src 'self' blob: data:",
               // Connect sources: API + Pluggy + Stripe + Meta Pixel + GTM (localhost only in dev)
               [
                 "connect-src 'self'",
