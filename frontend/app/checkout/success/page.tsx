@@ -26,15 +26,25 @@ function CheckoutSuccessContent() {
       // Wait 2s for webhook to process
       await new Promise(resolve => setTimeout(resolve, 2000));
 
+      const token = localStorage.getItem('token');
+      console.log('[verifySubscription] Token exists:', !!token);
+
       const response = await fetch('/api/subscriptions/status/', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
 
+      console.log('[verifySubscription] response.ok:', response.ok);
+      console.log('[verifySubscription] response.status:', response.status);
+
       if (response.ok) {
         const status = await response.json();
+        console.log('[verifySubscription] API response:', status);
+        console.log('[verifySubscription] status.status:', status.status);
+
         const isActive = status.status === 'trialing' || status.status === 'active';
+        console.log('[verifySubscription] isActive:', isActive);
 
         // Store subscription status in state AND sessionStorage
         // Setting state first ensures useEffect has the correct value
@@ -44,9 +54,12 @@ function CheckoutSuccessContent() {
         if (isActive) {
           sessionStorage.setItem('subscription_type', status.status);
         }
+      } else {
+        const errorText = await response.text();
+        console.error('[verifySubscription] API error response:', errorText);
       }
     } catch (error) {
-      console.error('Error verifying subscription:', error);
+      console.error('[verifySubscription] Catch error:', error);
       // Assume success if verification fails
       setSubscriptionActive(true);
     } finally {
