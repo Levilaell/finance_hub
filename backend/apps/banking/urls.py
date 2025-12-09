@@ -15,7 +15,6 @@ from .views import (
     BillViewSet
 )
 from .webhooks import pluggy_webhook_handler
-from .views import reset_demo_account
 
 app_name = 'banking'
 
@@ -35,7 +34,4 @@ urlpatterns = [
 
     # Webhook endpoint
     path('webhooks/pluggy/', pluggy_webhook_handler, name='pluggy_webhook'),
-
-    # Temporary demo reset endpoint
-    path('reset-demo/', reset_demo_account, name='reset_demo'),
 ]
