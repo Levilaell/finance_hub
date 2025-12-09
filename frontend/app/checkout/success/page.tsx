@@ -151,7 +151,7 @@ function CheckoutSuccessContent() {
             </p>
             {isTrial && (
               <p className="text-sm text-muted-foreground">
-                Seu cartão será cobrado R$ 97,00 após 7 dias. Cancele a qualquer momento sem custos.
+                Seu cartão será cobrado R$ 197,00 após 7 dias. Cancele a qualquer momento sem custos.
               </p>
             )}
           </div>
