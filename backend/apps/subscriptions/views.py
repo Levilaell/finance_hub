@@ -193,3 +193,78 @@ def stripe_config(request):
     return Response({
         'publishable_key': settings.STRIPE_TEST_PUBLIC_KEY if not settings.STRIPE_LIVE_MODE else settings.STRIPE_LIVE_PUBLIC_KEY
     })
+
+
+@api_view(['GET'])
+def checkout_session_status(request):
+    """
+    Get subscription status from a Stripe Checkout Session ID.
+    This endpoint does NOT require authentication - it uses the session_id
+    to verify the checkout was completed and returns the subscription status.
+
+    Used on /checkout/success page after Stripe redirects back.
+
+    Query params:
+        session_id: Stripe Checkout Session ID (from URL)
+
+    Returns:
+        {
+            "status": "trialing" | "active" | "none",
+            "subscription_id": "sub_xxx",
+            "customer_email": "user@example.com"
+        }
+    """
+    session_id = request.query_params.get('session_id')
+
+    if not session_id:
+        return Response(
+            {'error': 'session_id is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        # Retrieve the checkout session from Stripe
+        checkout_session = stripe.checkout.Session.retrieve(
+            session_id,
+            expand=['subscription']
+        )
+
+        # Check if checkout was completed
+        if checkout_session.status != 'complete':
+            return Response({
+                'status': 'incomplete',
+                'message': 'Checkout not completed'
+            }, status=status.HTTP_200_OK)
+
+        # Get subscription status
+        subscription = checkout_session.subscription
+
+        if subscription:
+            # subscription can be expanded object or just ID
+            if isinstance(subscription, str):
+                subscription = stripe.Subscription.retrieve(subscription)
+
+            return Response({
+                'status': subscription.status,  # 'trialing', 'active', etc.
+                'subscription_id': subscription.id,
+                'customer_email': checkout_session.customer_details.email if checkout_session.customer_details else None,
+                'trial_end': subscription.trial_end,
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'status': 'none',
+                'message': 'No subscription found in session'
+            }, status=status.HTTP_200_OK)
+
+    except stripe.error.InvalidRequestError as e:
+        logger.error(f"Invalid session_id: {session_id}, error: {str(e)}")
+        return Response(
+            {'error': 'Invalid session_id'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        logger.error(f"Error in checkout_session_status: {str(e)}")
+        return Response(
+            {'error': 'Erro ao verificar sessão'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

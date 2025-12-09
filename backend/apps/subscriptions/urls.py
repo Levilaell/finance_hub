@@ -10,6 +10,7 @@ urlpatterns = [
     # Subscription management
     path('checkout/', views.create_checkout_session, name='checkout'),
     path('status/', views.subscription_status, name='status'),
+    path('session-status/', views.checkout_session_status, name='session-status'),  # No auth required
     path('portal/', views.create_portal_session, name='portal'),
     path('config/', views.stripe_config, name='config'),
 

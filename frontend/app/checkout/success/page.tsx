@@ -23,36 +23,39 @@ function CheckoutSuccessContent() {
 
   const verifySubscription = async () => {
     try {
-      // Wait 2s for webhook to process
+      // Wait 2s for Stripe webhook to process
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      const token = localStorage.getItem('token');
-      console.log('[verifySubscription] Token exists:', !!token);
+      // Get session_id from URL (provided by Stripe redirect)
+      const sessionId = searchParams.get('session_id');
+      console.log('[verifySubscription] session_id:', sessionId);
 
-      const response = await fetch('/api/subscriptions/status/', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      if (!sessionId) {
+        console.error('[verifySubscription] No session_id in URL');
+        setVerifying(false);
+        return;
+      }
+
+      // Use the new endpoint that doesn't require authentication
+      const response = await fetch(`/api/subscriptions/session-status/?session_id=${sessionId}`);
 
       console.log('[verifySubscription] response.ok:', response.ok);
       console.log('[verifySubscription] response.status:', response.status);
 
       if (response.ok) {
-        const status = await response.json();
-        console.log('[verifySubscription] API response:', status);
-        console.log('[verifySubscription] status.status:', status.status);
+        const data = await response.json();
+        console.log('[verifySubscription] API response:', data);
+        console.log('[verifySubscription] status:', data.status);
 
-        const isActive = status.status === 'trialing' || status.status === 'active';
+        const isActive = data.status === 'trialing' || data.status === 'active';
         console.log('[verifySubscription] isActive:', isActive);
 
         // Store subscription status in state AND sessionStorage
-        // Setting state first ensures useEffect has the correct value
-        setSubscriptionStatus(status.status);
+        setSubscriptionStatus(data.status);
         setSubscriptionActive(isActive);
 
         if (isActive) {
-          sessionStorage.setItem('subscription_type', status.status);
+          sessionStorage.setItem('subscription_type', data.status);
         }
       } else {
         const errorText = await response.text();
@@ -60,8 +63,6 @@ function CheckoutSuccessContent() {
       }
     } catch (error) {
       console.error('[verifySubscription] Catch error:', error);
-      // Assume success if verification fails
-      setSubscriptionActive(true);
     } finally {
       setVerifying(false);
     }
