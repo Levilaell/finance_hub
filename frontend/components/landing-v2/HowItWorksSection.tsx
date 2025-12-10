@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Building2, Bot, LayoutDashboard } from "lucide-react";
 
+// Price ID padrão de R$197
+const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4PV1BYoKLt";
+
 export const HowItWorksSection = () => {
   const steps = [
     {
@@ -93,7 +96,7 @@ export const HowItWorksSection = () => {
             className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg px-8 py-6 h-auto shadow-[0_0_30px_rgba(74,170,123,0.3)] hover:shadow-[0_0_40px_rgba(74,170,123,0.5)] transition-all duration-300"
             asChild
           >
-            <a href="/register">
+            <a href={`/register?price_id=${PRICE_ID_197}`}>
               Começar agora - 7 dias grátis
             </a>
           </Button>

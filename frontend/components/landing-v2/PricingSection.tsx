@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Check, Sparkles } from "lucide-react";
 
+// Price ID padrão de R$197
+const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4PV1BYoKLt";
+
 export const PricingSection = () => {
   const features = [
     "Conexão ilimitada com bancos via Open Banking",
@@ -41,7 +44,7 @@ export const PricingSection = () => {
                 </div>
                 <h2 className="text-3xl lg:text-4xl font-bold mb-3">Acesso completo à plataforma</h2>
                 <div className="flex items-baseline justify-center gap-2 mb-2">
-                  <span className="text-6xl lg:text-7xl font-bold text-primary">R$ 97</span>
+                  <span className="text-6xl lg:text-7xl font-bold text-primary">R$ 197</span>
                   <span className="text-2xl text-muted-foreground">/mês</span>
                 </div>
                 <p className="text-muted-foreground">Cobrado mensalmente</p>
@@ -80,7 +83,7 @@ export const PricingSection = () => {
                   className="bg-primary hover:bg-primary/90 text-primary-foreground text-xl px-12 py-7 h-auto shadow-[0_0_30px_rgba(57,224,142,0.3)] hover:shadow-[0_0_40px_rgba(57,224,142,0.5)] transition-all duration-300 w-full md:w-auto"
                   asChild
                 >
-                  <a href="/register">
+                  <a href={`/register?price_id=${PRICE_ID_197}`}>
                     Começar Trial de 7 Dias
                   </a>
                 </Button>

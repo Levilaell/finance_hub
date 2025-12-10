@@ -3,6 +3,9 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 
+// Price ID padrão de R$197
+const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4PV1BYoKLt";
+
 export const FinalCTASection = () => {
   return (
     <section className="py-24 bg-gradient-to-br from-primary/20 via-background to-background relative overflow-hidden">
@@ -30,7 +33,7 @@ export const FinalCTASection = () => {
               className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg md:text-xl px-8 md:px-12 py-6 md:py-7 h-auto shadow-[0_0_40px_rgba(57,224,142,0.4)] hover:shadow-[0_0_50px_rgba(57,224,142,0.6)] transition-all duration-300"
               asChild
             >
-              <a href="/register">
+              <a href={`/register?price_id=${PRICE_ID_197}`}>
                 Começar Agora - 7 Dias Grátis
               </a>
             </Button>

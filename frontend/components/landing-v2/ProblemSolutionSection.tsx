@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { X, Check } from "lucide-react";
 
+// Price ID padrão de R$197
+const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4PV1BYoKLt";
+
 export const ProblemSolutionSection = () => {
   const problems = [
     "Vendas entram em 3 bancos diferentes, tudo desorganizado",
@@ -89,7 +92,7 @@ export const ProblemSolutionSection = () => {
             className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg px-8 py-6 h-auto shadow-[0_0_30px_rgba(74,170,123,0.3)] hover:shadow-[0_0_40px_rgba(74,170,123,0.5)] transition-all duration-300"
             asChild
           >
-            <a href="/register">
+            <a href={`/register?price_id=${PRICE_ID_197}`}>
               Quero clareza do meu caixa
             </a>
           </Button>

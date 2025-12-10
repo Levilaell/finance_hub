@@ -17,6 +17,9 @@ import { EyeIcon, EyeSlashIcon, ArrowLeftIcon } from '@heroicons/react/24/outlin
 import { AuthHeader } from '@/components/landing-v2/AuthHeader';
 import { Footer } from '@/components/landing-v2/Footer';
 
+// Price ID padrão de R$197
+const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4PV1BYoKLt";
+
 export default function LoginPage() {
   const router = useRouter();
   const { login, isLoading } = useAuthStore();
@@ -178,7 +181,7 @@ export default function LoginPage() {
                 <p className="text-muted-foreground">
                   Não tem uma conta?{' '}
                   <Link
-                    href="/register"
+                    href={`/register?price_id=${PRICE_ID_197}`}
                     className="text-primary hover:underline font-medium"
                   >
                     Criar conta grátis
