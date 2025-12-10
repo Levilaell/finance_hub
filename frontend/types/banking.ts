@@ -78,6 +78,15 @@ export interface BankAccount {
 // Transaction Types
 export type TransactionType = 'CREDIT' | 'DEBIT';
 
+// Linked Bill Summary (embedded in Transaction)
+export interface LinkedBillSummary {
+  id: string;
+  description: string;
+  amount: string;
+  due_date: string;
+  type: BillType;
+}
+
 // Transaction
 export interface Transaction {
   id: string;
@@ -95,6 +104,9 @@ export interface Transaction {
   is_income: boolean;
   is_expense: boolean;
   created_at: string;
+  // Linked bill information
+  linked_bill?: LinkedBillSummary | null;
+  has_linked_bill?: boolean;
 }
 
 // Category Types
@@ -212,6 +224,15 @@ export type BillStatus = 'pending' | 'partially_paid' | 'paid' | 'cancelled';
 
 export type BillRecurrence = 'once' | 'monthly' | 'weekly' | 'yearly';
 
+// Linked Transaction Summary (embedded in Bill)
+export interface LinkedTransactionSummary {
+  id: string;
+  description: string;
+  amount: string;
+  date: string;
+  account_name?: string;
+}
+
 // Bill
 export interface Bill {
   id: string;
@@ -236,6 +257,9 @@ export interface Bill {
   customer_supplier?: string;
   notes?: string;
   linked_transaction?: string;
+  // Linked transaction details
+  linked_transaction_details?: LinkedTransactionSummary | null;
+  has_linked_transaction?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -290,4 +314,70 @@ export interface CashFlowProjection {
   // For actual cash flow (what was paid)
   receivable_paid?: number;
   payable_paid?: number;
+}
+
+// ============================================================
+// Transaction-Bill Linking Types
+// ============================================================
+
+// Transaction Suggestion (for linking to bills)
+export interface TransactionSuggestion {
+  id: string;
+  description: string;
+  amount: number;
+  date: string;
+  type: TransactionType;
+  account_name: string;
+  merchant_name?: string;
+  relevance_score: number;
+}
+
+// Bill Suggestion (for linking to transactions)
+export interface BillSuggestion {
+  id: string;
+  description: string;
+  amount: number;
+  due_date: string;
+  type: BillType;
+  customer_supplier?: string;
+  category_name?: string;
+  category_icon?: string;
+  relevance_score: number;
+}
+
+// Link Transaction Request
+export interface LinkTransactionRequest {
+  transaction_id: string;
+}
+
+// Link Bill Request
+export interface LinkBillRequest {
+  bill_id: string;
+}
+
+// Auto Match Result (from sync)
+export interface AutoMatchResult {
+  matched: Array<{
+    transaction_id: string;
+    transaction_description: string;
+    bill_id: string;
+    bill_description: string;
+    amount: number;
+  }>;
+  ambiguous: Array<{
+    transaction_id: string;
+    transaction_description: string;
+    amount: number;
+    matching_bills_count: number;
+  }>;
+  matched_count: number;
+  ambiguous_count: number;
+}
+
+// ============================================================
+// User Settings Types
+// ============================================================
+
+export interface UserSettings {
+  auto_match_transactions: boolean;
 }

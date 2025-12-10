@@ -22,14 +22,18 @@ import {
   CheckIcon,
   BanknotesIcon,
   ClockIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  LinkIcon,
+  ArrowTopRightOnSquareIcon,
 } from '@heroicons/react/24/outline';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
+import { LinkTransactionDialog } from '@/components/banking';
 
 export default function BillsPage() {
   const router = useRouter();
@@ -41,8 +45,10 @@ export default function BillsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [isUnlinking, setIsUnlinking] = useState<string | null>(null);
 
   // Form states
   const [formData, setFormData] = useState<BillRequest>({
@@ -190,6 +196,27 @@ export default function BillsPage() {
     setPaymentAmount(bill.amount_remaining);
     setPaymentNotes('');
     setShowPaymentDialog(true);
+  };
+
+  const openLinkDialog = (bill: Bill) => {
+    setSelectedBill(bill);
+    setShowLinkDialog(true);
+  };
+
+  const handleUnlinkTransaction = async (billId: string) => {
+    if (!confirm('Deseja desvincular esta transação? A conta voltará ao status pendente.')) return;
+
+    setIsUnlinking(billId);
+    try {
+      await billsService.unlinkTransaction(billId);
+      toast.success('Transação desvinculada. Conta retornada para pendente.');
+      await fetchData();
+    } catch (error: any) {
+      console.error('Error unlinking transaction:', error);
+      toast.error(error?.response?.data?.error || 'Erro ao desvincular transação');
+    } finally {
+      setIsUnlinking(null);
+    }
   };
 
   const resetForm = () => {
@@ -556,6 +583,26 @@ export default function BillsPage() {
                           Atrasada
                         </Badge>
                       )}
+                      {bill.has_linked_transaction && bill.linked_transaction_details && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Badge className="bg-blue-100 text-blue-800 flex items-center gap-1">
+                                <LinkIcon className="h-3 w-3" />
+                                Vinculada
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="font-medium">{bill.linked_transaction_details.description}</p>
+                              <p className="text-xs">
+                                {format(new Date(bill.linked_transaction_details.date), 'dd/MM/yyyy', { locale: ptBR })}
+                                {' • '}
+                                {formatCurrency(parseFloat(bill.linked_transaction_details.amount))}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                     </div>
                     <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                       <span>
@@ -591,7 +638,46 @@ export default function BillsPage() {
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      {bill.status !== 'paid' && bill.status !== 'cancelled' && (
+                      {/* Link/Unlink button */}
+                      {bill.status === 'pending' && !bill.has_linked_transaction && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openLinkDialog(bill)}
+                              >
+                                <LinkIcon className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Vincular transação</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      {bill.has_linked_transaction && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleUnlinkTransaction(bill.id)}
+                                disabled={isUnlinking === bill.id}
+                              >
+                                {isUnlinking === bill.id ? (
+                                  <LoadingSpinner className="h-4 w-4" />
+                                ) : (
+                                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Desvincular transação</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      {/* Register payment button */}
+                      {bill.status !== 'paid' && bill.status !== 'cancelled' && !bill.has_linked_transaction && (
                         <Button
                           size="sm"
                           onClick={() => openPaymentDialog(bill)}
@@ -673,6 +759,14 @@ export default function BillsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Link Transaction Dialog */}
+      <LinkTransactionDialog
+        bill={selectedBill}
+        open={showLinkDialog}
+        onOpenChange={setShowLinkDialog}
+        onLinked={fetchData}
+      />
     </div>
   );
 }

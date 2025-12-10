@@ -17,7 +17,8 @@ import {
   CategorySummary,
   PaginatedResponse,
   Category,
-  CategoryRequest
+  CategoryRequest,
+  BillSuggestion
 } from "@/types/banking";
 
 class BankingService {
@@ -385,6 +386,29 @@ class BankingService {
       ERROR: 'bg-red-100 text-red-800',
     };
     return classes[status] || 'bg-gray-100 text-gray-800';
+  }
+
+  // ============================================================
+  // Bill Linking Methods
+  // ============================================================
+
+  /**
+   * Get suggested bills for linking to a transaction
+   */
+  async getSuggestedBills(transactionId: string): Promise<BillSuggestion[]> {
+    return apiClient.get<BillSuggestion[]>(
+      `/api/banking/transactions/${transactionId}/suggested_bills/`
+    );
+  }
+
+  /**
+   * Link a bill to a transaction
+   */
+  async linkBill(transactionId: string, billId: string): Promise<Transaction> {
+    return apiClient.post<Transaction>(
+      `/api/banking/transactions/${transactionId}/link_bill/`,
+      { bill_id: billId }
+    );
   }
 }
 

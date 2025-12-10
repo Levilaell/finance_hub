@@ -2,8 +2,9 @@
 Signal handlers for authentication events
 """
 from django.contrib.auth.signals import user_logged_in, user_logged_out
+from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import UserActivityLog
+from .models import UserActivityLog, UserSettings, User
 
 
 def get_client_ip(request):
@@ -58,3 +59,12 @@ def log_user_logout(sender, request, user, **kwargs):
             ip_address=get_client_ip(request),
             user_agent=request.META.get('HTTP_USER_AGENT', ''),
         )
+
+
+@receiver(post_save, sender=User)
+def create_user_settings(sender, instance, created, **kwargs):
+    """
+    Create UserSettings automatically when a new user is created.
+    """
+    if created:
+        UserSettings.objects.create(user=instance)

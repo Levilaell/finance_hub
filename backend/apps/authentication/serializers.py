@@ -136,3 +136,20 @@ class TokenResponseSerializer(serializers.Serializer):
     access = serializers.CharField()
     refresh = serializers.CharField()
     user = UserSerializer()
+
+
+class UserSettingsSerializer(serializers.Serializer):
+    """
+    Serializer for user automation settings.
+    """
+    auto_match_transactions = serializers.BooleanField(
+        required=False,
+        help_text='Automatically link transactions to bills when values match'
+    )
+
+    def update(self, instance, validated_data):
+        """Update user settings."""
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance

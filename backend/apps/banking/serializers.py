@@ -101,13 +101,18 @@ class TransactionSerializer(serializers.ModelSerializer):
         allow_null=True
     )
 
+    # Linked bill information
+    linked_bill = serializers.SerializerMethodField()
+    has_linked_bill = serializers.SerializerMethodField()
+
     class Meta:
         model = Transaction
         fields = [
             'id', 'account_name', 'account_type',
             'type', 'description', 'amount', 'currency_code',
             'date', 'category', 'user_category_id', 'pluggy_category',
-            'merchant_name', 'is_income', 'is_expense', 'created_at'
+            'merchant_name', 'is_income', 'is_expense', 'created_at',
+            'linked_bill', 'has_linked_bill'
         ]
         read_only_fields = ['id', 'pluggy_category', 'pluggy_category_id', 'created_at']
 
@@ -117,6 +122,23 @@ class TransactionSerializer(serializers.ModelSerializer):
         if 'request' in self.context:
             user = self.context['request'].user
             self.fields['user_category_id'].queryset = Category.objects.filter(user=user)
+
+    def get_linked_bill(self, obj):
+        """Get linked bill info if exists."""
+        if hasattr(obj, 'linked_bill') and obj.linked_bill:
+            bill = obj.linked_bill
+            return {
+                'id': str(bill.id),
+                'description': bill.description,
+                'amount': str(bill.amount),
+                'due_date': bill.due_date.isoformat(),
+                'type': bill.type
+            }
+        return None
+
+    def get_has_linked_bill(self, obj):
+        """Check if transaction has linked bill."""
+        return hasattr(obj, 'linked_bill') and obj.linked_bill is not None
 
 
 class TransactionFilterSerializer(serializers.Serializer):
@@ -204,6 +226,10 @@ class BillSerializer(serializers.ModelSerializer):
     category_color = serializers.CharField(source='category.color', read_only=True)
     category_icon = serializers.CharField(source='category.icon', read_only=True)
 
+    # Linked transaction information
+    linked_transaction_details = serializers.SerializerMethodField()
+    has_linked_transaction = serializers.SerializerMethodField()
+
     class Meta:
         model = Bill
         fields = [
@@ -213,13 +239,32 @@ class BillSerializer(serializers.ModelSerializer):
             'category', 'category_name', 'category_color', 'category_icon',
             'recurrence', 'parent_bill', 'installment_number',
             'customer_supplier', 'notes', 'linked_transaction',
+            'linked_transaction_details', 'has_linked_transaction',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'is_overdue', 'amount_remaining', 'payment_percentage',
             'category_name', 'category_color', 'category_icon',
+            'linked_transaction_details', 'has_linked_transaction',
             'created_at', 'updated_at'
         ]
+
+    def get_linked_transaction_details(self, obj):
+        """Get linked transaction info if exists."""
+        if obj.linked_transaction:
+            tx = obj.linked_transaction
+            return {
+                'id': str(tx.id),
+                'description': tx.description,
+                'amount': str(tx.amount),
+                'date': tx.date.isoformat(),
+                'account_name': tx.account.name if tx.account else None
+            }
+        return None
+
+    def get_has_linked_transaction(self, obj):
+        """Check if bill has linked transaction."""
+        return obj.linked_transaction is not None
 
     def validate(self, data):
         """Validate bill data."""
@@ -281,3 +326,140 @@ class BillsSummarySerializer(serializers.Serializer):
     overdue_count = serializers.IntegerField()
     receivable_count = serializers.IntegerField()
     payable_count = serializers.IntegerField()
+
+
+# ============================================================
+# Transaction-Bill Linking Serializers
+# ============================================================
+
+class LinkTransactionSerializer(serializers.Serializer):
+    """Serializer for linking a transaction to a bill."""
+    transaction_id = serializers.UUIDField(required=True)
+
+    def validate_transaction_id(self, value):
+        """Validate that transaction exists and belongs to user."""
+        request = self.context.get('request')
+        if not request:
+            raise serializers.ValidationError("Request context required")
+
+        try:
+            transaction = Transaction.objects.get(
+                id=value,
+                account__connection__user=request.user,
+                account__connection__is_active=True
+            )
+        except Transaction.DoesNotExist:
+            raise serializers.ValidationError("Transaction not found")
+
+        # Check if already linked
+        if hasattr(transaction, 'linked_bill') and transaction.linked_bill:
+            raise serializers.ValidationError("Transaction is already linked to another bill")
+
+        return value
+
+
+class LinkBillSerializer(serializers.Serializer):
+    """Serializer for linking a bill to a transaction."""
+    bill_id = serializers.UUIDField(required=True)
+
+    def validate_bill_id(self, value):
+        """Validate that bill exists and belongs to user."""
+        request = self.context.get('request')
+        if not request:
+            raise serializers.ValidationError("Request context required")
+
+        try:
+            bill = Bill.objects.get(id=value, user=request.user)
+        except Bill.DoesNotExist:
+            raise serializers.ValidationError("Bill not found")
+
+        # Check eligibility
+        if bill.status != 'pending':
+            raise serializers.ValidationError(f"Bill must be pending. Current status: {bill.status}")
+
+        if bill.amount_paid > 0:
+            raise serializers.ValidationError("Bill already has prior payments")
+
+        if bill.linked_transaction is not None:
+            raise serializers.ValidationError("Bill is already linked to another transaction")
+
+        return value
+
+
+class TransactionSuggestionSerializer(serializers.ModelSerializer):
+    """Serializer for transaction suggestions (for linking to bills)."""
+    account_name = serializers.CharField(source='account.name', read_only=True)
+    relevance_score = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Transaction
+        fields = [
+            'id', 'description', 'amount', 'date', 'type',
+            'account_name', 'merchant_name', 'relevance_score'
+        ]
+
+
+class BillSuggestionSerializer(serializers.ModelSerializer):
+    """Serializer for bill suggestions (for linking to transactions)."""
+    category_name = serializers.CharField(source='category.name', read_only=True, allow_null=True)
+    category_icon = serializers.CharField(source='category.icon', read_only=True, allow_null=True)
+    relevance_score = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Bill
+        fields = [
+            'id', 'description', 'amount', 'due_date', 'type',
+            'customer_supplier', 'category_name', 'category_icon',
+            'relevance_score'
+        ]
+
+
+class LinkedTransactionSerializer(serializers.ModelSerializer):
+    """Serializer for linked transaction info (embedded in Bill)."""
+    account_name = serializers.CharField(source='account.name', read_only=True)
+
+    class Meta:
+        model = Transaction
+        fields = ['id', 'description', 'amount', 'date', 'account_name']
+
+
+class LinkedBillSerializer(serializers.ModelSerializer):
+    """Serializer for linked bill info (embedded in Transaction)."""
+
+    class Meta:
+        model = Bill
+        fields = ['id', 'description', 'amount', 'due_date', 'type']
+
+
+class AutoMatchResultSerializer(serializers.Serializer):
+    """Serializer for auto-match results after sync."""
+
+    class MatchedItemSerializer(serializers.Serializer):
+        transaction_id = serializers.UUIDField()
+        transaction_description = serializers.CharField()
+        bill_id = serializers.UUIDField()
+        bill_description = serializers.CharField()
+        amount = serializers.DecimalField(max_digits=15, decimal_places=2)
+
+    class AmbiguousItemSerializer(serializers.Serializer):
+        transaction_id = serializers.UUIDField()
+        transaction_description = serializers.CharField()
+        amount = serializers.DecimalField(max_digits=15, decimal_places=2)
+        matching_bills_count = serializers.IntegerField()
+
+    matched = MatchedItemSerializer(many=True)
+    ambiguous = AmbiguousItemSerializer(many=True)
+    matched_count = serializers.IntegerField()
+    ambiguous_count = serializers.IntegerField()
+
+
+class UserSettingsSerializer(serializers.Serializer):
+    """Serializer for user settings."""
+    auto_match_transactions = serializers.BooleanField(required=False)
+
+    def update(self, instance, validated_data):
+        """Update user settings."""
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance

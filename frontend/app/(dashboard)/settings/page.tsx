@@ -19,10 +19,15 @@ import {
   EyeSlashIcon,
   KeyIcon,
   TrashIcon,
-  CreditCardIcon
+  CreditCardIcon,
+  CogIcon,
+  LinkIcon,
 } from '@heroicons/react/24/outline';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 import { SubscriptionManagement } from '@/components/subscription/SubscriptionManagement';
+import { settingsService } from '@/services/settings.service';
+import { UserSettings } from '@/types/banking';
 import {
   Dialog,
   DialogContent,
@@ -56,6 +61,38 @@ export default function SettingsPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
+  const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
+
+  // Fetch user settings on mount
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const settings = await settingsService.getSettings();
+        setUserSettings(settings);
+      } catch (error) {
+        console.error('Error fetching settings:', error);
+      } finally {
+        setIsLoadingSettings(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const handleAutoMatchToggle = async (enabled: boolean) => {
+    setIsUpdatingSettings(true);
+    try {
+      const updated = await settingsService.updateSettings({ auto_match_transactions: enabled });
+      setUserSettings(updated);
+      toast.success(enabled ? 'Vinculação automática ativada' : 'Vinculação automática desativada');
+    } catch (error) {
+      console.error('Error updating settings:', error);
+      toast.error('Erro ao atualizar configuração');
+    } finally {
+      setIsUpdatingSettings(false);
+    }
+  };
 
   const profileForm = useForm<ProfileForm>({
     defaultValues: {
@@ -175,9 +212,10 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 gap-1">
+        <TabsList className="grid w-full grid-cols-4 gap-1">
           <TabsTrigger value="profile" className="text-xs sm:text-sm">Perfil</TabsTrigger>
           <TabsTrigger value="security" className="text-xs sm:text-sm">Segurança</TabsTrigger>
+          <TabsTrigger value="automation" className="text-xs sm:text-sm">Automação</TabsTrigger>
           <TabsTrigger value="subscription" className="text-xs sm:text-sm">Assinatura</TabsTrigger>
         </TabsList>
 
@@ -414,6 +452,57 @@ export default function SettingsPage() {
                   Excluir Conta
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Automation Settings */}
+        <TabsContent value="automation">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <CogIcon className="h-5 w-5 mr-2" />
+                Configurações de Automação
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingSettings ? (
+                <div className="flex items-center justify-center py-8">
+                  <LoadingSpinner />
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Auto-match transactions */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <LinkIcon className="h-5 w-5 text-muted-foreground" />
+                        <Label className="text-base font-medium">
+                          Vinculação Automática de Transações
+                        </Label>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Quando ativado, novas transações do extrato bancário serão automaticamente
+                        vinculadas a contas a pagar/receber com o mesmo valor. A vinculação só
+                        ocorre quando há uma única conta compatível.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={userSettings?.auto_match_transactions ?? true}
+                      onCheckedChange={handleAutoMatchToggle}
+                      disabled={isUpdatingSettings}
+                    />
+                  </div>
+
+                  <div className="border-t border-white/10 pt-4">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Dica:</strong> Quando uma transação é vinculada a uma conta,
+                      a conta é automaticamente marcada como paga. Você pode desvincular
+                      manualmente a qualquer momento nas páginas de Contas ou Transações.
+                    </p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

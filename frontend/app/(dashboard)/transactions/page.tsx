@@ -19,6 +19,8 @@ import {
   XMarkIcon,
   ChevronDownIcon,
   CheckIcon,
+  LinkIcon,
+  DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 import { Input } from '@/components/ui/input';
 import {
@@ -41,6 +43,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { LinkBillDialog } from '@/components/banking';
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -52,6 +57,8 @@ export default function TransactionsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatingTransactionId, setUpdatingTransactionId] = useState<string | null>(null);
+  const [showLinkBillDialog, setShowLinkBillDialog] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -198,6 +205,11 @@ export default function TransactionsPage() {
     setSelectedCategory('all');
     setStartDate('');
     setEndDate('');
+  };
+
+  const openLinkBillDialog = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setShowLinkBillDialog(true);
   };
 
   const exportToCSV = () => {
@@ -537,6 +549,9 @@ export default function TransactionsPage() {
                       <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">
                         Valor
                       </th>
+                      <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">
+                        Vínculo
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -685,6 +700,44 @@ export default function TransactionsPage() {
                             {formatCurrency(Math.abs(transaction.amount))}
                           </span>
                         </td>
+                        <td className="py-3 px-4 text-center">
+                          {transaction.has_linked_bill && transaction.linked_bill ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <Badge className="bg-blue-100 text-blue-800 flex items-center gap-1">
+                                    <DocumentTextIcon className="h-3 w-3" />
+                                    Vinculada
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="font-medium">{transaction.linked_bill.description}</p>
+                                  <p className="text-xs">
+                                    Venc: {format(new Date(transaction.linked_bill.due_date), 'dd/MM/yyyy', { locale: ptBR })}
+                                    {' • '}
+                                    {formatCurrency(parseFloat(transaction.linked_bill.amount))}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 w-7 p-0"
+                                    onClick={() => openLinkBillDialog(transaction)}
+                                  >
+                                    <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Vincular a conta</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -783,6 +836,14 @@ export default function TransactionsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Link Bill Dialog */}
+      <LinkBillDialog
+        transaction={selectedTransaction}
+        open={showLinkBillDialog}
+        onOpenChange={setShowLinkBillDialog}
+        onLinked={fetchData}
+      />
     </div>
   );
 }

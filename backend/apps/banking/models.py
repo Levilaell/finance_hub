@@ -342,12 +342,13 @@ class Bill(models.Model):
     notes = models.TextField(blank=True)
 
     # Link to bank transaction (when paid through bank)
-    linked_transaction = models.ForeignKey(
+    # OneToOneField garante que uma transação só pode estar vinculada a uma bill
+    linked_transaction = models.OneToOneField(
         Transaction,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='linked_bills'
+        related_name='linked_bill'
     )
 
     # Metadata

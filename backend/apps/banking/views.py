@@ -21,11 +21,14 @@ from .serializers import (
     CreateConnectionSerializer, TransactionFilterSerializer,
     SyncStatusSerializer, ConnectTokenSerializer,
     SummarySerializer, CategorySerializer, BillSerializer,
-    BillFilterSerializer, RegisterPaymentSerializer, BillsSummarySerializer
+    BillFilterSerializer, RegisterPaymentSerializer, BillsSummarySerializer,
+    LinkTransactionSerializer, LinkBillSerializer,
+    TransactionSuggestionSerializer, BillSuggestionSerializer,
+    UserSettingsSerializer
 )
 from .services import (
     ConnectorService, BankConnectionService,
-    TransactionService
+    TransactionService, TransactionMatchService
 )
 from .pluggy_client import PluggyClient
 from apps.authentication.models import UserActivityLog
@@ -692,6 +695,64 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
         return Response(serializer.data)
 
+    @action(detail=True, methods=['get'])
+    def suggested_bills(self, request, pk=None):
+        """
+        Get bills suggested for linking to this transaction.
+        GET /api/banking/transactions/{id}/suggested_bills/
+        """
+        transaction = self.get_object()
+
+        # Check if already linked
+        if hasattr(transaction, 'linked_bill') and transaction.linked_bill:
+            return Response(
+                {'error': 'Transaction is already linked to a bill'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        match_service = TransactionMatchService()
+        suggestions = match_service.get_suggested_bills_for_transaction(transaction)
+
+        # Serialize with relevance score
+        result = []
+        for suggestion in suggestions:
+            bill = suggestion['bill']
+            bill.relevance_score = suggestion['relevance_score']
+            result.append(BillSuggestionSerializer(bill).data)
+
+        return Response(result)
+
+    @action(detail=True, methods=['post'])
+    def link_bill(self, request, pk=None):
+        """
+        Link a bill to this transaction.
+        POST /api/banking/transactions/{id}/link_bill/
+        Body: { "bill_id": "uuid" }
+        """
+        transaction = self.get_object()
+
+        serializer = LinkBillSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        bill_id = serializer.validated_data['bill_id']
+        bill = Bill.objects.get(id=bill_id)
+
+        match_service = TransactionMatchService()
+
+        try:
+            updated_bill = match_service.link_transaction_to_bill(transaction, bill)
+            # Return updated transaction with linked bill info
+            transaction.refresh_from_db()
+            return Response(TransactionSerializer(transaction, context={'request': request}).data)
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     @action(detail=False, methods=['get'])
     def summary(self, request):
         """
@@ -893,6 +954,91 @@ class BillViewSet(viewsets.ModelViewSet):
         bill.update_status()
 
         return Response(BillSerializer(bill).data)
+
+    @action(detail=True, methods=['post'])
+    def link_transaction(self, request, pk=None):
+        """
+        Link a transaction to this bill.
+        POST /api/banking/bills/{id}/link_transaction/
+        Body: { "transaction_id": "uuid" }
+        """
+        bill = self.get_object()
+
+        serializer = LinkTransactionSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        transaction_id = serializer.validated_data['transaction_id']
+        transaction = Transaction.objects.get(id=transaction_id)
+
+        match_service = TransactionMatchService()
+
+        try:
+            updated_bill = match_service.link_transaction_to_bill(transaction, bill)
+            return Response(BillSerializer(updated_bill).data)
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=True, methods=['post'])
+    def unlink_transaction(self, request, pk=None):
+        """
+        Remove link between transaction and bill.
+        POST /api/banking/bills/{id}/unlink_transaction/
+        """
+        bill = self.get_object()
+
+        match_service = TransactionMatchService()
+
+        try:
+            updated_bill = match_service.unlink_transaction_from_bill(bill)
+            return Response(BillSerializer(updated_bill).data)
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=True, methods=['get'])
+    def suggested_transactions(self, request, pk=None):
+        """
+        Get transactions suggested for linking to this bill.
+        GET /api/banking/bills/{id}/suggested_transactions/
+        """
+        bill = self.get_object()
+
+        # Check if bill is eligible
+        if bill.status != 'pending':
+            return Response(
+                {'error': 'Bill must be pending to link transactions'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if bill.amount_paid > 0:
+            return Response(
+                {'error': 'Bill already has prior payments'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if bill.linked_transaction:
+            return Response(
+                {'error': 'Bill is already linked to a transaction'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        match_service = TransactionMatchService()
+        suggestions = match_service.get_suggested_transactions_for_bill(bill)
+
+        # Serialize with relevance score
+        result = []
+        for suggestion in suggestions:
+            tx = suggestion['transaction']
+            tx.relevance_score = suggestion['relevance_score']
+            result.append(TransactionSuggestionSerializer(tx).data)
+
+        return Response(result)
 
     @action(detail=False, methods=['get'])
     def summary(self, request):

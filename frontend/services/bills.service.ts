@@ -10,7 +10,9 @@ import {
   BillsSummary,
   RegisterPaymentRequest,
   CashFlowProjection,
-  PaginatedResponse
+  PaginatedResponse,
+  TransactionSuggestion,
+  LinkTransactionRequest
 } from "@/types/banking";
 
 class BillsService {
@@ -164,6 +166,39 @@ class BillsService {
     }
 
     return new Date(dueDate).toLocaleDateString('pt-BR');
+  }
+
+  // ============================================================
+  // Transaction Linking Methods
+  // ============================================================
+
+  /**
+   * Get suggested transactions for linking to a bill
+   */
+  async getSuggestedTransactions(billId: string): Promise<TransactionSuggestion[]> {
+    return apiClient.get<TransactionSuggestion[]>(
+      `/api/banking/bills/${billId}/suggested_transactions/`
+    );
+  }
+
+  /**
+   * Link a transaction to a bill
+   */
+  async linkTransaction(billId: string, transactionId: string): Promise<Bill> {
+    return apiClient.post<Bill>(
+      `/api/banking/bills/${billId}/link_transaction/`,
+      { transaction_id: transactionId }
+    );
+  }
+
+  /**
+   * Unlink transaction from a bill
+   */
+  async unlinkTransaction(billId: string): Promise<Bill> {
+    return apiClient.post<Bill>(
+      `/api/banking/bills/${billId}/unlink_transaction/`,
+      {}
+    );
   }
 }
 

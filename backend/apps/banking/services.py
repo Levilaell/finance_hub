@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from decimal import Decimal
 
-from django.db import transaction
+from django.db import transaction as transaction_db
 from django.db import models
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -24,6 +24,9 @@ from .pluggy_client import PluggyClient
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+# Note: 'transaction_db' is used instead of 'transaction' to avoid
+# confusion with the Transaction model (TransactionModel)
 
 
 # Load Pluggy categories translations
@@ -913,7 +916,8 @@ class TransactionService:
             )
 
             synced_count = 0
-            with transaction.atomic():
+            new_transactions = []  # Track new transactions for auto-match
+            with transaction_db.atomic():
                 for pluggy_tx in pluggy_transactions:
                     tx_type = 'CREDIT' if pluggy_tx['type'] == 'CREDIT' else 'DEBIT'
 
@@ -940,7 +944,7 @@ class TransactionService:
                     user = account.connection.user
                     category = get_or_create_category(user, pluggy_category, tx_type)
 
-                    TransactionModel.objects.update_or_create(
+                    tx_obj, created = TransactionModel.objects.update_or_create(
                         pluggy_transaction_id=pluggy_tx['id'],
                         defaults={
                             'account': account,
@@ -959,6 +963,10 @@ class TransactionService:
                     )
                     synced_count += 1
 
+                    # Track new transactions for auto-match
+                    if created:
+                        new_transactions.append(tx_obj)
+
             account.last_synced_at = timezone.now()
             account.save()
 
@@ -968,6 +976,17 @@ class TransactionService:
             sync_log.save()
 
             logger.info(f"Synced {synced_count} transactions for account {account.id}")
+
+            # Auto-match new transactions with bills
+            if new_transactions:
+                match_service = TransactionMatchService()
+                match_result = match_service.auto_match_transactions(user, new_transactions)
+                logger.info(
+                    f"Auto-match result: {len(match_result['matched'])} matched, "
+                    f"{len(match_result['ambiguous'])} ambiguous, "
+                    f"{len(match_result['no_match'])} no match"
+                )
+
             return synced_count
 
         except Exception as e:
@@ -1014,3 +1033,308 @@ class TransactionService:
                 results[str(account.id)] = 0
 
         return results
+
+
+class TransactionMatchService:
+    """
+    Service for matching transactions with bills (accounts payable/receivable).
+    Handles automatic and manual linking of bank transactions to bills.
+    """
+
+    def get_eligible_bills_for_transaction(self, transaction: TransactionModel) -> List['Bill']:
+        """
+        Find bills that can be linked to a transaction.
+
+        Eligibility criteria:
+        - Same user as transaction owner
+        - Status = 'pending' (no prior payments)
+        - amount_paid = 0 (virgin bill)
+        - No linked_transaction yet
+        - Exact amount match
+        - Compatible type (CREDIT -> receivable, DEBIT -> payable)
+        """
+        from .models import Bill
+
+        user = transaction.account.connection.user
+
+        # Determine compatible bill type
+        bill_type = 'receivable' if transaction.type == 'CREDIT' else 'payable'
+
+        eligible_bills = Bill.objects.filter(
+            user=user,
+            type=bill_type,
+            status='pending',
+            amount_paid=Decimal('0.00'),
+            linked_transaction__isnull=True,
+            amount=transaction.amount
+        ).select_related('category').order_by('due_date')
+
+        return list(eligible_bills)
+
+    def get_eligible_transactions_for_bill(self, bill: 'Bill') -> List[TransactionModel]:
+        """
+        Find transactions that can be linked to a bill.
+
+        Eligibility criteria:
+        - Same user as bill owner
+        - No linked_bill yet
+        - Exact amount match
+        - Compatible type (receivable -> CREDIT, payable -> DEBIT)
+        """
+        user = bill.user
+
+        # Determine compatible transaction type
+        tx_type = 'CREDIT' if bill.type == 'receivable' else 'DEBIT'
+
+        eligible_transactions = TransactionModel.objects.filter(
+            account__connection__user=user,
+            account__connection__is_active=True,
+            type=tx_type,
+            amount=bill.amount,
+            linked_bill__isnull=True
+        ).select_related(
+            'account',
+            'account__connection',
+            'user_category'
+        ).order_by('-date')
+
+        return list(eligible_transactions)
+
+    def calculate_relevance_score(self, transaction: TransactionModel, bill: 'Bill') -> int:
+        """
+        Calculate relevance score (0-100) for ranking suggestions.
+        Higher score = more relevant match.
+        """
+        score = 0
+
+        # 1. Date proximity (up to 50 points)
+        tx_date = transaction.date.date() if hasattr(transaction.date, 'date') else transaction.date
+        days_diff = abs((tx_date - bill.due_date).days)
+
+        if days_diff == 0:
+            score += 50
+        elif days_diff <= 3:
+            score += 40
+        elif days_diff <= 7:
+            score += 30
+        elif days_diff <= 15:
+            score += 20
+        elif days_diff <= 30:
+            score += 10
+
+        # 2. Description similarity (up to 30 points)
+        tx_text = f"{transaction.description} {transaction.merchant_name or ''}".lower()
+        bill_text = f"{bill.description} {bill.customer_supplier or ''}".lower()
+
+        tx_words = set(tx_text.split())
+        bill_words = set(bill_text.split())
+        common_words = tx_words & bill_words
+
+        # Remove common stopwords
+        stopwords = {'de', 'da', 'do', 'para', 'a', 'o', 'e', 'em', 'com', 'por', '-', ''}
+        common_words = common_words - stopwords
+
+        score += min(len(common_words) * 10, 30)
+
+        # 3. Same category (up to 20 points)
+        if transaction.user_category_id and bill.category_id:
+            if transaction.user_category_id == bill.category_id:
+                score += 20
+
+        return score
+
+    def get_suggested_transactions_for_bill(self, bill: 'Bill', limit: int = 10) -> List[Dict]:
+        """
+        Get transactions suggested for linking to a bill, ordered by relevance.
+        Returns list of dicts with transaction data and relevance score.
+        """
+        if bill.status != 'pending' or bill.amount_paid > 0 or bill.linked_transaction:
+            return []
+
+        transactions = self.get_eligible_transactions_for_bill(bill)
+
+        # Calculate scores and sort
+        suggestions = []
+        for tx in transactions:
+            score = self.calculate_relevance_score(tx, bill)
+            suggestions.append({
+                'transaction': tx,
+                'relevance_score': score
+            })
+
+        # Sort by score descending
+        suggestions.sort(key=lambda x: x['relevance_score'], reverse=True)
+
+        return suggestions[:limit]
+
+    def get_suggested_bills_for_transaction(self, transaction: TransactionModel, limit: int = 10) -> List[Dict]:
+        """
+        Get bills suggested for linking to a transaction, ordered by relevance.
+        Returns list of dicts with bill data and relevance score.
+        """
+        # Check if transaction already linked
+        if hasattr(transaction, 'linked_bill') and transaction.linked_bill:
+            return []
+
+        bills = self.get_eligible_bills_for_transaction(transaction)
+
+        # Calculate scores and sort
+        suggestions = []
+        for bill in bills:
+            score = self.calculate_relevance_score(transaction, bill)
+            suggestions.append({
+                'bill': bill,
+                'relevance_score': score
+            })
+
+        # Sort by score descending
+        suggestions.sort(key=lambda x: x['relevance_score'], reverse=True)
+
+        return suggestions[:limit]
+
+    def link_transaction_to_bill(self, transaction: TransactionModel, bill: 'Bill') -> 'Bill':
+        """
+        Link a transaction to a bill and mark bill as paid.
+
+        Raises ValueError if linking is not allowed.
+        """
+        from .models import Bill
+
+        # Validations
+        if bill.status != 'pending':
+            raise ValueError(f"Bill must be pending. Current status: {bill.status}")
+
+        if bill.amount_paid > 0:
+            raise ValueError("Bill already has prior payments. Only virgin bills can be linked.")
+
+        if bill.linked_transaction is not None:
+            raise ValueError("Bill is already linked to another transaction.")
+
+        # Check if transaction is already linked
+        if hasattr(transaction, 'linked_bill') and transaction.linked_bill:
+            raise ValueError("Transaction is already linked to another bill.")
+
+        if transaction.amount != bill.amount:
+            raise ValueError(
+                f"Amount mismatch. Transaction: {transaction.amount}, Bill: {bill.amount}"
+            )
+
+        # Check type compatibility
+        expected_tx_type = 'CREDIT' if bill.type == 'receivable' else 'DEBIT'
+        if transaction.type != expected_tx_type:
+            raise ValueError(
+                f"Type mismatch. Bill type '{bill.type}' requires transaction type '{expected_tx_type}'"
+            )
+
+        # Check same user
+        tx_user = transaction.account.connection.user
+        if tx_user != bill.user:
+            raise ValueError("Transaction and bill must belong to the same user.")
+
+        # Link and update bill
+        with transaction_db.atomic():
+            bill.linked_transaction = transaction
+            bill.amount_paid = bill.amount
+            bill.paid_at = transaction.date
+            bill.status = 'paid'
+            bill.save()
+
+        logger.info(
+            f"Linked transaction {transaction.id} to bill {bill.id}. "
+            f"Bill marked as paid."
+        )
+
+        return bill
+
+    def unlink_transaction_from_bill(self, bill: 'Bill') -> 'Bill':
+        """
+        Remove link between transaction and bill, reverting bill to pending.
+        """
+        if bill.linked_transaction is None:
+            raise ValueError("Bill is not linked to any transaction.")
+
+        tx_id = bill.linked_transaction.id
+
+        # Revert bill to pending state
+        bill.linked_transaction = None
+        bill.amount_paid = Decimal('0.00')
+        bill.paid_at = None
+        bill.status = 'pending'
+        bill.save()
+
+        logger.info(
+            f"Unlinked transaction {tx_id} from bill {bill.id}. "
+            f"Bill reverted to pending."
+        )
+
+        return bill
+
+    def auto_match_transactions(
+        self,
+        user,
+        transactions: List[TransactionModel]
+    ) -> Dict[str, List]:
+        """
+        Automatically match transactions to bills.
+
+        Only matches if:
+        - User has auto_match_transactions enabled
+        - Exactly ONE bill matches the transaction
+
+        Returns:
+            {
+                'matched': [{'transaction': tx, 'bill': bill}, ...],
+                'ambiguous': [{'transaction': tx, 'bills': [bill1, bill2]}, ...],
+                'no_match': [tx, ...]
+            }
+        """
+        from apps.authentication.models import UserSettings
+
+        # Check user settings
+        settings = UserSettings.get_or_create_for_user(user)
+
+        result = {
+            'matched': [],
+            'ambiguous': [],
+            'no_match': []
+        }
+
+        if not settings.auto_match_transactions:
+            logger.info(f"Auto-match disabled for user {user.id}")
+            result['no_match'] = list(transactions)
+            return result
+
+        for tx in transactions:
+            # Skip if already linked
+            if hasattr(tx, 'linked_bill') and tx.linked_bill:
+                continue
+
+            eligible_bills = self.get_eligible_bills_for_transaction(tx)
+
+            if len(eligible_bills) == 0:
+                result['no_match'].append(tx)
+            elif len(eligible_bills) == 1:
+                # Single match - auto link
+                bill = eligible_bills[0]
+                try:
+                    self.link_transaction_to_bill(tx, bill)
+                    result['matched'].append({
+                        'transaction': tx,
+                        'bill': bill
+                    })
+                    logger.info(f"Auto-matched transaction {tx.id} to bill {bill.id}")
+                except ValueError as e:
+                    logger.warning(f"Failed to auto-match transaction {tx.id}: {e}")
+                    result['no_match'].append(tx)
+            else:
+                # Multiple matches - ambiguous, user must decide
+                result['ambiguous'].append({
+                    'transaction': tx,
+                    'bills': eligible_bills
+                })
+                logger.info(
+                    f"Ambiguous match for transaction {tx.id}: "
+                    f"{len(eligible_bills)} bills with same value"
+                )
+
+        return result

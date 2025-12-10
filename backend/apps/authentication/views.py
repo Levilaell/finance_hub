@@ -10,12 +10,13 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 
-from .models import User, UserActivityLog
+from .models import User, UserActivityLog, UserSettings
 from .serializers import (
     RegisterSerializer,
     LoginSerializer,
     UserSerializer,
-    TokenResponseSerializer
+    TokenResponseSerializer,
+    UserSettingsSerializer
 )
 
 
@@ -153,3 +154,25 @@ def get_client_ip(request):
     else:
         ip = request.META.get('REMOTE_ADDR')
     return ip
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def user_settings_view(request):
+    """
+    Get or update user settings.
+    GET /api/auth/settings/ - Get current settings
+    PATCH /api/auth/settings/ - Update settings
+    """
+    settings = UserSettings.get_or_create_for_user(request.user)
+
+    if request.method == 'GET':
+        serializer = UserSettingsSerializer(settings)
+        return Response(serializer.data)
+
+    elif request.method == 'PATCH':
+        serializer = UserSettingsSerializer(settings, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.update(settings, serializer.validated_data)
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

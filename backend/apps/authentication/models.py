@@ -158,3 +158,46 @@ class UserActivityLog(models.Model):
             user_agent=user_agent,
             metadata=metadata
         )
+
+
+class UserSettings(models.Model):
+    """
+    User automation and behavior settings.
+    Each user has one settings record (created automatically via signal).
+    """
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='settings',
+        primary_key=True
+    )
+
+    # Automation settings
+    auto_match_transactions = models.BooleanField(
+        _('auto match transactions'),
+        default=True,
+        help_text='Automatically link transactions to bills when values match'
+    )
+
+    # Future automation settings (placeholders)
+    # auto_categorize_transactions = models.BooleanField(default=True)
+    # notify_overdue_bills = models.BooleanField(default=True)
+    # notify_large_transactions = models.BooleanField(default=False)
+
+    # Timestamps
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+
+    class Meta:
+        db_table = 'user_settings'
+        verbose_name = _('User Settings')
+        verbose_name_plural = _('User Settings')
+
+    def __str__(self):
+        return f"Settings for {self.user.email}"
+
+    @classmethod
+    def get_or_create_for_user(cls, user):
+        """Get or create settings for a user."""
+        settings, created = cls.objects.get_or_create(user=user)
+        return settings
