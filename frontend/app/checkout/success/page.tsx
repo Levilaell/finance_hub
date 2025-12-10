@@ -23,18 +23,19 @@ function CheckoutSuccessContent() {
 
   const verifySubscription = async () => {
     try {
-      // Wait 2s for Stripe webhook to process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
       // Get session_id from URL (provided by Stripe redirect)
       const sessionId = searchParams.get('session_id');
       console.log('[verifySubscription] session_id:', sessionId);
 
+      // If no session_id, redirect to dashboard (invalid access)
       if (!sessionId) {
-        console.error('[verifySubscription] No session_id in URL');
-        setVerifying(false);
+        console.warn('[verifySubscription] No session_id in URL, redirecting to dashboard');
+        router.push('/dashboard');
         return;
       }
+
+      // Wait 2s for Stripe webhook to process
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Call backend directly (bypass Next.js proxy to avoid redirect issues)
       const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
