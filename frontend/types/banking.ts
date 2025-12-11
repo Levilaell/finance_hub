@@ -121,6 +121,7 @@ export interface Category {
   icon: string;
   is_system: boolean;
   parent?: string | null;
+  subcategories?: Category[];
   created_at: string;
   updated_at: string;
 }
@@ -380,4 +381,69 @@ export interface AutoMatchResult {
 
 export interface UserSettings {
   auto_match_transactions: boolean;
+}
+
+// ============================================================
+// Category Rule Types
+// ============================================================
+
+export type CategoryRuleMatchType = 'prefix' | 'contains' | 'fuzzy';
+
+export interface CategoryRule {
+  id: string;
+  pattern: string;
+  match_type: CategoryRuleMatchType;
+  match_type_display: string;
+  category: string;
+  category_name: string;
+  category_color: string;
+  category_icon: string;
+  is_active: boolean;
+  applied_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CategoryRuleRequest {
+  pattern: string;
+  match_type: CategoryRuleMatchType;
+  category: string;
+}
+
+export interface CategoryRuleStats {
+  total_rules: number;
+  active_rules: number;
+  inactive_rules: number;
+  total_times_applied: number;
+}
+
+// Similar Transaction (for batch categorization)
+export interface SimilarTransaction {
+  id: string;
+  description: string;
+  merchant_name: string;
+  amount: string;
+  date: string;
+  match_type: 'merchant' | 'prefix' | 'fuzzy';
+  score: number;
+}
+
+export interface SimilarTransactionsResponse {
+  count: number;
+  transactions: SimilarTransaction[];
+  suggested_pattern: string;
+  suggested_match_type: CategoryRuleMatchType;
+}
+
+// Extended transaction update with batch operations
+export interface TransactionCategoryUpdateRequest {
+  user_category_id: string | null;
+  apply_to_similar?: boolean;
+  create_rule?: boolean;
+  similar_transaction_ids?: string[];
+}
+
+export interface TransactionCategoryUpdateResponse extends Transaction {
+  applied_to_similar: number;
+  rule_created: boolean;
 }

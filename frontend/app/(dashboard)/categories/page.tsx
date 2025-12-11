@@ -13,6 +13,7 @@ import {
   PencilIcon,
   TrashIcon,
   TagIcon,
+  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 import {
   Dialog,
@@ -76,6 +77,7 @@ export default function CategoriesPage() {
     type: 'expense',
     color: '#d946ef',
     icon: '📁',
+    parent: null,
   });
 
   useEffect(() => {
@@ -99,22 +101,36 @@ export default function CategoriesPage() {
     }
   };
 
-  const handleOpenDialog = (category?: Category) => {
+  const handleOpenDialog = (category?: Category, parentCategory?: Category) => {
     if (category) {
+      // Editing existing category
       setEditingCategory(category);
       setFormData({
         name: category.name,
         type: category.type,
         color: category.color,
         icon: category.icon,
+        parent: category.parent || null,
+      });
+    } else if (parentCategory) {
+      // Creating subcategory
+      setEditingCategory(null);
+      setFormData({
+        name: '',
+        type: parentCategory.type,
+        color: '#d946ef',
+        icon: '📁',
+        parent: parentCategory.id,
       });
     } else {
+      // Creating new parent category
       setEditingCategory(null);
       setFormData({
         name: '',
         type: 'expense',
         color: '#d946ef',
         icon: '📁',
+        parent: null,
       });
     }
     setIsDialogOpen(true);
@@ -138,13 +154,14 @@ export default function CategoriesPage() {
         toast.success('Categoria atualizada com sucesso!');
       } else {
         await bankingService.createCategory(formData);
-        toast.success('Categoria criada com sucesso!');
+        toast.success(formData.parent ? 'Subcategoria criada com sucesso!' : 'Categoria criada com sucesso!');
       }
       handleCloseDialog();
       fetchCategories();
     } catch (error: any) {
       console.error('Error saving category:', error);
       const errorMessage = error.response?.data?.name?.[0] ||
+                          error.response?.data?.parent?.[0] ||
                           error.response?.data?.detail ||
                           'Erro ao salvar categoria';
       toast.error(errorMessage);
@@ -179,6 +196,17 @@ export default function CategoriesPage() {
     setIsDeleteDialogOpen(true);
   };
 
+  // Check if category is a subcategory (has parent)
+  const isSubcategory = formData.parent !== null && formData.parent !== undefined;
+
+  // Get parent categories for the select (only categories without parent and same type)
+  const getParentOptions = () => {
+    return categories.filter(c =>
+      c.type === formData.type &&
+      c.id !== editingCategory?.id
+    );
+  };
+
   if (!isAuthenticated || !user || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -189,6 +217,88 @@ export default function CategoriesPage() {
 
   const incomeCategories = categories.filter((c) => c.type === 'income');
   const expenseCategories = categories.filter((c) => c.type === 'expense');
+
+  // Component to render a single category row
+  const CategoryRow = ({ category, isChild = false }: { category: Category; isChild?: boolean }) => (
+    <div
+      className={`flex items-center justify-between p-3 rounded-lg border border-white/10 hover:bg-white/5 transition-colors ${
+        isChild ? 'ml-8 bg-white/[0.02]' : ''
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        {isChild ? (
+          // Subcategory: only colored square, no icon
+          <div
+            className="w-8 h-8 rounded-lg"
+            style={{ backgroundColor: category.color }}
+          />
+        ) : (
+          // Parent category: colored square with icon
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
+            style={{ backgroundColor: category.color }}
+          >
+            {category.icon}
+          </div>
+        )}
+        <div>
+          <div className={`font-medium text-white ${isChild ? 'text-sm' : ''}`}>
+            {category.name}
+          </div>
+          {category.is_system && (
+            <div className="text-xs text-muted-foreground">Sistema</div>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        {!isChild && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleOpenDialog(undefined, category)}
+            title="Adicionar subcategoria"
+          >
+            <PlusIcon className="h-4 w-4" />
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleOpenDialog(category)}
+        >
+          <PencilIcon className="h-4 w-4" />
+        </Button>
+        {!category.is_system && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openDeleteDialog(category)}
+          >
+            <TrashIcon className="h-4 w-4 text-red-500" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
+  // Component to render category with its subcategories
+  const CategoryWithChildren = ({ category }: { category: Category }) => (
+    <div className="space-y-2">
+      <CategoryRow category={category} />
+      {category.subcategories && category.subcategories.length > 0 && (
+        <div className="space-y-2">
+          {category.subcategories.map((sub) => (
+            <CategoryRow key={sub.id} category={sub} isChild />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // Count total including subcategories
+  const countWithSubcategories = (cats: Category[]) => {
+    return cats.reduce((acc, cat) => acc + 1 + (cat.subcategories?.length || 0), 0);
+  };
 
   return (
     <div className="space-y-6">
@@ -211,50 +321,14 @@ export default function CategoriesPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TagIcon className="h-5 w-5 text-green-500" />
-            Receitas ({incomeCategories.length})
+            Receitas ({countWithSubcategories(incomeCategories)})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {incomeCategories.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="space-y-3">
               {incomeCategories.map((category) => (
-                <div
-                  key={category.id}
-                  className="flex items-center justify-between p-3 rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
-                      style={{ backgroundColor: category.color }}
-                    >
-                      {category.icon}
-                    </div>
-                    <div>
-                      <div className="font-medium text-white">{category.name}</div>
-                      {category.is_system && (
-                        <div className="text-xs text-muted-foreground">Sistema</div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleOpenDialog(category)}
-                    >
-                      <PencilIcon className="h-4 w-4" />
-                    </Button>
-                    {!category.is_system && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openDeleteDialog(category)}
-                      >
-                        <TrashIcon className="h-4 w-4 text-red-500" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
+                <CategoryWithChildren key={category.id} category={category} />
               ))}
             </div>
           ) : (
@@ -270,50 +344,14 @@ export default function CategoriesPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TagIcon className="h-5 w-5 text-red-500" />
-            Despesas ({expenseCategories.length})
+            Despesas ({countWithSubcategories(expenseCategories)})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {expenseCategories.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="space-y-3">
               {expenseCategories.map((category) => (
-                <div
-                  key={category.id}
-                  className="flex items-center justify-between p-3 rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
-                      style={{ backgroundColor: category.color }}
-                    >
-                      {category.icon}
-                    </div>
-                    <div>
-                      <div className="font-medium text-white">{category.name}</div>
-                      {category.is_system && (
-                        <div className="text-xs text-muted-foreground">Sistema</div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleOpenDialog(category)}
-                    >
-                      <PencilIcon className="h-4 w-4" />
-                    </Button>
-                    {!category.is_system && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openDeleteDialog(category)}
-                      >
-                        <TrashIcon className="h-4 w-4 text-red-500" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
+                <CategoryWithChildren key={category.id} category={category} />
               ))}
             </div>
           ) : (
@@ -329,12 +367,18 @@ export default function CategoriesPage() {
         <DialogContent className="bg-card border-border">
           <DialogHeader>
             <DialogTitle className="text-white">
-              {editingCategory ? 'Editar Categoria' : 'Nova Categoria'}
+              {editingCategory
+                ? 'Editar Categoria'
+                : isSubcategory
+                  ? 'Nova Subcategoria'
+                  : 'Nova Categoria'}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
               {editingCategory
                 ? 'Altere os dados da categoria'
-                : 'Crie uma nova categoria personalizada'}
+                : isSubcategory
+                  ? 'Crie uma subcategoria para organizar melhor suas transações'
+                  : 'Crie uma nova categoria personalizada'}
             </DialogDescription>
           </DialogHeader>
 
@@ -347,11 +391,46 @@ export default function CategoriesPage() {
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Ex: Alimentação"
+                placeholder={isSubcategory ? 'Ex: Carne e Pescados' : 'Ex: Fornecedores'}
                 className="mt-1"
               />
             </div>
 
+            {/* Parent category select - only show when creating/editing */}
+            <div>
+              <Label htmlFor="parent" className="text-white">
+                Categoria Pai (opcional)
+              </Label>
+              <Select
+                value={formData.parent || 'none'}
+                onValueChange={(value) => {
+                  const newParent = value === 'none' ? null : value;
+                  // If selecting a parent, inherit the type
+                  if (newParent) {
+                    const parentCat = categories.find(c => c.id === newParent);
+                    if (parentCat) {
+                      setFormData({ ...formData, parent: newParent, type: parentCat.type });
+                    }
+                  } else {
+                    setFormData({ ...formData, parent: null });
+                  }
+                }}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Nenhuma (categoria principal)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma (categoria principal)</SelectItem>
+                  {getParentOptions().map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Type select - disabled when has parent */}
             <div>
               <Label htmlFor="type" className="text-white">
                 Tipo
@@ -359,8 +438,9 @@ export default function CategoriesPage() {
               <Select
                 value={formData.type}
                 onValueChange={(value: 'income' | 'expense') =>
-                  setFormData({ ...formData, type: value })
+                  setFormData({ ...formData, type: value, parent: null })
                 }
+                disabled={isSubcategory}
               >
                 <SelectTrigger className="mt-1">
                   <SelectValue />
@@ -370,6 +450,11 @@ export default function CategoriesPage() {
                   <SelectItem value="expense">Despesa</SelectItem>
                 </SelectContent>
               </Select>
+              {isSubcategory && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Tipo herdado da categoria pai
+                </p>
+              )}
             </div>
 
             <div>
@@ -391,37 +476,55 @@ export default function CategoriesPage() {
               </div>
             </div>
 
-            <div>
-              <Label className="text-white">Ícone</Label>
-              <div className="grid grid-cols-8 gap-2 mt-2">
-                {PRESET_ICONS.map((icon) => (
-                  <button
-                    key={icon}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, icon })}
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-xl transition-all ${
-                      formData.icon === icon
-                        ? 'bg-white/20 ring-2 ring-white'
-                        : 'hover:bg-white/10'
-                    }`}
-                  >
-                    {icon}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
-              <div
-                className="w-12 h-12 rounded-lg flex items-center justify-center text-2xl"
-                style={{ backgroundColor: formData.color }}
-              >
-                {formData.icon}
-              </div>
+            {/* Icon select - hidden for subcategories */}
+            {!isSubcategory && (
               <div>
-                <div className="font-medium text-white">{formData.name || 'Nome da categoria'}</div>
+                <Label className="text-white">Ícone</Label>
+                <div className="grid grid-cols-8 gap-2 mt-2">
+                  {PRESET_ICONS.map((icon) => (
+                    <button
+                      key={icon}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, icon })}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-xl transition-all ${
+                        formData.icon === icon
+                          ? 'bg-white/20 ring-2 ring-white'
+                          : 'hover:bg-white/10'
+                      }`}
+                    >
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Preview */}
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
+              {isSubcategory ? (
+                <div
+                  className="w-8 h-8 rounded-lg"
+                  style={{ backgroundColor: formData.color }}
+                />
+              ) : (
+                <div
+                  className="w-12 h-12 rounded-lg flex items-center justify-center text-2xl"
+                  style={{ backgroundColor: formData.color }}
+                >
+                  {formData.icon}
+                </div>
+              )}
+              <div>
+                <div className="font-medium text-white">
+                  {formData.name || (isSubcategory ? 'Nome da subcategoria' : 'Nome da categoria')}
+                </div>
                 <div className="text-sm text-muted-foreground">
                   {formData.type === 'income' ? 'Receita' : 'Despesa'}
+                  {isSubcategory && (
+                    <span className="ml-2">
+                      <ChevronRightIcon className="inline h-3 w-3" /> Subcategoria
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -455,6 +558,16 @@ export default function CategoriesPage() {
                 <>
                   Você tem certeza que deseja excluir a categoria{' '}
                   <span className="font-semibold text-white">{deletingCategory.name}</span>?
+                  {deletingCategory.subcategories && deletingCategory.subcategories.length > 0 && (
+                    <>
+                      <br />
+                      <br />
+                      <span className="text-yellow-500 font-medium">
+                        Atenção: Esta categoria possui {deletingCategory.subcategories.length} subcategoria(s)
+                        que também serão excluídas.
+                      </span>
+                    </>
+                  )}
                   <br />
                   <br />
                   Esta ação não pode ser desfeita. As transações com esta categoria
