@@ -45,7 +45,7 @@ import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { LinkBillDialog } from '@/components/banking';
+import { LinkBillDialog, CategoryConfirmModal } from '@/components/banking';
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -59,6 +59,11 @@ export default function TransactionsPage() {
   const [updatingTransactionId, setUpdatingTransactionId] = useState<string | null>(null);
   const [showLinkBillDialog, setShowLinkBillDialog] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+
+  // Category confirmation modal state
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryModalTransaction, setCategoryModalTransaction] = useState<Transaction | null>(null);
+  const [categoryModalCategory, setCategoryModalCategory] = useState<Category | null>(null);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -170,31 +175,58 @@ export default function TransactionsPage() {
   };
 
   const handleUpdateCategory = async (transactionId: string, categoryId: string | null) => {
-    setUpdatingTransactionId(transactionId);
-    try {
-      await bankingService.updateTransactionCategory(transactionId, categoryId);
+    // If removing category, do it directly
+    if (!categoryId) {
+      setUpdatingTransactionId(transactionId);
+      try {
+        await bankingService.updateTransactionCategory(transactionId, null);
+        updateLocalTransactionCategory(transactionId, null);
+        toast.success('Categoria removida');
+      } catch (error) {
+        console.error('Error removing category:', error);
+        toast.error('Erro ao remover categoria');
+      } finally {
+        setUpdatingTransactionId(null);
+      }
+      return;
+    }
 
-      // Update local state
-      setTransactions(prev =>
-        prev.map(t =>
-          t.id === transactionId
-            ? {
-                ...t,
-                user_category_id: categoryId,
-                category: categoryId
-                  ? categories.find(c => c.id === categoryId)?.name
-                  : t.pluggy_category
-              }
-            : t
-        )
-      );
+    // For setting a category, open the modal to check for similar transactions
+    const transaction = transactions.find(t => t.id === transactionId);
+    const category = categories.find(c => c.id === categoryId);
 
-      toast.success('Categoria atualizada com sucesso!');
-    } catch (error) {
-      console.error('Error updating category:', error);
-      toast.error('Erro ao atualizar categoria');
-    } finally {
-      setUpdatingTransactionId(null);
+    if (transaction && category) {
+      setCategoryModalTransaction(transaction);
+      setCategoryModalCategory(category);
+      setShowCategoryModal(true);
+    }
+  };
+
+  const updateLocalTransactionCategory = (transactionId: string, categoryId: string | null) => {
+    setTransactions(prev =>
+      prev.map(t =>
+        t.id === transactionId
+          ? {
+              ...t,
+              user_category_id: categoryId,
+              category: categoryId
+                ? categories.find(c => c.id === categoryId)?.name
+                : t.pluggy_category
+            }
+          : t
+      )
+    );
+  };
+
+  const handleCategoryModalConfirm = (result: { appliedToSimilar: number; ruleCreated: boolean }) => {
+    if (categoryModalTransaction && categoryModalCategory) {
+      // Update the main transaction
+      updateLocalTransactionCategory(categoryModalTransaction.id, categoryModalCategory.id);
+
+      // If similar transactions were updated, refresh the list to show updated categories
+      if (result.appliedToSimilar > 0) {
+        fetchData();
+      }
     }
   };
 
@@ -843,6 +875,15 @@ export default function TransactionsPage() {
         open={showLinkBillDialog}
         onOpenChange={setShowLinkBillDialog}
         onLinked={fetchData}
+      />
+
+      {/* Category Confirmation Modal */}
+      <CategoryConfirmModal
+        open={showCategoryModal}
+        onOpenChange={setShowCategoryModal}
+        transaction={categoryModalTransaction}
+        selectedCategory={categoryModalCategory}
+        onConfirm={handleCategoryModalConfirm}
       />
     </div>
   );

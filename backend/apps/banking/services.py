@@ -940,9 +940,31 @@ class TransactionService:
                     pluggy_category_id = pluggy_tx.get('categoryId', '')
                     pluggy_category_id = pluggy_category_id if pluggy_category_id is not None else ''
 
-                    # Get or create category for this transaction
+                    # Check if transaction already exists (to preserve user_category)
                     user = account.connection.user
-                    category = get_or_create_category(user, pluggy_category, tx_type)
+                    existing_tx = TransactionModel.objects.filter(
+                        pluggy_transaction_id=pluggy_tx['id']
+                    ).first()
+
+                    # Determine category to use
+                    if existing_tx and existing_tx.user_category:
+                        # Preserve existing user category (was manually categorized)
+                        category_to_use = existing_tx.user_category
+                    else:
+                        # New transaction - try to apply category rules first
+                        temp_tx = TransactionModel(
+                            description=description,
+                            merchant_name=merchant_name,
+                            type=tx_type,
+                            account=account
+                        )
+                        rule_category = CategoryRuleService.apply_rules_to_transaction(temp_tx)
+                        if rule_category:
+                            category_to_use = rule_category
+                            logger.info(f"Applied category rule to transaction: {description[:30]}...")
+                        else:
+                            # Fallback to Pluggy category
+                            category_to_use = get_or_create_category(user, pluggy_category, tx_type)
 
                     tx_obj, created = TransactionModel.objects.update_or_create(
                         pluggy_transaction_id=pluggy_tx['id'],
@@ -958,7 +980,7 @@ class TransactionService:
                             'merchant_name': merchant_name,
                             'merchant_category': merchant_category,
                             'payment_data': pluggy_tx.get('paymentData'),
-                            'user_category': category,  # Assign the auto-created category
+                            'user_category': category_to_use,
                         }
                     )
                     synced_count += 1
@@ -1338,3 +1360,207 @@ class TransactionMatchService:
                 )
 
         return result
+
+
+class CategoryRuleService:
+    """
+    Serviço para gerenciamento de regras de categorização automática.
+    Permite encontrar transações similares e aplicar categorias automaticamente.
+    """
+
+    STOPWORDS = {'de', 'da', 'do', 'para', 'a', 'o', 'e', 'em', 'com', 'por', 'pix', 'ted', 'doc', 'pagto'}
+
+    @staticmethod
+    def normalize_text(text: str) -> str:
+        """
+        Normaliza texto para comparação de similaridade.
+        Remove acentos, converte para lowercase e strip.
+        """
+        if not text:
+            return ''
+        try:
+            from unidecode import unidecode
+            return unidecode(text.lower().strip())
+        except ImportError:
+            # Fallback se unidecode não estiver instalado
+            return text.lower().strip()
+
+    @staticmethod
+    def find_similar_transactions(user, transaction, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Encontra transações similares à transação dada.
+
+        Critérios de similaridade (em ordem de prioridade):
+        1. Mesmo merchant_name (se disponível) - score: 1.0
+        2. Prefixo comum >= 8 chars - score: 0.9
+        3. Similaridade fuzzy >= 70% - score: variável
+
+        Args:
+            user: Usuário dono das transações
+            transaction: Transação base para comparação
+            limit: Número máximo de transações a retornar
+
+        Returns:
+            Lista de dicts com 'transaction', 'score' e 'match_type'
+        """
+        from difflib import SequenceMatcher
+
+        base_desc = CategoryRuleService.normalize_text(transaction.description)
+        base_merchant = CategoryRuleService.normalize_text(transaction.merchant_name)
+
+        # Limita a últimos 6 meses, mesmo tipo de transação
+        six_months_ago = timezone.now() - timedelta(days=180)
+        candidates = TransactionModel.objects.filter(
+            account__connection__user=user,
+            type=transaction.type,
+            date__gte=six_months_ago,
+        ).exclude(
+            id=transaction.id
+        ).select_related('user_category', 'account', 'account__connection')[:500]
+
+        similar = []
+        for t in candidates:
+            # Pula se já foi categorizada manualmente (user_category diferente do pluggy)
+            if t.user_category:
+                translated_pluggy = get_category_translations().get(t.pluggy_category, t.pluggy_category)
+                if t.user_category.name != translated_pluggy:
+                    continue
+
+            score = 0.0
+            match_type = None
+            t_desc = CategoryRuleService.normalize_text(t.description)
+
+            # 1. Match por merchant_name (mais confiável)
+            if base_merchant and t.merchant_name:
+                t_merchant = CategoryRuleService.normalize_text(t.merchant_name)
+                if base_merchant == t_merchant:
+                    score = 1.0
+                    match_type = 'merchant'
+
+            # 2. Match por prefixo (primeiros 12 chars)
+            if not match_type and len(base_desc) >= 8 and len(t_desc) >= 8:
+                prefix_len = min(12, len(base_desc), len(t_desc))
+                if base_desc[:prefix_len] == t_desc[:prefix_len]:
+                    score = 0.9
+                    match_type = 'prefix'
+
+            # 3. Fuzzy match (similaridade >= 70%)
+            if not match_type and len(base_desc) >= 5 and len(t_desc) >= 5:
+                ratio = SequenceMatcher(None, base_desc, t_desc).ratio()
+                if ratio >= 0.70:
+                    score = ratio
+                    match_type = 'fuzzy'
+
+            if match_type:
+                similar.append({
+                    'transaction': t,
+                    'score': score,
+                    'match_type': match_type
+                })
+
+        # Ordena por score decrescente e limita
+        return sorted(similar, key=lambda x: -x['score'])[:limit]
+
+    @staticmethod
+    def create_rule_from_transaction(user, transaction, category) -> 'CategoryRule':
+        """
+        Cria uma regra de categorização baseada em uma transação.
+
+        Args:
+            user: Usuário dono da regra
+            transaction: Transação que servirá de base para o padrão
+            category: Categoria a ser aplicada
+
+        Returns:
+            CategoryRule criada ou atualizada
+
+        Raises:
+            ValueError: Se o padrão for muito curto (< 3 chars)
+        """
+        from .models import CategoryRule
+
+        # Determina o melhor padrão baseado nos dados disponíveis
+        if transaction.merchant_name:
+            pattern = CategoryRuleService.normalize_text(transaction.merchant_name)
+            match_type = 'contains'
+        else:
+            desc = CategoryRuleService.normalize_text(transaction.description)
+            pattern = desc[:12].strip()
+            match_type = 'prefix'
+
+        # Valida tamanho mínimo do padrão
+        if len(pattern) < 3:
+            raise ValueError("Padrão muito curto para criar regra automática")
+
+        # Cria ou atualiza a regra
+        rule, created = CategoryRule.objects.get_or_create(
+            user=user,
+            pattern=pattern,
+            match_type=match_type,
+            defaults={
+                'category': category,
+                'created_from_transaction': transaction
+            }
+        )
+
+        if not created:
+            # Atualiza categoria se a regra já existia
+            rule.category = category
+            rule.save(update_fields=['category', 'updated_at'])
+
+        logger.info(
+            f"{'Created' if created else 'Updated'} category rule: "
+            f"'{pattern}' ({match_type}) -> {category.name} for user {user.id}"
+        )
+
+        return rule
+
+    @staticmethod
+    def apply_rules_to_transaction(transaction) -> Optional[Category]:
+        """
+        Aplica regras de categorização a uma transação.
+
+        Verifica todas as regras ativas do usuário e retorna a primeira
+        categoria que fizer match (ordenado por data de criação).
+
+        Args:
+            transaction: Transação a ser categorizada
+
+        Returns:
+            Category se encontrar match, None caso contrário
+        """
+        from difflib import SequenceMatcher
+        from .models import CategoryRule
+
+        user = transaction.account.connection.user
+        rules = CategoryRule.objects.filter(
+            user=user,
+            is_active=True
+        ).select_related('category').order_by('created_at')
+
+        t_desc = CategoryRuleService.normalize_text(transaction.description)
+        t_merchant = CategoryRuleService.normalize_text(transaction.merchant_name)
+
+        for rule in rules:
+            matched = False
+
+            if rule.match_type == 'prefix':
+                matched = t_desc.startswith(rule.pattern)
+            elif rule.match_type == 'contains':
+                matched = rule.pattern in t_desc or rule.pattern in t_merchant
+            elif rule.match_type == 'fuzzy':
+                ratio = SequenceMatcher(None, rule.pattern, t_desc).ratio()
+                matched = ratio >= 0.70
+
+            if matched:
+                # Incrementa contador de aplicações
+                CategoryRule.objects.filter(id=rule.id).update(
+                    applied_count=models.F('applied_count') + 1
+                )
+                logger.debug(
+                    f"Rule '{rule.pattern}' matched transaction {transaction.id}, "
+                    f"applying category {rule.category.name}"
+                )
+                return rule.category
+
+        return None

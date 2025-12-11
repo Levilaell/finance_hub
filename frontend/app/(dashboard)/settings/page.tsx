@@ -22,12 +22,14 @@ import {
   CreditCardIcon,
   CogIcon,
   LinkIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { SubscriptionManagement } from '@/components/subscription/SubscriptionManagement';
 import { settingsService } from '@/services/settings.service';
-import { UserSettings } from '@/types/banking';
+import { bankingService } from '@/services/banking.service';
+import { UserSettings, CategoryRule } from '@/types/banking';
 import {
   Dialog,
   DialogContent,
@@ -65,6 +67,12 @@ export default function SettingsPage() {
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
 
+  // Category Rules state
+  const [categoryRules, setCategoryRules] = useState<CategoryRule[]>([]);
+  const [isLoadingRules, setIsLoadingRules] = useState(true);
+  const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
+  const [togglingRuleId, setTogglingRuleId] = useState<string | null>(null);
+
   // Fetch user settings on mount
   useEffect(() => {
     const fetchSettings = async () => {
@@ -79,6 +87,60 @@ export default function SettingsPage() {
     };
     fetchSettings();
   }, []);
+
+  // Fetch category rules
+  useEffect(() => {
+    const fetchRules = async () => {
+      try {
+        const rules = await bankingService.getCategoryRules();
+        setCategoryRules(rules);
+      } catch (error) {
+        console.error('Error fetching category rules:', error);
+      } finally {
+        setIsLoadingRules(false);
+      }
+    };
+    fetchRules();
+  }, []);
+
+  const handleToggleRule = async (ruleId: string, isActive: boolean) => {
+    setTogglingRuleId(ruleId);
+    try {
+      const updated = await bankingService.updateCategoryRule(ruleId, { is_active: isActive });
+      setCategoryRules(prev =>
+        prev.map(r => r.id === ruleId ? updated : r)
+      );
+      toast.success(isActive ? 'Regra ativada' : 'Regra desativada');
+    } catch (error) {
+      console.error('Error toggling rule:', error);
+      toast.error('Erro ao atualizar regra');
+    } finally {
+      setTogglingRuleId(null);
+    }
+  };
+
+  const handleDeleteRule = async (ruleId: string) => {
+    setDeletingRuleId(ruleId);
+    try {
+      await bankingService.deleteCategoryRule(ruleId);
+      setCategoryRules(prev => prev.filter(r => r.id !== ruleId));
+      toast.success('Regra excluída');
+    } catch (error) {
+      console.error('Error deleting rule:', error);
+      toast.error('Erro ao excluir regra');
+    } finally {
+      setDeletingRuleId(null);
+    }
+  };
+
+  const getMatchTypeLabel = (matchType: string) => {
+    switch (matchType) {
+      case 'prefix': return 'Prefixo';
+      case 'contains': return 'Contém';
+      case 'fuzzy': return 'Similar';
+      default: return matchType;
+    }
+  };
 
   const handleAutoMatchToggle = async (enabled: boolean) => {
     setIsUpdatingSettings(true);
@@ -501,6 +563,98 @@ export default function SettingsPage() {
                       manualmente a qualquer momento nas páginas de Contas ou Transações.
                     </p>
                   </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Category Rules Section */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <SparklesIcon className="h-5 w-5 mr-2" />
+                Regras de Categorização Automática
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                As regras de categorização aplicam automaticamente categorias a novas transações
+                com base em padrões definidos. Você pode criar regras ao categorizar uma transação
+                manualmente na página de Transações.
+              </p>
+
+              {isLoadingRules ? (
+                <div className="flex items-center justify-center py-8">
+                  <LoadingSpinner />
+                </div>
+              ) : categoryRules.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground border rounded-lg border-dashed">
+                  <SparklesIcon className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                  <p>Nenhuma regra de categorização criada.</p>
+                  <p className="text-sm mt-1">
+                    Categorize uma transação manualmente para criar sua primeira regra.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {categoryRules.map((rule) => (
+                    <div
+                      key={rule.id}
+                      className={`
+                        flex items-center justify-between p-4 rounded-lg border transition-colors
+                        ${rule.is_active
+                          ? 'bg-background border-border'
+                          : 'bg-muted/30 border-muted opacity-60'
+                        }
+                      `}
+                    >
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div
+                          className="w-8 h-8 rounded flex items-center justify-center text-sm flex-shrink-0"
+                          style={{ backgroundColor: rule.category_color }}
+                        >
+                          {rule.category_icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{rule.category_name}</span>
+                            <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                              {getMatchTypeLabel(rule.match_type)}
+                            </span>
+                          </div>
+                          <div className="text-sm text-muted-foreground truncate">
+                            Padrão: <code className="bg-muted px-1 rounded">{rule.pattern}</code>
+                          </div>
+                          {rule.applied_count > 0 && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Aplicada {rule.applied_count}x
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <Switch
+                          checked={rule.is_active}
+                          onCheckedChange={(checked) => handleToggleRule(rule.id, checked)}
+                          disabled={togglingRuleId === rule.id || deletingRuleId === rule.id}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteRule(rule.id)}
+                          disabled={deletingRuleId === rule.id}
+                          className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                        >
+                          {deletingRuleId === rule.id ? (
+                            <LoadingSpinner className="w-4 h-4" />
+                          ) : (
+                            <TrashIcon className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>

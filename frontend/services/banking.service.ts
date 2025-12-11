@@ -18,7 +18,13 @@ import {
   PaginatedResponse,
   Category,
   CategoryRequest,
-  BillSuggestion
+  BillSuggestion,
+  CategoryRule,
+  CategoryRuleRequest,
+  CategoryRuleStats,
+  SimilarTransactionsResponse,
+  TransactionCategoryUpdateRequest,
+  TransactionCategoryUpdateResponse
 } from "@/types/banking";
 
 class BankingService {
@@ -408,6 +414,77 @@ class BankingService {
     return apiClient.post<Transaction>(
       `/api/banking/transactions/${transactionId}/link_bill/`,
       { bill_id: billId }
+    );
+  }
+
+  // ============================================================
+  // Category Rules Methods
+  // ============================================================
+
+  /**
+   * Get all category rules for the current user
+   */
+  async getCategoryRules(): Promise<CategoryRule[]> {
+    const response = await apiClient.get<PaginatedResponse<CategoryRule>>(
+      "/api/banking/category-rules/"
+    );
+    return response.results;
+  }
+
+  /**
+   * Create a new category rule
+   */
+  async createCategoryRule(data: CategoryRuleRequest): Promise<CategoryRule> {
+    return apiClient.post<CategoryRule>("/api/banking/category-rules/", data);
+  }
+
+  /**
+   * Update a category rule (toggle active, change category, etc)
+   */
+  async updateCategoryRule(id: string, data: Partial<CategoryRule>): Promise<CategoryRule> {
+    return apiClient.patch<CategoryRule>(`/api/banking/category-rules/${id}/`, data);
+  }
+
+  /**
+   * Delete a category rule
+   */
+  async deleteCategoryRule(id: string): Promise<void> {
+    return apiClient.delete(`/api/banking/category-rules/${id}/`);
+  }
+
+  /**
+   * Get category rules statistics
+   */
+  async getCategoryRulesStats(): Promise<CategoryRuleStats> {
+    return apiClient.get<CategoryRuleStats>("/api/banking/category-rules/stats/");
+  }
+
+  // ============================================================
+  // Similar Transactions Methods
+  // ============================================================
+
+  /**
+   * Get similar transactions for batch categorization
+   */
+  async getSimilarTransactions(transactionId: string): Promise<SimilarTransactionsResponse> {
+    return apiClient.get<SimilarTransactionsResponse>(
+      `/api/banking/transactions/${transactionId}/similar/`
+    );
+  }
+
+  /**
+   * Update transaction category with optional batch operations
+   * - apply_to_similar: Apply the same category to similar transactions
+   * - create_rule: Create a rule for future transactions
+   * - similar_transaction_ids: IDs of similar transactions to update
+   */
+  async updateTransactionCategoryWithRule(
+    id: string,
+    data: TransactionCategoryUpdateRequest
+  ): Promise<TransactionCategoryUpdateResponse> {
+    return apiClient.patch<TransactionCategoryUpdateResponse>(
+      `/api/banking/transactions/${id}/`,
+      data
     );
   }
 }

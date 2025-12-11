@@ -12,7 +12,8 @@ from .views import (
     TransactionViewSet,
     SyncLogViewSet,
     CategoryViewSet,
-    BillViewSet
+    BillViewSet,
+    CategoryRuleViewSet
 )
 from .webhooks import pluggy_webhook_handler
 
@@ -27,6 +28,7 @@ router.register('transactions', TransactionViewSet, basename='transaction')
 router.register('sync-logs', SyncLogViewSet, basename='synclog')
 router.register('categories', CategoryViewSet, basename='category')
 router.register('bills', BillViewSet, basename='bill')
+router.register('category-rules', CategoryRuleViewSet, basename='categoryrule')
 
 urlpatterns = [
     # API routes (no need for 'api/' prefix as it's already added in core/urls.py)
