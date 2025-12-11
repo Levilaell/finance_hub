@@ -179,6 +179,15 @@ async logout() {
     const response = await this.client.delete<T>(url);
     return response.data;
   }
+
+  async postFormData<T>(url: string, formData: FormData): Promise<T> {
+    const response = await this.client.post<T>(url, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
 }
 
 export const apiClient = new ApiClient();

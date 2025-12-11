@@ -200,6 +200,53 @@ class BillsService {
       {}
     );
   }
+
+  // ============================================================
+  // OCR Upload Methods
+  // ============================================================
+
+  /**
+   * Upload a boleto file (PDF or image) and extract data using OCR
+   */
+  async uploadBoleto(file: File): Promise<OCRResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return apiClient.postFormData<OCRResult>(
+      '/api/banking/bills/upload_boleto/',
+      formData
+    );
+  }
+
+  /**
+   * Create a bill from OCR results after user review
+   */
+  async createFromOCR(data: BillRequest & {
+    barcode?: string;
+    ocr_confidence?: number;
+    ocr_raw_data?: Record<string, any>;
+  }): Promise<Bill> {
+    return apiClient.post<Bill>(
+      '/api/banking/bills/create_from_ocr/',
+      data
+    );
+  }
+}
+
+// OCR Result type
+export interface OCRResult {
+  success: boolean;
+  barcode: string;
+  amount: string | null;
+  due_date: string | null;
+  beneficiary: string;
+  confidence: number;
+  needs_review: boolean;
+  extracted_fields?: Record<string, any>;
+  error: string;
 }
 
 export const billsService = new BillsService();
+
+// Re-export types for convenience
+export type { BillRequest } from '@/types/banking';

@@ -13,7 +13,7 @@ from django.db.models import Sum, Count, Min, Max
 
 from .models import (
     Connector, BankConnection, BankAccount,
-    Transaction, SyncLog, Category, Bill
+    Transaction, SyncLog, Category, Bill, CategoryRule
 )
 from .serializers import (
     ConnectorSerializer, BankConnectionSerializer,
@@ -24,11 +24,13 @@ from .serializers import (
     BillFilterSerializer, RegisterPaymentSerializer, BillsSummarySerializer,
     LinkTransactionSerializer, LinkBillSerializer,
     TransactionSuggestionSerializer, BillSuggestionSerializer,
-    UserSettingsSerializer
+    UserSettingsSerializer,
+    BillUploadSerializer, BillOCRResultSerializer, BillFromOCRSerializer,
+    CategoryRuleSerializer
 )
 from .services import (
     ConnectorService, BankConnectionService,
-    TransactionService, TransactionMatchService
+    TransactionService, TransactionMatchService, CategoryRuleService
 )
 from .pluggy_client import PluggyClient
 from apps.authentication.models import UserActivityLog
@@ -672,28 +674,123 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         """
-        Update transaction category.
+        Update transaction category with optional batch operations.
         PATCH /api/banking/transactions/{id}/
-        Body: { "user_category_id": "uuid" } or { "user_category_id": null }
+
+        Body options:
+        - Simple: { "user_category_id": "uuid" }
+        - With batch: {
+            "user_category_id": "uuid",
+            "apply_to_similar": true,
+            "create_rule": true,
+            "similar_transaction_ids": ["uuid1", "uuid2"]
+          }
         """
-        partial = kwargs.pop('partial', True)  # Force partial update
+        import logging
+        logger = logging.getLogger(__name__)
+
+        partial = kwargs.pop('partial', True)
         instance = self.get_object()
 
-        # Only allow updating user_category
-        allowed_fields = {'user_category_id'}
+        # Extract batch operation flags
+        apply_to_similar = request.data.get('apply_to_similar', False)
+        create_rule = request.data.get('create_rule', False)
+        similar_ids = request.data.get('similar_transaction_ids', [])
+
+        # Only allow specific fields
+        allowed_fields = {'user_category_id', 'apply_to_similar', 'create_rule', 'similar_transaction_ids'}
         request_fields = set(request.data.keys())
 
         if not request_fields.issubset(allowed_fields):
             return Response(
-                {'error': 'Only user_category_id can be updated'},
+                {'error': 'Only user_category_id and batch operation fields are allowed'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        # Update the main transaction
+        update_data = {'user_category_id': request.data.get('user_category_id')}
+        serializer = self.get_serializer(instance, data=update_data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
-        return Response(serializer.data)
+        # Refresh to get updated category
+        instance.refresh_from_db()
+
+        # Track batch operation results
+        applied_count = 0
+        rule_created = False
+
+        # Apply to similar transactions if requested
+        if apply_to_similar and similar_ids and instance.user_category:
+            applied_count = Transaction.objects.filter(
+                id__in=similar_ids,
+                account__connection__user=request.user
+            ).update(user_category=instance.user_category)
+            logger.info(f"Applied category to {applied_count} similar transactions")
+
+        # Create rule if requested
+        if create_rule and instance.user_category:
+            try:
+                CategoryRuleService.create_rule_from_transaction(
+                    request.user,
+                    instance,
+                    instance.user_category
+                )
+                rule_created = True
+                logger.info(f"Created category rule from transaction {instance.id}")
+            except ValueError as e:
+                logger.warning(f"Could not create rule: {e}")
+
+        response_data = serializer.data
+        response_data['applied_to_similar'] = applied_count
+        response_data['rule_created'] = rule_created
+
+        return Response(response_data)
+
+    @action(detail=True, methods=['get'])
+    def similar(self, request, pk=None):
+        """
+        Get similar transactions for batch categorization.
+        GET /api/banking/transactions/{id}/similar/
+
+        Returns transactions that match by:
+        1. Same merchant_name (highest score)
+        2. Similar description prefix
+        3. Fuzzy description match (>70%)
+        """
+        transaction = self.get_object()
+
+        similar = CategoryRuleService.find_similar_transactions(
+            request.user,
+            transaction,
+            limit=50
+        )
+
+        # Determine suggested pattern
+        if transaction.merchant_name:
+            suggested_pattern = CategoryRuleService.normalize_text(transaction.merchant_name)
+            suggested_match_type = 'contains'
+        else:
+            suggested_pattern = CategoryRuleService.normalize_text(transaction.description)[:12]
+            suggested_match_type = 'prefix'
+
+        return Response({
+            'count': len(similar),
+            'transactions': [
+                {
+                    'id': str(s['transaction'].id),
+                    'description': s['transaction'].description,
+                    'merchant_name': s['transaction'].merchant_name or '',
+                    'amount': str(s['transaction'].amount),
+                    'date': s['transaction'].date.isoformat(),
+                    'match_type': s['match_type'],
+                    'score': round(s['score'], 2)
+                }
+                for s in similar
+            ],
+            'suggested_pattern': suggested_pattern,
+            'suggested_match_type': suggested_match_type
+        })
 
     @action(detail=True, methods=['get'])
     def suggested_bills(self, request, pk=None):
@@ -859,7 +956,11 @@ class CategoryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        queryset = Category.objects.filter(user=self.request.user)
+        # Only return parent categories (subcategories come nested)
+        queryset = Category.objects.filter(
+            user=self.request.user,
+            parent=None
+        ).prefetch_related('subcategories')
 
         # Filter by type if provided
         category_type = self.request.query_params.get('type')
@@ -1250,3 +1351,219 @@ class BillViewSet(viewsets.ModelViewSet):
             })
 
         return Response(actual_data)
+
+    @action(detail=False, methods=['post'])
+    def upload_boleto(self, request):
+        """
+        Upload a boleto file (PDF or image) and extract data using OCR.
+        POST /api/banking/bills/upload_boleto/
+
+        Returns extracted data for user review before creating a bill.
+        """
+        from .ocr_service import get_ocr_service, OCRResult
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        # Validate file upload
+        serializer = BillUploadSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        uploaded_file = serializer.validated_data['file']
+        logger.info(f"Processing boleto upload: {uploaded_file.name} ({uploaded_file.size} bytes)")
+
+        try:
+            # Process file with OCR
+            ocr_service = get_ocr_service()
+            result = ocr_service.process_file(uploaded_file)
+
+            if not result.success:
+                logger.warning(f"OCR processing failed: {result.error}")
+                return Response({
+                    'success': False,
+                    'error': result.error or 'Falha ao processar arquivo',
+                    'needs_review': True,
+                    'barcode': '',
+                    'amount': None,
+                    'due_date': None,
+                    'beneficiary': '',
+                    'confidence': 0,
+                }, status=status.HTTP_200_OK)  # Return 200 so frontend can handle gracefully
+
+            # Build response with extracted data
+            response_data = {
+                'success': True,
+                'barcode': result.barcode,
+                'amount': str(result.amount) if result.amount else None,
+                'due_date': result.due_date.strftime('%Y-%m-%d') if result.due_date else None,
+                'beneficiary': result.beneficiary,
+                'confidence': result.confidence,
+                'needs_review': result.needs_review,
+                'extracted_fields': result.extracted_fields,
+                'error': '',
+            }
+
+            logger.info(f"OCR success: confidence={result.confidence}, barcode_found={bool(result.barcode)}")
+
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        except ImportError as e:
+            logger.error(f"OCR dependency missing: {e}")
+            return Response({
+                'success': False,
+                'error': 'Serviço de OCR não disponível. Verifique as dependências.',
+                'needs_review': True,
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        except Exception as e:
+            logger.exception(f"Unexpected error during OCR processing: {e}")
+            return Response({
+                'success': False,
+                'error': f'Erro ao processar arquivo: {str(e)}',
+                'needs_review': True,
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'])
+    def create_from_ocr(self, request):
+        """
+        Create a bill from OCR results after user review.
+        POST /api/banking/bills/create_from_ocr/
+
+        Body: {
+            "type": "payable",
+            "description": "...",
+            "amount": 100.00,
+            "due_date": "2025-01-15",
+            "customer_supplier": "...",
+            "barcode": "...",
+            "ocr_confidence": 85.5,
+            "ocr_raw_data": {...}
+        }
+        """
+        serializer = BillFromOCRSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        bill = serializer.save()
+
+        return Response(
+            BillSerializer(bill).data,
+            status=status.HTTP_201_CREATED
+        )
+
+
+class CategoryRuleViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing category rules.
+
+    GET    /api/banking/category-rules/          List all rules
+    POST   /api/banking/category-rules/          Create a new rule
+    GET    /api/banking/category-rules/{id}/     Get rule details
+    PATCH  /api/banking/category-rules/{id}/     Update rule (toggle active, etc)
+    DELETE /api/banking/category-rules/{id}/     Delete rule
+    """
+    serializer_class = CategoryRuleSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
+
+    def get_queryset(self):
+        return CategoryRule.objects.filter(
+            user=self.request.user
+        ).select_related('category').order_by('-created_at')
+
+    def perform_create(self, serializer):
+        """Create rule with current user."""
+        # Normalize pattern before saving
+        pattern = serializer.validated_data.get('pattern', '')
+        normalized = CategoryRuleService.normalize_text(pattern)
+        serializer.save(user=self.request.user, pattern=normalized)
+
+    def create(self, request, *args, **kwargs):
+        """
+        Create a new category rule.
+        POST /api/banking/category-rules/
+
+        Body: {
+            "pattern": "UBER",
+            "match_type": "contains",
+            "category": "uuid"
+        }
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Check if rule already exists
+        pattern = CategoryRuleService.normalize_text(request.data.get('pattern', ''))
+        match_type = request.data.get('match_type', 'prefix')
+
+        existing = CategoryRule.objects.filter(
+            user=request.user,
+            pattern=pattern,
+            match_type=match_type
+        ).first()
+
+        if existing:
+            # Update existing rule instead of creating duplicate
+            existing.category_id = request.data.get('category')
+            existing.is_active = True
+            existing.save(update_fields=['category', 'is_active', 'updated_at'])
+            return Response(
+                CategoryRuleSerializer(existing).data,
+                status=status.HTTP_200_OK
+            )
+
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, *args, **kwargs):
+        """
+        Update a category rule (typically toggle is_active).
+        PATCH /api/banking/category-rules/{id}/
+
+        Body: { "is_active": false } or { "category": "uuid" }
+        """
+        instance = self.get_object()
+
+        # Only allow updating specific fields
+        allowed_fields = {'is_active', 'category', 'pattern', 'match_type'}
+        request_fields = set(request.data.keys())
+
+        if not request_fields.issubset(allowed_fields):
+            return Response(
+                {'error': 'Only is_active, category, pattern, and match_type can be updated'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Normalize pattern if updating
+        if 'pattern' in request.data:
+            request.data['pattern'] = CategoryRuleService.normalize_text(request.data['pattern'])
+
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """
+        Get statistics about category rules.
+        GET /api/banking/category-rules/stats/
+        """
+        rules = self.get_queryset()
+
+        total = rules.count()
+        active = rules.filter(is_active=True).count()
+        total_applied = sum(r.applied_count for r in rules)
+
+        return Response({
+            'total_rules': total,
+            'active_rules': active,
+            'inactive_rules': total - active,
+            'total_times_applied': total_applied
+        })

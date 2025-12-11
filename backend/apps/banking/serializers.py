@@ -6,7 +6,7 @@ Ref: https://www.django-rest-framework.org/api-guide/serializers/
 from rest_framework import serializers
 from .models import (
     Connector, BankConnection, BankAccount,
-    Transaction, SyncLog, Category, Bill
+    Transaction, SyncLog, Category, Bill, CategoryRule
 )
 
 
@@ -187,20 +187,50 @@ class SummarySerializer(serializers.Serializer):
 
 class CategorySerializer(serializers.ModelSerializer):
     """Serializer for categories."""
+    subcategories = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
         fields = [
             'id', 'name', 'type', 'color', 'icon',
-            'is_system', 'parent', 'created_at', 'updated_at'
+            'is_system', 'parent', 'subcategories', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'is_system', 'created_at', 'updated_at']
 
+    def get_subcategories(self, obj):
+        """Return subcategories only for parent categories."""
+        if obj.parent is None:
+            children = obj.subcategories.all()
+            if children.exists():
+                return CategoryChildSerializer(children, many=True).data
+        return []
+
     def validate(self, data):
-        """Validate that user doesn't create duplicate categories."""
+        """Validate category data including parent constraints."""
         user = self.context['request'].user
         name = data.get('name')
-        type_value = data.get('type')
+        type_value = data.get('type') or (self.instance.type if self.instance else None)
+        parent = data.get('parent')
+
+        # Validate parent constraints
+        if parent:
+            # 1. Parent must belong to the same user
+            if parent.user != user:
+                raise serializers.ValidationError({
+                    'parent': 'Categoria pai inválida'
+                })
+
+            # 2. Parent must be of the same type
+            if parent.type != type_value:
+                raise serializers.ValidationError({
+                    'parent': 'Categoria pai deve ser do mesmo tipo (receita/despesa)'
+                })
+
+            # 3. Parent cannot have a parent (max 2 levels)
+            if parent.parent is not None:
+                raise serializers.ValidationError({
+                    'parent': 'Não é permitido criar subcategoria de subcategoria'
+                })
 
         # Check for duplicates (excluding current instance on updates)
         queryset = Category.objects.filter(user=user, name=name, type=type_value)
@@ -213,6 +243,18 @@ class CategorySerializer(serializers.ModelSerializer):
             })
 
         return data
+
+
+class CategoryChildSerializer(serializers.ModelSerializer):
+    """Simplified serializer for subcategories (no nested children)."""
+
+    class Meta:
+        model = Category
+        fields = [
+            'id', 'name', 'type', 'color', 'icon',
+            'is_system', 'parent', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'is_system', 'created_at', 'updated_at']
 
 
 class BillSerializer(serializers.ModelSerializer):
@@ -463,3 +505,142 @@ class UserSettingsSerializer(serializers.Serializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+
+# ============================================================
+# OCR Upload Serializers
+# ============================================================
+
+class BillUploadSerializer(serializers.Serializer):
+    """Serializer for validating boleto file upload."""
+    file = serializers.FileField(required=True)
+
+    ALLOWED_EXTENSIONS = ['pdf', 'png', 'jpg', 'jpeg']
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+    def validate_file(self, value):
+        """Validate file extension and size."""
+        # Check file extension
+        file_ext = value.name.lower().split('.')[-1] if '.' in value.name else ''
+        if file_ext not in self.ALLOWED_EXTENSIONS:
+            raise serializers.ValidationError(
+                f"Formato não suportado. Use: {', '.join(self.ALLOWED_EXTENSIONS)}"
+            )
+
+        # Check file size
+        if value.size > self.MAX_FILE_SIZE:
+            max_mb = self.MAX_FILE_SIZE / (1024 * 1024)
+            raise serializers.ValidationError(
+                f"Arquivo muito grande. Máximo: {max_mb:.0f}MB"
+            )
+
+        return value
+
+
+class BillOCRResultSerializer(serializers.Serializer):
+    """Serializer for OCR processing result."""
+    success = serializers.BooleanField()
+    barcode = serializers.CharField(allow_blank=True)
+    amount = serializers.DecimalField(
+        max_digits=15, decimal_places=2, allow_null=True
+    )
+    due_date = serializers.DateField(allow_null=True)
+    beneficiary = serializers.CharField(allow_blank=True)
+    confidence = serializers.FloatField()
+    needs_review = serializers.BooleanField()
+    extracted_fields = serializers.DictField(required=False)
+    error = serializers.CharField(allow_blank=True)
+
+
+class BillFromOCRSerializer(serializers.ModelSerializer):
+    """
+    Serializer for creating a Bill from OCR results.
+    Used after user reviews and confirms OCR data.
+    """
+    # OCR-specific fields
+    barcode = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    ocr_confidence = serializers.FloatField(required=False, allow_null=True)
+    ocr_raw_data = serializers.JSONField(required=False, allow_null=True)
+
+    class Meta:
+        model = Bill
+        fields = [
+            'type', 'description', 'amount', 'due_date',
+            'customer_supplier', 'category', 'notes',
+            'barcode', 'ocr_confidence', 'ocr_raw_data'
+        ]
+
+    def create(self, validated_data):
+        """Create bill with OCR flag set."""
+        validated_data['created_from_ocr'] = True
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+# ============================================================
+# Category Rule Serializers
+# ============================================================
+
+class CategoryRuleSerializer(serializers.ModelSerializer):
+    """Serializer for category rules."""
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    category_color = serializers.CharField(source='category.color', read_only=True)
+    category_icon = serializers.CharField(source='category.icon', read_only=True)
+    match_type_display = serializers.CharField(source='get_match_type_display', read_only=True)
+
+    class Meta:
+        model = CategoryRule
+        fields = [
+            'id', 'pattern', 'match_type', 'match_type_display',
+            'category', 'category_name', 'category_color', 'category_icon',
+            'is_active', 'applied_count',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'applied_count', 'created_at', 'updated_at']
+
+    def validate_pattern(self, value):
+        """Validate pattern minimum length."""
+        if len(value) < 3:
+            raise serializers.ValidationError("Padrão deve ter pelo menos 3 caracteres")
+        return value
+
+    def validate_category(self, value):
+        """Ensure category belongs to the user."""
+        request = self.context.get('request')
+        if request and value.user != request.user:
+            raise serializers.ValidationError("Categoria inválida")
+        return value
+
+
+class SimilarTransactionSerializer(serializers.Serializer):
+    """Serializer for similar transactions response."""
+    id = serializers.UUIDField()
+    description = serializers.CharField()
+    merchant_name = serializers.CharField(allow_blank=True)
+    amount = serializers.DecimalField(max_digits=15, decimal_places=2)
+    date = serializers.DateTimeField()
+    match_type = serializers.CharField()
+    score = serializers.FloatField()
+
+
+class SimilarTransactionsResponseSerializer(serializers.Serializer):
+    """Response serializer for GET /transactions/{id}/similar/"""
+    count = serializers.IntegerField()
+    transactions = SimilarTransactionSerializer(many=True)
+    suggested_pattern = serializers.CharField()
+    suggested_match_type = serializers.CharField()
+
+
+class CategoryUpdateWithRuleSerializer(serializers.Serializer):
+    """
+    Serializer for PATCH /transactions/{id}/ with rule creation support.
+    Extends the normal category update with batch operations.
+    """
+    user_category_id = serializers.UUIDField(required=False, allow_null=True)
+    apply_to_similar = serializers.BooleanField(default=False)
+    create_rule = serializers.BooleanField(default=False)
+    similar_transaction_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        default=list,
+        required=False
+    )

@@ -5,6 +5,7 @@ Ref: https://docs.pluggy.ai/docs/data-structure
 
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.core.validators import FileExtensionValidator
 from django.utils import timezone
 from decimal import Decimal
 import uuid
@@ -341,6 +342,34 @@ class Bill(models.Model):
     # Notes
     notes = models.TextField(blank=True)
 
+    # OCR fields (for uploaded boletos)
+    source_file = models.FileField(
+        upload_to='bills/uploads/%Y/%m/',
+        null=True,
+        blank=True,
+        validators=[FileExtensionValidator(['pdf', 'png', 'jpg', 'jpeg'])],
+        help_text='Original boleto file (PDF or image)'
+    )
+    barcode = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='Linha digitável do boleto (47-48 dígitos)'
+    )
+    ocr_confidence = models.FloatField(
+        null=True,
+        blank=True,
+        help_text='OCR confidence score (0-100)'
+    )
+    ocr_raw_data = models.JSONField(
+        null=True,
+        blank=True,
+        help_text='Raw OCR extraction data'
+    )
+    created_from_ocr = models.BooleanField(
+        default=False,
+        help_text='Whether this bill was created from OCR upload'
+    )
+
     # Link to bank transaction (when paid through bank)
     # OneToOneField garante que uma transação só pode estar vinculada a uma bill
     linked_transaction = models.OneToOneField(
@@ -431,3 +460,56 @@ class SyncLog(models.Model):
 
     def __str__(self):
         return f"{self.sync_type} - {self.status} at {self.started_at}"
+
+
+class CategoryRule(models.Model):
+    """
+    Regra de categorização automática baseada em padrão de transação.
+    Permite aplicar automaticamente categorias a transações que matcham
+    um padrão específico (por prefixo, conteúdo ou similaridade fuzzy).
+    """
+    MATCH_TYPE_CHOICES = [
+        ('prefix', 'Prefixo'),
+        ('contains', 'Contém'),
+        ('fuzzy', 'Similaridade'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='category_rules')
+
+    # Padrão de matching (normalizado: sem acentos, lowercase)
+    pattern = models.CharField(max_length=200)
+    match_type = models.CharField(max_length=20, choices=MATCH_TYPE_CHOICES, default='prefix')
+
+    # Categoria a aplicar quando houver match
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='rules')
+
+    # Status e métricas
+    is_active = models.BooleanField(default=True)
+    applied_count = models.IntegerField(default=0)  # Quantas vezes foi aplicada
+
+    # Rastreabilidade
+    created_from_transaction = models.ForeignKey(
+        Transaction,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_rules',
+        help_text='Transação que originou a criação desta regra'
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Category Rule'
+        verbose_name_plural = 'Category Rules'
+        unique_together = [['user', 'pattern', 'match_type']]
+        indexes = [
+            models.Index(fields=['user', 'is_active']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_match_type_display()}: '{self.pattern}' → {self.category.name}"
