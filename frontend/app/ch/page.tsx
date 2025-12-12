@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, X, Check, Building2, Bot, FileSpreadsheet, Shield, Sparkles, ChevronDown } from "lucide-react";
+import { X, Check, Building2, Bot, FileSpreadsheet, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Footer } from "@/components/landing-v2/Footer";
@@ -85,16 +85,18 @@ function LandingContent() {
               </span>
             </Link>
 
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" asChild>
+            <div className="flex items-center gap-2 sm:gap-4">
+              <Button variant="ghost" size="sm" className="sm:size-default" asChild>
                 <a href="/login">Entrar</a>
               </Button>
               <Button
-                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground text-sm sm:text-base"
+                size="sm"
                 asChild
               >
                 <a href={`/register?price_id=${PRICE_ID_197}`}>
-                  Começar teste grátis
+                  <span className="hidden sm:inline">Começar teste grátis</span>
+                  <span className="sm:hidden">Testar grátis</span>
                 </a>
               </Button>
             </div>
@@ -140,7 +142,7 @@ function LandingContent() {
                     </a>
                   </Button>
                   <p className="text-sm text-muted-foreground">
-                    Cancele quando quiser.
+                    7 dias grátis. Cancele quando quiser.
                   </p>
                 </motion.div>
               </motion.div>
@@ -213,7 +215,7 @@ function LandingContent() {
                 Você reconhece isso?
               </h2>
 
-              <Card className="p-8 border-destructive/30 bg-destructive/5 mb-8">
+              <Card className="p-5 sm:p-8 border-destructive/30 bg-destructive/5 mb-8">
                 <div className="space-y-4">
                   {[
                     "Baixar extrato de 3 bancos diferentes todo mês",
@@ -296,7 +298,7 @@ function LandingContent() {
                   viewport={{ once: true }}
                   transition={{ duration: 0.6, delay: index * 0.2 }}
                 >
-                  <Card className="p-8 h-full relative overflow-hidden text-center">
+                  <Card className="p-5 sm:p-8 h-full relative overflow-hidden text-center">
                     <div className="absolute top-4 right-4 text-7xl font-bold text-primary/20">
                       {step.number}
                     </div>
@@ -421,11 +423,11 @@ function LandingContent() {
                 <table className="w-full border-collapse bg-card rounded-xl overflow-hidden shadow-lg">
                   <thead>
                     <tr>
-                      <th className="text-left p-6 bg-muted/50"></th>
-                      <th className="text-center p-6 bg-destructive/10 text-destructive font-bold text-lg">
+                      <th className="text-left p-3 sm:p-6 bg-muted/50"></th>
+                      <th className="text-center p-3 sm:p-6 bg-destructive/10 text-destructive font-bold text-sm sm:text-lg">
                         BPO Tradicional
                       </th>
-                      <th className="text-center p-6 bg-primary/10 text-primary font-bold text-lg">
+                      <th className="text-center p-3 sm:p-6 bg-primary/10 text-primary font-bold text-sm sm:text-lg">
                         CaixaHub
                       </th>
                     </tr>
@@ -439,9 +441,9 @@ function LandingContent() {
                       { label: "Setup", traditional: "Semanas", caixahub: "2 minutos" }
                     ].map((row, index) => (
                       <tr key={index} className="border-t border-border/50">
-                        <td className="p-6 font-semibold text-foreground">{row.label}</td>
-                        <td className="p-6 text-center text-muted-foreground">{row.traditional}</td>
-                        <td className="p-6 text-center text-primary font-semibold">{row.caixahub}</td>
+                        <td className="p-3 sm:p-6 font-semibold text-foreground text-sm sm:text-base">{row.label}</td>
+                        <td className="p-3 sm:p-6 text-center text-muted-foreground text-sm sm:text-base">{row.traditional}</td>
+                        <td className="p-3 sm:p-6 text-center text-primary font-semibold text-sm sm:text-base">{row.caixahub}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -533,7 +535,7 @@ function LandingContent() {
                 Comece a ver suas finanças com clareza
               </h2>
 
-              <Card className="p-10 border-primary/50 bg-card/50 backdrop-blur">
+              <Card className="p-6 sm:p-10 border-primary/50 bg-card/50 backdrop-blur">
                 <div className="space-y-6">
                   <div>
                     <div className="text-5xl lg:text-6xl font-bold text-foreground">
@@ -553,6 +555,10 @@ function LandingContent() {
                   </Button>
 
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-primary" />
+                      7 dias grátis
+                    </div>
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-primary" />
                       Cancele quando quiser
