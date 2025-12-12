@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { X, Check, Building2, Bot, FileSpreadsheet, Sparkles } from "lucide-react";
+import { X, Check, CheckCircle2, Building2, Bot, FileSpreadsheet, Sparkles, Zap, Clock, PiggyBank, Landmark } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Footer } from "@/components/landing-v2/Footer";
@@ -57,6 +57,21 @@ const BANK_LOGOS = [
   { name: "C6 Bank", logo: "/banks/c6.svg" },
   { name: "Sicoob", logo: "/banks/sicoob.svg" },
   { name: "BB", logo: "/banks/bb.svg" },
+];
+
+// Métricas de social proof
+const METRICS = [
+  { icon: Zap, value: "50.000+", label: "transações categorizadas" },
+  { icon: Landmark, value: "100+", label: "bancos conectados" },
+  { icon: Clock, value: "2 min", label: "para começar" },
+  { icon: PiggyBank, value: "R$ 1.300+", label: "economia média/mês" }
+];
+
+// Benefícios do Hero
+const HERO_BENEFITS = [
+  "Categorização automática de todas as transações",
+  "Consolidação de múltiplos bancos em um só lugar",
+  "Relatórios e DRE prontos em 2 cliques"
 ];
 
 function LandingContent() {
@@ -126,10 +141,25 @@ function LandingContent() {
                   </p>
                 </div>
 
+                <div className="space-y-3">
+                  {HERO_BENEFITS.map((benefit, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.4, delay: 0.2 + index * 0.1 }}
+                      className="flex items-start gap-3"
+                    >
+                      <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                      <p className="text-base sm:text-lg text-foreground/90">{benefit}</p>
+                    </motion.div>
+                  ))}
+                </div>
+
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.4 }}
+                  transition={{ duration: 0.5, delay: 0.6 }}
                   className="space-y-3 flex flex-col items-center lg:items-start"
                 >
                   <Button
@@ -169,33 +199,56 @@ function LandingContent() {
           </div>
         </section>
 
-        {/* Barra de Logos (Confiança) */}
+        {/* Social Proof - Métricas */}
         <section className="py-12 bg-muted/30 border-y border-border/30">
           <div className="container mx-auto px-4">
+            {/* Métricas */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
-              className="text-center"
+              className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 mb-8"
             >
-              <p className="text-lg text-muted-foreground mb-8">
-                Integrado com <strong className="text-foreground">100+ bancos brasileiros</strong>
-              </p>
-              <div className="flex flex-wrap justify-center items-center gap-8 lg:gap-12">
-                {BANK_LOGOS.map((bank, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: 10 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.4, delay: index * 0.05 }}
-                    className="text-muted-foreground/60 hover:text-foreground transition-colors"
-                  >
-                    <span className="text-lg font-semibold">{bank.name}</span>
-                  </motion.div>
-                ))}
-                <span className="text-lg font-semibold text-primary">+100</span>
+              {METRICS.map((metric, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  className="flex flex-col items-center text-center p-3 sm:p-4"
+                >
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2 sm:mb-3">
+                    <metric.icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                  </div>
+                  <span className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">{metric.value}</span>
+                  <span className="text-xs sm:text-sm text-muted-foreground">{metric.label}</span>
+                </motion.div>
+              ))}
+            </motion.div>
+
+            {/* Bancos */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="pt-6 border-t border-border/30"
+            >
+              <div className="flex flex-col items-center gap-3">
+                <span className="text-sm text-muted-foreground">Funciona com:</span>
+                <div className="flex flex-wrap justify-center gap-x-4 sm:gap-x-6 gap-y-2">
+                  {BANK_LOGOS.map((bank, index) => (
+                    <span
+                      key={index}
+                      className="text-sm sm:text-base font-medium text-muted-foreground/70 hover:text-foreground transition-colors"
+                    >
+                      {bank.name}
+                    </span>
+                  ))}
+                  <span className="text-sm sm:text-base font-medium text-primary">+100</span>
+                </div>
               </div>
             </motion.div>
           </div>
