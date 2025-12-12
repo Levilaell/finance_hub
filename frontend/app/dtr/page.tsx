@@ -42,7 +42,7 @@ const DTR_CONFIG = {
 // Bancos suportados
 const SUPPORTED_BANKS = [
   "Itaú", "Bradesco", "Santander", "Banco do Brasil", "Caixa",
-  "Nubank", "Inter", "Sicoob", "Sicredi"
+  "Nubank", "Inter", "Sicoob", "Sicredi", "+100"
 ];
 
 // Métricas de social proof
