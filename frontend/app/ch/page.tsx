@@ -9,9 +9,43 @@ import { Footer } from "@/components/landing-v2/Footer";
 import Image from "next/image";
 import Link from "next/link";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 // Price ID para o plano de R$197
 const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4PV1BYoKLt";
+
+// DTR (Dynamic Text Replacement) por ângulo de criativo
+const DTR_CONFIG = {
+  price: {
+    headline: "Você paga R$ 1.500/mês pra alguém organizar suas finanças?",
+    subheadline: "O CaixaHub faz o mesmo por R$ 197. Conecta no banco. Categoriza sozinho. Relatórios prontos."
+  },
+  time: {
+    headline: "Quantas horas você perde copiando extrato pra planilha?",
+    subheadline: "O CaixaHub conecta direto no banco e organiza tudo sozinho. Você só consulta."
+  },
+  profit: {
+    headline: "Você sabe quanto sua empresa lucrou esse mês?",
+    subheadline: "O CaixaHub puxa suas transações do banco e monta os relatórios automaticamente."
+  },
+  result: {
+    headline: "Você tem banco, ERP, planilha... mas não consegue ver o resultado?",
+    subheadline: "O CaixaHub conecta suas contas e calcula seu lucro automaticamente. Quanto tem. Quanto entra. Quanto sai. Quanto sobra."
+  },
+  bpo: {
+    headline: "BPO financeiro cobra R$ 1.500 pra fazer isso aqui:",
+    subheadline: "Baixar extrato. Categorizar transação. Montar relatório. O CaixaHub faz sozinho por R$ 197/mês."
+  },
+  accountant: {
+    headline: "Você só descobre o resultado da empresa quando o contador fecha?",
+    subheadline: "O CaixaHub mostra seu lucro real todo dia, não só no fim do mês."
+  },
+  default: {
+    headline: "Gestão financeira da sua empresa no automático",
+    subheadline: "Conecte seus bancos uma vez. Transações categorizadas, relatórios prontos — tudo automático."
+  }
+};
 
 // Logos dos bancos
 const BANK_LOGOS = [
@@ -25,7 +59,12 @@ const BANK_LOGOS = [
   { name: "BB", logo: "/banks/bb.svg" },
 ];
 
-export default function CaixaHubLandingPage() {
+function LandingContent() {
+  const searchParams = useSearchParams();
+  const angle = searchParams.get("a") as keyof typeof DTR_CONFIG | null;
+
+  // Usa configuração baseada no parâmetro ?a=, fallback para default
+  const dtr = DTR_CONFIG[angle || "default"] || DTR_CONFIG.default;
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -78,11 +117,10 @@ export default function CaixaHubLandingPage() {
               >
                 <div className="space-y-6">
                   <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight">
-                    Seu financeiro{" "}
-                    <span className="text-primary">organizado automaticamente</span>
+                    {dtr.headline}
                   </h1>
                   <p className="text-xl lg:text-2xl text-muted-foreground leading-relaxed">
-                    Conecte seus bancos, a IA categoriza tudo, você só consulta. Relatórios prontos todo dia. Sem planilha, sem BPO caro.
+                    {dtr.subheadline}
                   </p>
                 </div>
 
@@ -102,7 +140,7 @@ export default function CaixaHubLandingPage() {
                     </a>
                   </Button>
                   <p className="text-sm text-muted-foreground">
-                    Sem cartão de crédito. Cancele quando quiser.
+                    Cancele quando quiser.
                   </p>
                 </motion.div>
               </motion.div>
@@ -462,7 +500,7 @@ export default function CaixaHubLandingPage() {
                   },
                   {
                     question: "E se não servir para mim?",
-                    answer: "Teste grátis por 7 dias, sem cartão de crédito. Não gostou, não paga nada. Cancele quando quiser, sem multa."
+                    answer: "Teste grátis por 7 dias. Não gostou, não paga nada. Cancele quando quiser, sem multa."
                   }
                 ].map((faq, index) => (
                   <AccordionItem key={index} value={`item-${index}`} className="border rounded-lg px-6 bg-card">
@@ -517,10 +555,6 @@ export default function CaixaHubLandingPage() {
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-primary" />
-                      Sem cartão de crédito
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-primary" />
                       Cancele quando quiser
                     </div>
                     <div className="flex items-center gap-2">
@@ -537,5 +571,17 @@ export default function CaixaHubLandingPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function CaixaHubLandingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Carregando...</div>
+      </div>
+    }>
+      <LandingContent />
+    </Suspense>
   );
 }
