@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { X, Check, CheckCircle2, Building2, Bot, FileSpreadsheet, Sparkles, Zap, Clock, PiggyBank, Landmark } from "lucide-react";
+import { X, Check, CheckCircle2, Building2, Bot, FileSpreadsheet, Sparkles, Zap, Clock, PiggyBank, Landmark, Play } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Footer } from "@/components/landing-v2/Footer";
@@ -18,7 +18,7 @@ const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4
 // DTR (Dynamic Text Replacement) por ângulo de criativo
 const DTR_CONFIG = {
   price: {
-    headline: "Você paga R$ 1.500/mês pra alguém organizar suas finanças?",
+    headline: "Você paga R$ 1.500/mês pra alguém organizar as finanças da sua empresa?",
     subheadline: "O CaixaHub faz o mesmo por R$ 197. Conecta no banco. Categoriza sozinho. Relatórios prontos."
   },
   time: {
@@ -394,8 +394,99 @@ function LandingContent() {
           </div>
         </section>
 
-        {/* Funcionalidades (com screenshots) */}
+        {/* Vídeo Demonstração */}
         <section className="py-24 bg-background">
+          <div className="container mx-auto px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="text-center mb-12"
+            >
+              <h2 className="text-4xl lg:text-5xl font-bold mb-4">
+                Veja o CaixaHub em ação
+              </h2>
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                Em menos de 3 minutos, entenda como configurar e usar todas as funcionalidades
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.7 }}
+              className="max-w-4xl mx-auto"
+            >
+              <Card className="overflow-hidden border-border/50 shadow-2xl">
+                <div className="relative aspect-video bg-black">
+                  <video
+                    controls
+                    poster="/landing-images/dashboard.png"
+                    className="w-full h-full object-contain"
+                    preload="metadata"
+                  >
+                    <source src="/videos/demo.mp4" type="video/mp4" />
+                    Seu navegador não suporta vídeos.
+                  </video>
+                </div>
+              </Card>
+
+              {/* Timestamps/Capítulos */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 gap-4"
+              >
+                {[
+                  { time: "0:00", title: "Conectar banco", desc: "Open Finance em 2 minutos" },
+                  { time: "0:30", title: "Dashboard", desc: "Visão geral das finanças" },
+                  { time: "1:00", title: "Transações", desc: "Categorização automática com IA" },
+                  { time: "1:30", title: "Contas", desc: "A pagar e a receber" },
+                  { time: "2:00", title: "Categorias", desc: "Personalização completa" },
+                  { time: "2:30", title: "Relatórios", desc: "Gráficos e comparativos" },
+                ].map((chapter, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary text-xs font-mono font-bold flex-shrink-0">
+                      {chapter.time}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">{chapter.title}</p>
+                      <p className="text-xs text-muted-foreground">{chapter.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </motion.div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.5 }}
+              className="text-center mt-12"
+            >
+              <Button
+                size="lg"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                asChild
+              >
+                <a href={`/register?price_id=${PRICE_ID_197}`}>
+                  Quero testar grátis
+                </a>
+              </Button>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Funcionalidades (com screenshots) */}
+        <section className="py-24 bg-muted/30 border-t border-border/30">
           <div className="container mx-auto px-4">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
