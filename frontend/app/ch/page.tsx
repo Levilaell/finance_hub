@@ -55,16 +55,23 @@ const DTR_CONFIG = {
   }
 };
 
-// Logos dos bancos
-const BANK_LOGOS = [
-  { name: "Itaú", logo: "/banks/itau.svg" },
-  { name: "Bradesco", logo: "/banks/bradesco.svg" },
-  { name: "Santander", logo: "/banks/santander.svg" },
-  { name: "Nubank", logo: "/banks/nubank.svg" },
-  { name: "Inter", logo: "/banks/inter.svg" },
-  { name: "C6 Bank", logo: "/banks/c6.svg" },
-  { name: "Sicoob", logo: "/banks/sicoob.svg" },
-  { name: "BB", logo: "/banks/bb.svg" },
+// Bancos suportados via Pluggy CDN
+// IDs obtidos da API Pluggy - https://cdn.pluggy.ai/assets/connector-icons/{ID}.svg
+const SUPPORTED_BANKS = [
+  { id: 201, name: "Itaú", color: "#EC7000" },
+  { id: 202, name: "Bradesco", color: "#CC092F" },
+  { id: 204, name: "Santander", color: "#EC0000" },
+  { id: 1, name: "Nubank", color: "#820AD1" },
+  { id: 208, name: "Inter", color: "#FF7A00" },
+  { id: 212, name: "C6 Bank", color: "#242424" },
+  { id: 206, name: "Banco do Brasil", color: "#FFEF00" },
+  { id: 203, name: "Caixa", color: "#005CA9" },
+  { id: 213, name: "Sicoob", color: "#003641" },
+  { id: 214, name: "Sicredi", color: "#00A651" },
+  { id: 215, name: "BTG Pactual", color: "#001E50" },
+  { id: 211, name: "Safra", color: "#00205B" },
+  { id: 209, name: "Original", color: "#00A650" },
+  { id: 210, name: "PagBank", color: "#00A650" },
 ];
 
 // Métricas de social proof
@@ -236,28 +243,79 @@ function LandingContent() {
               ))}
             </motion.div>
 
-            {/* Bancos */}
+            {/* Carrossel de Bancos */}
             <motion.div
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.4 }}
-              className="pt-6 border-t border-border/30"
+              className="pt-8 border-t border-border/30"
             >
-              <div className="flex flex-col items-center gap-3">
-                <span className="text-sm text-muted-foreground">Funciona com:</span>
-                <div className="flex flex-wrap justify-center gap-x-4 sm:gap-x-6 gap-y-2">
-                  {BANK_LOGOS.map((bank, index) => (
-                    <span
-                      key={index}
-                      className="text-sm sm:text-base font-medium text-muted-foreground/70 hover:text-foreground transition-colors"
+              <p className="text-center text-sm text-muted-foreground mb-6">
+                Conecta com mais de 100 bancos brasileiros
+              </p>
+
+              {/* Marquee Container */}
+              <div className="relative overflow-hidden">
+                {/* Gradient Overlays */}
+                <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-muted/30 to-transparent z-10 pointer-events-none" />
+                <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-muted/30 to-transparent z-10 pointer-events-none" />
+
+                {/* Scrolling Track */}
+                <div className="flex animate-marquee">
+                  {/* First set */}
+                  {SUPPORTED_BANKS.map((bank, index) => (
+                    <div
+                      key={`first-${index}`}
+                      className="flex-shrink-0 mx-4 sm:mx-6"
                     >
-                      {bank.name}
-                    </span>
+                      <div
+                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-card border border-border/50 flex items-center justify-center p-3 hover:scale-110 transition-transform duration-300 shadow-sm"
+                        title={bank.name}
+                      >
+                        <img
+                          src={`https://cdn.pluggy.ai/assets/connector-icons/${bank.id}.svg`}
+                          alt={bank.name}
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            // Fallback: show bank initial with brand color
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            target.parentElement!.innerHTML = `<span class="text-xl font-bold" style="color: ${bank.color}">${bank.name.charAt(0)}</span>`;
+                          }}
+                        />
+                      </div>
+                    </div>
                   ))}
-                  <span className="text-sm sm:text-base font-medium text-primary">+100</span>
+                  {/* Duplicate set for seamless loop */}
+                  {SUPPORTED_BANKS.map((bank, index) => (
+                    <div
+                      key={`second-${index}`}
+                      className="flex-shrink-0 mx-4 sm:mx-6"
+                    >
+                      <div
+                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-card border border-border/50 flex items-center justify-center p-3 hover:scale-110 transition-transform duration-300 shadow-sm"
+                        title={bank.name}
+                      >
+                        <img
+                          src={`https://cdn.pluggy.ai/assets/connector-icons/${bank.id}.svg`}
+                          alt={bank.name}
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            target.parentElement!.innerHTML = `<span class="text-xl font-bold" style="color: ${bank.color}">${bank.name.charAt(0)}</span>`;
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
+
+              <p className="text-center text-xs text-muted-foreground/70 mt-4">
+                Itaú • Bradesco • Santander • Nubank • Inter • C6 • BB • Caixa • Sicoob • Sicredi • e mais
+              </p>
             </motion.div>
           </div>
         </section>
