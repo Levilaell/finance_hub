@@ -22,8 +22,16 @@ const DTR_CONFIG = {
     subheadline: "O CaixaHub faz o mesmo por R$ 197. Conecta no banco. Categoriza sozinho. Relatórios prontos."
   },
   time: {
-    headline: "Quantas horas você perde copiando extrato pra planilha?",
-    subheadline: "O CaixaHub conecta direto no banco e organiza tudo sozinho. Você só consulta."
+    headline: "Quantas horas por semana você perde organizando extrato em planilha?",
+    subheadline: "O CaixaHub conecta no banco e categoriza tudo sozinho. Você só consulta. Sem digitação, sem trabalho manual."
+  },
+  visibility: {
+    headline: "Sua empresa vende bem, mas no fim do mês nunca sobra dinheiro?",
+    subheadline: "O CaixaHub mostra exatamente onde o lucro está vazando. Categoriza cada transação e entrega o resultado em tempo real."
+  },
+  delay: {
+    headline: "Você só descobre o resultado da empresa quando o contador fecha?",
+    subheadline: "O CaixaHub mostra seu lucro real todo dia, não só no fim do mês. Receitas, despesas e fluxo de caixa atualizados em tempo real."
   },
   profit: {
     headline: "Você sabe quanto sua empresa lucrou esse mês?",
