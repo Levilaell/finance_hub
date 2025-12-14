@@ -174,10 +174,9 @@ O CaixaHub é uma plataforma que automatiza a organização financeira de pequen
 4. **Custo-Benefício** - 10x mais barato que BPO tradicional
 5. **Categorias Hierárquicas** - Estrutura organizacional flexível
 6. **Match Inteligente** - Vinculação automática título-transação
-7. **OCR de Boletos** - Extração automática de dados
-8. **Sync em Tempo Real** - Dados sempre atualizados
-9. **Multi-Banco** - Dashboard unificado para todas as contas
-10. **Insights Acionáveis** - Análise de saúde financeira com IA
+7. **Sync em Tempo Real** - Dados sempre atualizados
+8. **Multi-Banco** - Dashboard unificado para todas as contas
+9. **Insights Acionáveis** - Análise de saúde financeira com IA
 
 ---
 
