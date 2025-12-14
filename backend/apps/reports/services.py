@@ -707,20 +707,28 @@ class ReportsService:
                 pluggy_category_id = tx.pluggy_category_id or ''
                 pluggy_category_name = tx.pluggy_category or ''
 
-                # If user has custom category, use it
+                # If user has custom category, use it for naming AND DRE group determination
                 if tx.user_category:
                     category_name = tx.user_category.name
                     parent_name = tx.user_category.parent.name if tx.user_category.parent else None
+
+                    # Determine DRE group based on user_category type
+                    # This ensures custom categories are NEVER excluded from DRE
+                    user_cat_type = tx.user_category.type  # 'income' or 'expense'
+                    if user_cat_type == 'income':
+                        dre_group = DREGroup.RECEITAS_OPERACIONAIS.value
+                    else:
+                        dre_group = DREGroup.DESPESAS_OPERACIONAIS.value
                 else:
                     category_name = get_category_display_name(pluggy_category_id, pluggy_category_name)
                     parent_id = get_parent_category_id(pluggy_category_id)
                     parent_name = get_category_display_name(parent_id) if parent_id else None
 
-                # Determine DRE group
-                dre_group = get_dre_group_for_category(pluggy_category_id, tx.type)
+                    # Determine DRE group based on Pluggy category
+                    dre_group = get_dre_group_for_category(pluggy_category_id, tx.type)
 
                 if dre_group is None:
-                    continue  # Excluded transaction
+                    continue  # Excluded transaction (only for Pluggy categories like transfers)
 
                 if dre_group not in groups:
                     continue
@@ -836,7 +844,7 @@ class ReportsService:
             }
             response['comparison'] = comparison_dre
 
-            # Calculate variations
+            # Calculate summary variations
             variations = {}
             for key in current_dre['summary']:
                 current_val = current_dre['summary'][key]
@@ -851,6 +859,50 @@ class ReportsService:
                     'percentage': round(variation_percent, 2)
                 }
             response['variations'] = variations
+
+            # Calculate category variations - Add previous_total and variation to each category/subcategory
+            def calc_variation(current, previous):
+                """Calculate variation percentage safely."""
+                if previous != 0:
+                    return round(((current - previous) / abs(previous)) * 100, 2)
+                return 100.0 if current > 0 else 0.0
+
+            # Build comparison lookup by group_id -> category_name -> data
+            comp_lookup = {}
+            for comp_group in comparison_dre['groups']:
+                comp_lookup[comp_group['id']] = {}
+                for comp_cat in comp_group['categories']:
+                    comp_lookup[comp_group['id']][comp_cat['name']] = {
+                        'total': comp_cat['total'],
+                        'subcategories': {sub['name']: sub['total'] for sub in comp_cat['subcategories']}
+                    }
+
+            # Enrich current groups with variation data
+            for group in current_dre['groups']:
+                group_id = group['id']
+                comp_group_data = comp_lookup.get(group_id, {})
+
+                # Calculate group variation
+                comp_group = next((g for g in comparison_dre['groups'] if g['id'] == group_id), None)
+                comp_total = comp_group['total'] if comp_group else 0
+                group['previous_total'] = comp_total
+                group['variation'] = calc_variation(group['total'], comp_total)
+
+                for category in group['categories']:
+                    cat_name = category['name']
+                    comp_cat_data = comp_group_data.get(cat_name, {'total': 0, 'subcategories': {}})
+
+                    # Add previous_total and variation to category
+                    category['previous_total'] = comp_cat_data['total']
+                    category['variation'] = calc_variation(category['total'], comp_cat_data['total'])
+
+                    for subcategory in category['subcategories']:
+                        sub_name = subcategory['name']
+                        comp_sub_total = comp_cat_data['subcategories'].get(sub_name, 0)
+
+                        # Add previous_total and variation to subcategory
+                        subcategory['previous_total'] = comp_sub_total
+                        subcategory['variation'] = calc_variation(subcategory['total'], comp_sub_total)
 
         return response
 

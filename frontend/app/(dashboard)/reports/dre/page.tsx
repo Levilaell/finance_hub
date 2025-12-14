@@ -519,8 +519,20 @@ export default function DREPage() {
                                 </td>
                                 {hasComparison && (
                                   <>
-                                    <td className="py-2 px-4 text-right text-white/50">-</td>
-                                    <td className="py-2 px-4 text-right">-</td>
+                                    <td className="py-2 px-4 text-right text-white/50">
+                                      {category.previous_total !== undefined
+                                        ? formatCurrency(category.previous_total)
+                                        : '-'}
+                                    </td>
+                                    <td className={`py-2 px-4 text-right ${
+                                      category.variation !== undefined
+                                        ? getVariationClass(category.variation, isExpense)
+                                        : ''
+                                    }`}>
+                                      {category.variation !== undefined
+                                        ? formatVariation(category.variation)
+                                        : '-'}
+                                    </td>
                                   </>
                                 )}
                               </tr>
@@ -539,8 +551,20 @@ export default function DREPage() {
                                   </td>
                                   {hasComparison && (
                                     <>
-                                      <td className="py-2 px-4 text-right text-white/40">-</td>
-                                      <td className="py-2 px-4 text-right">-</td>
+                                      <td className="py-2 px-4 text-right text-white/40 text-sm">
+                                        {sub.previous_total !== undefined
+                                          ? formatCurrency(sub.previous_total)
+                                          : '-'}
+                                      </td>
+                                      <td className={`py-2 px-4 text-right text-sm ${
+                                        sub.variation !== undefined
+                                          ? getVariationClass(sub.variation, isExpense)
+                                          : ''
+                                      }`}>
+                                        {sub.variation !== undefined
+                                          ? formatVariation(sub.variation)
+                                          : '-'}
+                                      </td>
                                     </>
                                   )}
                                 </tr>

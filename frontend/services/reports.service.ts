@@ -156,12 +156,16 @@ export interface DashboardSummaryData {
 export interface DRESubcategory {
   name: string;
   total: number;
+  previous_total?: number;  // Only present when comparing periods
+  variation?: number;       // Percentage variation
 }
 
 export interface DRECategory {
   name: string;
   total: number;
   subcategories: DRESubcategory[];
+  previous_total?: number;  // Only present when comparing periods
+  variation?: number;       // Percentage variation
 }
 
 export interface DREGroup {
@@ -170,6 +174,8 @@ export interface DREGroup {
   sign: string;
   total: number;
   categories: DRECategory[];
+  previous_total?: number;  // Only present when comparing periods
+  variation?: number;       // Percentage variation
 }
 
 export interface DRESummary {
