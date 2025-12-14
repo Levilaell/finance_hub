@@ -73,7 +73,7 @@ export function CategoryConfirmModal({
       setSelectedIds(new Set(response.transactions.map(t => t.id)));
     } catch (error) {
       console.error('Error fetching similar transactions:', error);
-      toast.error('Erro ao buscar transacoes similares');
+      toast.error('Erro ao buscar transações similares');
     } finally {
       setIsLoading(false);
     }
@@ -118,10 +118,10 @@ export function CategoryConfirmModal({
       const messages: string[] = [];
       messages.push('Categoria atualizada');
       if (result.applied_to_similar > 0) {
-        messages.push(`${result.applied_to_similar} transacoes similares atualizadas`);
+        messages.push(`${result.applied_to_similar} transações similares atualizadas`);
       }
       if (result.rule_created) {
-        messages.push('Regra criada para futuras transacoes');
+        messages.push('Regra criada para futuras transações');
       }
       toast.success(messages.join('. '));
 
@@ -179,7 +179,7 @@ export function CategoryConfirmModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <SparklesIcon className="h-5 w-5 text-blue-500" />
-            Transacoes Similares Encontradas
+            Transações Similares Encontradas
           </DialogTitle>
           <DialogDescription>
             Deseja aplicar a categoria{' '}
@@ -192,7 +192,7 @@ export function CategoryConfirmModal({
               </span>
               {selectedCategory.name}
             </span>{' '}
-            tambem a estas transacoes similares?
+            também a estas transações similares?
           </DialogDescription>
         </DialogHeader>
 
@@ -204,8 +204,8 @@ export function CategoryConfirmModal({
           ) : similarTransactions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <DocumentDuplicateIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>Nenhuma transacao similar encontrada.</p>
-              <p className="text-sm mt-1">A categoria sera aplicada apenas a esta transacao.</p>
+              <p>Nenhuma transação similar encontrada.</p>
+              <p className="text-sm mt-1">A categoria será aplicada apenas a esta transação.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -219,7 +219,7 @@ export function CategoryConfirmModal({
                     Selecionar todas
                   </Button>
                   <Button variant="ghost" size="sm" onClick={deselectAll}>
-                    Limpar selecao
+                    Limpar seleção
                   </Button>
                 </div>
               </div>
@@ -275,11 +275,11 @@ export function CategoryConfirmModal({
                     onCheckedChange={(checked) => setCreateRule(!!checked)}
                   />
                   <div>
-                    <div className="font-medium">Criar regra para futuras transacoes</div>
+                    <div className="font-medium">Criar regra para futuras transações</div>
                     <div className="text-sm text-muted-foreground mt-0.5">
-                      Transacoes com padrao similar a{' '}
+                      Transações com padrão similar a{' '}
                       <code className="bg-muted px-1 rounded">{suggestedPattern || transaction.description.substring(0, 15)}</code>{' '}
-                      serao automaticamente categorizadas
+                      serão automaticamente categorizadas
                     </div>
                   </div>
                 </label>

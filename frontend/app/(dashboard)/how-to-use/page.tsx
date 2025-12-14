@@ -304,7 +304,7 @@ export default function ComoUsarPage() {
             <div className="h-10 w-10 rounded-lg bg-gray-500/20 border border-gray-500/30 flex items-center justify-center">
               <CogIcon className="h-5 w-5 text-gray-400" />
             </div>
-            <h3 className="text-xl font-semibold text-white">Configuracoes</h3>
+            <h3 className="text-xl font-semibold text-white">Configurações</h3>
           </div>
           <p className="text-muted-foreground mb-3">Gerencie sua conta:</p>
           <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
@@ -357,7 +357,7 @@ export default function ComoUsarPage() {
             Se tiver problemas ao conectar sua conta ou sincronizar:
           </p>
           <ul className="mt-3 space-y-2 text-muted-foreground ml-6 list-disc text-sm">
-            <li>Verifique se seu banco esta disponivel</li>
+            <li>Verifique se seu banco está disponível</li>
             <li>Tente desconectar e reconectar a conta</li>
             <li>Aguarde alguns minutos entre tentativas</li>
           </ul>
