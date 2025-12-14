@@ -476,12 +476,9 @@ export default function DREPage() {
                                 {compGroup ? formatCurrency(compGroup.total) : '-'}
                               </td>
                               <td className="py-3 px-4 text-right">
-                                {compGroup && compGroup.total > 0 && (
-                                  <span className={getVariationClass(
-                                    ((group.total - compGroup.total) / compGroup.total) * 100,
-                                    isExpense
-                                  )}>
-                                    {formatVariation(((group.total - compGroup.total) / compGroup.total) * 100)}
+                                {group.variation !== undefined && (
+                                  <span className={getVariationClass(group.variation, isExpense)}>
+                                    {formatVariation(group.variation)}
                                   </span>
                                 )}
                               </td>
