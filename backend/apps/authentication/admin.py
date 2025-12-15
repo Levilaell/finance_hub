@@ -15,20 +15,22 @@ class UserAdmin(BaseUserAdmin):
     """
     # Display fields in list view
     list_display = (
-        'username', 
-        'email', 
-        'first_name', 
-        'last_name', 
-        'is_staff', 
+        'username',
+        'email',
+        'first_name',
+        'last_name',
+        'acquisition_angle',
+        'is_staff',
         'is_active',
         'created_at'
     )
-    
+
     # Fields to filter by in the right sidebar
     list_filter = (
-        'is_staff', 
-        'is_superuser', 
-        'is_active', 
+        'is_staff',
+        'is_superuser',
+        'is_active',
+        'acquisition_angle',
         'created_at'
     )
     
@@ -52,6 +54,9 @@ class UserAdmin(BaseUserAdmin):
         (_('Additional info'), {
             'fields': ('timezone', 'last_login_ip'),
         }),
+        (_('Acquisition tracking'), {
+            'fields': ('signup_price_id', 'acquisition_angle'),
+        }),
     )
     
     # Fields to display when creating a new user
@@ -65,7 +70,7 @@ class UserAdmin(BaseUserAdmin):
     )
     
     # Read-only fields
-    readonly_fields = ('last_login', 'date_joined', 'created_at', 'updated_at', 'last_login_ip')
+    readonly_fields = ('last_login', 'date_joined', 'created_at', 'updated_at', 'last_login_ip', 'signup_price_id', 'acquisition_angle')
 
 
 @admin.register(PasswordReset)

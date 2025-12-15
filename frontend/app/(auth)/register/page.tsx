@@ -20,6 +20,7 @@ import { trackLead, trackViewContent, trackRegistration } from '@/lib/meta-pixel
 import { AuthHeader } from '@/components/landing-v2/AuthHeader';
 import { Footer } from '@/components/landing-v2/Footer';
 import { startStripeCheckout, getPriceIdFromUrl } from '@/utils/checkout';
+import { getAcquisitionAngle, clearAcquisitionAngle } from '@/hooks/use-acquisition-tracking';
 
 function RegisterContent() {
   const router = useRouter();
@@ -55,12 +56,19 @@ function RegisterContent() {
 
   const onSubmit = async (data: RegisterData) => {
     try {
-      // Inclui price_id nos dados de registro para salvar no perfil
+      // Recupera o ângulo de aquisição do localStorage
+      const acquisitionAngle = getAcquisitionAngle();
+
+      // Inclui price_id e acquisition_angle nos dados de registro para salvar no perfil
       const registerData = {
         ...data,
         price_id: priceId || sessionStorage.getItem('checkout_price_id') || undefined,
+        acquisition_angle: acquisitionAngle || undefined,
       };
       await registerUser(registerData);
+
+      // Limpa o acquisition_angle após registro bem-sucedido
+      clearAcquisitionAngle();
 
       trackLead({
         content_name: 'Registration Form',

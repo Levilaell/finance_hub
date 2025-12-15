@@ -46,6 +46,13 @@ class RegisterSerializer(serializers.ModelSerializer):
         allow_blank=True,
         help_text='Stripe Price ID da landing page de origem'
     )
+    # Ângulo de aquisição para tracking de campanhas
+    acquisition_angle = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        help_text='Ângulo/campanha de aquisição (ex: time, price, delay, visibility)'
+    )
 
     class Meta:
         model = User
@@ -55,6 +62,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             'phone',
             'password',
             'price_id',
+            'acquisition_angle',
         )
 
     def validate_email(self, value):
@@ -74,6 +82,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         """Criar apenas User (sem Company)"""
         # Extrair price_id antes de criar usuário
         price_id = validated_data.pop('price_id', None)
+        # Extrair acquisition_angle antes de criar usuário
+        acquisition_angle = validated_data.pop('acquisition_angle', None)
 
         # Gerar username a partir do email
         validated_data['username'] = validated_data['email']
@@ -81,6 +91,10 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Salvar price_id no campo correto se fornecido
         if price_id:
             validated_data['signup_price_id'] = price_id
+
+        # Salvar acquisition_angle se fornecido
+        if acquisition_angle:
+            validated_data['acquisition_angle'] = acquisition_angle
 
         # Criar User
         user = User.objects.create_user(**validated_data)

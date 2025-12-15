@@ -33,6 +33,16 @@ class User(AbstractUser):
         help_text='Stripe Price ID da landing page onde o usuário se cadastrou'
     )
 
+    # Ângulo de aquisição (UTM) - para tracking de campanhas
+    # Valores esperados: time, price, delay, visibility
+    acquisition_angle = models.CharField(
+        _('acquisition angle'),
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text='Ângulo/campanha de aquisição (ex: time, price, delay, visibility)'
+    )
+
     class Meta:
         db_table = 'users'
         verbose_name = _('User')

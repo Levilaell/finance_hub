@@ -39,6 +39,7 @@ export interface RegisterData {
   phone: string;
   password: string;
   price_id?: string; // Para teste A/B de preços
+  acquisition_angle?: string; // Para tracking de campanhas (ex: time, price, delay, visibility)
 }
 
 export interface LoginResponse {

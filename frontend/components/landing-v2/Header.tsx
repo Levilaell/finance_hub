@@ -4,8 +4,12 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
+import { useAcquisitionTracking } from "@/hooks/use-acquisition-tracking";
 
 export const Header = () => {
+  // Captura parâmetro de aquisição (UTM) da URL e salva no localStorage
+  useAcquisitionTracking();
+
   return (
     <motion.header
       initial={{ opacity: 0, y: -20 }}
