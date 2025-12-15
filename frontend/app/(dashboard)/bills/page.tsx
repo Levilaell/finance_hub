@@ -34,8 +34,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { LinkTransactionDialog } from '@/components/banking';
-import { BillUploadDialog } from '@/components/banking/BillUploadDialog';
-import { DocumentArrowUpIcon } from '@heroicons/react/24/outline';
 
 export default function BillsPage() {
   const router = useRouter();
@@ -48,7 +46,6 @@ export default function BillsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
-  const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState<string | null>(null);
@@ -295,14 +292,6 @@ export default function BillsPage() {
             ) : (
               <ArrowPathIcon className="h-4 w-4" />
             )}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setShowUploadDialog(true)}
-            className="text-white border-white/20 hover:bg-white/10"
-          >
-            <DocumentArrowUpIcon className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Upload Boleto</span>
           </Button>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
@@ -777,13 +766,6 @@ export default function BillsPage() {
         open={showLinkDialog}
         onOpenChange={setShowLinkDialog}
         onLinked={fetchData}
-      />
-
-      {/* Upload Boleto Dialog */}
-      <BillUploadDialog
-        open={showUploadDialog}
-        onOpenChange={setShowUploadDialog}
-        onSuccess={fetchData}
       />
     </div>
   );

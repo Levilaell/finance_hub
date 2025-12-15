@@ -36,8 +36,10 @@ import {
   TableCellsIcon,
   ChartPieIcon,
   ArrowsRightLeftIcon,
-  ScaleIcon
+  ScaleIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
+import Link from 'next/link';
 import { format, startOfMonth, endOfMonth, subMonths, subYears, parseISO, startOfYear, endOfYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Input } from '@/components/ui/input';
@@ -626,6 +628,14 @@ export default function ReportsPage() {
         </div>
 
         <div className="flex gap-2">
+          {/* Link DRE */}
+          <Link href="/reports/dre">
+            <Button variant="outline" size="sm" className="text-white border-white/20 hover:bg-white/10">
+              <DocumentTextIcon className="h-4 w-4 mr-2" />
+              DRE
+            </Button>
+          </Link>
+
           {/* Filtro de período */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

@@ -18,7 +18,6 @@ import {
   ArrowDownTrayIcon,
   XMarkIcon,
   ChevronDownIcon,
-  CheckIcon,
   LinkIcon,
   DocumentTextIcon,
 } from '@heroicons/react/24/outline';
@@ -45,7 +44,7 @@ import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { LinkBillDialog, CategoryConfirmModal } from '@/components/banking';
+import { LinkBillDialog, CategoryConfirmModal, CategoryPopoverContent } from '@/components/banking';
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -652,50 +651,17 @@ export default function TransactionsPage() {
                                 )}
                               </button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-64 p-2" align="start">
-                              <div className="space-y-1">
-                                <div className="text-xs font-medium text-muted-foreground px-2 py-1">
-                                  Selecione uma categoria
-                                </div>
-                                <button
-                                  onClick={() => handleUpdateCategory(transaction.id, null)}
-                                  className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-white/10 transition-colors flex items-center justify-between"
-                                >
-                                  <span>Remover categoria</span>
-                                  {!transaction.user_category_id && (
-                                    <CheckIcon className="h-4 w-4 text-green-500" />
-                                  )}
-                                </button>
-                                <div className="border-t border-white/10 my-1" />
-                                {categories
-                                  .filter((c) =>
-                                    transaction.type === 'CREDIT'
-                                      ? c.type === 'income'
-                                      : c.type === 'expense'
-                                  )
-                                  .map((category) => (
-                                    <button
-                                      key={category.id}
-                                      onClick={() =>
-                                        handleUpdateCategory(transaction.id, category.id)
-                                      }
-                                      className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-white/10 transition-colors flex items-center justify-between gap-2"
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <div
-                                          className="w-5 h-5 rounded flex items-center justify-center text-xs"
-                                          style={{ backgroundColor: category.color }}
-                                        >
-                                          {category.icon}
-                                        </div>
-                                        <span>{category.name}</span>
-                                      </div>
-                                      {transaction.user_category_id === category.id && (
-                                        <CheckIcon className="h-4 w-4 text-green-500" />
-                                      )}
-                                    </button>
-                                  ))}
-                              </div>
+                            <PopoverContent className="w-80 p-0" align="start">
+                              <CategoryPopoverContent
+                                categories={categories}
+                                transactionType={transaction.type}
+                                selectedCategoryId={transaction.user_category_id}
+                                onSelectCategory={(categoryId) =>
+                                  handleUpdateCategory(transaction.id, categoryId)
+                                }
+                                onCategoriesChange={fetchData}
+                                disabled={updatingTransactionId === transaction.id}
+                              />
                             </PopoverContent>
                           </Popover>
                         </td>

@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/banking/', include('apps.banking.urls')),
     path('api/subscriptions/', include('apps.subscriptions.urls')),
     path('api/ai-insights/', include('apps.ai_insights.urls')),
+    path('api/reports/', include('apps.reports.urls')),
 
     # DJ-Stripe webhook URLs (handles /stripe/webhook/<uuid>/)
     path('stripe/', include('djstripe.urls', namespace='djstripe')),

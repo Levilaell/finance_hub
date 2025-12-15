@@ -615,3 +615,678 @@ class ReportsService:
         }
 
         return comparison_data
+
+    @staticmethod
+    def get_dre_report(
+        user,
+        start_date: datetime,
+        end_date: datetime,
+        compare_start: Optional[datetime] = None,
+        compare_end: Optional[datetime] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate DRE (Demonstrativo de Resultado do Exercício) report.
+
+        Args:
+            user: User instance
+            start_date: Start date for the report
+            end_date: End date for the report
+            compare_start: Start date for comparison period (optional)
+            compare_end: End date for comparison period (optional)
+
+        Returns:
+            Dictionary with DRE data including groups, categories, and totals
+        """
+        from .dre_mapping import (
+            get_dre_group_for_category,
+            get_category_display_name,
+            get_parent_category_id,
+            get_dre_structure,
+            DREGroup
+        )
+
+        def calculate_period_dre(user, start_date, end_date) -> Dict[str, Any]:
+            """Calculate DRE for a specific period."""
+            transactions = Transaction.objects.filter(
+                account__connection__user=user,
+                date__gte=start_date,
+                date__lte=end_date
+            ).select_related('user_category', 'account__connection')
+
+            # Initialize groups
+            groups = {
+                DREGroup.RECEITAS_OPERACIONAIS.value: {
+                    'id': DREGroup.RECEITAS_OPERACIONAIS.value,
+                    'name': 'Receitas Operacionais',
+                    'sign': '+',
+                    'total': Decimal('0'),
+                    'categories': defaultdict(lambda: {
+                        'name': '',
+                        'total': Decimal('0'),
+                        'subcategories': defaultdict(lambda: {'name': '', 'total': Decimal('0')})
+                    })
+                },
+                DREGroup.DESPESAS_OPERACIONAIS.value: {
+                    'id': DREGroup.DESPESAS_OPERACIONAIS.value,
+                    'name': 'Despesas Operacionais',
+                    'sign': '-',
+                    'total': Decimal('0'),
+                    'categories': defaultdict(lambda: {
+                        'name': '',
+                        'total': Decimal('0'),
+                        'subcategories': defaultdict(lambda: {'name': '', 'total': Decimal('0')})
+                    })
+                },
+                DREGroup.DESPESAS_FINANCEIRAS.value: {
+                    'id': DREGroup.DESPESAS_FINANCEIRAS.value,
+                    'name': 'Despesas Financeiras',
+                    'sign': '-',
+                    'total': Decimal('0'),
+                    'categories': defaultdict(lambda: {
+                        'name': '',
+                        'total': Decimal('0'),
+                        'subcategories': defaultdict(lambda: {'name': '', 'total': Decimal('0')})
+                    })
+                },
+                DREGroup.RECEITAS_FINANCEIRAS.value: {
+                    'id': DREGroup.RECEITAS_FINANCEIRAS.value,
+                    'name': 'Receitas Financeiras',
+                    'sign': '+',
+                    'total': Decimal('0'),
+                    'categories': defaultdict(lambda: {
+                        'name': '',
+                        'total': Decimal('0'),
+                        'subcategories': defaultdict(lambda: {'name': '', 'total': Decimal('0')})
+                    })
+                },
+            }
+
+            # Process transactions
+            for tx in transactions:
+                # Determine category info
+                pluggy_category_id = tx.pluggy_category_id or ''
+                pluggy_category_name = tx.pluggy_category or ''
+
+                # If user has custom category, use it for naming AND DRE group determination
+                if tx.user_category:
+                    category_name = tx.user_category.name
+                    parent_name = tx.user_category.parent.name if tx.user_category.parent else None
+
+                    # Determine DRE group based on user_category type
+                    # This ensures custom categories are NEVER excluded from DRE
+                    user_cat_type = tx.user_category.type  # 'income' or 'expense'
+                    if user_cat_type == 'income':
+                        dre_group = DREGroup.RECEITAS_OPERACIONAIS.value
+                    else:
+                        dre_group = DREGroup.DESPESAS_OPERACIONAIS.value
+                else:
+                    category_name = get_category_display_name(pluggy_category_id, pluggy_category_name)
+                    parent_id = get_parent_category_id(pluggy_category_id)
+                    parent_name = get_category_display_name(parent_id) if parent_id else None
+
+                    # Determine DRE group based on Pluggy category
+                    dre_group = get_dre_group_for_category(pluggy_category_id, tx.type)
+
+                if dre_group is None:
+                    continue  # Excluded transaction (only for Pluggy categories like transfers)
+
+                if dre_group not in groups:
+                    continue
+
+                amount = abs(tx.amount)
+
+                # Add to group total
+                groups[dre_group]['total'] += amount
+
+                # Determine parent and subcategory
+                if parent_name:
+                    parent_key = parent_name
+                    sub_key = category_name
+                else:
+                    parent_key = category_name
+                    sub_key = None
+
+                # Add to category
+                groups[dre_group]['categories'][parent_key]['name'] = parent_key
+                groups[dre_group]['categories'][parent_key]['total'] += amount
+
+                # Add to subcategory if exists
+                if sub_key:
+                    groups[dre_group]['categories'][parent_key]['subcategories'][sub_key]['name'] = sub_key
+                    groups[dre_group]['categories'][parent_key]['subcategories'][sub_key]['total'] += amount
+
+            # Calculate summary
+            receitas_op = groups[DREGroup.RECEITAS_OPERACIONAIS.value]['total']
+            despesas_op = groups[DREGroup.DESPESAS_OPERACIONAIS.value]['total']
+            receitas_fin = groups[DREGroup.RECEITAS_FINANCEIRAS.value]['total']
+            despesas_fin = groups[DREGroup.DESPESAS_FINANCEIRAS.value]['total']
+
+            resultado_operacional = receitas_op - despesas_op
+            resultado_financeiro = receitas_fin - despesas_fin
+            resultado_liquido = resultado_operacional + resultado_financeiro
+
+            # Convert to serializable format
+            result_groups = []
+            for group_id in [
+                DREGroup.RECEITAS_OPERACIONAIS.value,
+                DREGroup.DESPESAS_OPERACIONAIS.value,
+                DREGroup.RECEITAS_FINANCEIRAS.value,
+                DREGroup.DESPESAS_FINANCEIRAS.value,
+            ]:
+                group = groups[group_id]
+                categories = []
+                for cat_key, cat_data in sorted(
+                    group['categories'].items(),
+                    key=lambda x: x[1]['total'],
+                    reverse=True
+                ):
+                    subcategories = []
+                    for sub_key, sub_data in sorted(
+                        cat_data['subcategories'].items(),
+                        key=lambda x: x[1]['total'],
+                        reverse=True
+                    ):
+                        if sub_data['total'] > 0:
+                            subcategories.append({
+                                'name': sub_data['name'],
+                                'total': float(sub_data['total'])
+                            })
+
+                    if cat_data['total'] > 0:
+                        categories.append({
+                            'name': cat_data['name'],
+                            'total': float(cat_data['total']),
+                            'subcategories': subcategories
+                        })
+
+                result_groups.append({
+                    'id': group['id'],
+                    'name': group['name'],
+                    'sign': group['sign'],
+                    'total': float(group['total']),
+                    'categories': categories
+                })
+
+            return {
+                'groups': result_groups,
+                'summary': {
+                    'receitas_operacionais': float(receitas_op),
+                    'despesas_operacionais': float(despesas_op),
+                    'resultado_operacional': float(resultado_operacional),
+                    'receitas_financeiras': float(receitas_fin),
+                    'despesas_financeiras': float(despesas_fin),
+                    'resultado_financeiro': float(resultado_financeiro),
+                    'resultado_liquido': float(resultado_liquido)
+                }
+            }
+
+        # Calculate current period
+        current_dre = calculate_period_dre(user, start_date, end_date)
+
+        # Calculate comparison period if requested
+        comparison_dre = None
+        if compare_start and compare_end:
+            comparison_dre = calculate_period_dre(user, compare_start, compare_end)
+
+        # Build response
+        response = {
+            'period': {
+                'start': start_date.strftime('%Y-%m-%d'),
+                'end': end_date.strftime('%Y-%m-%d')
+            },
+            'current': current_dre,
+        }
+
+        if comparison_dre:
+            response['comparison_period'] = {
+                'start': compare_start.strftime('%Y-%m-%d'),
+                'end': compare_end.strftime('%Y-%m-%d')
+            }
+            response['comparison'] = comparison_dre
+
+            # Calculate summary variations
+            variations = {}
+            for key in current_dre['summary']:
+                current_val = current_dre['summary'][key]
+                previous_val = comparison_dre['summary'][key]
+                if previous_val != 0:
+                    variation_percent = ((current_val - previous_val) / abs(previous_val)) * 100
+                else:
+                    variation_percent = 100 if current_val > 0 else 0
+
+                variations[key] = {
+                    'absolute': current_val - previous_val,
+                    'percentage': round(variation_percent, 2)
+                }
+            response['variations'] = variations
+
+            # Calculate category variations - Add previous_total and variation to each category/subcategory
+            def calc_variation(current, previous):
+                """Calculate variation percentage safely."""
+                if previous != 0:
+                    return round(((current - previous) / abs(previous)) * 100, 2)
+                return 100.0 if current > 0 else 0.0
+
+            # Build comparison lookup by group_id -> category_name -> data
+            comp_lookup = {}
+            for comp_group in comparison_dre['groups']:
+                comp_lookup[comp_group['id']] = {}
+                for comp_cat in comp_group['categories']:
+                    comp_lookup[comp_group['id']][comp_cat['name']] = {
+                        'total': comp_cat['total'],
+                        'subcategories': {sub['name']: sub['total'] for sub in comp_cat['subcategories']}
+                    }
+
+            # Enrich current groups with variation data
+            for group in current_dre['groups']:
+                group_id = group['id']
+                comp_group_data = comp_lookup.get(group_id, {})
+
+                # Calculate group variation
+                comp_group = next((g for g in comparison_dre['groups'] if g['id'] == group_id), None)
+                comp_total = comp_group['total'] if comp_group else 0
+                group['previous_total'] = comp_total
+                group['variation'] = calc_variation(group['total'], comp_total)
+
+                for category in group['categories']:
+                    cat_name = category['name']
+                    comp_cat_data = comp_group_data.get(cat_name, {'total': 0, 'subcategories': {}})
+
+                    # Add previous_total and variation to category
+                    category['previous_total'] = comp_cat_data['total']
+                    category['variation'] = calc_variation(category['total'], comp_cat_data['total'])
+
+                    for subcategory in category['subcategories']:
+                        sub_name = subcategory['name']
+                        comp_sub_total = comp_cat_data['subcategories'].get(sub_name, 0)
+
+                        # Add previous_total and variation to subcategory
+                        subcategory['previous_total'] = comp_sub_total
+                        subcategory['variation'] = calc_variation(subcategory['total'], comp_sub_total)
+
+        return response
+
+    @staticmethod
+    def export_dre_pdf(
+        user,
+        start_date: datetime,
+        end_date: datetime,
+        compare_start: Optional[datetime] = None,
+        compare_end: Optional[datetime] = None
+    ) -> bytes:
+        """
+        Export DRE report as PDF.
+
+        Args:
+            user: User instance
+            start_date: Start date for the report
+            end_date: End date for the report
+            compare_start: Start date for comparison period (optional)
+            compare_end: End date for comparison period (optional)
+
+        Returns:
+            PDF file content as bytes
+        """
+        from io import BytesIO
+        from weasyprint import HTML, CSS
+
+        # Get DRE data
+        dre_data = ReportsService.get_dre_report(
+            user, start_date, end_date, compare_start, compare_end
+        )
+
+        # Format currency
+        def fmt_currency(value):
+            return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+        def fmt_percent(value):
+            sign = "+" if value > 0 else ""
+            return f"{sign}{value:.1f}%"
+
+        # Build HTML
+        has_comparison = 'comparison' in dre_data
+
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {{
+                    font-family: 'Helvetica', 'Arial', sans-serif;
+                    font-size: 10pt;
+                    color: #333;
+                    padding: 20px;
+                }}
+                h1 {{
+                    text-align: center;
+                    font-size: 16pt;
+                    margin-bottom: 5px;
+                    color: #1a1a2e;
+                }}
+                .subtitle {{
+                    text-align: center;
+                    font-size: 10pt;
+                    color: #666;
+                    margin-bottom: 20px;
+                }}
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-bottom: 20px;
+                }}
+                th, td {{
+                    padding: 8px 12px;
+                    text-align: left;
+                    border-bottom: 1px solid #ddd;
+                }}
+                th {{
+                    background-color: #1a1a2e;
+                    color: white;
+                    font-weight: bold;
+                }}
+                .group-header {{
+                    background-color: #f5f5f5;
+                    font-weight: bold;
+                }}
+                .category-row {{
+                    padding-left: 20px;
+                }}
+                .subcategory-row {{
+                    padding-left: 40px;
+                    font-size: 9pt;
+                    color: #666;
+                }}
+                .number {{
+                    text-align: right;
+                    font-family: 'Courier', monospace;
+                }}
+                .positive {{
+                    color: #16a34a;
+                }}
+                .negative {{
+                    color: #dc2626;
+                }}
+                .total-row {{
+                    font-weight: bold;
+                    background-color: #e8e8e8;
+                }}
+                .summary-row {{
+                    font-weight: bold;
+                    font-size: 11pt;
+                }}
+                .resultado-row {{
+                    background-color: #1a1a2e;
+                    color: white;
+                    font-weight: bold;
+                }}
+                .footer {{
+                    margin-top: 30px;
+                    text-align: center;
+                    font-size: 8pt;
+                    color: #999;
+                }}
+            </style>
+        </head>
+        <body>
+            <h1>DEMONSTRATIVO DE RESULTADO DO EXERCÍCIO</h1>
+            <div class="subtitle">
+                Período: {start_date.strftime('%d/%m/%Y')} a {end_date.strftime('%d/%m/%Y')}
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 50%;">Descrição</th>
+                        <th class="number" style="width: 25%;">Período Atual</th>
+                        {"<th class='number' style='width: 15%;'>Período Anterior</th><th class='number' style='width: 10%;'>Variação</th>" if has_comparison else ""}
+                    </tr>
+                </thead>
+                <tbody>
+        """
+
+        # Add groups
+        for group in dre_data['current']['groups']:
+            sign_class = 'positive' if group['sign'] == '+' else 'negative'
+            sign_prefix = '+' if group['sign'] == '+' else '-'
+
+            # Group header
+            html_content += f"""
+                <tr class="group-header">
+                    <td>({group['sign']}) {group['name']}</td>
+                    <td class="number {sign_class}">{fmt_currency(group['total'])}</td>
+            """
+            if has_comparison:
+                comp_group = next((g for g in dre_data['comparison']['groups'] if g['id'] == group['id']), None)
+                comp_total = comp_group['total'] if comp_group else 0
+                variation = ((group['total'] - comp_total) / comp_total * 100) if comp_total else 0
+                html_content += f"""
+                    <td class="number">{fmt_currency(comp_total)}</td>
+                    <td class="number {'positive' if variation >= 0 else 'negative'}">{fmt_percent(variation)}</td>
+                """
+            html_content += "</tr>"
+
+            # Categories
+            for category in group['categories']:
+                html_content += f"""
+                    <tr class="category-row">
+                        <td style="padding-left: 20px;">{category['name']}</td>
+                        <td class="number">{fmt_currency(category['total'])}</td>
+                """
+                if has_comparison:
+                    html_content += "<td></td><td></td>"
+                html_content += "</tr>"
+
+                # Subcategories
+                for sub in category['subcategories']:
+                    html_content += f"""
+                        <tr class="subcategory-row">
+                            <td style="padding-left: 40px;">└ {sub['name']}</td>
+                            <td class="number">{fmt_currency(sub['total'])}</td>
+                    """
+                    if has_comparison:
+                        html_content += "<td></td><td></td>"
+                    html_content += "</tr>"
+
+        # Summary rows
+        summary = dre_data['current']['summary']
+        comp_summary = dre_data['comparison']['summary'] if has_comparison else {}
+
+        def add_summary_row(label, key, is_resultado=False):
+            value = summary[key]
+            row_class = 'resultado-row' if is_resultado else 'summary-row'
+            value_class = 'positive' if value >= 0 else 'negative'
+
+            row = f"""
+                <tr class="{row_class}">
+                    <td>{label}</td>
+                    <td class="number {value_class}">{fmt_currency(value)}</td>
+            """
+            if has_comparison:
+                comp_val = comp_summary.get(key, 0)
+                var = dre_data['variations'].get(key, {})
+                var_pct = var.get('percentage', 0)
+                row += f"""
+                    <td class="number">{fmt_currency(comp_val)}</td>
+                    <td class="number {'positive' if var_pct >= 0 else 'negative'}">{fmt_percent(var_pct)}</td>
+                """
+            row += "</tr>"
+            return row
+
+        html_content += "<tr><td colspan='4' style='height: 10px;'></td></tr>"
+        html_content += add_summary_row("(=) RESULTADO OPERACIONAL", "resultado_operacional")
+        html_content += add_summary_row("(+) Receitas Financeiras", "receitas_financeiras")
+        html_content += add_summary_row("(-) Despesas Financeiras", "despesas_financeiras")
+        html_content += "<tr><td colspan='4' style='height: 5px;'></td></tr>"
+        html_content += add_summary_row("(=) RESULTADO LÍQUIDO", "resultado_liquido", is_resultado=True)
+
+        html_content += f"""
+                </tbody>
+            </table>
+
+            <div class="footer">
+                Relatório gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')} | CaixaHub
+            </div>
+        </body>
+        </html>
+        """
+
+        # Generate PDF
+        pdf_buffer = BytesIO()
+        HTML(string=html_content).write_pdf(pdf_buffer)
+        pdf_buffer.seek(0)
+
+        return pdf_buffer.read()
+
+    @staticmethod
+    def export_dre_excel(
+        user,
+        start_date: datetime,
+        end_date: datetime,
+        compare_start: Optional[datetime] = None,
+        compare_end: Optional[datetime] = None
+    ) -> bytes:
+        """
+        Export DRE report as Excel.
+
+        Args:
+            user: User instance
+            start_date: Start date for the report
+            end_date: End date for the report
+            compare_start: Start date for comparison period (optional)
+            compare_end: End date for comparison period (optional)
+
+        Returns:
+            Excel file content as bytes
+        """
+        from io import BytesIO
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+        from openpyxl.utils import get_column_letter
+
+        # Get DRE data
+        dre_data = ReportsService.get_dre_report(
+            user, start_date, end_date, compare_start, compare_end
+        )
+
+        has_comparison = 'comparison' in dre_data
+
+        # Create workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "DRE"
+
+        # Styles
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="1A1A2E", end_color="1A1A2E", fill_type="solid")
+        group_fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
+        result_fill = PatternFill(start_color="1A1A2E", end_color="1A1A2E", fill_type="solid")
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+
+        # Title
+        ws.merge_cells('A1:D1')
+        ws['A1'] = "DEMONSTRATIVO DE RESULTADO DO EXERCÍCIO"
+        ws['A1'].font = Font(bold=True, size=14)
+        ws['A1'].alignment = Alignment(horizontal='center')
+
+        ws.merge_cells('A2:D2')
+        ws['A2'] = f"Período: {start_date.strftime('%d/%m/%Y')} a {end_date.strftime('%d/%m/%Y')}"
+        ws['A2'].alignment = Alignment(horizontal='center')
+
+        # Headers
+        row = 4
+        headers = ['Descrição', 'Período Atual']
+        if has_comparison:
+            headers.extend(['Período Anterior', 'Variação'])
+
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center' if col > 1 else 'left')
+            cell.border = thin_border
+
+        row += 1
+
+        # Data rows
+        def add_row(description, current_value, prev_value=None, variation=None, indent=0, is_group=False, is_result=False):
+            nonlocal row
+            ws.cell(row=row, column=1, value=("  " * indent) + description)
+            ws.cell(row=row, column=2, value=current_value)
+            ws['B' + str(row)].number_format = 'R$ #,##0.00'
+
+            if has_comparison:
+                ws.cell(row=row, column=3, value=prev_value or 0)
+                ws['C' + str(row)].number_format = 'R$ #,##0.00'
+                ws.cell(row=row, column=4, value=f"{variation:.1f}%" if variation else "")
+
+            # Apply styles
+            for col in range(1, 5 if has_comparison else 3):
+                cell = ws.cell(row=row, column=col)
+                cell.border = thin_border
+                if is_group:
+                    cell.fill = group_fill
+                    cell.font = Font(bold=True)
+                if is_result:
+                    cell.fill = result_fill
+                    cell.font = Font(bold=True, color="FFFFFF")
+
+            row += 1
+
+        # Add groups
+        for group in dre_data['current']['groups']:
+            comp_group = next((g for g in dre_data.get('comparison', {}).get('groups', []) if g['id'] == group['id']), None) if has_comparison else None
+            comp_total = comp_group['total'] if comp_group else 0
+            variation = ((group['total'] - comp_total) / comp_total * 100) if comp_total else 0
+
+            add_row(
+                f"({group['sign']}) {group['name']}",
+                group['total'],
+                comp_total if has_comparison else None,
+                variation if has_comparison else None,
+                is_group=True
+            )
+
+            for category in group['categories']:
+                add_row(category['name'], category['total'], indent=1)
+                for sub in category['subcategories']:
+                    add_row(f"└ {sub['name']}", sub['total'], indent=2)
+
+        # Empty row
+        row += 1
+
+        # Summary
+        summary = dre_data['current']['summary']
+        comp_summary = dre_data.get('comparison', {}).get('summary', {})
+        variations = dre_data.get('variations', {})
+
+        def add_summary_row(label, key, is_result=False):
+            value = summary[key]
+            comp_val = comp_summary.get(key, 0) if has_comparison else None
+            var_pct = variations.get(key, {}).get('percentage', 0) if has_comparison else None
+            add_row(label, value, comp_val, var_pct, is_result=is_result)
+
+        add_summary_row("(=) RESULTADO OPERACIONAL", "resultado_operacional", is_result=False)
+        add_summary_row("(+) Receitas Financeiras", "receitas_financeiras")
+        add_summary_row("(-) Despesas Financeiras", "despesas_financeiras")
+        row += 1
+        add_summary_row("(=) RESULTADO LÍQUIDO", "resultado_liquido", is_result=True)
+
+        # Adjust column widths
+        ws.column_dimensions['A'].width = 40
+        ws.column_dimensions['B'].width = 20
+        if has_comparison:
+            ws.column_dimensions['C'].width = 20
+            ws.column_dimensions['D'].width = 12
+
+        # Save to bytes
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        return buffer.read()

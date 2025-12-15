@@ -153,6 +153,65 @@ export interface DashboardSummaryData {
   };
 }
 
+export interface DRESubcategory {
+  name: string;
+  total: number;
+  previous_total?: number;  // Only present when comparing periods
+  variation?: number;       // Percentage variation
+}
+
+export interface DRECategory {
+  name: string;
+  total: number;
+  subcategories: DRESubcategory[];
+  previous_total?: number;  // Only present when comparing periods
+  variation?: number;       // Percentage variation
+}
+
+export interface DREGroup {
+  id: string;
+  name: string;
+  sign: string;
+  total: number;
+  categories: DRECategory[];
+  previous_total?: number;  // Only present when comparing periods
+  variation?: number;       // Percentage variation
+}
+
+export interface DRESummary {
+  receitas_operacionais: number;
+  despesas_operacionais: number;
+  resultado_operacional: number;
+  receitas_financeiras: number;
+  despesas_financeiras: number;
+  resultado_financeiro: number;
+  resultado_liquido: number;
+}
+
+export interface DREPeriodData {
+  groups: DREGroup[];
+  summary: DRESummary;
+}
+
+export interface DREVariation {
+  absolute: number;
+  percentage: number;
+}
+
+export interface DREReport {
+  period: {
+    start: string;
+    end: string;
+  };
+  current: DREPeriodData;
+  comparison_period?: {
+    start: string;
+    end: string;
+  };
+  comparison?: DREPeriodData;
+  variations?: Record<string, DREVariation>;
+}
+
 class ReportsService {
   /**
    * Get cash flow report
@@ -297,6 +356,73 @@ class ReportsService {
       return response;
     } catch (error) {
       console.error('Error fetching available reports:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get DRE (Income Statement) report
+   */
+  async getDRE(params: {
+    start_date: string;
+    end_date: string;
+    compare_with_previous?: boolean;
+  }): Promise<DREReport> {
+    try {
+      const response = await apiClient.get<DREReport>('/api/reports/dre/', params);
+      return response;
+    } catch (error) {
+      console.error('Error fetching DRE report:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Export DRE as PDF
+   */
+  async exportDREPdf(params: {
+    start_date: string;
+    end_date: string;
+    compare_with_previous?: boolean;
+  }): Promise<Blob> {
+    try {
+      const queryParams = new URLSearchParams({
+        start_date: params.start_date,
+        end_date: params.end_date,
+        compare_with_previous: params.compare_with_previous ? 'true' : 'false'
+      });
+      const response = await fetch(`/api/reports/dre_export_pdf/?${queryParams}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to export PDF');
+      return await response.blob();
+    } catch (error) {
+      console.error('Error exporting DRE PDF:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Export DRE as Excel
+   */
+  async exportDREExcel(params: {
+    start_date: string;
+    end_date: string;
+    compare_with_previous?: boolean;
+  }): Promise<Blob> {
+    try {
+      const queryParams = new URLSearchParams({
+        start_date: params.start_date,
+        end_date: params.end_date,
+        compare_with_previous: params.compare_with_previous ? 'true' : 'false'
+      });
+      const response = await fetch(`/api/reports/dre_export_excel/?${queryParams}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to export Excel');
+      return await response.blob();
+    } catch (error) {
+      console.error('Error exporting DRE Excel:', error);
       throw error;
     }
   }

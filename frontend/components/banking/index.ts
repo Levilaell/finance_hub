@@ -7,3 +7,4 @@ export { PluggyConnectWidget } from './pluggy-connect-widget';
 export { LinkTransactionDialog } from './LinkTransactionDialog';
 export { LinkBillDialog } from './LinkBillDialog';
 export { CategoryConfirmModal } from './CategoryConfirmModal';
+export { CategoryPopoverContent } from './CategoryPopoverContent';
