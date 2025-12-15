@@ -18,7 +18,7 @@ const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4
 // DTR (Dynamic Text Replacement) por ângulo de criativo
 const DTR_CONFIG = {
   price: {
-    headline: "Você paga R$ 1.500/mês pra alguém organizar as finanças da sua empresa?",
+    headline: "Você paga R$ 1.500/mês pra alguém categorizar seu extrato?",
     subheadline: "O CaixaHub faz o mesmo por R$ 197. Conecta no banco. Categoriza sozinho. Relatórios prontos."
   },
   time: {
