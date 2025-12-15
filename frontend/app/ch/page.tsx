@@ -11,6 +11,7 @@ import Link from "next/link";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { useAcquisitionTracking } from "@/hooks/use-acquisition-tracking";
 
 // Price ID para o plano de R$197
 const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4PV1BYoKLt";
@@ -92,6 +93,9 @@ const HERO_BENEFITS = [
 function LandingContent() {
   const searchParams = useSearchParams();
   const angle = searchParams.get("a") as keyof typeof DTR_CONFIG | null;
+
+  // Captura parâmetro de aquisição (UTM) da URL e salva no localStorage
+  useAcquisitionTracking();
 
   // Usa configuração baseada no parâmetro ?a=, fallback para default
   const dtr = DTR_CONFIG[angle || "default"] || DTR_CONFIG.default;
