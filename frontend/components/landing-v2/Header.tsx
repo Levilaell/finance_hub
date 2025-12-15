@@ -1,15 +1,19 @@
 "use client";
 
+import { Suspense } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
 import { useAcquisitionTracking } from "@/hooks/use-acquisition-tracking";
 
-export const Header = () => {
-  // Captura parâmetro de aquisição (UTM) da URL e salva no localStorage
+// Componente interno que usa useSearchParams (via hook)
+function AcquisitionTracker() {
   useAcquisitionTracking();
+  return null;
+}
 
+export const Header = () => {
   return (
     <motion.header
       initial={{ opacity: 0, y: -20 }}
@@ -17,6 +21,11 @@ export const Header = () => {
       transition={{ duration: 0.6 }}
       className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border/50"
     >
+      {/* Suspense boundary para o hook que usa useSearchParams */}
+      <Suspense fallback={null}>
+        <AcquisitionTracker />
+      </Suspense>
+
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
           <Link href="/" className="flex items-center space-x-2">
@@ -27,7 +36,7 @@ export const Header = () => {
               CaixaHub
             </span>
           </Link>
-          
+
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
