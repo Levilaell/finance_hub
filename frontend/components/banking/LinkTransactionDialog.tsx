@@ -95,22 +95,22 @@ export function LinkTransactionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <LinkIcon className="h-5 w-5" />
             Vincular Transação
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm">
             Selecione uma transação do extrato para vincular a esta conta.
             A conta será automaticamente marcada como paga.
           </DialogDescription>
         </DialogHeader>
 
         {bill && (
-          <div className="bg-muted/50 rounded-lg p-4 mb-4">
-            <h3 className="font-semibold text-lg">{bill.description}</h3>
-            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+          <div className="bg-muted/50 rounded-lg p-3 sm:p-4 mb-4">
+            <h3 className="font-semibold text-base sm:text-lg break-words">{bill.description}</h3>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs sm:text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <BanknotesIcon className="h-4 w-4" />
                 {formatCurrency(bill.amount)}
@@ -120,7 +120,7 @@ export function LinkTransactionDialog({
                 Venc: {format(new Date(bill.due_date), 'dd/MM/yyyy', { locale: ptBR })}
               </span>
               {bill.customer_supplier && (
-                <span>• {bill.customer_supplier}</span>
+                <span className="truncate max-w-[150px] sm:max-w-none">• {bill.customer_supplier}</span>
               )}
             </div>
           </div>
@@ -132,24 +132,24 @@ export function LinkTransactionDialog({
           </div>
         ) : suggestions.length > 0 ? (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               {suggestions.length} transação(ões) encontrada(s)
             </p>
             {suggestions.map((transaction) => (
               <div
                 key={transaction.id}
-                className="flex items-center justify-between p-4 border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border border-white/10 rounded-lg hover:bg-white/5 transition-colors gap-3"
               >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-medium">{transaction.description}</h4>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-start sm:items-center gap-2">
+                    <h4 className="font-medium text-sm sm:text-base break-words">{transaction.description}</h4>
                     <Badge
                       className={`${getRelevanceColor(transaction.relevance_score)} text-white text-xs`}
                     >
                       {getRelevanceLabel(transaction.relevance_score)} ({transaction.relevance_score}%)
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs sm:text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <BanknotesIcon className="h-3 w-3" />
                       {formatCurrency(transaction.amount)}
@@ -158,19 +158,20 @@ export function LinkTransactionDialog({
                       <CalendarIcon className="h-3 w-3" />
                       {format(new Date(transaction.date), 'dd/MM/yyyy', { locale: ptBR })}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <BuildingLibraryIcon className="h-3 w-3" />
+                    <span className="flex items-center gap-1 truncate max-w-[120px] sm:max-w-none">
+                      <BuildingLibraryIcon className="h-3 w-3 flex-shrink-0" />
                       {transaction.account_name}
                     </span>
                   </div>
                   {transaction.merchant_name && (
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-muted-foreground mt-1 truncate">
                       {transaction.merchant_name}
                     </p>
                   )}
                 </div>
                 <Button
                   size="sm"
+                  className="w-full sm:w-auto h-8 sm:h-9"
                   onClick={() => handleLink(transaction.id)}
                   disabled={isLinking !== null}
                 >
@@ -178,8 +179,8 @@ export function LinkTransactionDialog({
                     <LoadingSpinner className="w-4 h-4" />
                   ) : (
                     <>
-                      <LinkIcon className="h-4 w-4 mr-1" />
-                      Vincular
+                      <LinkIcon className="h-4 w-4 sm:mr-1" />
+                      <span className="sm:inline">Vincular</span>
                     </>
                   )}
                 </Button>
