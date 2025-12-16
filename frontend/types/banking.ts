@@ -258,11 +258,54 @@ export interface Bill {
   customer_supplier?: string;
   notes?: string;
   linked_transaction?: string;
-  // Linked transaction details
+  // Linked transaction details (legacy)
   linked_transaction_details?: LinkedTransactionSummary | null;
   has_linked_transaction?: boolean;
+  // Pagamentos parciais (novo sistema)
+  payments?: BillPayment[];
+  payments_count?: number;
+  can_add_payment?: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// BillPayment - Pagamento individual de uma bill
+export interface BillPayment {
+  id: string;
+  amount: number;
+  payment_date: string;
+  notes: string;
+  transaction?: string;
+  transaction_details?: LinkedTransactionSummary | null;
+  has_transaction: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Request para criar pagamento
+export interface BillPaymentCreateRequest {
+  amount: number;
+  transaction_id?: string;
+  notes?: string;
+}
+
+// Resposta de transações sugeridas para pagamento parcial
+export interface PartialPaymentSuggestionsResponse {
+  remaining_amount: string;
+  transactions: PartialPaymentSuggestion[];
+}
+
+// Sugestão de transação para pagamento parcial
+export interface PartialPaymentSuggestion {
+  id: string;
+  description: string;
+  amount: number;
+  date: string;
+  type: TransactionType;
+  account_name: string;
+  merchant_name?: string;
+  relevance_score: number;
+  would_complete_bill: boolean;
 }
 
 // Bill Request

@@ -25,6 +25,8 @@ import {
   ExclamationTriangleIcon,
   LinkIcon,
   ArrowTopRightOnSquareIcon,
+  ListBulletIcon,
+  PlusCircleIcon,
 } from '@heroicons/react/24/outline';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -33,7 +35,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { LinkTransactionDialog } from '@/components/banking';
+import { LinkTransactionDialog, LinkPartialPaymentDialog, BillPaymentsList } from '@/components/banking';
 
 export default function BillsPage() {
   const router = useRouter();
@@ -46,6 +48,8 @@ export default function BillsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [showPartialPaymentDialog, setShowPartialPaymentDialog] = useState(false);
+  const [showPaymentsListDialog, setShowPaymentsListDialog] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState<string | null>(null);
@@ -69,6 +73,25 @@ export default function BillsPage() {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showOverdue, setShowOverdue] = useState(false);
+
+  // Função para achatar categorias com subcategorias
+  const flattenCategories = (cats: Category[], type: 'income' | 'expense') => {
+    return cats
+      .filter(c => c.type === type)
+      .flatMap(cat => {
+        const items: Array<Category & { displayName?: string; isSubcategory?: boolean }> = [
+          { ...cat, displayName: cat.name, isSubcategory: false }
+        ];
+        if (cat.subcategories && cat.subcategories.length > 0) {
+          items.push(...cat.subcategories.map(sub => ({
+            ...sub,
+            displayName: `  └ ${sub.name}`,
+            isSubcategory: true
+          })));
+        }
+        return items;
+      });
+  };
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -201,6 +224,16 @@ export default function BillsPage() {
   const openLinkDialog = (bill: Bill) => {
     setSelectedBill(bill);
     setShowLinkDialog(true);
+  };
+
+  const openPartialPaymentDialog = (bill: Bill) => {
+    setSelectedBill(bill);
+    setShowPartialPaymentDialog(true);
+  };
+
+  const openPaymentsListDialog = (bill: Bill) => {
+    setSelectedBill(bill);
+    setShowPaymentsListDialog(true);
   };
 
   const handleUnlinkTransaction = async (billId: string) => {
@@ -393,21 +426,22 @@ export default function BillsPage() {
                       <SelectValue placeholder="Selecione uma categoria" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories
-                        .filter(c =>
-                          formData.type === 'receivable' ? c.type === 'income' : c.type === 'expense'
-                        )
-                        .map(cat => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-4 h-4 rounded"
-                                style={{ backgroundColor: cat.color }}
-                              />
-                              {cat.name}
-                            </div>
-                          </SelectItem>
-                        ))}
+                      {flattenCategories(
+                        categories,
+                        formData.type === 'receivable' ? 'income' : 'expense'
+                      ).map(cat => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-4 h-4 rounded"
+                              style={{ backgroundColor: cat.color }}
+                            />
+                            <span className={cat.isSubcategory ? 'text-muted-foreground' : ''}>
+                              {cat.displayName || cat.name}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -609,6 +643,24 @@ export default function BillsPage() {
                             </Tooltip>
                           </TooltipProvider>
                         )}
+                        {bill.payments_count && bill.payments_count > 0 && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Badge
+                                  className="text-xs bg-purple-100 text-purple-800 flex items-center gap-1 cursor-pointer hover:bg-purple-200"
+                                  onClick={() => openPaymentsListDialog(bill)}
+                                >
+                                  <ListBulletIcon className="h-3 w-3" />
+                                  {bill.payments_count} pagamento{bill.payments_count > 1 ? 's' : ''}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Clique para ver os pagamentos</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </div>
                     </div>
                     {/* Informações secundárias */}
@@ -648,24 +700,7 @@ export default function BillsPage() {
                       </p>
                     </div>
                     <div className="flex gap-1.5 sm:gap-2">
-                      {/* Link/Unlink button */}
-                      {bill.status === 'pending' && !bill.has_linked_transaction && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 w-8 sm:h-9 sm:w-9 p-0"
-                                onClick={() => openLinkDialog(bill)}
-                              >
-                                <LinkIcon className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Vincular transação</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
+                      {/* Legacy Link/Unlink button (for backward compatibility) */}
                       {bill.has_linked_transaction && (
                         <TooltipProvider>
                           <Tooltip>
@@ -688,16 +723,29 @@ export default function BillsPage() {
                           </Tooltip>
                         </TooltipProvider>
                       )}
-                      {/* Register payment button */}
-                      {bill.status !== 'paid' && bill.status !== 'cancelled' && !bill.has_linked_transaction && (
-                        <Button
-                          size="sm"
-                          className="h-8 sm:h-9 px-2 sm:px-3"
-                          onClick={() => openPaymentDialog(bill)}
-                        >
-                          <CheckIcon className="h-4 w-4 sm:mr-1" />
-                          <span className="hidden sm:inline">Registrar</span>
-                        </Button>
+                      {/* Add payment button (new partial payment system) */}
+                      {bill.can_add_payment && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                className="h-8 sm:h-9 px-2 sm:px-3"
+                                onClick={() => openPartialPaymentDialog(bill)}
+                              >
+                                <PlusCircleIcon className="h-4 w-4 sm:mr-1" />
+                                <span className="hidden sm:inline">
+                                  {bill.payments_count && bill.payments_count > 0 ? 'Add Pagamento' : 'Registrar'}
+                                </span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {bill.payments_count && bill.payments_count > 0
+                                ? 'Adicionar mais um pagamento'
+                                : 'Registrar pagamento'}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                       <Button
                         size="sm"
@@ -775,13 +823,89 @@ export default function BillsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Link Transaction Dialog */}
+      {/* Link Transaction Dialog (Legacy) */}
       <LinkTransactionDialog
         bill={selectedBill}
         open={showLinkDialog}
         onOpenChange={setShowLinkDialog}
         onLinked={fetchData}
       />
+
+      {/* Partial Payment Dialog (New System) */}
+      <LinkPartialPaymentDialog
+        bill={selectedBill}
+        open={showPartialPaymentDialog}
+        onOpenChange={setShowPartialPaymentDialog}
+        onPaymentAdded={fetchData}
+      />
+
+      {/* Payments List Dialog */}
+      <Dialog open={showPaymentsListDialog} onOpenChange={setShowPaymentsListDialog}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ListBulletIcon className="h-5 w-5" />
+              Pagamentos - {selectedBill?.description}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedBill && (
+            <div className="space-y-4">
+              {/* Summary */}
+              <div className="bg-muted/50 rounded-lg p-4">
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Valor Total</p>
+                    <p className="font-semibold">{formatCurrency(selectedBill.amount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Já Pago</p>
+                    <p className="font-semibold text-green-600">{formatCurrency(selectedBill.amount_paid)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Restante</p>
+                    <p className="font-semibold text-orange-600">{formatCurrency(selectedBill.amount_remaining)}</p>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                    <span>Progresso</span>
+                    <span>{selectedBill.payment_percentage?.toFixed(0) || 0}%</span>
+                  </div>
+                  <Progress value={selectedBill.payment_percentage || 0} className="h-2" />
+                </div>
+              </div>
+
+              {/* Payments List */}
+              <BillPaymentsList
+                bill={selectedBill}
+                onPaymentRemoved={() => {
+                  fetchData();
+                  // Close dialog if all payments removed
+                  if (selectedBill.payments_count === 1) {
+                    setShowPaymentsListDialog(false);
+                  }
+                }}
+              />
+
+              {/* Add more payments button */}
+              {selectedBill.can_add_payment && (
+                <div className="flex justify-center pt-2 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowPaymentsListDialog(false);
+                      openPartialPaymentDialog(selectedBill);
+                    }}
+                  >
+                    <PlusCircleIcon className="h-4 w-4 mr-2" />
+                    Adicionar Pagamento
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -268,9 +268,14 @@ class BillSerializer(serializers.ModelSerializer):
     category_color = serializers.CharField(source='category.color', read_only=True)
     category_icon = serializers.CharField(source='category.icon', read_only=True)
 
-    # Linked transaction information
+    # Linked transaction information (legacy)
     linked_transaction_details = serializers.SerializerMethodField()
     has_linked_transaction = serializers.SerializerMethodField()
+
+    # Payments (novo sistema de pagamentos parciais)
+    payments = serializers.SerializerMethodField()
+    payments_count = serializers.SerializerMethodField()
+    can_add_payment = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Bill
@@ -282,17 +287,19 @@ class BillSerializer(serializers.ModelSerializer):
             'recurrence', 'parent_bill', 'installment_number',
             'customer_supplier', 'notes', 'linked_transaction',
             'linked_transaction_details', 'has_linked_transaction',
+            'payments', 'payments_count', 'can_add_payment',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'is_overdue', 'amount_remaining', 'payment_percentage',
             'category_name', 'category_color', 'category_icon',
             'linked_transaction_details', 'has_linked_transaction',
+            'payments', 'payments_count', 'can_add_payment',
             'created_at', 'updated_at'
         ]
 
     def get_linked_transaction_details(self, obj):
-        """Get linked transaction info if exists."""
+        """Get linked transaction info if exists (legacy)."""
         if obj.linked_transaction:
             tx = obj.linked_transaction
             return {
@@ -305,8 +312,25 @@ class BillSerializer(serializers.ModelSerializer):
         return None
 
     def get_has_linked_transaction(self, obj):
-        """Check if bill has linked transaction."""
-        return obj.linked_transaction is not None
+        """
+        Check if bill has linked transaction.
+        Verifica AMBOS: campo legacy E BillPayments com transação.
+        """
+        # Legacy check
+        if obj.linked_transaction is not None:
+            return True
+        # Novo sistema: verifica se há payments com transação
+        return obj.payments.filter(transaction__isnull=False).exists()
+
+    def get_payments(self, obj):
+        """Retorna lista de pagamentos da bill."""
+        from .serializers import BillPaymentSerializer
+        payments = obj.payments.select_related('transaction', 'transaction__account').all()
+        return BillPaymentSerializer(payments, many=True).data
+
+    def get_payments_count(self, obj):
+        """Retorna contagem de pagamentos."""
+        return obj.payments.count()
 
     def validate(self, data):
         """Validate bill data."""
@@ -505,6 +529,121 @@ class UserSettingsSerializer(serializers.Serializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+
+# ============================================================
+# BillPayment Serializers (Pagamentos Parciais)
+# ============================================================
+
+class BillPaymentSerializer(serializers.ModelSerializer):
+    """Serializer para pagamentos individuais de uma bill."""
+    transaction_details = serializers.SerializerMethodField()
+    has_transaction = serializers.SerializerMethodField()
+
+    class Meta:
+        from .models import BillPayment
+        model = BillPayment
+        fields = [
+            'id', 'amount', 'payment_date', 'notes',
+            'transaction', 'transaction_details', 'has_transaction',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'transaction_details', 'has_transaction', 'created_at', 'updated_at']
+
+    def get_transaction_details(self, obj):
+        """Retorna detalhes da transação vinculada."""
+        if obj.transaction:
+            return {
+                'id': str(obj.transaction.id),
+                'description': obj.transaction.description,
+                'amount': str(obj.transaction.amount),
+                'date': obj.transaction.date.isoformat(),
+                'account_name': obj.transaction.account.name if obj.transaction.account else None
+            }
+        return None
+
+    def get_has_transaction(self, obj):
+        """Indica se o pagamento tem transação vinculada."""
+        return obj.transaction is not None
+
+
+class BillPaymentCreateSerializer(serializers.Serializer):
+    """Serializer para criar um pagamento com ou sem transação vinculada."""
+    amount = serializers.DecimalField(max_digits=15, decimal_places=2)
+    transaction_id = serializers.UUIDField(required=False, allow_null=True)
+    notes = serializers.CharField(required=False, allow_blank=True, default='')
+
+    def validate_amount(self, value):
+        """Valida que o valor é positivo."""
+        if value <= 0:
+            raise serializers.ValidationError("Valor deve ser maior que zero")
+        return value
+
+    def validate_transaction_id(self, value):
+        """Valida que a transação existe e não está vinculada."""
+        if value is None:
+            return None
+
+        request = self.context.get('request')
+        if not request:
+            raise serializers.ValidationError("Request context required")
+
+        try:
+            transaction = Transaction.objects.get(
+                id=value,
+                account__connection__user=request.user,
+                account__connection__is_active=True
+            )
+        except Transaction.DoesNotExist:
+            raise serializers.ValidationError("Transação não encontrada")
+
+        # Verifica se já está vinculada via BillPayment
+        from .models import BillPayment
+        if BillPayment.objects.filter(transaction=transaction).exists():
+            raise serializers.ValidationError("Transação já está vinculada a outra conta")
+
+        # Verifica se está vinculada via legacy
+        if hasattr(transaction, 'linked_bill') and transaction.linked_bill:
+            raise serializers.ValidationError("Transação já está vinculada (legacy) a outra conta")
+
+        return value
+
+    def validate(self, data):
+        """Validação geral."""
+        bill = self.context.get('bill')
+        if not bill:
+            raise serializers.ValidationError("Bill context required")
+
+        # Valida que o valor não excede o restante
+        if data['amount'] > bill.amount_remaining:
+            raise serializers.ValidationError({
+                'amount': f"Valor excede o restante ({bill.amount_remaining})"
+            })
+
+        # Se tem transação, o valor deve ser igual ao da transação
+        if data.get('transaction_id'):
+            transaction = Transaction.objects.get(id=data['transaction_id'])
+            if transaction.amount != data['amount']:
+                raise serializers.ValidationError({
+                    'amount': f"Valor deve ser igual ao da transação ({transaction.amount})"
+                })
+
+        return data
+
+
+class PartialPaymentTransactionSerializer(serializers.ModelSerializer):
+    """Serializer para sugestões de transações para pagamento parcial."""
+    account_name = serializers.CharField(source='account.name', read_only=True)
+    relevance_score = serializers.IntegerField(read_only=True)
+    would_complete_bill = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Transaction
+        fields = [
+            'id', 'description', 'amount', 'date', 'type',
+            'account_name', 'merchant_name', 'relevance_score',
+            'would_complete_bill'
+        ]
 
 
 # ============================================================

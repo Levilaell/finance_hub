@@ -8,3 +8,5 @@ export { LinkTransactionDialog } from './LinkTransactionDialog';
 export { LinkBillDialog } from './LinkBillDialog';
 export { CategoryConfirmModal } from './CategoryConfirmModal';
 export { CategoryPopoverContent } from './CategoryPopoverContent';
+export { LinkPartialPaymentDialog } from './LinkPartialPaymentDialog';
+export { BillPaymentsList } from './BillPaymentsList';

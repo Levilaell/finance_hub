@@ -426,6 +426,73 @@ class Bill(models.Model):
             self.status = 'pending'
         self.save()
 
+    def recalculate_payments(self):
+        """
+        Recalcula amount_paid a partir de todos os BillPayments.
+        Deve ser chamado após adicionar/remover pagamentos.
+        """
+        from django.db.models import Sum
+        total = self.payments.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        self.amount_paid = total
+        self.update_status()
+
+    @property
+    def can_add_payment(self):
+        """Verifica se a bill pode receber mais pagamentos."""
+        return self.status not in ['paid', 'cancelled'] and self.amount_remaining > 0
+
+
+class BillPayment(models.Model):
+    """
+    Representa um pagamento individual de uma conta (Bill).
+    Permite vincular múltiplas transações a uma única bill (pagamentos rateados).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    bill = models.ForeignKey(
+        Bill,
+        on_delete=models.CASCADE,
+        related_name='payments'
+    )
+
+    # Detalhes do pagamento
+    amount = models.DecimalField(max_digits=15, decimal_places=2)
+    payment_date = models.DateTimeField(default=timezone.now)
+    notes = models.TextField(blank=True)
+
+    # Transação vinculada (opcional - pagamento pode ser manual)
+    transaction = models.OneToOneField(
+        Transaction,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='bill_payment'
+    )
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-payment_date', '-created_at']
+        indexes = [
+            models.Index(fields=['bill', 'payment_date']),
+        ]
+
+    def __str__(self):
+        tx_info = f" (Tx: {self.transaction.description[:20]})" if self.transaction else " (Manual)"
+        return f"Pagamento de {self.amount} para {self.bill.description[:30]}{tx_info}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Recalcula os totais da bill após salvar
+        self.bill.recalculate_payments()
+
+    def delete(self, *args, **kwargs):
+        bill = self.bill
+        super().delete(*args, **kwargs)
+        # Recalcula os totais da bill após deletar
+        bill.recalculate_payments()
+
 
 class SyncLog(models.Model):
     """

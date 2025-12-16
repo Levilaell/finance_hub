@@ -12,7 +12,11 @@ import {
   CashFlowProjection,
   PaginatedResponse,
   TransactionSuggestion,
-  LinkTransactionRequest
+  LinkTransactionRequest,
+  // BillPayment types (pagamentos parciais)
+  BillPayment,
+  BillPaymentCreateRequest,
+  PartialPaymentSuggestionsResponse
 } from "@/types/banking";
 
 class BillsService {
@@ -198,6 +202,47 @@ class BillsService {
     return apiClient.post<Bill>(
       `/api/banking/bills/${billId}/unlink_transaction/`,
       {}
+    );
+  }
+
+  // ============================================================
+  // Partial Payment Methods (Pagamentos Parciais)
+  // ============================================================
+
+  /**
+   * Get all payments for a bill
+   */
+  async getPayments(billId: string): Promise<BillPayment[]> {
+    return apiClient.get<BillPayment[]>(
+      `/api/banking/bills/${billId}/payments/`
+    );
+  }
+
+  /**
+   * Add a payment to a bill (with optional transaction link)
+   */
+  async addPayment(billId: string, data: BillPaymentCreateRequest): Promise<Bill> {
+    return apiClient.post<Bill>(
+      `/api/banking/bills/${billId}/add_payment/`,
+      data
+    );
+  }
+
+  /**
+   * Remove a payment from a bill
+   */
+  async removePayment(billId: string, paymentId: string): Promise<Bill> {
+    return apiClient.delete<Bill>(
+      `/api/banking/bills/${billId}/payments/${paymentId}/`
+    );
+  }
+
+  /**
+   * Get suggested transactions for partial payment
+   */
+  async getSuggestedTransactionsPartial(billId: string): Promise<PartialPaymentSuggestionsResponse> {
+    return apiClient.get<PartialPaymentSuggestionsResponse>(
+      `/api/banking/bills/${billId}/suggested_transactions_partial/`
     );
   }
 

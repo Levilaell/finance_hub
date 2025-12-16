@@ -1361,6 +1361,184 @@ class TransactionMatchService:
 
         return result
 
+    # ============================================================
+    # MÉTODOS PARA PAGAMENTOS PARCIAIS (BillPayment)
+    # ============================================================
+
+    def get_eligible_transactions_for_partial_payment(
+        self,
+        bill: 'Bill',
+        max_amount: Optional[Decimal] = None
+    ) -> List[TransactionModel]:
+        """
+        Encontra transações elegíveis para pagamento parcial.
+
+        Critérios:
+        - Mesmo usuário da bill
+        - Não vinculada a nenhuma bill (via BillPayment ou legacy)
+        - Tipo compatível (receivable -> CREDIT, payable -> DEBIT)
+        - Valor <= valor restante (ou max_amount se especificado)
+        """
+        from .models import Bill, BillPayment
+
+        user = bill.user
+        remaining = max_amount or bill.amount_remaining
+
+        # Tipo de transação compatível
+        tx_type = 'CREDIT' if bill.type == 'receivable' else 'DEBIT'
+
+        # IDs de transações já vinculadas via BillPayment
+        linked_via_payment = set(
+            BillPayment.objects.filter(
+                transaction__isnull=False
+            ).values_list('transaction_id', flat=True)
+        )
+
+        # IDs de transações vinculadas via legacy (Bill.linked_transaction)
+        linked_via_legacy = set(
+            Bill.objects.filter(
+                linked_transaction__isnull=False
+            ).values_list('linked_transaction_id', flat=True)
+        )
+
+        excluded_ids = linked_via_payment | linked_via_legacy
+
+        eligible = TransactionModel.objects.filter(
+            account__connection__user=user,
+            account__connection__is_active=True,
+            type=tx_type,
+            amount__lte=remaining,
+            amount__gt=0
+        ).exclude(
+            id__in=excluded_ids
+        ).select_related(
+            'account',
+            'account__connection',
+            'user_category'
+        ).order_by('-date')
+
+        return list(eligible)
+
+    def link_transaction_as_partial_payment(
+        self,
+        transaction: TransactionModel,
+        bill: 'Bill',
+        notes: str = ''
+    ) -> 'BillPayment':
+        """
+        Vincula uma transação como pagamento parcial a uma bill.
+
+        Cria um BillPayment e atualiza o status da bill.
+
+        Raises:
+            ValueError: Se a vinculação não for permitida
+        """
+        from .models import Bill, BillPayment
+
+        # Validações
+        if not bill.can_add_payment:
+            raise ValueError(f"Bill não pode receber pagamentos. Status: {bill.status}")
+
+        if transaction.amount > bill.amount_remaining:
+            raise ValueError(
+                f"Valor da transação ({transaction.amount}) excede o restante "
+                f"({bill.amount_remaining})"
+            )
+
+        # Verifica se transação já está vinculada via BillPayment
+        if BillPayment.objects.filter(transaction=transaction).exists():
+            raise ValueError("Transação já está vinculada a outra conta")
+
+        # Verifica se transação está vinculada via legacy
+        if hasattr(transaction, 'linked_bill') and transaction.linked_bill:
+            raise ValueError("Transação já está vinculada (legacy) a outra conta")
+
+        # Verifica compatibilidade de tipo
+        expected_tx_type = 'CREDIT' if bill.type == 'receivable' else 'DEBIT'
+        if transaction.type != expected_tx_type:
+            raise ValueError(
+                f"Tipo incompatível. Bill tipo '{bill.type}' requer "
+                f"transação tipo '{expected_tx_type}'"
+            )
+
+        # Verifica mesmo usuário
+        tx_user = transaction.account.connection.user
+        if tx_user != bill.user:
+            raise ValueError("Transação e bill devem pertencer ao mesmo usuário")
+
+        # Cria o BillPayment
+        with transaction_db.atomic():
+            payment = BillPayment.objects.create(
+                bill=bill,
+                transaction=transaction,
+                amount=transaction.amount,
+                payment_date=transaction.date,
+                notes=notes
+            )
+            # recalculate_payments é chamado automaticamente no save() do BillPayment
+
+        logger.info(
+            f"Criado pagamento parcial {payment.id}: "
+            f"Transação {transaction.id} -> Bill {bill.id} "
+            f"(Valor: {transaction.amount})"
+        )
+
+        return payment
+
+    def unlink_payment(self, payment: 'BillPayment') -> 'Bill':
+        """
+        Remove um pagamento de uma bill.
+
+        Deleta o BillPayment e recalcula o status da bill.
+        """
+        bill = payment.bill
+        payment_id = payment.id
+        tx_id = payment.transaction_id
+
+        with transaction_db.atomic():
+            payment.delete()
+            # recalculate_payments é chamado automaticamente no delete() do BillPayment
+
+        logger.info(
+            f"Removido pagamento {payment_id} da bill {bill.id}. "
+            f"Transação {tx_id} agora está livre."
+        )
+
+        return bill
+
+    def get_suggested_transactions_for_partial(
+        self,
+        bill: 'Bill',
+        limit: int = 20
+    ) -> List[Dict]:
+        """
+        Retorna transações sugeridas para pagamento parcial, ordenadas por relevância.
+
+        Adiciona bônus para valores que dividem igualmente o total.
+        """
+        if not bill.can_add_payment:
+            return []
+
+        transactions = self.get_eligible_transactions_for_partial_payment(bill)
+
+        suggestions = []
+        for tx in transactions:
+            score = self.calculate_relevance_score(tx, bill)
+
+            # Bônus para valores que dividem igualmente
+            if bill.amount > 0 and tx.amount > 0:
+                if bill.amount % tx.amount == 0:
+                    score += 10
+
+            suggestions.append({
+                'transaction': tx,
+                'relevance_score': min(score, 100),
+                'would_complete_bill': tx.amount >= bill.amount_remaining
+            })
+
+        suggestions.sort(key=lambda x: x['relevance_score'], reverse=True)
+        return suggestions[:limit]
+
 
 class CategoryRuleService:
     """

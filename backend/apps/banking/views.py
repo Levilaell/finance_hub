@@ -26,7 +26,9 @@ from .serializers import (
     TransactionSuggestionSerializer, BillSuggestionSerializer,
     UserSettingsSerializer,
     BillUploadSerializer, BillOCRResultSerializer, BillFromOCRSerializer,
-    CategoryRuleSerializer
+    CategoryRuleSerializer,
+    # BillPayment serializers (pagamentos parciais)
+    BillPaymentSerializer, BillPaymentCreateSerializer, PartialPaymentTransactionSerializer
 )
 from .services import (
     ConnectorService, BankConnectionService,
@@ -1224,6 +1226,153 @@ class BillViewSet(viewsets.ModelViewSet):
             result.append(TransactionSuggestionSerializer(tx).data)
 
         return Response(result)
+
+    # ============================================================
+    # ENDPOINTS PARA PAGAMENTOS PARCIAIS (BillPayment)
+    # ============================================================
+
+    @action(detail=True, methods=['get'])
+    def payments(self, request, pk=None):
+        """
+        Lista todos os pagamentos de uma bill.
+        GET /api/banking/bills/{id}/payments/
+        """
+        bill = self.get_object()
+        payments = bill.payments.select_related('transaction', 'transaction__account').all()
+        serializer = BillPaymentSerializer(payments, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def add_payment(self, request, pk=None):
+        """
+        Adiciona um pagamento a uma bill (manual ou com transação).
+        POST /api/banking/bills/{id}/add_payment/
+        Body: { "amount": 1000.00, "transaction_id": "uuid" (opcional), "notes": "..." }
+        """
+        from .models import BillPayment
+
+        bill = self.get_object()
+
+        if not bill.can_add_payment:
+            return Response(
+                {'error': f'Conta não pode receber pagamentos. Status: {bill.status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = BillPaymentCreateSerializer(
+            data=request.data,
+            context={'request': request, 'bill': bill}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+        transaction_id = data.get('transaction_id')
+
+        if transaction_id:
+            # Vincular transação como pagamento
+            transaction = Transaction.objects.get(id=transaction_id)
+            match_service = TransactionMatchService()
+
+            try:
+                payment = match_service.link_transaction_as_partial_payment(
+                    transaction=transaction,
+                    bill=bill,
+                    notes=data.get('notes', '')
+                )
+            except ValueError as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # Pagamento manual (sem transação)
+            payment = BillPayment.objects.create(
+                bill=bill,
+                amount=data['amount'],
+                payment_date=timezone.now(),
+                notes=data.get('notes', '')
+            )
+            # recalculate_payments é chamado automaticamente no save()
+
+        # Log activity
+        UserActivityLog.log_event(
+            user=request.user,
+            event_type='bill_payment_added',
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            bill_id=str(bill.id),
+            payment_id=str(payment.id),
+            amount=float(data['amount']),
+            has_transaction=bool(transaction_id)
+        )
+
+        bill.refresh_from_db()
+        return Response(BillSerializer(bill).data)
+
+    @action(detail=True, methods=['delete'], url_path='payments/(?P<payment_id>[^/.]+)')
+    def remove_payment(self, request, pk=None, payment_id=None):
+        """
+        Remove um pagamento de uma bill.
+        DELETE /api/banking/bills/{id}/payments/{payment_id}/
+        """
+        from .models import BillPayment
+
+        bill = self.get_object()
+
+        try:
+            payment = bill.payments.get(id=payment_id)
+        except BillPayment.DoesNotExist:
+            return Response(
+                {'error': 'Pagamento não encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        match_service = TransactionMatchService()
+        updated_bill = match_service.unlink_payment(payment)
+
+        # Log activity
+        UserActivityLog.log_event(
+            user=request.user,
+            event_type='bill_payment_removed',
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            bill_id=str(bill.id),
+            payment_id=str(payment_id)
+        )
+
+        return Response(BillSerializer(updated_bill).data)
+
+    @action(detail=True, methods=['get'])
+    def suggested_transactions_partial(self, request, pk=None):
+        """
+        Retorna transações sugeridas para pagamento parcial.
+        GET /api/banking/bills/{id}/suggested_transactions_partial/
+
+        Retorna transações com valor <= valor restante.
+        """
+        bill = self.get_object()
+
+        if not bill.can_add_payment:
+            return Response(
+                {'error': 'Conta não pode receber mais pagamentos'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        match_service = TransactionMatchService()
+        suggestions = match_service.get_suggested_transactions_for_partial(bill)
+
+        result = []
+        for suggestion in suggestions:
+            tx = suggestion['transaction']
+            tx.relevance_score = suggestion['relevance_score']
+            tx.would_complete_bill = suggestion['would_complete_bill']
+            serializer = PartialPaymentTransactionSerializer(
+                tx,
+                context={'request': request, 'bill': bill}
+            )
+            result.append(serializer.data)
+
+        return Response({
+            'remaining_amount': str(bill.amount_remaining),
+            'transactions': result
+        })
 
     @action(detail=False, methods=['get'])
     def summary(self, request):
