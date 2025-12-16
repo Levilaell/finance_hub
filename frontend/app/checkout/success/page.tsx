@@ -82,13 +82,15 @@ function CheckoutSuccessContent() {
           currency: 'BRL',
           content_name: 'CaixaHub Trial 7 dias'
         });
+        // Set flag to show onboarding tour for new users
+        localStorage.setItem('caixahub_show_tour', 'true');
       }
 
       // Auto redirect after 5 seconds
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
-            router.push('/how-to-use');
+            router.push('/dashboard');
             return 0;
           }
           return prev - 1;
@@ -160,11 +162,11 @@ function CheckoutSuccessContent() {
 
           <div className="space-y-3">
             <Button
-              onClick={() => router.push('/how-to-use')}
+              onClick={() => router.push('/dashboard')}
               className="w-full"
               size="lg"
             >
-              Começar Tutorial
+              Ir para o Dashboard
             </Button>
 
             <p className="text-sm text-muted-foreground">

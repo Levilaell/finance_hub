@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import {
   LinkIcon,
   ArrowPathIcon,
@@ -14,18 +15,38 @@ import {
   BanknotesIcon,
   ArrowDownTrayIcon,
   CalendarDaysIcon,
+  PlayIcon,
 } from '@heroicons/react/24/outline';
+import { Button } from '@/components/ui/button';
+import { useOnboarding } from '@/lib/onboarding/useOnboarding';
 
 export default function ComoUsarPage() {
+  const router = useRouter();
+  const { resetTour } = useOnboarding();
+
+  const handleRestartTour = () => {
+    resetTour();
+    router.push('/dashboard');
+  };
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
       <div className="space-y-8 pb-8">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-white">Como Usar o CaixaHub</h1>
-          <p className="text-muted-foreground mt-1">
-            Guia completo para gerenciar suas finanças de forma simples
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-white">Como Usar o CaixaHub</h1>
+            <p className="text-muted-foreground mt-1">
+              Guia completo para gerenciar suas finanças de forma simples
+            </p>
+          </div>
+          <Button
+            onClick={handleRestartTour}
+            variant="outline"
+            className="flex items-center gap-2 shrink-0"
+          >
+            <PlayIcon className="h-4 w-4" />
+            Refazer Tour
+          </Button>
         </div>
 
         {/* Quick Start Guide */}

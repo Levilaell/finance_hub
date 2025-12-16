@@ -31,10 +31,12 @@ import {
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline';
+import { useOnboarding } from '@/lib/onboarding/useOnboarding';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
+  const { shouldShowTour, startTour } = useOnboarding();
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [billsSummary, setBillsSummary] = useState<BillsSummary | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
@@ -50,6 +52,17 @@ export default function DashboardPage() {
     }
     fetchDashboardData();
   }, [isAuthenticated, router]);
+
+  // Start onboarding tour for new users
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && shouldShowTour()) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        startTour();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, isAuthenticated, shouldShowTour, startTour]);
 
   const fetchDashboardData = async () => {
     setIsLoading(true);
@@ -345,7 +358,7 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         <Link href="/accounts">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" data-tour="contas">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <CreditCardIcon className="h-5 w-5" />
