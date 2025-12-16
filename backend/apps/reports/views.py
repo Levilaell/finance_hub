@@ -27,8 +27,9 @@ class ReportsViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def _parse_date(self, date_str: str) -> datetime:
-        """Parse date string to datetime."""
-        return datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+        """Parse date string to datetime with proper timezone handling."""
+        naive_dt = datetime.strptime(date_str, '%Y-%m-%d')
+        return timezone.make_aware(naive_dt, timezone.utc)
 
     @action(detail=False, methods=['get'])
     def dre(self, request):

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { reportsService, DREReport, DREGroup } from '@/services/reports.service';
@@ -447,10 +447,9 @@ export default function DREPage() {
                     const isExpense = group.sign === '-';
 
                     return (
-                      <>
+                      <React.Fragment key={group.id}>
                         {/* Group Header */}
                         <tr
-                          key={group.id}
                           className="bg-white/5 hover:bg-white/10 cursor-pointer border-b border-white/5"
                           onClick={() => toggleGroup(group.id)}
                         >
@@ -493,9 +492,8 @@ export default function DREPage() {
                           const hasSubcategories = category.subcategories.length > 0;
 
                           return (
-                            <>
+                            <React.Fragment key={categoryKey}>
                               <tr
-                                key={categoryKey}
                                 className={`border-b border-white/5 ${hasSubcategories ? 'hover:bg-white/5 cursor-pointer' : ''}`}
                                 onClick={() => hasSubcategories && toggleCategory(categoryKey)}
                               >
@@ -566,10 +564,10 @@ export default function DREPage() {
                                   )}
                                 </tr>
                               ))}
-                            </>
+                            </React.Fragment>
                           );
                         })}
-                      </>
+                      </React.Fragment>
                     );
                   })}
 
