@@ -10,6 +10,15 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 
 from .services import ReportsService
+from apps.authentication.models import UserActivityLog
+
+
+def get_client_ip(request):
+    """Extract client IP from request."""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
 
 
 class ReportsViewSet(viewsets.ViewSet):
@@ -80,6 +89,19 @@ class ReportsViewSet(viewsets.ViewSet):
                 compare_start=compare_start,
                 compare_end=compare_end
             )
+
+            # Log report generation
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='report_generated',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                report_type='dre',
+                start_date=start_date_str,
+                end_date=end_date_str,
+                compare_with_previous=compare_with_previous
+            )
+
             return Response(report)
         except Exception as e:
             return Response(
@@ -130,6 +152,17 @@ class ReportsViewSet(viewsets.ViewSet):
                 end_date=end_date,
                 compare_start=compare_start,
                 compare_end=compare_end
+            )
+
+            # Log PDF export
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='report_exported_pdf',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                report_type='dre',
+                start_date=start_date_str,
+                end_date=end_date_str
             )
 
             response = HttpResponse(pdf_content, content_type='application/pdf')
@@ -187,6 +220,17 @@ class ReportsViewSet(viewsets.ViewSet):
                 compare_end=compare_end
             )
 
+            # Log Excel export
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='report_exported_excel',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                report_type='dre',
+                start_date=start_date_str,
+                end_date=end_date_str
+            )
+
             response = HttpResponse(
                 excel_content,
                 content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -216,6 +260,19 @@ class ReportsViewSet(viewsets.ViewSet):
             end_date=end_date,
             granularity=granularity
         )
+
+        # Log report generation
+        UserActivityLog.log_event(
+            user=request.user,
+            event_type='report_generated',
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            report_type='cash_flow',
+            start_date=start_date_str,
+            end_date=end_date_str,
+            granularity=granularity
+        )
+
         return Response(report)
 
     @action(detail=False, methods=['get'])
@@ -234,6 +291,19 @@ class ReportsViewSet(viewsets.ViewSet):
             end_date=end_date,
             transaction_type=transaction_type
         )
+
+        # Log report generation
+        UserActivityLog.log_event(
+            user=request.user,
+            event_type='report_generated',
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            report_type='category_breakdown',
+            start_date=start_date_str,
+            end_date=end_date_str,
+            transaction_type=transaction_type
+        )
+
         return Response(report)
 
     @action(detail=False, methods=['get'])
@@ -255,6 +325,18 @@ class ReportsViewSet(viewsets.ViewSet):
             month=month,
             year=year
         )
+
+        # Log report generation
+        UserActivityLog.log_event(
+            user=request.user,
+            event_type='report_generated',
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            report_type='monthly_summary',
+            month=month,
+            year=year
+        )
+
         return Response(report)
 
     @action(detail=False, methods=['get'])
@@ -270,6 +352,18 @@ class ReportsViewSet(viewsets.ViewSet):
             months=months,
             end_date=end_date
         )
+
+        # Log report generation
+        UserActivityLog.log_event(
+            user=request.user,
+            event_type='report_generated',
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            report_type='trend_analysis',
+            months=months,
+            end_date=end_date_str
+        )
+
         return Response(report)
 
     @action(detail=False, methods=['post'])
@@ -295,4 +389,18 @@ class ReportsViewSet(viewsets.ViewSet):
             period2_start=period2_start,
             period2_end=period2_end
         )
+
+        # Log report generation
+        UserActivityLog.log_event(
+            user=request.user,
+            event_type='report_generated',
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            report_type='comparison',
+            period1_start=data.get('period1_start'),
+            period1_end=data.get('period1_end'),
+            period2_start=data.get('period2_start'),
+            period2_end=data.get('period2_end')
+        )
+
         return Response(report)

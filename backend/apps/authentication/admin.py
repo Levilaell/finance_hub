@@ -5,7 +5,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
-from .models import User, PasswordReset, UserActivityLog
+from .models import User, PasswordReset, UserActivityLog, UserSettings
 
 
 @admin.register(User)
@@ -139,4 +139,35 @@ class UserActivityLogAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(UserSettings)
+class UserSettingsAdmin(admin.ModelAdmin):
+    """Admin interface for User Settings."""
+    list_display = [
+        'user_email', 'auto_match_transactions_badge', 'created_at', 'updated_at'
+    ]
+    list_filter = ['auto_match_transactions', 'created_at']
+    search_fields = ['user__email', 'user__first_name', 'user__last_name']
+    readonly_fields = ['user', 'created_at', 'updated_at']
+    ordering = ['-updated_at']
+
+    def user_email(self, obj):
+        return obj.user.email
+    user_email.short_description = 'Usuário'
+    user_email.admin_order_field = 'user__email'
+
+    def auto_match_transactions_badge(self, obj):
+        if obj.auto_match_transactions:
+            return format_html('<span style="color: green;">✓ Ativo</span>')
+        return format_html('<span style="color: red;">✗ Inativo</span>')
+    auto_match_transactions_badge.short_description = 'Auto-Match Transações'
+
+    def has_add_permission(self, request):
+        # Settings are created automatically via signal
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        # Settings should not be deleted manually
         return False

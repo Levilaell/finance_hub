@@ -1025,7 +1025,53 @@ class BillViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """Assign current user when creating a bill."""
-        serializer.save(user=self.request.user)
+        bill = serializer.save(user=self.request.user)
+
+        # Log bill creation
+        UserActivityLog.log_event(
+            user=self.request.user,
+            event_type='bill_created',
+            ip_address=get_client_ip(self.request),
+            user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
+            bill_id=str(bill.id),
+            bill_type=bill.type,
+            amount=float(bill.amount),
+            description=bill.description[:100] if bill.description else ''
+        )
+
+    def perform_update(self, serializer):
+        """Log bill update."""
+        bill = serializer.save()
+
+        # Log bill update
+        UserActivityLog.log_event(
+            user=self.request.user,
+            event_type='bill_updated',
+            ip_address=get_client_ip(self.request),
+            user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
+            bill_id=str(bill.id),
+            bill_type=bill.type,
+            status=bill.status
+        )
+
+    def perform_destroy(self, instance):
+        """Log bill deletion."""
+        bill_id = str(instance.id)
+        bill_type = instance.type
+        description = instance.description[:100] if instance.description else ''
+
+        instance.delete()
+
+        # Log bill deletion
+        UserActivityLog.log_event(
+            user=self.request.user,
+            event_type='bill_deleted',
+            ip_address=get_client_ip(self.request),
+            user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
+            bill_id=bill_id,
+            bill_type=bill_type,
+            description=description
+        )
 
     @action(detail=True, methods=['post'])
     def register_payment(self, request, pk=None):
@@ -1054,6 +1100,19 @@ class BillViewSet(viewsets.ModelViewSet):
             bill.notes = f"{bill.notes}\n{notes}" if bill.notes else notes
         bill.update_status()
 
+        # Log payment registration
+        UserActivityLog.log_event(
+            user=request.user,
+            event_type='bill_payment_registered',
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            bill_id=str(bill.id),
+            bill_type=bill.type,
+            payment_amount=float(payment_amount),
+            total_paid=float(bill.amount_paid),
+            new_status=bill.status
+        )
+
         return Response(BillSerializer(bill).data)
 
     @action(detail=True, methods=['post'])
@@ -1078,6 +1137,18 @@ class BillViewSet(viewsets.ModelViewSet):
 
         try:
             updated_bill = match_service.link_transaction_to_bill(transaction, bill)
+
+            # Log transaction link
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='bill_transaction_linked',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                bill_id=str(bill.id),
+                transaction_id=str(transaction_id),
+                bill_type=bill.type
+            )
+
             return Response(BillSerializer(updated_bill).data)
         except ValueError as e:
             return Response(
@@ -1092,11 +1163,24 @@ class BillViewSet(viewsets.ModelViewSet):
         POST /api/banking/bills/{id}/unlink_transaction/
         """
         bill = self.get_object()
+        transaction_id = str(bill.linked_transaction_id) if bill.linked_transaction else None
 
         match_service = TransactionMatchService()
 
         try:
             updated_bill = match_service.unlink_transaction_from_bill(bill)
+
+            # Log transaction unlink
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='bill_transaction_unlinked',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                bill_id=str(bill.id),
+                transaction_id=transaction_id,
+                bill_type=bill.type
+            )
+
             return Response(BillSerializer(updated_bill).data)
         except ValueError as e:
             return Response(

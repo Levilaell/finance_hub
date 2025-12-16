@@ -42,7 +42,17 @@ def register_view(request):
         user.last_login_ip = get_client_ip(request)
         user.save(update_fields=['last_login', 'last_login_ip'])
 
-        # Log registration and automatic login
+        # Log signup event
+        UserActivityLog.log_event(
+            user=user,
+            event_type='signup',
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            signup_price_id=user.signup_price_id,
+            acquisition_angle=user.acquisition_angle
+        )
+
+        # Log automatic login after registration
         UserActivityLog.log_event(
             user=user,
             event_type='login',
@@ -176,3 +186,32 @@ def user_settings_view(request):
             serializer.update(settings, serializer.validated_data)
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def track_page_view(request):
+    """
+    Track page view for analytics.
+    POST /api/auth/track-page-view/
+    Body: {"page": "/dashboard", "referrer": "/login"}
+    """
+    page = request.data.get('page', '')
+    referrer = request.data.get('referrer', '')
+
+    if not page:
+        return Response(
+            {'error': 'page is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    UserActivityLog.log_event(
+        user=request.user,
+        event_type='page_view',
+        ip_address=get_client_ip(request),
+        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+        page=page,
+        referrer=referrer
+    )
+
+    return Response({'status': 'ok'})

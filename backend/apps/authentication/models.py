@@ -109,17 +109,39 @@ class UserActivityLog(models.Model):
     Tracks user login and activity events
     """
     EVENT_TYPES = [
+        # Authentication
+        ('signup', 'Signup'),
         ('login', 'Login'),
         ('logout', 'Logout'),
-        ('bank_connection_created', 'Bank Connection Created'),
-        ('bank_connection_updated', 'Bank Connection Updated'),
-        ('bank_connection_deleted', 'Bank Connection Deleted'),
-        ('sync_started', 'Sync Started'),
-        ('sync_completed', 'Sync Completed'),
-        ('sync_failed', 'Sync Failed'),
         ('password_reset_requested', 'Password Reset Requested'),
         ('password_changed', 'Password Changed'),
         ('profile_updated', 'Profile Updated'),
+        # Bank connections
+        ('bank_connection_created', 'Bank Connection Created'),
+        ('bank_connection_updated', 'Bank Connection Updated'),
+        ('bank_connection_deleted', 'Bank Connection Deleted'),
+        # Sync
+        ('sync_started', 'Sync Started'),
+        ('sync_completed', 'Sync Completed'),
+        ('sync_failed', 'Sync Failed'),
+        # Reports
+        ('report_generated', 'Report Generated'),
+        ('report_exported_pdf', 'Report Exported PDF'),
+        ('report_exported_excel', 'Report Exported Excel'),
+        # AI Insights
+        ('ai_insights_enabled', 'AI Insights Enabled'),
+        ('ai_insights_disabled', 'AI Insights Disabled'),
+        ('ai_insights_regenerated', 'AI Insights Regenerated'),
+        ('ai_insights_viewed', 'AI Insights Viewed'),
+        # Bills
+        ('bill_created', 'Bill Created'),
+        ('bill_updated', 'Bill Updated'),
+        ('bill_deleted', 'Bill Deleted'),
+        ('bill_payment_registered', 'Bill Payment Registered'),
+        ('bill_transaction_linked', 'Bill Transaction Linked'),
+        ('bill_transaction_unlinked', 'Bill Transaction Unlinked'),
+        # Page views
+        ('page_view', 'Page View'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='activity_logs')

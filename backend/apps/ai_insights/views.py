@@ -19,8 +19,17 @@ from apps.ai_insights.serializers import (
 )
 from apps.ai_insights.services.insight_generator import InsightGenerator
 from apps.ai_insights.tasks import generate_insight_for_user
+from apps.authentication.models import UserActivityLog
 
 logger = logging.getLogger(__name__)
+
+
+def get_client_ip(request):
+    """Extract client IP from request."""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
 
 
 class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
@@ -51,6 +60,16 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
                 {'error': 'Nenhuma análise disponível. Ative os Insights com IA primeiro.'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+        # Log insight view
+        UserActivityLog.log_event(
+            user=request.user,
+            event_type='ai_insights_viewed',
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            insight_id=str(latest_insight.id),
+            health_score=float(latest_insight.health_score)
+        )
 
         serializer = AIInsightDetailSerializer(latest_insight)
         return Response(serializer.data)
@@ -104,6 +123,16 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
             config.enabled_at = timezone.now()
             config.save()
 
+            # Log AI insights enabled
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='ai_insights_enabled',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                company_type=serializer.validated_data['company_type'],
+                business_sector=serializer.validated_data['business_sector']
+            )
+
             # Generate first insight immediately (async)
             generate_insight_for_user.delay(request.user.id)
 
@@ -123,6 +152,14 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
         """Force regenerate insight for the user."""
         try:
             config = AIInsightConfig.objects.get(user=request.user, is_enabled=True)
+
+            # Log AI insights regeneration
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='ai_insights_regenerated',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')
+            )
 
             # Trigger new generation
             generate_insight_for_user.delay(request.user.id)
@@ -144,6 +181,14 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
             config = AIInsightConfig.objects.get(user=request.user)
             config.is_enabled = False
             config.save()
+
+            # Log AI insights disabled
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='ai_insights_disabled',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')
+            )
 
             return Response({
                 'message': 'Insights com IA desabilitados com sucesso.'

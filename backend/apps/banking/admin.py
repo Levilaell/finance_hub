@@ -6,7 +6,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from .models import (
     Connector, BankConnection, BankAccount,
-    Transaction, Category, SyncLog
+    Transaction, Category, SyncLog, Bill, CategoryRule
 )
 
 
@@ -202,3 +202,181 @@ class SyncLogAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         # Sync logs are created automatically
         return False
+
+
+@admin.register(Bill)
+class BillAdmin(admin.ModelAdmin):
+    """Admin interface for Bills (Contas a Pagar/Receber)."""
+    list_display = [
+        'description', 'user_email', 'type_badge', 'amount_display',
+        'status_badge', 'due_date', 'is_overdue_badge', 'category_name',
+        'created_from_ocr', 'created_at'
+    ]
+    list_filter = ['type', 'status', 'recurrence', 'created_from_ocr', 'due_date', 'created_at']
+    search_fields = [
+        'description', 'customer_supplier', 'barcode',
+        'user__email', 'user__first_name', 'user__last_name'
+    ]
+    readonly_fields = [
+        'id', 'created_at', 'updated_at', 'paid_at',
+        'ocr_confidence', 'ocr_raw_data', 'amount_remaining_display',
+        'payment_percentage_display'
+    ]
+    raw_id_fields = ['user', 'category', 'linked_transaction', 'parent_bill']
+    date_hierarchy = 'due_date'
+    ordering = ['due_date', '-created_at']
+
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('user', 'type', 'description', 'customer_supplier')
+        }),
+        ('Valores', {
+            'fields': ('amount', 'amount_paid', 'amount_remaining_display',
+                      'payment_percentage_display', 'currency_code')
+        }),
+        ('Datas e Status', {
+            'fields': ('due_date', 'status', 'paid_at')
+        }),
+        ('Categorização', {
+            'fields': ('category', 'recurrence', 'parent_bill', 'installment_number')
+        }),
+        ('OCR / Boleto', {
+            'fields': ('source_file', 'barcode', 'created_from_ocr',
+                      'ocr_confidence', 'ocr_raw_data'),
+            'classes': ('collapse',)
+        }),
+        ('Vinculação Bancária', {
+            'fields': ('linked_transaction',),
+            'classes': ('collapse',)
+        }),
+        ('Notas', {
+            'fields': ('notes',),
+            'classes': ('collapse',)
+        }),
+        ('Metadados', {
+            'fields': ('id', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def user_email(self, obj):
+        return obj.user.email
+    user_email.short_description = 'Usuário'
+    user_email.admin_order_field = 'user__email'
+
+    def type_badge(self, obj):
+        color = '#10b981' if obj.type == 'receivable' else '#ef4444'
+        label = 'A Receber' if obj.type == 'receivable' else 'A Pagar'
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">{}</span>',
+            color, label
+        )
+    type_badge.short_description = 'Tipo'
+
+    def amount_display(self, obj):
+        return f"{obj.currency_code} {obj.amount:,.2f}"
+    amount_display.short_description = 'Valor'
+
+    def status_badge(self, obj):
+        colors = {
+            'pending': '#f59e0b',
+            'partially_paid': '#3b82f6',
+            'paid': '#10b981',
+            'cancelled': '#6b7280',
+        }
+        labels = {
+            'pending': 'Pendente',
+            'partially_paid': 'Parcial',
+            'paid': 'Pago',
+            'cancelled': 'Cancelado',
+        }
+        color = colors.get(obj.status, '#6b7280')
+        label = labels.get(obj.status, obj.status)
+        return format_html(
+            '<span style="background: {}; color: white; padding: 2px 8px; border-radius: 3px;">{}</span>',
+            color, label
+        )
+    status_badge.short_description = 'Status'
+
+    def is_overdue_badge(self, obj):
+        if obj.is_overdue:
+            return format_html('<span style="color: red; font-weight: bold;">⚠ Atrasado</span>')
+        return '-'
+    is_overdue_badge.short_description = 'Atraso'
+
+    def category_name(self, obj):
+        return obj.category.name if obj.category else '-'
+    category_name.short_description = 'Categoria'
+
+    def amount_remaining_display(self, obj):
+        return f"{obj.currency_code} {obj.amount_remaining:,.2f}"
+    amount_remaining_display.short_description = 'Valor Restante'
+
+    def payment_percentage_display(self, obj):
+        return f"{obj.payment_percentage:.1f}%"
+    payment_percentage_display.short_description = '% Pago'
+
+
+@admin.register(CategoryRule)
+class CategoryRuleAdmin(admin.ModelAdmin):
+    """Admin interface for Category Rules (Regras de Categorização)."""
+    list_display = [
+        'pattern', 'match_type_badge', 'category_display', 'user_email',
+        'applied_count', 'is_active_badge', 'created_at'
+    ]
+    list_filter = ['match_type', 'is_active', 'created_at']
+    search_fields = [
+        'pattern', 'category__name',
+        'user__email', 'user__first_name', 'user__last_name'
+    ]
+    readonly_fields = ['id', 'applied_count', 'created_from_transaction', 'created_at', 'updated_at']
+    raw_id_fields = ['user', 'category', 'created_from_transaction']
+    ordering = ['-created_at']
+
+    fieldsets = (
+        ('Regra', {
+            'fields': ('user', 'pattern', 'match_type', 'category')
+        }),
+        ('Status', {
+            'fields': ('is_active', 'applied_count')
+        }),
+        ('Origem', {
+            'fields': ('created_from_transaction',),
+            'classes': ('collapse',)
+        }),
+        ('Metadados', {
+            'fields': ('id', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def user_email(self, obj):
+        return obj.user.email
+    user_email.short_description = 'Usuário'
+    user_email.admin_order_field = 'user__email'
+
+    def match_type_badge(self, obj):
+        colors = {
+            'prefix': '#3b82f6',
+            'contains': '#8b5cf6',
+            'fuzzy': '#f59e0b',
+        }
+        color = colors.get(obj.match_type, '#6b7280')
+        return format_html(
+            '<span style="background: {}; color: white; padding: 2px 8px; border-radius: 3px;">{}</span>',
+            color, obj.get_match_type_display()
+        )
+    match_type_badge.short_description = 'Tipo Match'
+
+    def category_display(self, obj):
+        return format_html(
+            '<span style="color: {};">{} {}</span>',
+            obj.category.color, obj.category.icon, obj.category.name
+        )
+    category_display.short_description = 'Categoria'
+
+    def is_active_badge(self, obj):
+        if obj.is_active:
+            return format_html('<span style="color: green;">✓ Ativo</span>')
+        return format_html('<span style="color: red;">✗ Inativo</span>')
+    is_active_badge.short_description = 'Status'

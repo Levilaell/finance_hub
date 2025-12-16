@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import register_view, login_view, RefreshView, profile_view, user_settings_view
+from .views import register_view, login_view, RefreshView, profile_view, user_settings_view, track_page_view
 
 app_name = 'authentication'
 
@@ -9,4 +9,5 @@ urlpatterns = [
     path('refresh/', RefreshView.as_view(), name='refresh'),  # ← Class-based
     path('profile/', profile_view, name='profile'),
     path('settings/', user_settings_view, name='settings'),
+    path('track-page-view/', track_page_view, name='track_page_view'),
 ]
