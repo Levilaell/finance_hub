@@ -208,7 +208,7 @@ export function CategoryPopoverContent({
       <div
         className={`group flex items-center justify-between py-2 px-3 rounded-md cursor-pointer transition-colors ${
           isChild ? 'ml-6' : ''
-        } ${isSelected ? 'bg-primary/20' : 'hover:bg-white/5'}`}
+        } ${isSelected ? 'bg-primary/20' : 'hover:bg-accent'}`}
       >
         {/* Clickable area for selection */}
         <div
@@ -228,7 +228,7 @@ export function CategoryPopoverContent({
               {category.icon}
             </div>
           )}
-          <span className={`truncate ${isChild ? 'text-sm' : ''} ${isSelected ? 'text-primary font-medium' : 'text-white'}`}>
+          <span className={`truncate ${isChild ? 'text-sm' : ''} ${isSelected ? 'text-primary font-medium' : 'text-popover-foreground'}`}>
             {category.name}
           </span>
           {isSelected && <CheckIcon className="h-4 w-4 text-primary shrink-0" />}
@@ -304,7 +304,7 @@ export function CategoryPopoverContent({
         {/* Remove category option */}
         <div
           className={`flex items-center gap-2 py-2 px-3 rounded-md cursor-pointer transition-colors mb-1 ${
-            !selectedCategoryId ? 'bg-primary/20' : 'hover:bg-white/5'
+            !selectedCategoryId ? 'bg-primary/20' : 'hover:bg-accent'
           }`}
           onClick={() => !disabled && onSelectCategory(null)}
         >
@@ -313,7 +313,7 @@ export function CategoryPopoverContent({
           {!selectedCategoryId && <CheckIcon className="h-4 w-4 text-primary ml-auto" />}
         </div>
 
-        <div className="border-t border-white/10 my-2" />
+        <div className="border-t border-border my-2" />
 
         {/* Categories list */}
         {filteredCategories.length > 0 ? (
@@ -342,7 +342,7 @@ export function CategoryPopoverContent({
       <Dialog open={isCreateEditDialogOpen} onOpenChange={setIsCreateEditDialogOpen}>
         <DialogContent className="bg-card border-border sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-white">
+            <DialogTitle className="text-card-foreground">
               {editingCategory
                 ? 'Editar Categoria'
                 : isSubcategory
@@ -361,7 +361,7 @@ export function CategoryPopoverContent({
           <div className="space-y-4">
             {/* Name input */}
             <div>
-              <Label htmlFor="cat-name" className="text-white">
+              <Label htmlFor="cat-name" className="text-card-foreground">
                 Nome
               </Label>
               <Input
@@ -375,7 +375,7 @@ export function CategoryPopoverContent({
 
             {/* Color picker */}
             <div>
-              <Label className="text-white">Cor</Label>
+              <Label className="text-card-foreground">Cor</Label>
               <div className="grid grid-cols-8 gap-2 mt-2">
                 {PRESET_COLORS.map((color) => (
                   <button
@@ -384,7 +384,7 @@ export function CategoryPopoverContent({
                     onClick={() => setFormData({ ...formData, color })}
                     className={`w-7 h-7 rounded-lg transition-all ${
                       formData.color === color
-                        ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-900'
+                        ? 'ring-2 ring-primary ring-offset-2 ring-offset-card'
                         : 'hover:scale-110'
                     }`}
                     style={{ backgroundColor: color }}
@@ -396,7 +396,7 @@ export function CategoryPopoverContent({
             {/* Icon picker - only for parent categories */}
             {!isSubcategory && (
               <div>
-                <Label className="text-white">Ícone</Label>
+                <Label className="text-card-foreground">Ícone</Label>
                 <div className="grid grid-cols-8 gap-2 mt-2">
                   {PRESET_ICONS.map((icon) => (
                     <button
@@ -405,8 +405,8 @@ export function CategoryPopoverContent({
                       onClick={() => setFormData({ ...formData, icon })}
                       className={`w-7 h-7 rounded-lg flex items-center justify-center text-base transition-all ${
                         formData.icon === icon
-                          ? 'bg-white/20 ring-2 ring-white'
-                          : 'hover:bg-white/10'
+                          ? 'bg-accent ring-2 ring-primary'
+                          : 'hover:bg-accent'
                       }`}
                     >
                       {icon}
@@ -417,7 +417,7 @@ export function CategoryPopoverContent({
             )}
 
             {/* Preview */}
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-accent">
               {isSubcategory ? (
                 <div
                   className="w-6 h-6 rounded"
@@ -432,7 +432,7 @@ export function CategoryPopoverContent({
                 </div>
               )}
               <div>
-                <div className="font-medium text-white text-sm">
+                <div className="font-medium text-card-foreground text-sm">
                   {formData.name || 'Nome da categoria'}
                 </div>
                 <div className="text-xs text-muted-foreground">
@@ -469,12 +469,12 @@ export function CategoryPopoverContent({
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="bg-card border-border sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-white">Excluir Categoria</DialogTitle>
+            <DialogTitle className="text-card-foreground">Excluir Categoria</DialogTitle>
             <DialogDescription className="text-muted-foreground">
               {deletingCategory && (
                 <>
                   Deseja excluir a categoria{' '}
-                  <span className="font-semibold text-white">
+                  <span className="font-semibold text-card-foreground">
                     {deletingCategory.name}
                   </span>
                   ?
