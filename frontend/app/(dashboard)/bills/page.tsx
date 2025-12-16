@@ -263,12 +263,12 @@ export default function BillsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">Contas a Pagar/Receber</h1>
-          <p className="text-white/70 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Contas a Pagar/Receber</h1>
+          <p className="text-sm sm:text-base text-white/70 mt-1">
             Gerencie suas contas pendentes
           </p>
         </div>
@@ -295,17 +295,18 @@ export default function BillsPage() {
           </Button>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button>
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Nova Conta
+              <Button className="flex-1 sm:flex-none">
+                <PlusIcon className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Nova Conta</span>
+                <span className="sm:hidden">Nova</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Criar Nova Conta</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleCreateBill} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label>Tipo</Label>
                     <Select
@@ -350,7 +351,7 @@ export default function BillsPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label>Valor</Label>
                     <Input
@@ -434,56 +435,56 @@ export default function BillsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Total</p>
+                <p className="text-xl sm:text-2xl font-bold">{stats.total}</p>
               </div>
-              <BanknotesIcon className="h-8 w-8 text-muted-foreground" />
+              <BanknotesIcon className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Pendentes</p>
-                <p className="text-2xl font-bold text-orange-500">{stats.pending}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Pendentes</p>
+                <p className="text-xl sm:text-2xl font-bold text-orange-500">{stats.pending}</p>
               </div>
-              <ClockIcon className="h-8 w-8 text-orange-500" />
+              <ClockIcon className="h-6 w-6 sm:h-8 sm:w-8 text-orange-500" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Atrasadas</p>
-                <p className="text-2xl font-bold text-red-500">{stats.overdue}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Atrasadas</p>
+                <p className="text-xl sm:text-2xl font-bold text-red-500">{stats.overdue}</p>
               </div>
-              <ExclamationTriangleIcon className="h-8 w-8 text-red-500" />
+              <ExclamationTriangleIcon className="h-6 w-6 sm:h-8 sm:w-8 text-red-500" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">A Pagar</p>
-                <p className="text-xl font-bold text-red-600">{formatCurrency(stats.totalPayable)}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">A Pagar</p>
+                <p className="text-base sm:text-xl font-bold text-red-600">{formatCurrency(stats.totalPayable)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
+        <Card className="col-span-2 sm:col-span-1">
+          <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">A Receber</p>
-                <p className="text-xl font-bold text-green-600">{formatCurrency(stats.totalReceivable)}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">A Receber</p>
+                <p className="text-base sm:text-xl font-bold text-green-600">{formatCurrency(stats.totalReceivable)}</p>
               </div>
             </div>
           </CardContent>
@@ -501,19 +502,20 @@ export default function BillsPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div>
-                <Label>Pesquisar</Label>
+                <Label className="text-xs sm:text-sm">Pesquisar</Label>
                 <Input
                   placeholder="Descrição ou cliente..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-9 sm:h-10"
                 />
               </div>
               <div>
-                <Label>Tipo</Label>
+                <Label className="text-xs sm:text-sm">Tipo</Label>
                 <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-9 sm:h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -524,15 +526,15 @@ export default function BillsPage() {
                 </Select>
               </div>
               <div>
-                <Label>Status</Label>
+                <Label className="text-xs sm:text-sm">Status</Label>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-9 sm:h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="pending">Pendente</SelectItem>
-                    <SelectItem value="partially_paid">Parcialmente Pago</SelectItem>
+                    <SelectItem value="partially_paid">Parc. Pago</SelectItem>
                     <SelectItem value="paid">Pago</SelectItem>
                   </SelectContent>
                 </Select>
@@ -541,9 +543,10 @@ export default function BillsPage() {
                 <Button
                   variant={showOverdue ? 'default' : 'outline'}
                   onClick={() => setShowOverdue(!showOverdue)}
-                  className="w-full"
+                  className="w-full h-9 sm:h-10 text-xs sm:text-sm"
                 >
-                  Somente Atrasadas
+                  <span className="sm:hidden">Atrasadas</span>
+                  <span className="hidden sm:inline">Somente Atrasadas</span>
                 </Button>
               </div>
             </div>
@@ -560,61 +563,67 @@ export default function BillsPage() {
         </CardHeader>
         <CardContent>
           {filteredBills.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {filteredBills.map((bill) => (
                 <div
                   key={bill.id}
-                  className="flex items-center justify-between p-4 border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border border-white/10 rounded-lg hover:bg-white/5 transition-colors gap-3 sm:gap-4"
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <h3 className="font-semibold text-lg">{bill.description}</h3>
-                      <Badge className={billsService.getStatusBadgeClass(bill.status)}>
-                        {billsService.getStatusLabel(bill.status)}
-                      </Badge>
-                      <Badge
-                        variant="outline"
-                        className={bill.type === 'receivable' ? 'text-green-500' : 'text-red-500'}
-                      >
-                        {billsService.getTypeLabel(bill.type)}
-                      </Badge>
-                      {bill.is_overdue && (
-                        <Badge className="bg-red-100 text-red-800">
-                          Atrasada
+                  {/* Conteúdo principal */}
+                  <div className="flex-1 min-w-0">
+                    {/* Título e badges */}
+                    <div className="flex flex-wrap items-start sm:items-center gap-2">
+                      <h3 className="font-semibold text-base sm:text-lg break-words">{bill.description}</h3>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Badge className={`text-xs ${billsService.getStatusBadgeClass(bill.status)}`}>
+                          {billsService.getStatusLabel(bill.status)}
                         </Badge>
-                      )}
-                      {bill.has_linked_transaction && bill.linked_transaction_details && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Badge className="bg-blue-100 text-blue-800 flex items-center gap-1">
-                                <LinkIcon className="h-3 w-3" />
-                                Vinculada
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="font-medium">{bill.linked_transaction_details.description}</p>
-                              <p className="text-xs">
-                                {format(new Date(bill.linked_transaction_details.date), 'dd/MM/yyyy', { locale: ptBR })}
-                                {' • '}
-                                {formatCurrency(parseFloat(bill.linked_transaction_details.amount))}
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${bill.type === 'receivable' ? 'text-green-500' : 'text-red-500'}`}
+                        >
+                          {billsService.getTypeLabel(bill.type)}
+                        </Badge>
+                        {bill.is_overdue && (
+                          <Badge className="text-xs bg-red-100 text-red-800">
+                            Atrasada
+                          </Badge>
+                        )}
+                        {bill.has_linked_transaction && bill.linked_transaction_details && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Badge className="text-xs bg-blue-100 text-blue-800 flex items-center gap-1">
+                                  <LinkIcon className="h-3 w-3" />
+                                  <span className="hidden sm:inline">Vinculada</span>
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="font-medium">{bill.linked_transaction_details.description}</p>
+                                <p className="text-xs">
+                                  {format(new Date(bill.linked_transaction_details.date), 'dd/MM/yyyy', { locale: ptBR })}
+                                  {' • '}
+                                  {formatCurrency(parseFloat(bill.linked_transaction_details.amount))}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                    {/* Informações secundárias */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs sm:text-sm text-muted-foreground">
                       <span>
-                        Vencimento: {format(new Date(bill.due_date), 'dd/MM/yyyy', { locale: ptBR })}
+                        Venc: {format(new Date(bill.due_date), 'dd/MM/yyyy', { locale: ptBR })}
                       </span>
                       {bill.customer_supplier && (
-                        <span>• {bill.customer_supplier}</span>
+                        <span className="truncate max-w-[150px] sm:max-w-none">• {bill.customer_supplier}</span>
                       )}
                       {bill.recurrence !== 'once' && (
                         <span>• {billsService.getRecurrenceLabel(bill.recurrence)}</span>
                       )}
                     </div>
+                    {/* Barra de progresso */}
                     {bill.status === 'partially_paid' && (
                       <div className="mt-3">
                         <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
@@ -628,16 +637,17 @@ export default function BillsPage() {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-2xl font-bold">
+                  {/* Valor e ações */}
+                  <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/10">
+                    <div className="text-left sm:text-right">
+                      <p className="text-xl sm:text-2xl font-bold">
                         {formatCurrency(bill.amount_remaining)}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {billsService.getDueDateLabel(bill.due_date)}
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5 sm:gap-2">
                       {/* Link/Unlink button */}
                       {bill.status === 'pending' && !bill.has_linked_transaction && (
                         <TooltipProvider>
@@ -646,6 +656,7 @@ export default function BillsPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
+                                className="h-8 w-8 sm:h-9 sm:w-9 p-0"
                                 onClick={() => openLinkDialog(bill)}
                               >
                                 <LinkIcon className="h-4 w-4" />
@@ -662,6 +673,7 @@ export default function BillsPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
+                                className="h-8 w-8 sm:h-9 sm:w-9 p-0"
                                 onClick={() => handleUnlinkTransaction(bill.id)}
                                 disabled={isUnlinking === bill.id}
                               >
@@ -680,15 +692,17 @@ export default function BillsPage() {
                       {bill.status !== 'paid' && bill.status !== 'cancelled' && !bill.has_linked_transaction && (
                         <Button
                           size="sm"
+                          className="h-8 sm:h-9 px-2 sm:px-3"
                           onClick={() => openPaymentDialog(bill)}
                         >
-                          <CheckIcon className="h-4 w-4 mr-1" />
-                          Registrar
+                          <CheckIcon className="h-4 w-4 sm:mr-1" />
+                          <span className="hidden sm:inline">Registrar</span>
                         </Button>
                       )}
                       <Button
                         size="sm"
                         variant="outline"
+                        className="h-8 w-8 sm:h-9 sm:w-9 p-0"
                         onClick={() => handleDeleteBill(bill.id)}
                       >
                         <XMarkIcon className="h-4 w-4" />
@@ -715,22 +729,22 @@ export default function BillsPage() {
 
       {/* Payment Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Registrar Pagamento</DialogTitle>
           </DialogHeader>
           {selectedBill && (
             <form onSubmit={handleRegisterPayment} className="space-y-4">
               <div>
-                <p className="text-sm text-muted-foreground">Conta</p>
-                <p className="font-semibold">{selectedBill.description}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Conta</p>
+                <p className="font-semibold text-sm sm:text-base break-words">{selectedBill.description}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Valor restante</p>
-                <p className="text-2xl font-bold">{formatCurrency(selectedBill.amount_remaining)}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Valor restante</p>
+                <p className="text-xl sm:text-2xl font-bold">{formatCurrency(selectedBill.amount_remaining)}</p>
               </div>
               <div>
-                <Label>Valor do Pagamento</Label>
+                <Label className="text-xs sm:text-sm">Valor do Pagamento</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -738,10 +752,11 @@ export default function BillsPage() {
                   onChange={(e) => setPaymentAmount(parseFloat(e.target.value))}
                   max={selectedBill.amount_remaining}
                   required
+                  className="h-9 sm:h-10"
                 />
               </div>
               <div>
-                <Label>Observações (Opcional)</Label>
+                <Label className="text-xs sm:text-sm">Observações (Opcional)</Label>
                 <Textarea
                   value={paymentNotes}
                   onChange={(e) => setPaymentNotes(e.target.value)}
@@ -749,11 +764,11 @@ export default function BillsPage() {
                   rows={3}
                 />
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setShowPaymentDialog(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit">Confirmar Pagamento</Button>
+                <Button type="submit">Confirmar</Button>
               </div>
             </form>
           )}
