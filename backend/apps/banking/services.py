@@ -1270,23 +1270,29 @@ class TransactionMatchService:
 
     def unlink_transaction_from_bill(self, bill: 'Bill') -> 'Bill':
         """
-        Remove link between transaction and bill, reverting bill to pending.
+        Remove link between transaction and bill.
+
+        Se a bill tiver BillPayments, recalcula o status a partir deles.
+        Caso contrário, reverte para pending.
         """
         if bill.linked_transaction is None:
             raise ValueError("Bill is not linked to any transaction.")
 
         tx_id = bill.linked_transaction.id
 
-        # Revert bill to pending state
-        bill.linked_transaction = None
-        bill.amount_paid = Decimal('0.00')
-        bill.paid_at = None
-        bill.status = 'pending'
-        bill.save()
+        with transaction_db.atomic():
+            # Remove apenas o vínculo legacy
+            bill.linked_transaction = None
+            bill.save(update_fields=['linked_transaction'])
+
+            # Recalcula a partir dos BillPayments existentes
+            # Se não houver BillPayments, amount_paid será 0 e status será 'pending'
+            # update_status() já cuida de resetar paid_at quando necessário
+            bill.recalculate_payments()
 
         logger.info(
             f"Unlinked transaction {tx_id} from bill {bill.id}. "
-            f"Bill reverted to pending."
+            f"Bill status: {bill.status}, amount_paid: {bill.amount_paid}"
         )
 
         return bill

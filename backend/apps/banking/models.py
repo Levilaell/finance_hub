@@ -422,8 +422,10 @@ class Bill(models.Model):
                 self.paid_at = timezone.now()
         elif self.amount_paid > 0:
             self.status = 'partially_paid'
+            self.paid_at = None  # Reset: não está totalmente pago
         else:
             self.status = 'pending'
+            self.paid_at = None  # Reset: não há pagamentos
         self.save()
 
     def recalculate_payments(self):
@@ -482,7 +484,41 @@ class BillPayment(models.Model):
         tx_info = f" (Tx: {self.transaction.description[:20]})" if self.transaction else " (Manual)"
         return f"Pagamento de {self.amount} para {self.bill.description[:30]}{tx_info}"
 
+    def clean(self):
+        """
+        Valida que o pagamento não excede o valor restante da bill.
+        Previne overpayment mesmo quando criado via Admin ou código direto.
+        """
+        from django.core.exceptions import ValidationError
+        from django.db.models import Sum
+
+        if not self.bill_id:
+            return  # Será validado pelo campo required
+
+        if self.amount <= 0:
+            raise ValidationError({'amount': 'Valor deve ser maior que zero'})
+
+        # Calcula o total já pago (excluindo este payment se for update)
+        existing_payments = self.bill.payments.all()
+        if self.pk:
+            existing_payments = existing_payments.exclude(pk=self.pk)
+
+        current_paid = existing_payments.aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0.00')
+
+        remaining = self.bill.amount - current_paid
+
+        if self.amount > remaining:
+            raise ValidationError({
+                'amount': f'Pagamento ({self.amount}) excede o valor restante ({remaining})'
+            })
+
     def save(self, *args, **kwargs):
+        # Valida antes de salvar (previne overpayment)
+        # skip_validation pode ser passado para migrações ou casos especiais
+        if not kwargs.pop('skip_validation', False):
+            self.full_clean()
         super().save(*args, **kwargs)
         # Recalcula os totais da bill após salvar
         self.bill.recalculate_payments()

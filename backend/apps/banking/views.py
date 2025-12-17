@@ -1249,62 +1249,80 @@ class BillViewSet(viewsets.ModelViewSet):
         POST /api/banking/bills/{id}/add_payment/
         Body: { "amount": 1000.00, "transaction_id": "uuid" (opcional), "notes": "..." }
         """
+        from django.db import transaction as db_transaction
+        from django.core.exceptions import ValidationError
         from .models import BillPayment
 
-        bill = self.get_object()
-
-        if not bill.can_add_payment:
-            return Response(
-                {'error': f'Conta não pode receber pagamentos. Status: {bill.status}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        serializer = BillPaymentCreateSerializer(
-            data=request.data,
-            context={'request': request, 'bill': bill}
-        )
-        serializer.is_valid(raise_exception=True)
-
-        data = serializer.validated_data
-        transaction_id = data.get('transaction_id')
-
-        if transaction_id:
-            # Vincular transação como pagamento
-            transaction = Transaction.objects.get(id=transaction_id)
-            match_service = TransactionMatchService()
-
-            try:
-                payment = match_service.link_transaction_as_partial_payment(
-                    transaction=transaction,
-                    bill=bill,
-                    notes=data.get('notes', '')
+        try:
+            with db_transaction.atomic():
+                # Lock da bill para evitar race condition em pagamentos concorrentes
+                bill = Bill.objects.select_for_update().get(
+                    pk=pk,
+                    user=request.user
                 )
-            except ValueError as e:
-                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            # Pagamento manual (sem transação)
-            payment = BillPayment.objects.create(
-                bill=bill,
-                amount=data['amount'],
-                payment_date=timezone.now(),
-                notes=data.get('notes', '')
+
+                if not bill.can_add_payment:
+                    return Response(
+                        {'error': f'Conta não pode receber pagamentos. Status: {bill.status}'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                serializer = BillPaymentCreateSerializer(
+                    data=request.data,
+                    context={'request': request, 'bill': bill}
+                )
+                serializer.is_valid(raise_exception=True)
+
+                data = serializer.validated_data
+                transaction_id = data.get('transaction_id')
+
+                if transaction_id:
+                    # Vincular transação como pagamento
+                    transaction = Transaction.objects.get(id=transaction_id)
+                    match_service = TransactionMatchService()
+
+                    payment = match_service.link_transaction_as_partial_payment(
+                        transaction=transaction,
+                        bill=bill,
+                        notes=data.get('notes', '')
+                    )
+                else:
+                    # Pagamento manual (sem transação)
+                    payment = BillPayment.objects.create(
+                        bill=bill,
+                        amount=data['amount'],
+                        payment_date=timezone.now(),
+                        notes=data.get('notes', '')
+                    )
+                    # recalculate_payments é chamado automaticamente no save()
+
+                # Log activity
+                UserActivityLog.log_event(
+                    user=request.user,
+                    event_type='bill_payment_added',
+                    ip_address=get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    bill_id=str(bill.id),
+                    payment_id=str(payment.id),
+                    amount=float(data['amount']),
+                    has_transaction=bool(transaction_id)
+                )
+
+                bill.refresh_from_db()
+                return Response(BillSerializer(bill).data)
+
+        except Bill.DoesNotExist:
+            return Response(
+                {'error': 'Conta não encontrada'},
+                status=status.HTTP_404_NOT_FOUND
             )
-            # recalculate_payments é chamado automaticamente no save()
-
-        # Log activity
-        UserActivityLog.log_event(
-            user=request.user,
-            event_type='bill_payment_added',
-            ip_address=get_client_ip(request),
-            user_agent=request.META.get('HTTP_USER_AGENT', ''),
-            bill_id=str(bill.id),
-            payment_id=str(payment.id),
-            amount=float(data['amount']),
-            has_transaction=bool(transaction_id)
-        )
-
-        bill.refresh_from_db()
-        return Response(BillSerializer(bill).data)
+        except (ValueError, ValidationError) as e:
+            error_msg = str(e)
+            if hasattr(e, 'message_dict'):
+                error_msg = '; '.join(
+                    f"{k}: {', '.join(v)}" for k, v in e.message_dict.items()
+                )
+            return Response({'error': error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['delete'], url_path='payments/(?P<payment_id>[^/.]+)')
     def remove_payment(self, request, pk=None, payment_id=None):
