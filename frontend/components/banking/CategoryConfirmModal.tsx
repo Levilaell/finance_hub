@@ -102,12 +102,16 @@ export function CategoryConfirmModal({
   const handleApply = async () => {
     if (!transaction || !selectedCategory) return;
 
+    // Get pending subcategory from transaction (set by transactions page)
+    const pendingSubcategoryId = (transaction as any)._pendingSubcategoryId;
+
     setIsApplying(true);
     try {
       const result = await bankingService.updateTransactionCategoryWithRule(
         transaction.id,
         {
           user_category_id: selectedCategory.id,
+          user_subcategory_id: pendingSubcategoryId || null,
           apply_to_similar: selectedIds.size > 0,
           create_rule: createRule,
           similar_transaction_ids: Array.from(selectedIds),
@@ -141,9 +145,12 @@ export function CategoryConfirmModal({
   const handleApplyOnlyThis = async () => {
     if (!transaction || !selectedCategory) return;
 
+    // Get pending subcategory from transaction (set by transactions page)
+    const pendingSubcategoryId = (transaction as any)._pendingSubcategoryId;
+
     setIsApplying(true);
     try {
-      await bankingService.updateTransactionCategory(transaction.id, selectedCategory.id);
+      await bankingService.updateTransactionCategory(transaction.id, selectedCategory.id, pendingSubcategoryId || null);
       toast.success('Categoria atualizada');
       onConfirm({
         appliedToSimilar: 0,

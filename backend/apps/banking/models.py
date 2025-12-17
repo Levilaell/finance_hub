@@ -195,6 +195,15 @@ class Transaction(models.Model):
         related_name='transactions'
     )
 
+    # User customizable subcategory (must have parent = user_category)
+    user_subcategory = models.ForeignKey(
+        'Category',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='transactions_as_subcategory'
+    )
+
     # Payment data
     payment_data = models.JSONField(null=True, blank=True)  # Additional payment details
     merchant_name = models.CharField(max_length=200, blank=True)
@@ -211,6 +220,7 @@ class Transaction(models.Model):
             models.Index(fields=['type', 'date']),
             models.Index(fields=['pluggy_category', 'date']),
             models.Index(fields=['user_category', 'date']),
+            models.Index(fields=['user_subcategory', 'date']),
         ]
 
     def __str__(self):
@@ -232,6 +242,13 @@ class Transaction(models.Model):
         if self.user_category:
             return self.user_category.name
         return self.pluggy_category
+
+    @property
+    def effective_subcategory(self):
+        """Get the effective subcategory name if set."""
+        if self.user_subcategory:
+            return self.user_subcategory.name
+        return None
 
 
 class Category(models.Model):

@@ -29,7 +29,8 @@ interface CategoryPopoverContentProps {
   categories: Category[];
   transactionType: 'CREDIT' | 'DEBIT';
   selectedCategoryId?: string | null;
-  onSelectCategory: (categoryId: string | null) => void;
+  selectedSubcategoryId?: string | null;
+  onSelectCategory: (categoryId: string | null, subcategoryId?: string | null) => void;
   onCategoriesChange: () => void;
   disabled?: boolean;
 }
@@ -38,6 +39,7 @@ export function CategoryPopoverContent({
   categories,
   transactionType,
   selectedCategoryId,
+  selectedSubcategoryId,
   onSelectCategory,
   onCategoriesChange,
   disabled = false,
@@ -198,11 +200,28 @@ export function CategoryPopoverContent({
   const CategoryItem = ({
     category,
     isChild = false,
+    parentCategory,
   }: {
     category: Category;
     isChild?: boolean;
+    parentCategory?: Category;
   }) => {
-    const isSelected = selectedCategoryId === category.id;
+    // For parent categories: check if it's selected (and no subcategory selected)
+    // For child categories: check if this specific subcategory is selected
+    const isSelected = isChild
+      ? selectedSubcategoryId === category.id
+      : selectedCategoryId === category.id && !selectedSubcategoryId;
+
+    const handleClick = () => {
+      if (disabled) return;
+      if (isChild && parentCategory) {
+        // Selecting a subcategory: set both category and subcategory
+        onSelectCategory(parentCategory.id, category.id);
+      } else {
+        // Selecting a parent category: set category, clear subcategory
+        onSelectCategory(category.id, null);
+      }
+    };
 
     return (
       <div
@@ -213,7 +232,7 @@ export function CategoryPopoverContent({
         {/* Clickable area for selection */}
         <div
           className="flex items-center gap-2 flex-1 min-w-0"
-          onClick={() => !disabled && onSelectCategory(category.id)}
+          onClick={handleClick}
         >
           {isChild ? (
             <div
@@ -306,7 +325,7 @@ export function CategoryPopoverContent({
           className={`flex items-center gap-2 py-2 px-3 rounded-md cursor-pointer transition-colors mb-1 ${
             !selectedCategoryId ? 'bg-primary/20' : 'hover:bg-accent'
           }`}
-          onClick={() => !disabled && onSelectCategory(null)}
+          onClick={() => !disabled && onSelectCategory(null, null)}
         >
           <XMarkIcon className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">Remover categoria</span>
@@ -324,7 +343,12 @@ export function CategoryPopoverContent({
                 {category.subcategories && category.subcategories.length > 0 && (
                   <div className="space-y-1">
                     {category.subcategories.map((sub) => (
-                      <CategoryItem key={sub.id} category={sub} isChild />
+                      <CategoryItem
+                        key={sub.id}
+                        category={sub}
+                        isChild
+                        parentCategory={category}
+                      />
                     ))}
                   </div>
                 )}

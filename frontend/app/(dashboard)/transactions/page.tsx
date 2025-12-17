@@ -173,13 +173,13 @@ export default function TransactionsPage() {
     setFilteredTransactions(filtered);
   };
 
-  const handleUpdateCategory = async (transactionId: string, categoryId: string | null) => {
+  const handleUpdateCategory = async (transactionId: string, categoryId: string | null, subcategoryId?: string | null) => {
     // If removing category, do it directly
     if (!categoryId) {
       setUpdatingTransactionId(transactionId);
       try {
-        await bankingService.updateTransactionCategory(transactionId, null);
-        updateLocalTransactionCategory(transactionId, null);
+        await bankingService.updateTransactionCategory(transactionId, null, null);
+        updateLocalTransactionCategory(transactionId, null, null);
         toast.success('Categoria removida');
       } catch (error) {
         console.error('Error removing category:', error);
@@ -190,24 +190,41 @@ export default function TransactionsPage() {
       return;
     }
 
-    // For setting a category, open the modal to check for similar transactions
+    // If only updating subcategory (same category)
     const transaction = transactions.find(t => t.id === transactionId);
+    if (transaction && transaction.user_category_id === categoryId && subcategoryId !== undefined) {
+      setUpdatingTransactionId(transactionId);
+      try {
+        await bankingService.updateTransactionCategory(transactionId, categoryId, subcategoryId);
+        updateLocalTransactionCategory(transactionId, categoryId, subcategoryId);
+        toast.success(subcategoryId ? 'Subcategoria atualizada' : 'Subcategoria removida');
+      } catch (error) {
+        console.error('Error updating subcategory:', error);
+        toast.error('Erro ao atualizar subcategoria');
+      } finally {
+        setUpdatingTransactionId(null);
+      }
+      return;
+    }
+
+    // For setting a new category, open the modal to check for similar transactions
     const category = categories.find(c => c.id === categoryId);
 
     if (transaction && category) {
-      setCategoryModalTransaction(transaction);
+      setCategoryModalTransaction({ ...transaction, _pendingSubcategoryId: subcategoryId } as any);
       setCategoryModalCategory(category);
       setShowCategoryModal(true);
     }
   };
 
-  const updateLocalTransactionCategory = (transactionId: string, categoryId: string | null) => {
+  const updateLocalTransactionCategory = (transactionId: string, categoryId: string | null, subcategoryId?: string | null) => {
     setTransactions(prev =>
       prev.map(t =>
         t.id === transactionId
           ? {
               ...t,
               user_category_id: categoryId,
+              user_subcategory_id: subcategoryId ?? null,
               category: categoryId
                 ? categories.find(c => c.id === categoryId)?.name
                 : t.pluggy_category
@@ -219,8 +236,9 @@ export default function TransactionsPage() {
 
   const handleCategoryModalConfirm = (result: { appliedToSimilar: number; ruleCreated: boolean }) => {
     if (categoryModalTransaction && categoryModalCategory) {
-      // Update the main transaction
-      updateLocalTransactionCategory(categoryModalTransaction.id, categoryModalCategory.id);
+      // Update the main transaction (include pending subcategory if any)
+      const pendingSubcategoryId = (categoryModalTransaction as any)._pendingSubcategoryId;
+      updateLocalTransactionCategory(categoryModalTransaction.id, categoryModalCategory.id, pendingSubcategoryId);
 
       // If similar transactions were updated, refresh the list to show updated categories
       if (result.appliedToSimilar > 0) {
@@ -632,16 +650,40 @@ export default function TransactionsPage() {
                                       const currentCategory = categories.find(
                                         c => c.id === transaction.user_category_id
                                       );
+                                      // Find subcategory from nested subcategories
+                                      let currentSubcategory = null;
+                                      if (transaction.user_subcategory_id) {
+                                        for (const cat of categories) {
+                                          const sub = cat.subcategories?.find(
+                                            s => s.id === transaction.user_subcategory_id
+                                          );
+                                          if (sub) {
+                                            currentSubcategory = sub;
+                                            break;
+                                          }
+                                        }
+                                      }
                                       return currentCategory ? (
-                                        <>
+                                        <div className="flex items-center gap-2">
                                           <div
                                             className="w-5 h-5 rounded flex items-center justify-center text-xs flex-shrink-0"
                                             style={{ backgroundColor: currentCategory.color }}
                                           >
                                             {currentCategory.icon}
                                           </div>
-                                          <span>{currentCategory.name}</span>
-                                        </>
+                                          <div className="flex flex-col items-start">
+                                            <span>{currentCategory.name}</span>
+                                            {currentSubcategory && (
+                                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                <div
+                                                  className="w-2 h-2 rounded-sm"
+                                                  style={{ backgroundColor: currentSubcategory.color }}
+                                                />
+                                                {currentSubcategory.name}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
                                       ) : (
                                         <span>{transaction.category || 'Sem categoria'}</span>
                                       );
@@ -656,8 +698,9 @@ export default function TransactionsPage() {
                                 categories={categories}
                                 transactionType={transaction.type}
                                 selectedCategoryId={transaction.user_category_id}
-                                onSelectCategory={(categoryId) =>
-                                  handleUpdateCategory(transaction.id, categoryId)
+                                selectedSubcategoryId={transaction.user_subcategory_id}
+                                onSelectCategory={(categoryId, subcategoryId) =>
+                                  handleUpdateCategory(transaction.id, categoryId, subcategoryId)
                                 }
                                 onCategoriesChange={fetchData}
                                 disabled={updatingTransactionId === transaction.id}

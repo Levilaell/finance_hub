@@ -97,9 +97,18 @@ export interface Transaction {
   amount: number;
   currency_code: string;
   date: string;
+  // Category information
   category?: string;
   user_category_id?: string | null;
   pluggy_category?: string;
+  category_color?: string | null;
+  category_icon?: string | null;
+  // Subcategory information
+  subcategory?: string | null;
+  user_subcategory_id?: string | null;
+  subcategory_color?: string | null;
+  subcategory_name?: string | null;
+  // Other fields
   merchant_name?: string;
   is_income: boolean;
   is_expense: boolean;
@@ -481,6 +490,7 @@ export interface SimilarTransactionsResponse {
 // Extended transaction update with batch operations
 export interface TransactionCategoryUpdateRequest {
   user_category_id: string | null;
+  user_subcategory_id?: string | null;
   apply_to_similar?: boolean;
   create_rule?: boolean;
   similar_transaction_ids?: string[];

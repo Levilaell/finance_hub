@@ -223,11 +223,16 @@ class BankingService {
 
   async updateTransactionCategory(
     id: string,
-    categoryId: string | null
+    categoryId: string | null,
+    subcategoryId?: string | null
   ): Promise<Transaction> {
+    const data: Record<string, string | null> = { user_category_id: categoryId };
+    if (subcategoryId !== undefined) {
+      data.user_subcategory_id = subcategoryId;
+    }
     return apiClient.patch<Transaction>(
       `/api/banking/transactions/${id}/`,
-      { user_category_id: categoryId }
+      data
     );
   }
 

@@ -82,7 +82,7 @@ def get_category_icon(category_name_pt: str) -> str:
         'Atividades de empreendedorismo': '💼',
         'Auxílio do governo': '🏛️',
         'Renda não-recorrente': '💸',
-        'Juros de rendimentos de dividendos': '📈',
+        'Dividendos e Rendimentos': '📈',
 
         # Loans and financing
         'Empréstimos e financiamento': '🏦',
@@ -112,7 +112,7 @@ def get_category_icon(category_name_pt: str) -> str:
         'Transferência - Boleto bancário': '📄',
         'Transferência - Dinheiro': '💵',
         'Transferência - Cheque': '📝',
-        'Transferências- DOC': '🏦',
+        'Transferência - DOC': '🏦',
         'Transferência - Câmbio': '💱',
         'Transferência - Mesma instituição': '🏦',
         'Transferência - PIX': '⚡',
@@ -155,7 +155,7 @@ def get_category_icon(category_name_pt: str) -> str:
         'Compras online': '🛒',
         'Eletrônicos': '📱',
         'Pet Shops e veterinários': '🐾',
-        'Vestiário': '👔',
+        'Roupas': '👔',
         'Artigos infantis': '🧸',
         'Livraria': '📚',
         'Artigos esportivos': '⚽',
@@ -262,7 +262,7 @@ def get_category_color(category_name_pt: str) -> str:
         'Atividades de empreendedorismo': '#34d399',  # emerald-400
         'Auxílio do governo': '#6ee7b7',  # emerald-300
         'Renda não-recorrente': '#a7f3d0',  # emerald-200
-        'Juros de rendimentos de dividendos': '#0891b2',  # cyan-600
+        'Dividendos e Rendimentos': '#0891b2',  # cyan-600
 
         # Loans and financing - Red/Orange tones
         'Empréstimos e financiamento': '#dc2626',  # red-600
@@ -292,7 +292,7 @@ def get_category_color(category_name_pt: str) -> str:
         'Transferência - Boleto bancário': '#818cf8',  # indigo-400
         'Transferência - Dinheiro': '#4f46e5',  # indigo-600
         'Transferência - Cheque': '#4338ca',  # indigo-700
-        'Transferências- DOC': '#3730a3',  # indigo-800
+        'Transferência - DOC': '#3730a3',  # indigo-800
         'Transferência - Câmbio': '#a78bfa',  # violet-400
         'Transferência - Mesma instituição': '#6366f1',  # indigo-500
         'Transferência - PIX': '#8b5cf6',  # violet-500
@@ -335,7 +335,7 @@ def get_category_color(category_name_pt: str) -> str:
         'Compras online': '#db2777',  # pink-600
         'Eletrônicos': '#be185d',  # pink-700
         'Pet Shops e veterinários': '#f472b6',  # pink-400
-        'Vestiário': '#f9a8d4',  # pink-300
+        'Roupas': '#f9a8d4',  # pink-300
         'Artigos infantis': '#fbcfe8',  # pink-200
         'Livraria': '#be185d',  # pink-700
         'Artigos esportivos': '#db2777',  # pink-600

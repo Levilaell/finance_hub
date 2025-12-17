@@ -100,6 +100,21 @@ class TransactionSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
+    # Category details for display
+    category_color = serializers.CharField(source='user_category.color', read_only=True, default=None)
+    category_icon = serializers.CharField(source='user_category.icon', read_only=True, default=None)
+
+    # Subcategory information
+    subcategory = serializers.CharField(source='effective_subcategory', read_only=True)
+    user_subcategory_id = serializers.PrimaryKeyRelatedField(
+        source='user_subcategory',
+        queryset=Category.objects.none(),
+        required=False,
+        allow_null=True
+    )
+    # Subcategory details for display
+    subcategory_color = serializers.CharField(source='user_subcategory.color', read_only=True, default=None)
+    subcategory_name = serializers.CharField(source='user_subcategory.name', read_only=True, default=None)
 
     # Linked bill information
     linked_bill = serializers.SerializerMethodField()
@@ -111,6 +126,8 @@ class TransactionSerializer(serializers.ModelSerializer):
             'id', 'account_name', 'account_type',
             'type', 'description', 'amount', 'currency_code',
             'date', 'category', 'user_category_id', 'pluggy_category',
+            'category_color', 'category_icon',
+            'subcategory', 'user_subcategory_id', 'subcategory_color', 'subcategory_name',
             'merchant_name', 'is_income', 'is_expense', 'created_at',
             'linked_bill', 'has_linked_bill'
         ]
@@ -118,10 +135,51 @@ class TransactionSerializer(serializers.ModelSerializer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Set queryset for user_category based on request user
+        # Set queryset for user_category and user_subcategory based on request user
         if 'request' in self.context:
             user = self.context['request'].user
             self.fields['user_category_id'].queryset = Category.objects.filter(user=user)
+            # Subcategory must have a parent (is a subcategory)
+            self.fields['user_subcategory_id'].queryset = Category.objects.filter(
+                user=user,
+                parent__isnull=False
+            )
+
+    def validate(self, data):
+        """Validate that subcategory belongs to the category."""
+        # Get category from data or from existing instance
+        user_category = data.get('user_category')
+        if user_category is None and self.instance:
+            user_category = self.instance.user_category
+
+        user_subcategory = data.get('user_subcategory')
+
+        # If subcategory is set, validate it belongs to the category
+        if user_subcategory:
+            if not user_category:
+                raise serializers.ValidationError({
+                    'user_subcategory_id': 'Subcategoria requer uma categoria definida'
+                })
+            if user_subcategory.parent_id != user_category.id:
+                raise serializers.ValidationError({
+                    'user_subcategory_id': 'Subcategoria deve pertencer à categoria selecionada'
+                })
+
+        # If category changes and has a subcategory, clear the subcategory
+        if self.instance and 'user_category' in data:
+            new_category = data.get('user_category')
+            current_category = self.instance.user_category
+            current_subcategory = self.instance.user_subcategory
+
+            # Category is changing
+            if current_category and current_subcategory:
+                category_changed = (new_category is None) or (new_category.id != current_category.id)
+                if category_changed:
+                    # Category changed, subcategory must be cleared or updated
+                    if 'user_subcategory' not in data:
+                        data['user_subcategory'] = None
+
+        return data
 
     def get_linked_bill(self, obj):
         """Get linked bill info if exists."""

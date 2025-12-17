@@ -140,7 +140,7 @@
     {
       "id": "03060000",
       "description": "Proceeds interests and dividends",
-      "descriptionTranslated": "Juros de rendimentos de dividendos",
+      "descriptionTranslated": "Dividendos e Rendimentos",
       "parentId": "03000000",
       "parentDescription": "Investments"
     },
@@ -206,7 +206,7 @@
     {
       "id": "05040000",
       "description": "Transfer - DOC",
-      "descriptionTranslated": "Transferências- DOC",
+      "descriptionTranslated": "Transferência - DOC",
       "parentId": "05000000",
       "parentDescription": "Transfers"
     },
@@ -459,7 +459,7 @@
     {
       "id": "08040000",
       "description": "Clothing",
-      "descriptionTranslated": "Vestiário",
+      "descriptionTranslated": "Roupas",
       "parentId": "08000000",
       "parentDescription": "Shopping"
     },
@@ -832,28 +832,28 @@
       "descriptionTranslated": "Seguros"
     },
     {
-      "id": "200100000",
+      "id": "20010000",
       "description": "Life insurance",
       "descriptionTranslated": "Seguro de vida",
       "parentId": "20000000",
       "parentDescription": "Insurance"
     },
     {
-      "id": "200200000",
+      "id": "20020000",
       "description": "Home insurance",
       "descriptionTranslated": "Seguro residencial",
       "parentId": "20000000",
       "parentDescription": "Insurance"
     },
     {
-      "id": "200300000",
+      "id": "20030000",
       "description": "Health insurance",
       "descriptionTranslated": "Seguro saúde",
       "parentId": "20000000",
       "parentDescription": "Insurance"
     },
     {
-      "id": "200400000",
+      "id": "20040000",
       "description": "Vehicle insurance",
       "descriptionTranslated": "Seguro de veículos",
       "parentId": "20000000",
