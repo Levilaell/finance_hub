@@ -55,10 +55,9 @@ function RetailLandingContent() {
   const angle = searchParams.get("a");
 
   // Salva o parâmetro de aquisição no localStorage para usar no registro
+  // Se não houver parâmetro "a", usa "retail" como default para essa LP
   useEffect(() => {
-    if (angle) {
-      localStorage.setItem('acquisition_angle', angle);
-    }
+    localStorage.setItem('acquisition_angle', angle || 'retail');
   }, [angle]);
 
   return (
