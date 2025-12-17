@@ -717,7 +717,7 @@ export default function SettingsPage() {
               )}
             </div>
             <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg">
-              <p className="text-sm text-red-800">
+              <p className="text-sm text-red-400">
                 ⚠️ <strong>Aviso:</strong> Isso excluirá permanentemente sua conta, dados da empresa, transações, categorias e todas as outras informações associadas. Esta ação não pode ser desfeita.
               </p>
             </div>

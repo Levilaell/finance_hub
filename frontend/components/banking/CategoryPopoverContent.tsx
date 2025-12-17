@@ -490,6 +490,12 @@ export function CategoryPopoverContent({
                         </span>
                       </>
                     )}
+                  <br />
+                  <br />
+                  <span className="text-amber-400 font-medium">
+                    Esta ação não pode ser desfeita. As transações com esta categoria
+                    voltarão a usar a categoria original do banco.
+                  </span>
                 </>
               )}
             </DialogDescription>

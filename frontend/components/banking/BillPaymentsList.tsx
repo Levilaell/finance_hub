@@ -150,7 +150,10 @@ export function BillPaymentsList({ bill, onPaymentRemoved }: BillPaymentsListPro
                       <strong>{paymentToDelete.transaction_details?.description}</strong>
                     </>
                   )}
-                  . Esta ação não pode ser desfeita.
+                  .{' '}
+                  <span className="text-amber-400 font-medium">
+                    Esta ação não pode ser desfeita.
+                  </span>
                 </>
               )}
             </AlertDialogDescription>
