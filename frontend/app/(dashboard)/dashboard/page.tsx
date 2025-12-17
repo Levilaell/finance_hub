@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { bankingService } from '@/services/banking.service';
@@ -37,6 +37,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const { shouldShowTour, startTour } = useOnboarding();
+  const tourStartedRef = useRef(false);
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [billsSummary, setBillsSummary] = useState<BillsSummary | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
@@ -53,16 +54,18 @@ export default function DashboardPage() {
     fetchDashboardData();
   }, [isAuthenticated, router]);
 
-  // Start onboarding tour for new users
+  // Start onboarding tour for new users (runs only once per page load)
   useEffect(() => {
-    if (!isLoading && isAuthenticated && shouldShowTour()) {
+    if (!isLoading && isAuthenticated && !tourStartedRef.current && shouldShowTour()) {
+      tourStartedRef.current = true;
       // Small delay to ensure DOM is ready
       const timer = setTimeout(() => {
         startTour();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [isLoading, isAuthenticated, shouldShowTour, startTour]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, isAuthenticated]);
 
   const fetchDashboardData = async () => {
     setIsLoading(true);
