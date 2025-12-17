@@ -306,7 +306,10 @@ export default function BillsPage() {
             <TooltipProvider>
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
-                  <button className="text-white/50 hover:text-white/80 transition-colors">
+                  <button
+                    className="text-white/50 hover:text-white/80 transition-colors"
+                    aria-label="Ajuda sobre contas a pagar/receber"
+                  >
                     <QuestionMarkCircleIcon className="h-5 w-5 sm:h-6 sm:w-6" />
                   </button>
                 </TooltipTrigger>
