@@ -915,7 +915,7 @@ class ReportsService:
         compare_end: Optional[datetime] = None
     ) -> bytes:
         """
-        Export DRE report as PDF.
+        Export DRE report as PDF using reportlab.
 
         Args:
             user: User instance
@@ -928,7 +928,11 @@ class ReportsService:
             PDF file content as bytes
         """
         from io import BytesIO
-        from weasyprint import HTML, CSS
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import mm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 
         # Get DRE data
         dre_data = ReportsService.get_dre_report(
@@ -943,200 +947,165 @@ class ReportsService:
             sign = "+" if value > 0 else ""
             return f"{sign}{value:.1f}%"
 
-        # Build HTML
         has_comparison = 'comparison' in dre_data
 
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                body {{
-                    font-family: 'Helvetica', 'Arial', sans-serif;
-                    font-size: 10pt;
-                    color: #333;
-                    padding: 20px;
-                }}
-                h1 {{
-                    text-align: center;
-                    font-size: 16pt;
-                    margin-bottom: 5px;
-                    color: #1a1a2e;
-                }}
-                .subtitle {{
-                    text-align: center;
-                    font-size: 10pt;
-                    color: #666;
-                    margin-bottom: 20px;
-                }}
-                table {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-bottom: 20px;
-                }}
-                th, td {{
-                    padding: 8px 12px;
-                    text-align: left;
-                    border-bottom: 1px solid #ddd;
-                }}
-                th {{
-                    background-color: #1a1a2e;
-                    color: white;
-                    font-weight: bold;
-                }}
-                .group-header {{
-                    background-color: #f5f5f5;
-                    font-weight: bold;
-                }}
-                .category-row {{
-                    padding-left: 20px;
-                }}
-                .subcategory-row {{
-                    padding-left: 40px;
-                    font-size: 9pt;
-                    color: #666;
-                }}
-                .number {{
-                    text-align: right;
-                    font-family: 'Courier', monospace;
-                }}
-                .positive {{
-                    color: #16a34a;
-                }}
-                .negative {{
-                    color: #dc2626;
-                }}
-                .total-row {{
-                    font-weight: bold;
-                    background-color: #e8e8e8;
-                }}
-                .summary-row {{
-                    font-weight: bold;
-                    font-size: 11pt;
-                }}
-                .resultado-row {{
-                    background-color: #1a1a2e;
-                    color: white;
-                    font-weight: bold;
-                }}
-                .footer {{
-                    margin-top: 30px;
-                    text-align: center;
-                    font-size: 8pt;
-                    color: #999;
-                }}
-            </style>
-        </head>
-        <body>
-            <h1>DEMONSTRATIVO DE RESULTADO DO EXERCÍCIO</h1>
-            <div class="subtitle">
-                Período: {start_date.strftime('%d/%m/%Y')} a {end_date.strftime('%d/%m/%Y')}
-            </div>
+        # Create PDF buffer
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=20*mm, bottomMargin=20*mm)
+        elements = []
 
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 50%;">Descrição</th>
-                        <th class="number" style="width: 25%;">Período Atual</th>
-                        {"<th class='number' style='width: 15%;'>Período Anterior</th><th class='number' style='width: 10%;'>Variação</th>" if has_comparison else ""}
-                    </tr>
-                </thead>
-                <tbody>
-        """
+        # Styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'Title',
+            parent=styles['Heading1'],
+            fontSize=16,
+            alignment=1,
+            spaceAfter=5
+        )
+        subtitle_style = ParagraphStyle(
+            'Subtitle',
+            parent=styles['Normal'],
+            fontSize=10,
+            alignment=1,
+            textColor=colors.grey,
+            spaceAfter=20
+        )
+        footer_style = ParagraphStyle(
+            'Footer',
+            parent=styles['Normal'],
+            fontSize=8,
+            alignment=1,
+            textColor=colors.grey
+        )
+
+        # Title
+        elements.append(Paragraph("DEMONSTRATIVO DE RESULTADO DO EXERCÍCIO", title_style))
+        elements.append(Paragraph(
+            f"Período: {start_date.strftime('%d/%m/%Y')} a {end_date.strftime('%d/%m/%Y')}",
+            subtitle_style
+        ))
+
+        # Build table data
+        if has_comparison:
+            table_data = [['Descrição', 'Período Atual', 'Período Anterior', 'Variação']]
+            col_widths = [220, 100, 100, 60]
+        else:
+            table_data = [['Descrição', 'Período Atual']]
+            col_widths = [320, 160]
+
+        row_styles = []  # Store (row_index, style_type)
 
         # Add groups
         for group in dre_data['current']['groups']:
-            sign_class = 'positive' if group['sign'] == '+' else 'negative'
-            sign_prefix = '+' if group['sign'] == '+' else '-'
+            row_idx = len(table_data)
+            row_styles.append((row_idx, 'group'))
 
-            # Group header
-            html_content += f"""
-                <tr class="group-header">
-                    <td>({group['sign']}) {group['name']}</td>
-                    <td class="number {sign_class}">{fmt_currency(group['total'])}</td>
-            """
             if has_comparison:
                 comp_group = next((g for g in dre_data['comparison']['groups'] if g['id'] == group['id']), None)
                 comp_total = comp_group['total'] if comp_group else 0
                 variation = ((group['total'] - comp_total) / comp_total * 100) if comp_total else 0
-                html_content += f"""
-                    <td class="number">{fmt_currency(comp_total)}</td>
-                    <td class="number {'positive' if variation >= 0 else 'negative'}">{fmt_percent(variation)}</td>
-                """
-            html_content += "</tr>"
+                table_data.append([
+                    f"({group['sign']}) {group['name']}",
+                    fmt_currency(group['total']),
+                    fmt_currency(comp_total),
+                    fmt_percent(variation)
+                ])
+            else:
+                table_data.append([
+                    f"({group['sign']}) {group['name']}",
+                    fmt_currency(group['total'])
+                ])
 
             # Categories
             for category in group['categories']:
-                html_content += f"""
-                    <tr class="category-row">
-                        <td style="padding-left: 20px;">{category['name']}</td>
-                        <td class="number">{fmt_currency(category['total'])}</td>
-                """
+                row_idx = len(table_data)
+                row_styles.append((row_idx, 'category'))
                 if has_comparison:
-                    html_content += "<td></td><td></td>"
-                html_content += "</tr>"
+                    table_data.append([f"    {category['name']}", fmt_currency(category['total']), '', ''])
+                else:
+                    table_data.append([f"    {category['name']}", fmt_currency(category['total'])])
 
                 # Subcategories
                 for sub in category['subcategories']:
-                    html_content += f"""
-                        <tr class="subcategory-row">
-                            <td style="padding-left: 40px;">└ {sub['name']}</td>
-                            <td class="number">{fmt_currency(sub['total'])}</td>
-                    """
+                    row_idx = len(table_data)
+                    row_styles.append((row_idx, 'subcategory'))
                     if has_comparison:
-                        html_content += "<td></td><td></td>"
-                    html_content += "</tr>"
+                        table_data.append([f"        └ {sub['name']}", fmt_currency(sub['total']), '', ''])
+                    else:
+                        table_data.append([f"        └ {sub['name']}", fmt_currency(sub['total'])])
+
+        # Empty row
+        table_data.append([''] * (4 if has_comparison else 2))
 
         # Summary rows
         summary = dre_data['current']['summary']
-        comp_summary = dre_data['comparison']['summary'] if has_comparison else {}
+        comp_summary = dre_data.get('comparison', {}).get('summary', {})
+        variations = dre_data.get('variations', {})
 
         def add_summary_row(label, key, is_resultado=False):
+            row_idx = len(table_data)
+            row_styles.append((row_idx, 'resultado' if is_resultado else 'summary'))
             value = summary[key]
-            row_class = 'resultado-row' if is_resultado else 'summary-row'
-            value_class = 'positive' if value >= 0 else 'negative'
-
-            row = f"""
-                <tr class="{row_class}">
-                    <td>{label}</td>
-                    <td class="number {value_class}">{fmt_currency(value)}</td>
-            """
             if has_comparison:
                 comp_val = comp_summary.get(key, 0)
-                var = dre_data['variations'].get(key, {})
-                var_pct = var.get('percentage', 0)
-                row += f"""
-                    <td class="number">{fmt_currency(comp_val)}</td>
-                    <td class="number {'positive' if var_pct >= 0 else 'negative'}">{fmt_percent(var_pct)}</td>
-                """
-            row += "</tr>"
-            return row
+                var_pct = variations.get(key, {}).get('percentage', 0)
+                table_data.append([label, fmt_currency(value), fmt_currency(comp_val), fmt_percent(var_pct)])
+            else:
+                table_data.append([label, fmt_currency(value)])
 
-        html_content += "<tr><td colspan='4' style='height: 10px;'></td></tr>"
-        html_content += add_summary_row("(=) RESULTADO OPERACIONAL", "resultado_operacional")
-        html_content += add_summary_row("(+) Receitas Financeiras", "receitas_financeiras")
-        html_content += add_summary_row("(-) Despesas Financeiras", "despesas_financeiras")
-        html_content += "<tr><td colspan='4' style='height: 5px;'></td></tr>"
-        html_content += add_summary_row("(=) RESULTADO LÍQUIDO", "resultado_liquido", is_resultado=True)
+        add_summary_row("(=) RESULTADO OPERACIONAL", "resultado_operacional")
+        add_summary_row("(+) Receitas Financeiras", "receitas_financeiras")
+        add_summary_row("(-) Despesas Financeiras", "despesas_financeiras")
+        table_data.append([''] * (4 if has_comparison else 2))
+        add_summary_row("(=) RESULTADO LÍQUIDO", "resultado_liquido", is_resultado=True)
 
-        html_content += f"""
-                </tbody>
-            </table>
+        # Create table
+        table = Table(table_data, colWidths=col_widths)
 
-            <div class="footer">
-                Relatório gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')} | CaixaHub
-            </div>
-        </body>
-        </html>
-        """
+        # Base table style
+        style_commands = [
+            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.1, 0.1, 0.18)),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(0.8, 0.8, 0.8)),
+        ]
 
-        # Generate PDF
-        pdf_buffer = BytesIO()
-        HTML(string=html_content).write_pdf(pdf_buffer)
-        pdf_buffer.seek(0)
+        # Apply row-specific styles
+        for row_idx, style_type in row_styles:
+            if style_type == 'group':
+                style_commands.append(('BACKGROUND', (0, row_idx), (-1, row_idx), colors.Color(0.95, 0.95, 0.95)))
+                style_commands.append(('FONTNAME', (0, row_idx), (-1, row_idx), 'Helvetica-Bold'))
+            elif style_type == 'subcategory':
+                style_commands.append(('TEXTCOLOR', (0, row_idx), (-1, row_idx), colors.Color(0.4, 0.4, 0.4)))
+                style_commands.append(('FONTSIZE', (0, row_idx), (-1, row_idx), 8))
+            elif style_type == 'summary':
+                style_commands.append(('FONTNAME', (0, row_idx), (-1, row_idx), 'Helvetica-Bold'))
+            elif style_type == 'resultado':
+                style_commands.append(('BACKGROUND', (0, row_idx), (-1, row_idx), colors.Color(0.1, 0.1, 0.18)))
+                style_commands.append(('TEXTCOLOR', (0, row_idx), (-1, row_idx), colors.white))
+                style_commands.append(('FONTNAME', (0, row_idx), (-1, row_idx), 'Helvetica-Bold'))
 
-        return pdf_buffer.read()
+        table.setStyle(TableStyle(style_commands))
+        elements.append(table)
+
+        # Footer
+        elements.append(Spacer(1, 30))
+        elements.append(Paragraph(
+            f"Relatório gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')} | CaixaHub",
+            footer_style
+        ))
+
+        # Build PDF
+        doc.build(elements)
+        buffer.seek(0)
+
+        return buffer.read()
 
     @staticmethod
     def export_dre_excel(
