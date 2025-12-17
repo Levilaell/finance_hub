@@ -9,7 +9,8 @@ import { Footer } from "@/components/landing-v2/Footer";
 import Image from "next/image";
 import Link from "next/link";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 // Price ID para o plano de R$197
 const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4PV1BYoKLt";
@@ -50,6 +51,16 @@ const SOLUTION_BENEFITS = [
 ];
 
 function RetailLandingContent() {
+  const searchParams = useSearchParams();
+  const angle = searchParams.get("a");
+
+  // Salva o parâmetro de aquisição no localStorage para usar no registro
+  useEffect(() => {
+    if (angle) {
+      localStorage.setItem('acquisition_angle', angle);
+    }
+  }, [angle]);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
