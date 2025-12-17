@@ -340,6 +340,7 @@ export default function AccountsPage() {
           <Button
             onClick={handleConnectBank}
             className="w-full sm:w-auto bg-white text-black hover:bg-white/90 transition-all duration-300"
+            data-tour="conectar-banco"
           >
             <LinkIcon className="h-4 w-4 mr-2" />
             Conectar Banco

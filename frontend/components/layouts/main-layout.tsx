@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -46,6 +46,20 @@ export function MainLayout({ children }: MainLayoutProps) {
   const { user, logout } = useAuthStore(); // ✅ Removed _hasHydrated
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+
+  // Listen for tour events to open/close mobile sidebar
+  useEffect(() => {
+    const handleOpenSidebar = () => setSidebarOpen(true);
+    const handleCloseSidebar = () => setSidebarOpen(false);
+
+    window.addEventListener('tour:open-sidebar', handleOpenSidebar);
+    window.addEventListener('tour:close-sidebar', handleCloseSidebar);
+
+    return () => {
+      window.removeEventListener('tour:open-sidebar', handleOpenSidebar);
+      window.removeEventListener('tour:close-sidebar', handleCloseSidebar);
+    };
+  }, []);
 
   // ✅ Simplified user functions - removed hydration checks
   const getUserInitials = () => {
@@ -115,6 +129,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                   onClick={() => setSidebarOpen(false)}
+                  {...(item.href === '/accounts' && { 'data-tour': 'contas-mobile' })}
                 >
                   <item.icon className="h-5 w-5 flex-shrink-0" />
                   <span className="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{item.name}</span>
@@ -181,6 +196,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                       ? "bg-white/10 text-white border border-white/20"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
+                  {...(item.href === '/accounts' && { 'data-tour': 'contas-desktop' })}
                 >
                   <item.icon className="h-5 w-5 flex-shrink-0" />
                   <span className="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{item.name}</span>
@@ -230,6 +246,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             size="icon"
             className="lg:hidden text-white"
             onClick={() => setSidebarOpen(true)}
+            data-tour="menu-mobile"
           >
             <Menu className="h-5 w-5" />
           </Button>

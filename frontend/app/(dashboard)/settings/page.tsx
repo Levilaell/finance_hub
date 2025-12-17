@@ -504,7 +504,8 @@ export default function SettingsPage() {
                 <div>
                   <p className="font-medium text-red-600">Excluir Conta</p>
                   <p className="text-sm text-muted-foreground">
-                    Excluir permanentemente sua conta e todos os dados associados. Esta ação não pode ser desfeita.
+                    Excluir permanentemente sua conta e todos os dados associados.{' '}
+                    <span className="text-amber-400 font-medium">Esta ação não pode ser desfeita.</span>
                   </p>
                 </div>
                 <Button 
@@ -673,7 +674,8 @@ export default function SettingsPage() {
           <DialogHeader>
             <DialogTitle className="text-red-600">Excluir Conta</DialogTitle>
             <DialogDescription>
-              Esta ação excluirá permanentemente sua conta e todos os dados associados. Isso não pode ser desfeito.
+              Esta ação excluirá permanentemente sua conta e todos os dados associados.{' '}
+              <span className="text-amber-400 font-medium">Isso não pode ser desfeito.</span>
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={deleteAccountForm.handleSubmit(onDeleteAccountSubmit)} className="space-y-4 py-4">
