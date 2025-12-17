@@ -212,21 +212,45 @@ export default function ComoUsarPage() {
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li className="flex items-center gap-2">
               <CheckCircleIcon className="h-4 w-4 text-orange-400" />
-              <span><strong className="text-white">Recorrência:</strong> única, semanal, mensal ou anual</span>
+              <span><strong className="text-white">Criar conta:</strong> informe tipo (pagar/receber), valor e vencimento</span>
             </li>
             <li className="flex items-center gap-2">
               <CheckCircleIcon className="h-4 w-4 text-orange-400" />
-              <span><strong className="text-white">Status:</strong> Pendente, Parcial ou Pago</span>
+              <span><strong className="text-white">Vincular transação:</strong> conecte a conta a um débito/crédito do extrato</span>
             </li>
             <li className="flex items-center gap-2">
               <CheckCircleIcon className="h-4 w-4 text-orange-400" />
-              <span><strong className="text-white">Pagamentos parciais:</strong> registre valores pagos aos poucos</span>
+              <span><strong className="text-white">Pagamentos parciais:</strong> registre múltiplos pagamentos até quitar</span>
             </li>
             <li className="flex items-center gap-2">
               <CheckCircleIcon className="h-4 w-4 text-orange-400" />
-              <span><strong className="text-white">Filtros:</strong> por tipo, status e nome</span>
+              <span><strong className="text-white">Pagamento manual:</strong> registre pagamentos em dinheiro ou não rastreados</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-orange-400" />
+              <span><strong className="text-white">Status automático:</strong> Pendente → Parcial → Pago</span>
             </li>
           </ul>
+          <div className="mt-4 space-y-3">
+            <div className="bg-orange-500/10 border border-orange-500/20 rounded-md p-3">
+              <h4 className="font-semibold text-orange-300 mb-2">Como vincular uma transação:</h4>
+              <ol className="list-decimal list-inside space-y-1 text-sm text-orange-200/80">
+                <li>Acesse a conta pendente</li>
+                <li>Clique em <strong>"Vincular Transação"</strong></li>
+                <li>O sistema sugere transações compatíveis (mesmo tipo e valor)</li>
+                <li>Selecione a transação do extrato</li>
+                <li>Conta atualizada automaticamente</li>
+              </ol>
+            </div>
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3">
+              <div className="flex gap-2">
+                <CheckCircleIcon className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-200/80">
+                  <strong className="text-blue-300">Dica:</strong> Use "Adicionar Pagamento" para registrar pagamentos em dinheiro ou parcelados que não aparecem no extrato
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Categories */}

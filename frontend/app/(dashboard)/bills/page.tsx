@@ -27,6 +27,7 @@ import {
   ArrowTopRightOnSquareIcon,
   ListBulletIcon,
   PlusCircleIcon,
+  QuestionMarkCircleIcon,
 } from '@heroicons/react/24/outline';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -300,7 +301,33 @@ export default function BillsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white">Contas a Pagar/Receber</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">Contas a Pagar/Receber</h1>
+            <TooltipProvider>
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <button className="text-white/50 hover:text-white/80 transition-colors">
+                    <QuestionMarkCircleIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="start" className="max-w-sm p-4 bg-zinc-900 border-white/10">
+                  <div className="space-y-3 text-sm">
+                    <p className="font-semibold text-white">Como funciona:</p>
+                    <ul className="space-y-2 text-white/80">
+                      <li><strong className="text-orange-400">1.</strong> Crie uma conta (a pagar ou receber)</li>
+                      <li><strong className="text-orange-400">2.</strong> Vincule a transações do extrato quando pagar</li>
+                      <li><strong className="text-orange-400">3.</strong> Ou registre pagamentos manuais (dinheiro)</li>
+                    </ul>
+                    <div className="pt-2 border-t border-white/10">
+                      <p className="text-white/60 text-xs">
+                        <strong className="text-blue-400">Dica:</strong> Pagamentos parciais são suportados. Vincule várias transações até quitar a conta.
+                      </p>
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <p className="text-sm sm:text-base text-white/70 mt-1">
             Gerencie suas contas pendentes
           </p>
