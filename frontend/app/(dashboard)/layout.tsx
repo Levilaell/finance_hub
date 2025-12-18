@@ -82,10 +82,10 @@ export default function DashboardLayout({
   // Show loading while hydrating or checking authentication
   if (!hasHydrated || isLoading || checkingSubscription) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p>{checkingSubscription ? 'Verificando assinatura...' : 'Carregando...'}</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-foreground">{checkingSubscription ? 'Verificando assinatura...' : 'Carregando...'}</p>
         </div>
       </div>
     );
@@ -94,10 +94,10 @@ export default function DashboardLayout({
   // Show loading while user data is being fetched
   if (!user && !isLoading && hasHydrated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p>Verificando autenticação...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-foreground">Verificando autenticação...</p>
         </div>
       </div>
     );
@@ -111,13 +111,11 @@ export default function DashboardLayout({
   // If we have user data, show the protected content
   if (isAuthenticated && user) {
     return (
-      <div className="dark">
-        <MainLayout>
-          <div className="min-h-screen">
-            {children}
-          </div>
-        </MainLayout>
-      </div>
+      <MainLayout>
+        <div className="min-h-screen">
+          {children}
+        </div>
+      </MainLayout>
     );
   }
 

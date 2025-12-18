@@ -206,21 +206,21 @@ export default function AIInsightsPage() {
 
                 {/* Error Message */}
                 {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <p className="text-sm text-red-600">{error}</p>
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                    <p className="text-sm text-red-400">{error}</p>
                   </div>
                 )}
 
                 {/* Info */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-blue-900 mb-2">O que você terá acesso:</h4>
-                  <ul className="space-y-2 text-sm text-blue-800 list-disc list-inside">
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-300 mb-2">O que você terá acesso:</h4>
+                  <ul className="space-y-2 text-sm text-blue-400 list-disc list-inside">
                     <li>Score de Saúde Financeira (0-10)</li>
                     <li>Alertas sobre riscos financeiros</li>
                     <li>Recomendações personalizadas</li>
                     <li>Previsões de fluxo de caixa</li>
                   </ul>
-                  <p className="text-xs text-blue-600 mt-3">
+                  <p className="text-xs text-blue-500 mt-3">
                     Sua primeira análise será gerada em alguns instantes após ativar.
                   </p>
                 </div>
@@ -322,17 +322,17 @@ export default function AIInsightsPage() {
           </div>
         </div>
 
-        <Card className="border-red-200 bg-red-50">
+        <Card className="border-red-500/20 bg-red-500/10">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
-              <div className="bg-red-100 rounded-full p-3">
-                <Sparkles className="h-6 w-6 text-red-600" />
+              <div className="bg-red-500/20 rounded-full p-3">
+                <Sparkles className="h-6 w-6 text-red-400" />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-red-900 mb-2">
+                <h3 className="text-lg font-semibold text-red-400 mb-2">
                   Erro ao Gerar Análise
                 </h3>
-                <p className="text-sm text-red-700 mb-4">
+                <p className="text-sm text-red-400/80 mb-4">
                   {latestInsight.error_message || 'Ocorreu um erro ao gerar a análise. Tente novamente mais tarde.'}
                 </p>
                 <Button onClick={loadData} variant="outline" size="sm">
@@ -440,7 +440,7 @@ export default function AIInsightsPage() {
             <ul className="space-y-3">
               {latestInsight.recommendations.map((recommendation, index) => (
                 <li key={index} className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-semibold">
+                  <span className="flex-shrink-0 w-6 h-6 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center text-sm font-semibold">
                     {index + 1}
                   </span>
                   <span className="text-muted-foreground">{recommendation}</span>

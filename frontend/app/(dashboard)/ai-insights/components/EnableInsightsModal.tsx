@@ -120,14 +120,14 @@ export function EnableInsightsModal({ open, onClose, onSuccess }: EnableInsights
 
           {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-600">{error}</p>
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+              <p className="text-sm text-red-400">{error}</p>
             </div>
           )}
 
           {/* Info */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm text-blue-800">
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+            <p className="text-sm text-blue-400">
               ℹ️ Sua primeira análise será gerada automaticamente em alguns instantes após ativar.
             </p>
           </div>

@@ -170,7 +170,7 @@ export function CategoryConfirmModal({
       case 'merchant':
         return 'Mesmo fornecedor';
       case 'prefix':
-        return 'Descricao similar';
+        return 'Descrição similar';
       case 'fuzzy':
         return 'Texto parecido';
       default:
@@ -304,7 +304,7 @@ export function CategoryConfirmModal({
             onClick={handleApplyOnlyThis}
             disabled={isApplying}
           >
-            Aplicar so nesta
+            Aplicar só nesta
           </Button>
           {similarTransactions.length > 0 && (
             <Button

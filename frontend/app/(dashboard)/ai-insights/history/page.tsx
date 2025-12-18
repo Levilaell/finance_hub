@@ -72,7 +72,7 @@ export default function HistoryPage() {
             const numericScoreChange = insight.score_change !== null && typeof insight.score_change === 'string' ? parseFloat(insight.score_change) : insight.score_change;
 
             return (
-            <Card key={insight.id} className={insight.has_error ? 'border-red-200 bg-red-50/30' : ''}>
+            <Card key={insight.id} className={insight.has_error ? 'border-red-500/20 bg-red-500/10' : ''}>
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between">
                   {/* Left Side - Main Info */}

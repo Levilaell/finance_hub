@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className="dark">
       <GoogleTagManager gtmId="GTM-K6CD5ZNP" />
       <body className={inter.className}>
         <noscript>

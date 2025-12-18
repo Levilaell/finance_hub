@@ -15,9 +15,9 @@ export function PredictionsCard({ predictions }: PredictionsCardProps) {
   }
 
   const confidenceColors = {
-    high: 'text-green-600 bg-green-100',
-    medium: 'text-yellow-600 bg-yellow-100',
-    low: 'text-red-600 bg-red-100'
+    high: 'text-green-400 bg-green-500/20',
+    medium: 'text-yellow-400 bg-yellow-500/20',
+    low: 'text-red-400 bg-red-500/20'
   };
 
   const confidenceLabels = {
