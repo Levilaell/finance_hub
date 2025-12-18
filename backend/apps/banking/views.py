@@ -700,17 +700,21 @@ class TransactionViewSet(viewsets.ModelViewSet):
         similar_ids = request.data.get('similar_transaction_ids', [])
 
         # Only allow specific fields
-        allowed_fields = {'user_category_id', 'apply_to_similar', 'create_rule', 'similar_transaction_ids'}
+        allowed_fields = {'user_category_id', 'user_subcategory_id', 'apply_to_similar', 'create_rule', 'similar_transaction_ids'}
         request_fields = set(request.data.keys())
 
         if not request_fields.issubset(allowed_fields):
             return Response(
-                {'error': 'Only user_category_id and batch operation fields are allowed'},
+                {'error': 'Only user_category_id, user_subcategory_id and batch operation fields are allowed'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         # Update the main transaction
-        update_data = {'user_category_id': request.data.get('user_category_id')}
+        update_data = {
+            'user_category_id': request.data.get('user_category_id'),
+        }
+        if 'user_subcategory_id' in request.data:
+            update_data['user_subcategory_id'] = request.data.get('user_subcategory_id')
         serializer = self.get_serializer(instance, data=update_data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
