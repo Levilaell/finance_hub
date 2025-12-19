@@ -1863,3 +1863,66 @@ class CategoryRuleService:
                 return rule.category
 
         return None
+
+    @staticmethod
+    def apply_rule_to_existing_transactions(rule) -> dict:
+        """
+        Aplica uma regra específica a todas as transações existentes do usuário
+        que correspondem ao padrão da regra.
+
+        Args:
+            rule: CategoryRule a ser aplicada
+
+        Returns:
+            dict com 'matched_count' e 'updated_count'
+        """
+        from difflib import SequenceMatcher
+        from .models import Transaction
+
+        user = rule.user
+
+        # Buscar transações do usuário
+        transactions = Transaction.objects.filter(
+            account__connection__user=user
+        ).select_related('account', 'account__connection')
+
+        matched_count = 0
+        updated_count = 0
+
+        for tx in transactions:
+            t_desc = CategoryRuleService.normalize_text(tx.description)
+            t_merchant = CategoryRuleService.normalize_text(tx.merchant_name or '')
+
+            matched = False
+            if rule.match_type == 'prefix':
+                matched = t_desc.startswith(rule.pattern)
+            elif rule.match_type == 'contains':
+                matched = rule.pattern in t_desc or rule.pattern in t_merchant
+            elif rule.match_type == 'fuzzy':
+                ratio = SequenceMatcher(None, rule.pattern, t_desc).ratio()
+                matched = ratio >= 0.70
+
+            if matched:
+                matched_count += 1
+                # Atualiza a categoria da transação
+                if tx.user_category_id != rule.category_id:
+                    tx.user_category = rule.category
+                    tx.save(update_fields=['user_category', 'updated_at'])
+                    updated_count += 1
+
+        # Atualiza contador de aplicações da regra
+        if updated_count > 0:
+            from .models import CategoryRule
+            CategoryRule.objects.filter(id=rule.id).update(
+                applied_count=models.F('applied_count') + updated_count
+            )
+
+        logger.info(
+            f"Rule '{rule.pattern}' applied to existing transactions: "
+            f"{matched_count} matched, {updated_count} updated"
+        )
+
+        return {
+            'matched_count': matched_count,
+            'updated_count': updated_count
+        }

@@ -23,13 +23,24 @@ import {
   CogIcon,
   LinkIcon,
   SparklesIcon,
+  PencilIcon,
+  PlusIcon,
+  PlayIcon,
 } from '@heroicons/react/24/outline';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { SubscriptionManagement } from '@/components/subscription/SubscriptionManagement';
 import { settingsService } from '@/services/settings.service';
 import { bankingService } from '@/services/banking.service';
-import { UserSettings, CategoryRule } from '@/types/banking';
+import { UserSettings, CategoryRule, Category, CategoryRuleMatchType } from '@/types/banking';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -72,6 +83,19 @@ export default function SettingsPage() {
   const [isLoadingRules, setIsLoadingRules] = useState(true);
   const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
   const [togglingRuleId, setTogglingRuleId] = useState<string | null>(null);
+
+  // Rule Modal state (used for both create and edit)
+  const [editingRule, setEditingRule] = useState<CategoryRule | null>(null);
+  const [ruleModalOpen, setRuleModalOpen] = useState(false);
+  const [ruleModalMode, setRuleModalMode] = useState<'create' | 'edit'>('create');
+  const [rulePattern, setRulePattern] = useState('');
+  const [ruleMatchType, setRuleMatchType] = useState<CategoryRuleMatchType>('contains');
+  const [ruleCategoryId, setRuleCategoryId] = useState('');
+  const [applyToExisting, setApplyToExisting] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  const [isSavingRule, setIsSavingRule] = useState(false);
+  const [applyingRuleId, setApplyingRuleId] = useState<string | null>(null);
 
   // Fetch user settings on mount
   useEffect(() => {
@@ -139,6 +163,135 @@ export default function SettingsPage() {
       case 'contains': return 'Contém';
       case 'fuzzy': return 'Similar';
       default: return matchType;
+    }
+  };
+
+  const loadCategories = async () => {
+    if (categories.length === 0) {
+      setIsLoadingCategories(true);
+      try {
+        const cats = await bankingService.getCategories();
+        // Filter to only parent categories (no subcategories)
+        const parentCategories = cats.filter(c => !c.parent);
+        setCategories(parentCategories);
+      } catch (error) {
+        console.error('Error loading categories:', error);
+        toast.error('Erro ao carregar categorias');
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    }
+  };
+
+  const handleCreateRule = async () => {
+    setRuleModalMode('create');
+    setEditingRule(null);
+    setRulePattern('');
+    setRuleMatchType('contains');
+    setRuleCategoryId('');
+    setApplyToExisting(true);
+    setRuleModalOpen(true);
+    await loadCategories();
+  };
+
+  const handleEditRule = async (rule: CategoryRule) => {
+    setRuleModalMode('edit');
+    setEditingRule(rule);
+    setRulePattern(rule.pattern);
+    setRuleMatchType(rule.match_type);
+    setRuleCategoryId(rule.category);
+    setApplyToExisting(false);
+    setRuleModalOpen(true);
+    await loadCategories();
+  };
+
+  const handleSaveRule = async () => {
+    // Validation
+    if (!rulePattern.trim()) {
+      toast.error('O padrão não pode estar vazio');
+      return;
+    }
+    if (rulePattern.trim().length < 3) {
+      toast.error('O padrão deve ter pelo menos 3 caracteres');
+      return;
+    }
+    if (!ruleCategoryId) {
+      toast.error('Selecione uma categoria');
+      return;
+    }
+
+    setIsSavingRule(true);
+    try {
+      if (ruleModalMode === 'edit' && editingRule) {
+        // Edit existing rule
+        const updated = await bankingService.updateCategoryRule(editingRule.id, {
+          pattern: rulePattern.trim(),
+          match_type: ruleMatchType,
+          category: ruleCategoryId,
+        });
+        setCategoryRules(prev =>
+          prev.map(r => r.id === editingRule.id ? updated : r)
+        );
+
+        // Apply to existing if checked
+        if (applyToExisting) {
+          const result = await bankingService.applyCategoryRule(editingRule.id);
+          toast.success(`Regra atualizada. ${result.updated_count} transações atualizadas.`);
+        } else {
+          toast.success('Regra atualizada com sucesso');
+        }
+      } else {
+        // Create new rule
+        const result = await bankingService.createCategoryRule(
+          {
+            pattern: rulePattern.trim(),
+            match_type: ruleMatchType,
+            category: ruleCategoryId,
+          },
+          applyToExisting
+        );
+
+        // Add to list (remove apply_result before adding)
+        const { apply_result, ...newRule } = result;
+        setCategoryRules(prev => [newRule as CategoryRule, ...prev]);
+
+        if (apply_result) {
+          toast.success(`Regra criada! ${apply_result.updated_count} transações categorizadas.`);
+        } else {
+          toast.success('Regra criada com sucesso');
+        }
+      }
+
+      setRuleModalOpen(false);
+      setEditingRule(null);
+    } catch (error: any) {
+      console.error('Error saving rule:', error);
+      const errorMessage = error.response?.data?.error || 'Erro ao salvar regra';
+      toast.error(errorMessage);
+    } finally {
+      setIsSavingRule(false);
+    }
+  };
+
+  const handleApplyRule = async (ruleId: string) => {
+    setApplyingRuleId(ruleId);
+    try {
+      const result = await bankingService.applyCategoryRule(ruleId);
+      if (result.updated_count > 0) {
+        toast.success(`${result.updated_count} transações atualizadas`);
+        // Refresh rule to update applied_count
+        const rules = await bankingService.getCategoryRules();
+        setCategoryRules(rules);
+      } else if (result.matched_count > 0) {
+        toast.info(`${result.matched_count} transações correspondentes já estavam categorizadas`);
+      } else {
+        toast.info('Nenhuma transação correspondente encontrada');
+      }
+    } catch (error: any) {
+      console.error('Error applying rule:', error);
+      toast.error('Erro ao aplicar regra');
+    } finally {
+      setApplyingRuleId(null);
     }
   };
 
@@ -571,17 +724,25 @@ export default function SettingsPage() {
 
           {/* Category Rules Section */}
           <Card className="mt-6">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center">
                 <SparklesIcon className="h-5 w-5 mr-2" />
                 Regras de Categorização Automática
               </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCreateRule}
+                className="flex items-center gap-1"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Nova Regra
+              </Button>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                As regras de categorização aplicam automaticamente categorias a novas transações
-                com base em padrões definidos. Você pode criar regras ao categorizar uma transação
-                manualmente na página de Transações.
+                As regras de categorização aplicam automaticamente categorias a transações
+                com base em padrões definidos. Você pode criar regras manualmente ou ao categorizar transações.
               </p>
 
               {isLoadingRules ? (
@@ -593,7 +754,7 @@ export default function SettingsPage() {
                   <SparklesIcon className="h-10 w-10 mx-auto mb-2 opacity-50" />
                   <p>Nenhuma regra de categorização criada.</p>
                   <p className="text-sm mt-1">
-                    Categorize uma transação manualmente para criar sua primeira regra.
+                    Clique em &quot;Nova Regra&quot; para criar sua primeira regra.
                   </p>
                 </div>
               ) : (
@@ -634,18 +795,43 @@ export default function SettingsPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 flex-shrink-0">
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <Switch
                           checked={rule.is_active}
                           onCheckedChange={(checked) => handleToggleRule(rule.id, checked)}
-                          disabled={togglingRuleId === rule.id || deletingRuleId === rule.id}
+                          disabled={togglingRuleId === rule.id || deletingRuleId === rule.id || applyingRuleId === rule.id}
                         />
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => handleApplyRule(rule.id)}
+                          disabled={deletingRuleId === rule.id || applyingRuleId === rule.id || !rule.is_active}
+                          className="text-green-600 hover:text-green-700 hover:bg-green-500/10"
+                          title="Aplicar a transações existentes"
+                        >
+                          {applyingRuleId === rule.id ? (
+                            <LoadingSpinner className="w-4 h-4" />
+                          ) : (
+                            <PlayIcon className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditRule(rule)}
+                          disabled={deletingRuleId === rule.id || togglingRuleId === rule.id || applyingRuleId === rule.id}
+                          className="text-muted-foreground hover:text-foreground"
+                          title="Editar regra"
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleDeleteRule(rule.id)}
-                          disabled={deletingRuleId === rule.id}
+                          disabled={deletingRuleId === rule.id || applyingRuleId === rule.id}
                           className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                          title="Excluir regra"
                         >
                           {deletingRuleId === rule.id ? (
                             <LoadingSpinner className="w-4 h-4" />
@@ -740,6 +926,174 @@ export default function SettingsPage() {
               disabled={deleteAccountMutation.isPending}
             >
               {deleteAccountMutation.isPending ? <LoadingSpinner /> : 'Excluir Conta'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create/Edit Rule Modal */}
+      <Dialog open={ruleModalOpen} onOpenChange={(open) => {
+        setRuleModalOpen(open);
+        if (!open) setEditingRule(null);
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {ruleModalMode === 'create' ? (
+                <>
+                  <PlusIcon className="h-5 w-5" />
+                  Nova Regra de Categorização
+                </>
+              ) : (
+                <>
+                  <PencilIcon className="h-5 w-5" />
+                  Editar Regra de Categorização
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {ruleModalMode === 'create'
+                ? 'Crie uma regra para categorizar transações automaticamente com base em padrões.'
+                : 'Ajuste o padrão, tipo de correspondência e categoria desta regra.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Pattern */}
+            <div className="space-y-2">
+              <Label htmlFor="rule-pattern">Padrão</Label>
+              <Input
+                id="rule-pattern"
+                value={rulePattern}
+                onChange={(e) => setRulePattern(e.target.value)}
+                placeholder="Ex: pix enviado para paulo"
+              />
+              <p className="text-xs text-muted-foreground">
+                O texto que será buscado nas descrições das transações (mínimo 3 caracteres).
+              </p>
+            </div>
+
+            {/* Match Type */}
+            <div className="space-y-2">
+              <Label htmlFor="rule-match-type">Tipo de Correspondência</Label>
+              <Select value={ruleMatchType} onValueChange={(value: CategoryRuleMatchType) => setRuleMatchType(value)}>
+                <SelectTrigger id="rule-match-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="prefix">
+                    <div className="flex flex-col">
+                      <span>Prefixo</span>
+                      <span className="text-xs text-muted-foreground">Descrição começa com o padrão</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="contains">
+                    <div className="flex flex-col">
+                      <span>Contém</span>
+                      <span className="text-xs text-muted-foreground">Padrão aparece em qualquer lugar</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="fuzzy">
+                    <div className="flex flex-col">
+                      <span>Similaridade</span>
+                      <span className="text-xs text-muted-foreground">Correspondência aproximada (70%+)</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Category */}
+            <div className="space-y-2">
+              <Label htmlFor="rule-category">Categoria</Label>
+              {isLoadingCategories ? (
+                <div className="flex items-center gap-2 h-10 px-3 border rounded-md">
+                  <LoadingSpinner className="w-4 h-4" />
+                  <span className="text-sm text-muted-foreground">Carregando categorias...</span>
+                </div>
+              ) : (
+                <Select value={ruleCategoryId} onValueChange={setRuleCategoryId}>
+                  <SelectTrigger id="rule-category">
+                    <SelectValue placeholder="Selecione uma categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-4 h-4 rounded flex items-center justify-center text-xs"
+                            style={{ backgroundColor: cat.color }}
+                          >
+                            {cat.icon}
+                          </span>
+                          <span>{cat.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({cat.type === 'expense' ? 'Despesa' : 'Receita'})
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Apply to existing transactions */}
+            <div className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
+              <Checkbox
+                id="apply-to-existing"
+                checked={applyToExisting}
+                onCheckedChange={(checked) => setApplyToExisting(checked === true)}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="apply-to-existing" className="cursor-pointer font-medium">
+                  Aplicar a transações existentes
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {ruleModalMode === 'create'
+                    ? 'Categorizar automaticamente as transações já existentes que correspondem a este padrão.'
+                    : 'Atualizar a categoria das transações existentes que correspondem ao novo padrão.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Preview */}
+            {rulePattern.trim().length >= 3 && (
+              <div className="bg-muted/50 p-3 rounded-lg border">
+                <p className="text-sm font-medium mb-1">Prévia da regra:</p>
+                <p className="text-sm text-muted-foreground">
+                  {ruleMatchType === 'prefix' && (
+                    <>Transações que <strong>começam com</strong> &quot;{rulePattern.trim().toLowerCase()}&quot;</>
+                  )}
+                  {ruleMatchType === 'contains' && (
+                    <>Transações que <strong>contêm</strong> &quot;{rulePattern.trim().toLowerCase()}&quot;</>
+                  )}
+                  {ruleMatchType === 'fuzzy' && (
+                    <>Transações <strong>similares a</strong> &quot;{rulePattern.trim().toLowerCase()}&quot; (70%+ de correspondência)</>
+                  )}
+                  {' '}serão categorizadas automaticamente.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRuleModalOpen(false);
+                setEditingRule(null);
+              }}
+              disabled={isSavingRule}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveRule}
+              disabled={isSavingRule || rulePattern.trim().length < 3 || !ruleCategoryId}
+            >
+              {isSavingRule ? <LoadingSpinner className="mr-2" /> : null}
+              {ruleModalMode === 'create' ? 'Criar Regra' : 'Salvar Alterações'}
             </Button>
           </DialogFooter>
         </DialogContent>

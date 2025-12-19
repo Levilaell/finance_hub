@@ -463,9 +463,17 @@ class BankingService {
 
   /**
    * Create a new category rule
+   * @param data Rule data including pattern, match_type, and category
+   * @param applyToExisting If true, applies the rule to existing transactions
    */
-  async createCategoryRule(data: CategoryRuleRequest): Promise<CategoryRule> {
-    return apiClient.post<CategoryRule>("/api/banking/category-rules/", data);
+  async createCategoryRule(
+    data: CategoryRuleRequest,
+    applyToExisting: boolean = false
+  ): Promise<CategoryRule & { apply_result?: { matched_count: number; updated_count: number } }> {
+    return apiClient.post<CategoryRule & { apply_result?: { matched_count: number; updated_count: number } }>(
+      "/api/banking/category-rules/",
+      { ...data, apply_to_existing: applyToExisting }
+    );
   }
 
   /**
@@ -480,6 +488,20 @@ class BankingService {
    */
   async deleteCategoryRule(id: string): Promise<void> {
     return apiClient.delete(`/api/banking/category-rules/${id}/`);
+  }
+
+  /**
+   * Apply a category rule to existing transactions
+   * @param id Rule ID
+   * @returns Result with matched and updated counts
+   */
+  async applyCategoryRule(id: string): Promise<{
+    success: boolean;
+    matched_count: number;
+    updated_count: number;
+    message: string;
+  }> {
+    return apiClient.post(`/api/banking/category-rules/${id}/apply/`);
   }
 
   /**

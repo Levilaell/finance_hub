@@ -1843,7 +1843,8 @@ class CategoryRuleViewSet(viewsets.ModelViewSet):
         Body: {
             "pattern": "UBER",
             "match_type": "contains",
-            "category": "uuid"
+            "category": "uuid",
+            "apply_to_existing": true  // Optional: apply to existing transactions
         }
         """
         serializer = self.get_serializer(data=request.data)
@@ -1852,6 +1853,7 @@ class CategoryRuleViewSet(viewsets.ModelViewSet):
         # Check if rule already exists
         pattern = CategoryRuleService.normalize_text(request.data.get('pattern', ''))
         match_type = request.data.get('match_type', 'prefix')
+        apply_to_existing = request.data.get('apply_to_existing', False)
 
         existing = CategoryRule.objects.filter(
             user=request.user,
@@ -1864,13 +1866,25 @@ class CategoryRuleViewSet(viewsets.ModelViewSet):
             existing.category_id = request.data.get('category')
             existing.is_active = True
             existing.save(update_fields=['category', 'is_active', 'updated_at'])
-            return Response(
-                CategoryRuleSerializer(existing).data,
-                status=status.HTTP_200_OK
-            )
+            rule = existing
+            response_data = CategoryRuleSerializer(existing).data
+            created = False
+        else:
+            self.perform_create(serializer)
+            rule = CategoryRule.objects.get(id=serializer.data['id'])
+            response_data = serializer.data
+            created = True
 
-        self.perform_create(serializer)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        # Apply to existing transactions if requested
+        apply_result = None
+        if apply_to_existing:
+            apply_result = CategoryRuleService.apply_rule_to_existing_transactions(rule)
+
+        response_data['apply_result'] = apply_result
+        return Response(
+            response_data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        )
 
     def partial_update(self, request, *args, **kwargs):
         """
@@ -1918,4 +1932,23 @@ class CategoryRuleViewSet(viewsets.ModelViewSet):
             'active_rules': active,
             'inactive_rules': total - active,
             'total_times_applied': total_applied
+        })
+
+    @action(detail=True, methods=['post'])
+    def apply(self, request, pk=None):
+        """
+        Apply a category rule to existing transactions.
+        POST /api/banking/category-rules/{id}/apply/
+
+        Returns the number of transactions matched and updated.
+        """
+        rule = self.get_object()
+
+        result = CategoryRuleService.apply_rule_to_existing_transactions(rule)
+
+        return Response({
+            'success': True,
+            'matched_count': result['matched_count'],
+            'updated_count': result['updated_count'],
+            'message': f"Regra aplicada: {result['matched_count']} transações correspondentes, {result['updated_count']} atualizadas"
         })
