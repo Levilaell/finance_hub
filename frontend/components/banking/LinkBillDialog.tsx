@@ -117,12 +117,12 @@ export function LinkBillDialog({
     if (bill.would_overpay) {
       return {
         type: 'warning' as const,
-        message: `Transacao R$ ${txAmount.toFixed(2)} > Conta R$ ${bill.amount_remaining.toFixed(2)}. Sera registrado R$ ${bill.amount_remaining.toFixed(2)}.`,
+        message: `Transação R$ ${txAmount.toFixed(2)} > Conta R$ ${bill.amount_remaining.toFixed(2)}. Será registrado R$ ${bill.amount_remaining.toFixed(2)}.`,
       };
     } else {
       return {
         type: 'info' as const,
-        message: `Transacao R$ ${txAmount.toFixed(2)} < Conta R$ ${bill.amount_remaining.toFixed(2)}. Pagamento parcial de R$ ${txAmount.toFixed(2)}.`,
+        message: `Transação R$ ${txAmount.toFixed(2)} < Conta R$ ${bill.amount_remaining.toFixed(2)}. Pagamento parcial de R$ ${txAmount.toFixed(2)}.`,
       };
     }
   };
@@ -136,7 +136,7 @@ export function LinkBillDialog({
             Vincular a Conta
           </DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
-            Selecione uma conta para vincular a esta transacao.
+            Selecione uma conta para vincular a esta transação.
           </DialogDescription>
         </DialogHeader>
 

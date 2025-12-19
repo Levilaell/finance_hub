@@ -233,29 +233,29 @@ export default function ComoUsarPage() {
           </ul>
           <div className="mt-4 space-y-3">
             <div className="bg-orange-500/10 border border-orange-500/20 rounded-md p-3">
-              <h4 className="font-semibold text-orange-300 mb-2">Como vincular uma transacao:</h4>
+              <h4 className="font-semibold text-orange-300 mb-2">Como vincular uma transação:</h4>
               <ol className="list-decimal list-inside space-y-1 text-sm text-orange-200/80">
                 <li>Acesse a conta pendente</li>
-                <li>Clique em <strong>"Vincular Transacao"</strong></li>
-                <li>O sistema sugere transacoes compativeis (mesmo tipo e valor)</li>
-                <li>Selecione a transacao do extrato</li>
+                <li>Clique em <strong>&quot;Vincular Transação&quot;</strong></li>
+                <li>O sistema sugere transações compatíveis (mesmo tipo e valor)</li>
+                <li>Selecione a transação do extrato</li>
                 <li>Conta atualizada automaticamente</li>
               </ol>
             </div>
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3">
-              <h4 className="font-semibold text-amber-300 mb-2">Vincular transacao com valor diferente:</h4>
+              <h4 className="font-semibold text-amber-300 mb-2">Vincular transação com valor diferente:</h4>
               <ul className="space-y-1 text-sm text-amber-200/80">
-                <li>Voce pode vincular uma transacao mesmo que o valor seja diferente da conta</li>
+                <li>Você pode vincular uma transação mesmo que o valor seja diferente da conta</li>
                 <li>O sistema registra automaticamente como <strong>pagamento parcial</strong></li>
-                <li>Se a transacao for maior que o restante, apenas o valor restante e registrado</li>
-                <li>Na lista de transacoes, clique nos 3 pontos &gt; <strong>"Vincular a Conta"</strong> para ver todas as contas disponiveis</li>
+                <li>Se a transação for maior que o restante, apenas o valor restante é registrado</li>
+                <li>Na lista de transações, clique nos 3 pontos &gt; <strong>&quot;Vincular a Conta&quot;</strong> para ver todas as contas disponíveis</li>
               </ul>
             </div>
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3">
               <div className="flex gap-2">
                 <CheckCircleIcon className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-blue-200/80">
-                  <strong className="text-blue-300">Dica:</strong> Use "Adicionar Pagamento" para registrar pagamentos em dinheiro ou parcelados que nao aparecem no extrato
+                  <strong className="text-blue-300">Dica:</strong> Use &quot;Adicionar Pagamento&quot; para registrar pagamentos em dinheiro ou parcelados que não aparecem no extrato
                 </div>
               </div>
             </div>
@@ -289,9 +289,9 @@ export default function ComoUsarPage() {
             <div className="bg-pink-500/10 border border-pink-500/20 rounded-md p-3">
               <h4 className="font-semibold text-pink-300 mb-2">Subcategorias:</h4>
               <ul className="space-y-1 text-sm text-pink-200/80">
-                <li>Organize suas categorias em dois niveis (ex: Alimentacao &gt; Restaurantes)</li>
+                <li>Organize suas categorias em dois níveis (ex: Alimentação &gt; Restaurantes)</li>
                 <li>Subcategorias herdam automaticamente o tipo da categoria pai</li>
-                <li>Clique em <strong>"Adicionar Subcategoria"</strong> dentro de uma categoria existente</li>
+                <li>Clique em <strong>&quot;Adicionar Subcategoria&quot;</strong> dentro de uma categoria existente</li>
               </ul>
             </div>
           </div>
@@ -303,44 +303,44 @@ export default function ComoUsarPage() {
             <div className="h-10 w-10 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
               <CogIcon className="h-5 w-5 text-emerald-400" />
             </div>
-            <h3 className="text-xl font-semibold text-white">Regras de Categorizacao Automatica</h3>
+            <h3 className="text-xl font-semibold text-white">Regras de Categorização Automática</h3>
           </div>
-          <p className="text-muted-foreground mb-3">Automatize a categorizacao das suas transacoes:</p>
+          <p className="text-muted-foreground mb-3">Automatize a categorização das suas transações:</p>
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li className="flex items-center gap-2">
               <CheckCircleIcon className="h-4 w-4 text-emerald-400" />
-              <span><strong className="text-white">Crie regras:</strong> defina padroes de texto para categorizar automaticamente</span>
+              <span><strong className="text-white">Crie regras:</strong> defina padrões de texto para categorizar automaticamente</span>
             </li>
             <li className="flex items-center gap-2">
               <CheckCircleIcon className="h-4 w-4 text-emerald-400" />
-              <span><strong className="text-white">Tipos de match:</strong> Prefixo, Contem ou Aproximado</span>
+              <span><strong className="text-white">Tipos de match:</strong> Prefixo, Contém ou Aproximado</span>
             </li>
             <li className="flex items-center gap-2">
               <CheckCircleIcon className="h-4 w-4 text-emerald-400" />
-              <span><strong className="text-white">Aplicar a existentes:</strong> aplique regras a transacoes ja importadas</span>
+              <span><strong className="text-white">Aplicar a existentes:</strong> aplique regras a transações já importadas</span>
             </li>
             <li className="flex items-center gap-2">
               <CheckCircleIcon className="h-4 w-4 text-emerald-400" />
-              <span><strong className="text-white">Localizacao:</strong> Configuracoes &gt; Automacao</span>
+              <span><strong className="text-white">Localização:</strong> Configurações &gt; Automação</span>
             </li>
           </ul>
           <div className="mt-4 space-y-3">
             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-md p-3">
               <h4 className="font-semibold text-emerald-300 mb-2">Como criar uma regra:</h4>
               <ol className="list-decimal list-inside space-y-1 text-sm text-emerald-200/80">
-                <li>Acesse <strong>Configuracoes</strong> no menu</li>
-                <li>Clique na aba <strong>"Automacao"</strong></li>
-                <li>Clique em <strong>"Nova Regra"</strong></li>
-                <li>Defina o padrao (ex: "uber", "pix enviado")</li>
+                <li>Acesse <strong>Configurações</strong> no menu</li>
+                <li>Clique na aba <strong>&quot;Automação&quot;</strong></li>
+                <li>Clique em <strong>&quot;Nova Regra&quot;</strong></li>
+                <li>Defina o padrão (ex: &quot;uber&quot;, &quot;pix enviado&quot;)</li>
                 <li>Escolha o tipo de match e a categoria</li>
-                <li>Marque "Aplicar a transacoes existentes" se desejar</li>
+                <li>Marque &quot;Aplicar a transações existentes&quot; se desejar</li>
               </ol>
             </div>
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3">
               <div className="flex gap-2">
                 <CheckCircleIcon className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-blue-200/80">
-                  <strong className="text-blue-300">Dica:</strong> Ao categorizar uma transacao manualmente, marque "Criar regra" para que transacoes similares sejam categorizadas automaticamente no futuro
+                  <strong className="text-blue-300">Dica:</strong> Ao categorizar uma transação manualmente, marque &quot;Criar regra&quot; para que transações similares sejam categorizadas automaticamente no futuro
                 </div>
               </div>
             </div>
@@ -451,15 +451,15 @@ export default function ComoUsarPage() {
             </li>
             <li className="flex items-start gap-2">
               <CheckCircleIcon className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
-              <span><strong className="text-white">Crie regras de categorizacao</strong> para automatizar a organizacao das transacoes</span>
+              <span><strong className="text-white">Crie regras de categorização</strong> para automatizar a organização das transações</span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircleIcon className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
-              <span><strong className="text-white">Use subcategorias</strong> para organizar melhor seus gastos (ex: Alimentacao &gt; Restaurantes)</span>
+              <span><strong className="text-white">Use subcategorias</strong> para organizar melhor seus gastos (ex: Alimentação &gt; Restaurantes)</span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircleIcon className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
-              <span><strong className="text-white">Use Contas a Pagar</strong> para nao esquecer compromissos</span>
+              <span><strong className="text-white">Use Contas a Pagar</strong> para não esquecer compromissos</span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircleIcon className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
