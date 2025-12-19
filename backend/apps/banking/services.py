@@ -1673,10 +1673,24 @@ class CategoryRuleService:
     def normalize_text(text: str) -> str:
         """
         Normaliza texto para comparação de similaridade.
-        Remove acentos, converte para lowercase e strip.
+        Remove acentos, converte para lowercase, normaliza traços e espaços.
         """
         if not text:
             return ''
+
+        import re
+
+        # Normaliza diferentes tipos de traços para hífen simples
+        # En-dash (–), Em-dash (—), Minus (−), outros traços Unicode
+        text = re.sub(r'[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]', '-', text)
+
+        # Normaliza diferentes tipos de espaços para espaço simples
+        # Non-breaking space, thin space, em space, etc.
+        text = re.sub(r'[\u00A0\u2000-\u200B\u202F\u205F\u3000]', ' ', text)
+
+        # Colapsa múltiplos espaços em um único
+        text = re.sub(r' +', ' ', text)
+
         try:
             from unidecode import unidecode
             return unidecode(text.lower().strip())
