@@ -129,22 +129,21 @@ export function LinkBillDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
             <LinkIcon className="h-5 w-5" />
             Vincular a Conta
           </DialogTitle>
-          <DialogDescription>
-            Selecione uma conta a pagar/receber para vincular a esta transacao.
-            Valores diferentes serao registrados como pagamento parcial.
+          <DialogDescription className="text-xs sm:text-sm">
+            Selecione uma conta para vincular a esta transacao.
           </DialogDescription>
         </DialogHeader>
 
         {transaction && (
-          <div className="bg-muted/50 rounded-lg p-4 mb-4">
-            <h3 className="font-semibold text-lg">{transaction.description}</h3>
-            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+          <div className="bg-muted/50 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4">
+            <h3 className="font-semibold text-sm sm:text-lg line-clamp-2">{transaction.description}</h3>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 text-xs sm:text-sm text-muted-foreground">
               <span className={`flex items-center gap-1 font-medium ${
                 transaction.type === 'CREDIT' ? 'text-green-500' : 'text-red-500'
               }`}>
@@ -156,10 +155,10 @@ export function LinkBillDialog({
                 <CalendarIcon className="h-4 w-4" />
                 {format(new Date(transaction.date), 'dd/MM/yyyy', { locale: ptBR })}
               </span>
-              <span>{transaction.account_name}</span>
+              <span className="truncate max-w-[120px] sm:max-w-none">{transaction.account_name}</span>
             </div>
             {transaction.merchant_name && (
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1 truncate">
                 {transaction.merchant_name}
               </p>
             )}
@@ -167,12 +166,12 @@ export function LinkBillDialog({
         )}
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
+          <div className="flex items-center justify-center py-8 sm:py-12">
             <LoadingSpinner />
           </div>
         ) : suggestions.length > 0 ? (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
+          <div className="space-y-2 sm:space-y-3">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               {suggestions.length} conta(s) encontrada(s)
             </p>
             {suggestions.map((bill) => {
@@ -180,35 +179,37 @@ export function LinkBillDialog({
               return (
                 <div
                   key={bill.id}
-                  className="p-4 border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
+                  className="p-3 sm:p-4 border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-medium">{bill.description}</h4>
-                        <Badge
-                          variant="outline"
-                          className={getTypeColor(bill.type)}
-                        >
-                          {getTypeLabel(bill.type)}
-                        </Badge>
-                        {bill.amount_match ? (
-                          <Badge className="bg-green-500 text-white text-xs">
-                            <CheckCircleIcon className="h-3 w-3 mr-1" />
-                            Valor exato
-                          </Badge>
-                        ) : (
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-start gap-1.5 sm:gap-2">
+                        <h4 className="font-medium text-sm sm:text-base line-clamp-2 break-words w-full sm:w-auto">{bill.description}</h4>
+                        <div className="flex flex-wrap gap-1.5">
                           <Badge
-                            className={`${getRelevanceColor(bill.relevance_score)} text-white text-xs`}
+                            variant="outline"
+                            className={`${getTypeColor(bill.type)} text-xs`}
                           >
-                            {getRelevanceLabel(bill.relevance_score)}
+                            {getTypeLabel(bill.type)}
                           </Badge>
-                        )}
+                          {bill.amount_match ? (
+                            <Badge className="bg-green-500 text-white text-xs">
+                              <CheckCircleIcon className="h-3 w-3 mr-1" />
+                              Valor exato
+                            </Badge>
+                          ) : (
+                            <Badge
+                              className={`${getRelevanceColor(bill.relevance_score)} text-white text-xs`}
+                            >
+                              {getRelevanceLabel(bill.relevance_score)}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs sm:text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
-                          <BanknotesIcon className="h-3 w-3" />
-                          {formatCurrency(bill.amount)}
+                          <BanknotesIcon className="h-3 w-3 flex-shrink-0" />
+                          <span>{formatCurrency(bill.amount)}</span>
                           {bill.amount_remaining !== bill.amount && (
                             <span className="text-yellow-500">
                               (resta {formatCurrency(bill.amount_remaining)})
@@ -216,12 +217,12 @@ export function LinkBillDialog({
                           )}
                         </span>
                         <span className="flex items-center gap-1">
-                          <CalendarIcon className="h-3 w-3" />
-                          Venc: {format(new Date(bill.due_date), 'dd/MM/yyyy', { locale: ptBR })}
+                          <CalendarIcon className="h-3 w-3 flex-shrink-0" />
+                          {format(new Date(bill.due_date), 'dd/MM/yy', { locale: ptBR })}
                         </span>
                         {bill.customer_supplier && (
-                          <span className="flex items-center gap-1">
-                            <UserIcon className="h-3 w-3" />
+                          <span className="flex items-center gap-1 truncate max-w-[150px] sm:max-w-none">
+                            <UserIcon className="h-3 w-3 flex-shrink-0" />
                             {bill.customer_supplier}
                           </span>
                         )}
@@ -241,7 +242,7 @@ export function LinkBillDialog({
                             : 'bg-blue-500/20 text-blue-300'
                         }`}>
                           <ExclamationTriangleIcon className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                          <span>{amountInfo.message}</span>
+                          <span className="break-words">{amountInfo.message}</span>
                         </div>
                       )}
                     </div>
@@ -249,14 +250,15 @@ export function LinkBillDialog({
                       size="sm"
                       onClick={() => handleLink(bill)}
                       disabled={isLinking !== null}
-                      className={!bill.amount_match ? 'bg-yellow-600 hover:bg-yellow-700' : ''}
+                      className={`w-full sm:w-auto flex-shrink-0 ${!bill.amount_match ? 'bg-yellow-600 hover:bg-yellow-700' : ''}`}
                     >
                       {isLinking === bill.id ? (
                         <LoadingSpinner className="w-4 h-4" />
                       ) : (
                         <>
                           <LinkIcon className="h-4 w-4 mr-1" />
-                          {bill.amount_match ? 'Vincular' : 'Vincular Mesmo Assim'}
+                          <span className="sm:hidden">{bill.amount_match ? 'Vincular' : 'Vincular'}</span>
+                          <span className="hidden sm:inline">{bill.amount_match ? 'Vincular' : 'Vincular Mesmo Assim'}</span>
                         </>
                       )}
                     </Button>
@@ -266,19 +268,19 @@ export function LinkBillDialog({
             })}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <DocumentTextIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">
+          <div className="text-center py-8 sm:py-12">
+            <DocumentTextIcon className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-muted-foreground mb-3 sm:mb-4" />
+            <p className="text-sm sm:text-base text-muted-foreground">
               Nenhuma conta pendente encontrada.
             </p>
-            <p className="text-sm text-muted-foreground mt-2">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-2">
               Crie uma conta a pagar/receber primeiro em &quot;Contas&quot;.
             </p>
           </div>
         )}
 
-        <div className="flex justify-end pt-4 border-t border-white/10">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <div className="flex justify-end pt-3 sm:pt-4 border-t border-white/10">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
             Cancelar
           </Button>
         </div>
