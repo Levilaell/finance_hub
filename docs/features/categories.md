@@ -338,7 +338,7 @@ Regras permitem categorizar transacoes automaticamente com base em padroes de te
 curl -X POST /api/banking/category-rules/ \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
-    "pattern": "pix enviado para paulo",
+    "pattern": "pix enviado para joão",
     "match_type": "contains",
     "category": "uuid-da-categoria",
     "apply_to_existing": true
