@@ -453,21 +453,24 @@ class Command(BaseCommand):
                     if created:
                         self.stdout.write(f"  + Created category: {cat_data['name']}")
 
-    def _create_transactions(self, account, user, count, days_back):
+    def _create_transactions(self, account, user, count, days_back, mode='personal'):
         """Create realistic test transactions"""
         transactions_created = 0
         now = timezone.now()
 
+        # Select templates based on mode
+        templates = self.RETAIL_TEMPLATES if mode == 'retail' else self.TRANSACTION_TEMPLATES
+
         # Build weighted list of categories based on frequency
         category_pool = []
-        for category_name, config in self.TRANSACTION_TEMPLATES.items():
+        for category_name, config in templates.items():
             weight = int(config['frequency'] * 1000)
             category_pool.extend([category_name] * weight)
 
         for i in range(count):
             # Select random category
             category_name = random.choice(category_pool)
-            config = self.TRANSACTION_TEMPLATES[category_name]
+            config = templates[category_name]
 
             # Get or create category
             category_type = 'income' if config['type'] == 'CREDIT' else 'expense'
