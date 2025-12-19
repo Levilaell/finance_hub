@@ -618,7 +618,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
     serializer_class = TransactionSerializer
     permission_classes = [IsAuthenticated]
     filterset_fields = ['account', 'type', 'category']
-    http_method_names = ['get', 'patch', 'head', 'options']  # Only allow GET and PATCH
+    http_method_names = ['get', 'post', 'patch', 'head', 'options']  # GET, POST (for actions), PATCH
 
     def get_queryset(self):
         import logging
