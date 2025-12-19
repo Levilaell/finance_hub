@@ -1347,9 +1347,14 @@ class TransactionMatchService:
         if bill.linked_transaction is not None:
             raise ValueError("Bill is already linked to another transaction.")
 
-        # Check if transaction is already linked
+        # Check if transaction is already linked (legacy)
         if hasattr(transaction, 'linked_bill') and transaction.linked_bill:
             raise ValueError("Transaction is already linked to another bill.")
+
+        # Check if transaction is already used in a BillPayment
+        from .models import BillPayment
+        if BillPayment.objects.filter(transaction=transaction).exists():
+            raise ValueError("Transaction is already used in a bill payment.")
 
         if transaction.amount != bill.amount:
             raise ValueError(

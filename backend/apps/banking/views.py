@@ -1266,32 +1266,66 @@ class BillViewSet(viewsets.ModelViewSet):
         """
         Remove link between transaction and bill.
         POST /api/banking/bills/{id}/unlink_transaction/
+
+        Handles both:
+        - Legacy links (linked_transaction field)
+        - New BillPayment links
         """
         bill = self.get_object()
-        transaction_id = str(bill.linked_transaction_id) if bill.linked_transaction else None
-
         match_service = TransactionMatchService()
 
-        try:
-            updated_bill = match_service.unlink_transaction_from_bill(bill)
+        # Check for legacy link first
+        if bill.linked_transaction:
+            transaction_id = str(bill.linked_transaction_id)
+            try:
+                updated_bill = match_service.unlink_transaction_from_bill(bill)
 
-            # Log transaction unlink
+                UserActivityLog.log_event(
+                    user=request.user,
+                    event_type='bill_transaction_unlinked',
+                    ip_address=get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    bill_id=str(bill.id),
+                    transaction_id=transaction_id,
+                    bill_type=bill.type
+                )
+
+                return Response(BillSerializer(updated_bill).data)
+            except ValueError as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Check for BillPayment links
+        payments_with_tx = bill.payments.filter(transaction__isnull=False)
+        if payments_with_tx.exists():
+            # Remove all payments that have linked transactions
+            transaction_ids = []
+            for payment in payments_with_tx:
+                transaction_ids.append(str(payment.transaction_id))
+                match_service.unlink_payment(payment)
+
+            # Refresh bill from db
+            bill.refresh_from_db()
+
             UserActivityLog.log_event(
                 user=request.user,
                 event_type='bill_transaction_unlinked',
                 ip_address=get_client_ip(request),
                 user_agent=request.META.get('HTTP_USER_AGENT', ''),
                 bill_id=str(bill.id),
-                transaction_id=transaction_id,
+                transaction_id=','.join(transaction_ids),
                 bill_type=bill.type
             )
 
-            return Response(BillSerializer(updated_bill).data)
-        except ValueError as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response(BillSerializer(bill).data)
+
+        # No links found
+        return Response(
+            {'error': 'Bill is not linked to any transaction'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     @action(detail=True, methods=['get'])
     def suggested_transactions(self, request, pk=None):
