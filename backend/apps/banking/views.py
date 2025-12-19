@@ -639,7 +639,9 @@ class TransactionViewSet(viewsets.ModelViewSet):
             'account',
             'account__connection',
             'account__connection__connector',
-            'user_category'
+            'user_category',
+            'bill_payment',
+            'bill_payment__bill'
         )
 
         logger.info(f"Transactions for user {self.request.user.id}: {queryset.count()}")

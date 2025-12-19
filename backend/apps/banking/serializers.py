@@ -182,9 +182,20 @@ class TransactionSerializer(serializers.ModelSerializer):
         return data
 
     def get_linked_bill(self, obj):
-        """Get linked bill info if exists."""
+        """Get linked bill info if exists (legacy or via BillPayment)."""
+        # Check legacy linked_bill first
         if hasattr(obj, 'linked_bill') and obj.linked_bill:
             bill = obj.linked_bill
+            return {
+                'id': str(bill.id),
+                'description': bill.description,
+                'amount': str(bill.amount),
+                'due_date': bill.due_date.isoformat(),
+                'type': bill.type
+            }
+        # Check new BillPayment relationship
+        if hasattr(obj, 'bill_payment') and obj.bill_payment:
+            bill = obj.bill_payment.bill
             return {
                 'id': str(bill.id),
                 'description': bill.description,
@@ -195,8 +206,12 @@ class TransactionSerializer(serializers.ModelSerializer):
         return None
 
     def get_has_linked_bill(self, obj):
-        """Check if transaction has linked bill."""
-        return hasattr(obj, 'linked_bill') and obj.linked_bill is not None
+        """Check if transaction has linked bill (legacy or via BillPayment)."""
+        if hasattr(obj, 'linked_bill') and obj.linked_bill is not None:
+            return True
+        if hasattr(obj, 'bill_payment') and obj.bill_payment is not None:
+            return True
+        return False
 
 
 class TransactionFilterSerializer(serializers.Serializer):
