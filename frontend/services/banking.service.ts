@@ -422,6 +422,31 @@ class BankingService {
     );
   }
 
+  /**
+   * Get ALL pending bills for manual linking (no amount filter)
+   * Returns bills with match info (amount_match, amount_diff, would_overpay)
+   */
+  async getAllPendingBills(transactionId: string): Promise<BillSuggestionExtended[]> {
+    return apiClient.get<BillSuggestionExtended[]>(
+      `/api/banking/transactions/${transactionId}/all_pending_bills/`
+    );
+  }
+
+  /**
+   * Manually link a bill to a transaction (allows different amounts)
+   * Creates a BillPayment with min(transaction.amount, bill.amount_remaining)
+   */
+  async linkBillManual(transactionId: string, billId: string): Promise<{
+    transaction: Transaction;
+    bill: Bill;
+    message: string;
+  }> {
+    return apiClient.post(
+      `/api/banking/transactions/${transactionId}/link_bill_manual/`,
+      { bill_id: billId }
+    );
+  }
+
   // ============================================================
   // Category Rules Methods
   // ============================================================

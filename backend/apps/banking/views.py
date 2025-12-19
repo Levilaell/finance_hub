@@ -856,6 +856,103 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+    @action(detail=True, methods=['get'])
+    def all_pending_bills(self, request, pk=None):
+        """
+        Get ALL pending bills for manual linking (no amount filter).
+        GET /api/banking/transactions/{id}/all_pending_bills/
+
+        Returns bills with additional match info:
+        - amount_match: boolean
+        - amount_diff: float (positive = transaction > bill)
+        - would_overpay: boolean
+        """
+        transaction = self.get_object()
+
+        # Check if already linked
+        if hasattr(transaction, 'linked_bill') and transaction.linked_bill:
+            return Response(
+                {'error': 'Transaction is already linked to a bill'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if used in a BillPayment
+        from .models import BillPayment
+        if BillPayment.objects.filter(transaction=transaction).exists():
+            return Response(
+                {'error': 'Transaction is already used in a bill payment'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        match_service = TransactionMatchService()
+        suggestions = match_service.get_all_pending_bills_for_transaction(transaction)
+
+        # Serialize with extra info
+        result = []
+        for suggestion in suggestions:
+            bill = suggestion['bill']
+            bill_data = BillSuggestionSerializer(bill).data
+            bill_data['amount_match'] = suggestion['amount_match']
+            bill_data['amount_diff'] = suggestion['amount_diff']
+            bill_data['would_overpay'] = suggestion['would_overpay']
+            bill_data['relevance_score'] = suggestion['relevance_score']
+            bill_data['amount_remaining'] = float(bill.amount_remaining)
+            result.append(bill_data)
+
+        return Response(result)
+
+    @action(detail=True, methods=['post'])
+    def link_bill_manual(self, request, pk=None):
+        """
+        Manually link a bill to this transaction (allows different amounts).
+        POST /api/banking/transactions/{id}/link_bill_manual/
+        Body: { "bill_id": "uuid" }
+
+        Behavior:
+        - Creates a BillPayment linking transaction to bill
+        - Payment amount = min(transaction.amount, bill.amount_remaining)
+        - Updates bill status accordingly
+        """
+        transaction = self.get_object()
+
+        serializer = LinkBillSerializer(
+            data=request.data,
+            context={'request': request, 'allow_partial': True}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        bill_id = serializer.validated_data['bill_id']
+        bill = Bill.objects.get(id=bill_id)
+
+        match_service = TransactionMatchService()
+
+        try:
+            updated_bill = match_service.link_transaction_to_bill_forced(transaction, bill)
+
+            # Log activity
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='bill_transaction_linked_manual',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                bill_id=str(bill.id),
+                transaction_id=str(transaction.id),
+                amount_diff=float(transaction.amount) - float(bill.amount)
+            )
+
+            # Return updated transaction
+            transaction.refresh_from_db()
+            return Response({
+                'transaction': TransactionSerializer(transaction, context={'request': request}).data,
+                'bill': BillSerializer(updated_bill).data,
+                'message': 'Vinculado com sucesso via pagamento parcial' if updated_bill.status == 'partially_paid' else 'Vinculado com sucesso'
+            })
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     @action(detail=False, methods=['get'])
     def summary(self, request):
         """

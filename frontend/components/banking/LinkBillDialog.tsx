@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { bankingService } from '@/services/banking.service';
-import { Transaction, BillSuggestion } from '@/types/banking';
+import { Transaction, BillSuggestionExtended } from '@/types/banking';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -22,6 +22,8 @@ import {
   CalendarIcon,
   DocumentTextIcon,
   UserIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 
@@ -38,7 +40,7 @@ export function LinkBillDialog({
   onOpenChange,
   onLinked,
 }: LinkBillDialogProps) {
-  const [suggestions, setSuggestions] = useState<BillSuggestion[]>([]);
+  const [suggestions, setSuggestions] = useState<BillSuggestionExtended[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLinking, setIsLinking] = useState<string | null>(null);
 
@@ -53,23 +55,25 @@ export function LinkBillDialog({
 
     setIsLoading(true);
     try {
-      const data = await bankingService.getSuggestedBills(transaction.id);
+      // Use the new endpoint that returns ALL pending bills
+      const data = await bankingService.getAllPendingBills(transaction.id);
       setSuggestions(data);
     } catch (error) {
       console.error('Error fetching suggestions:', error);
-      toast.error('Erro ao buscar contas sugeridas');
+      toast.error('Erro ao buscar contas');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleLink = async (billId: string) => {
+  const handleLink = async (bill: BillSuggestionExtended) => {
     if (!transaction) return;
 
-    setIsLinking(billId);
+    setIsLinking(bill.id);
     try {
-      await bankingService.linkBill(transaction.id, billId);
-      toast.success('Conta vinculada com sucesso! Marcada como paga.');
+      // Use the new manual link endpoint
+      const result = await bankingService.linkBillManual(transaction.id, bill.id);
+      toast.success(result.message);
       onLinked();
       onOpenChange(false);
     } catch (error: any) {
@@ -89,7 +93,7 @@ export function LinkBillDialog({
 
   const getRelevanceLabel = (score: number) => {
     if (score >= 80) return 'Alta';
-    if (score >= 60) return 'Média';
+    if (score >= 60) return 'Media';
     if (score >= 40) return 'Baixa';
     return 'Muito Baixa';
   };
@@ -102,6 +106,27 @@ export function LinkBillDialog({
     return type === 'receivable' ? 'text-green-500' : 'text-red-500';
   };
 
+  const getAmountDiffLabel = (bill: BillSuggestionExtended) => {
+    if (bill.amount_match) {
+      return null; // No warning needed
+    }
+
+    const txAmount = transaction ? Math.abs(transaction.amount) : 0;
+    const diff = Math.abs(bill.amount_diff);
+
+    if (bill.would_overpay) {
+      return {
+        type: 'warning' as const,
+        message: `Transacao R$ ${txAmount.toFixed(2)} > Conta R$ ${bill.amount_remaining.toFixed(2)}. Sera registrado R$ ${bill.amount_remaining.toFixed(2)}.`,
+      };
+    } else {
+      return {
+        type: 'info' as const,
+        message: `Transacao R$ ${txAmount.toFixed(2)} < Conta R$ ${bill.amount_remaining.toFixed(2)}. Pagamento parcial de R$ ${txAmount.toFixed(2)}.`,
+      };
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -111,8 +136,8 @@ export function LinkBillDialog({
             Vincular a Conta
           </DialogTitle>
           <DialogDescription>
-            Selecione uma conta a pagar/receber para vincular a esta transação.
-            A conta será automaticamente marcada como paga.
+            Selecione uma conta a pagar/receber para vincular a esta transacao.
+            Valores diferentes serao registrados como pagamento parcial.
           </DialogDescription>
         </DialogHeader>
 
@@ -150,74 +175,104 @@ export function LinkBillDialog({
             <p className="text-sm text-muted-foreground">
               {suggestions.length} conta(s) encontrada(s)
             </p>
-            {suggestions.map((bill) => (
-              <div
-                key={bill.id}
-                className="flex items-center justify-between p-4 border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-medium">{bill.description}</h4>
-                    <Badge
-                      variant="outline"
-                      className={getTypeColor(bill.type)}
-                    >
-                      {getTypeLabel(bill.type)}
-                    </Badge>
-                    <Badge
-                      className={`${getRelevanceColor(bill.relevance_score)} text-white text-xs`}
-                    >
-                      {getRelevanceLabel(bill.relevance_score)} ({bill.relevance_score}%)
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <BanknotesIcon className="h-3 w-3" />
-                      {formatCurrency(bill.amount)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <CalendarIcon className="h-3 w-3" />
-                      Venc: {format(new Date(bill.due_date), 'dd/MM/yyyy', { locale: ptBR })}
-                    </span>
-                    {bill.customer_supplier && (
-                      <span className="flex items-center gap-1">
-                        <UserIcon className="h-3 w-3" />
-                        {bill.customer_supplier}
-                      </span>
-                    )}
-                  </div>
-                  {bill.category_name && (
-                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                      {bill.category_icon && <span>{bill.category_icon}</span>}
-                      {bill.category_name}
-                    </p>
-                  )}
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => handleLink(bill.id)}
-                  disabled={isLinking !== null}
+            {suggestions.map((bill) => {
+              const amountInfo = getAmountDiffLabel(bill);
+              return (
+                <div
+                  key={bill.id}
+                  className="p-4 border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
                 >
-                  {isLinking === bill.id ? (
-                    <LoadingSpinner className="w-4 h-4" />
-                  ) : (
-                    <>
-                      <LinkIcon className="h-4 w-4 mr-1" />
-                      Vincular
-                    </>
-                  )}
-                </Button>
-              </div>
-            ))}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-medium">{bill.description}</h4>
+                        <Badge
+                          variant="outline"
+                          className={getTypeColor(bill.type)}
+                        >
+                          {getTypeLabel(bill.type)}
+                        </Badge>
+                        {bill.amount_match ? (
+                          <Badge className="bg-green-500 text-white text-xs">
+                            <CheckCircleIcon className="h-3 w-3 mr-1" />
+                            Valor exato
+                          </Badge>
+                        ) : (
+                          <Badge
+                            className={`${getRelevanceColor(bill.relevance_score)} text-white text-xs`}
+                          >
+                            {getRelevanceLabel(bill.relevance_score)}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <BanknotesIcon className="h-3 w-3" />
+                          {formatCurrency(bill.amount)}
+                          {bill.amount_remaining !== bill.amount && (
+                            <span className="text-yellow-500">
+                              (resta {formatCurrency(bill.amount_remaining)})
+                            </span>
+                          )}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <CalendarIcon className="h-3 w-3" />
+                          Venc: {format(new Date(bill.due_date), 'dd/MM/yyyy', { locale: ptBR })}
+                        </span>
+                        {bill.customer_supplier && (
+                          <span className="flex items-center gap-1">
+                            <UserIcon className="h-3 w-3" />
+                            {bill.customer_supplier}
+                          </span>
+                        )}
+                      </div>
+                      {bill.category_name && (
+                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                          {bill.category_icon && <span>{bill.category_icon}</span>}
+                          {bill.category_name}
+                        </p>
+                      )}
+
+                      {/* Warning for different amounts */}
+                      {amountInfo && (
+                        <div className={`mt-2 p-2 rounded text-xs flex items-start gap-2 ${
+                          amountInfo.type === 'warning'
+                            ? 'bg-yellow-500/20 text-yellow-300'
+                            : 'bg-blue-500/20 text-blue-300'
+                        }`}>
+                          <ExclamationTriangleIcon className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                          <span>{amountInfo.message}</span>
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => handleLink(bill)}
+                      disabled={isLinking !== null}
+                      className={!bill.amount_match ? 'bg-yellow-600 hover:bg-yellow-700' : ''}
+                    >
+                      {isLinking === bill.id ? (
+                        <LoadingSpinner className="w-4 h-4" />
+                      ) : (
+                        <>
+                          <LinkIcon className="h-4 w-4 mr-1" />
+                          {bill.amount_match ? 'Vincular' : 'Vincular Mesmo Assim'}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-12">
             <DocumentTextIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">
-              Nenhuma conta compatível encontrada.
+              Nenhuma conta pendente encontrada.
             </p>
             <p className="text-sm text-muted-foreground mt-2">
-              As contas devem ter o mesmo valor e estar pendentes para serem vinculadas.
+              Crie uma conta a pagar/receber primeiro em &quot;Contas&quot;.
             </p>
           </div>
         )}

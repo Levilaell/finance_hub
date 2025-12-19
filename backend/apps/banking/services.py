@@ -1093,6 +1093,121 @@ class TransactionMatchService:
 
         return list(eligible_bills)
 
+    def get_all_pending_bills_for_transaction(self, transaction: TransactionModel) -> List[Dict]:
+        """
+        Get ALL pending bills for manual linking (no amount filter).
+        Returns bills with match info for UI display.
+
+        Criteria:
+        - Same user as transaction owner
+        - Status in ['pending', 'partially_paid']
+        - No linked_transaction (legacy link)
+        - Compatible type (CREDIT -> receivable, DEBIT -> payable)
+        - Has remaining amount > 0
+        """
+        from .models import Bill
+
+        user = transaction.account.connection.user
+
+        # Determine compatible bill type
+        bill_type = 'receivable' if transaction.type == 'CREDIT' else 'payable'
+
+        bills = Bill.objects.filter(
+            user=user,
+            type=bill_type,
+            status__in=['pending', 'partially_paid'],
+            linked_transaction__isnull=True
+        ).select_related('category').order_by('due_date')
+
+        result = []
+        for bill in bills:
+            # Skip bills with no remaining amount
+            if bill.amount_remaining <= 0:
+                continue
+
+            amount_diff = float(transaction.amount) - float(bill.amount_remaining)
+            # Compare with amount_remaining for partially paid bills
+            amount_match = transaction.amount == bill.amount_remaining
+            result.append({
+                'bill': bill,
+                'amount_match': amount_match,
+                'amount_diff': amount_diff,
+                'would_overpay': amount_diff > 0,
+                'relevance_score': self.calculate_relevance_score(transaction, bill)
+            })
+
+        # Sort by relevance score descending
+        result.sort(key=lambda x: x['relevance_score'], reverse=True)
+        return result
+
+    def link_transaction_to_bill_forced(
+        self,
+        transaction: TransactionModel,
+        bill: 'Bill'
+    ) -> 'Bill':
+        """
+        Force link a transaction to a bill, handling different amounts.
+
+        - If transaction amount <= bill remaining: register as partial payment
+        - If transaction amount > bill remaining: register full payment (caps at remaining)
+        """
+        from .models import Bill, BillPayment
+        from django.db import transaction as db_transaction
+
+        # Validations
+        if bill.status == 'paid':
+            raise ValueError("Bill is already fully paid.")
+
+        if bill.status == 'cancelled':
+            raise ValueError("Bill is cancelled.")
+
+        if bill.amount_remaining <= 0:
+            raise ValueError("Bill has no remaining amount to pay.")
+
+        if transaction.amount <= 0:
+            raise ValueError("Transaction amount must be greater than zero.")
+
+        if bill.linked_transaction is not None:
+            raise ValueError("Bill is already linked to another transaction (legacy).")
+
+        if hasattr(transaction, 'linked_bill') and transaction.linked_bill:
+            raise ValueError("Transaction is already linked to another bill.")
+
+        # Check type compatibility
+        expected_tx_type = 'CREDIT' if bill.type == 'receivable' else 'DEBIT'
+        if transaction.type != expected_tx_type:
+            raise ValueError(
+                f"Type mismatch. Bill type '{bill.type}' requires transaction type '{expected_tx_type}'"
+            )
+
+        # Check same user
+        if transaction.account.connection.user != bill.user:
+            raise ValueError("Transaction and bill must belong to the same user")
+
+        # Check if transaction is already used in a BillPayment
+        existing_payment = BillPayment.objects.filter(transaction=transaction).first()
+        if existing_payment:
+            raise ValueError(f"Transaction is already linked to bill '{existing_payment.bill.description}'")
+
+        # Determine payment amount (cap at remaining)
+        payment_amount = min(transaction.amount, bill.amount_remaining)
+
+        # Use atomic transaction for data integrity
+        with db_transaction.atomic():
+            # Create BillPayment
+            payment = BillPayment.objects.create(
+                bill=bill,
+                amount=payment_amount,
+                payment_date=transaction.date.date() if hasattr(transaction.date, 'date') else transaction.date,
+                transaction=transaction,
+                notes=f"Vinculado manualmente. Transacao: {transaction.description[:50]}"
+            )
+
+            # Refresh bill to get updated state
+            bill.refresh_from_db()
+
+        return bill
+
     def get_eligible_transactions_for_bill(self, bill: 'Bill') -> List[TransactionModel]:
         """
         Find transactions that can be linked to a bill.

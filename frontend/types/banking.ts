@@ -398,6 +398,14 @@ export interface BillSuggestion {
   relevance_score: number;
 }
 
+// Bill Suggestion Extended (for manual linking with amount info)
+export interface BillSuggestionExtended extends BillSuggestion {
+  amount_match: boolean;
+  amount_diff: number;
+  would_overpay: boolean;
+  amount_remaining: number;
+}
+
 // Link Transaction Request
 export interface LinkTransactionRequest {
   transaction_id: string;

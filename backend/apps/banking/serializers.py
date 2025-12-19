@@ -489,6 +489,8 @@ class LinkBillSerializer(serializers.Serializer):
     def validate_bill_id(self, value):
         """Validate that bill exists and belongs to user."""
         request = self.context.get('request')
+        allow_partial = self.context.get('allow_partial', False)
+
         if not request:
             raise serializers.ValidationError("Request context required")
 
@@ -497,15 +499,21 @@ class LinkBillSerializer(serializers.Serializer):
         except Bill.DoesNotExist:
             raise serializers.ValidationError("Bill not found")
 
-        # Check eligibility
-        if bill.status != 'pending':
-            raise serializers.ValidationError(f"Bill must be pending. Current status: {bill.status}")
-
-        if bill.amount_paid > 0:
-            raise serializers.ValidationError("Bill already has prior payments")
-
-        if bill.linked_transaction is not None:
-            raise serializers.ValidationError("Bill is already linked to another transaction")
+        # For manual linking, allow partially paid bills
+        if allow_partial:
+            # Only check if bill is fully paid or has legacy link
+            if bill.status == 'paid':
+                raise serializers.ValidationError("Bill is already fully paid")
+            if bill.linked_transaction is not None:
+                raise serializers.ValidationError("Bill is already linked to another transaction")
+        else:
+            # Original strict validation
+            if bill.status != 'pending':
+                raise serializers.ValidationError(f"Bill must be pending. Current status: {bill.status}")
+            if bill.amount_paid > 0:
+                raise serializers.ValidationError("Bill already has prior payments")
+            if bill.linked_transaction is not None:
+                raise serializers.ValidationError("Bill is already linked to another transaction")
 
         return value
 
