@@ -1061,18 +1061,23 @@ class CategoryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Only return parent categories (subcategories come nested)
-        queryset = Category.objects.filter(
-            user=self.request.user,
-            parent=None
-        ).prefetch_related('subcategories')
+        # For list action, only return parent categories (subcategories come nested)
+        # For other actions (retrieve, update, destroy), return all categories
+        if self.action == 'list':
+            queryset = Category.objects.filter(
+                user=self.request.user,
+                parent=None
+            ).prefetch_related('subcategories')
 
-        # Filter by type if provided
-        category_type = self.request.query_params.get('type')
-        if category_type:
-            queryset = queryset.filter(type=category_type)
+            # Filter by type if provided
+            category_type = self.request.query_params.get('type')
+            if category_type:
+                queryset = queryset.filter(type=category_type)
 
-        return queryset.order_by('type', 'name')
+            return queryset.order_by('type', 'name')
+
+        # For retrieve, update, destroy - return all categories for this user
+        return Category.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         """Assign current user when creating a category."""
