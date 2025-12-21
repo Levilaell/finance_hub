@@ -49,6 +49,11 @@ const DTR_CONFIG = {
     headline: "Todo seu BPO em um só lugar",
     subheadline: "O CaixaHub conecta suas contas bancárias e executa toda a operação financeira com IA categorizando, conciliando e organizando seu fluxo de caixa automaticamente, sem precisar de consultor nem implantação."
   },
+
+  bio: {
+    headline: "Todo seu BPO em um só lugar",
+    subheadline: "O CaixaHub conecta suas contas bancárias e executa toda a operação financeira com IA categorizando, conciliando e organizando seu fluxo de caixa automaticamente, sem precisar de consultor nem implantação."
+  },
   accountant: {
     headline: "Você só descobre o resultado da empresa quando o contador fecha?",
     subheadline: "O CaixaHub mostra seu lucro real todo dia, não só no fim do mês."
