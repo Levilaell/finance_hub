@@ -5,9 +5,11 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
+from django.utils import timezone
+from django.db.models import Count
 from djstripe.models import Customer, Subscription, Price, Product
 from apps.authentication.models import User
-from .models import TrialUsageTracking
+from .models import TrialUsageTracking, AcquisitionTracking
 
 # Desregistrar os admins padrão do dj-stripe
 admin.site.unregister(Customer)
@@ -30,6 +32,177 @@ class TrialUsageTrackingAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(AcquisitionTracking)
+class AcquisitionTrackingAdmin(admin.ModelAdmin):
+    """Admin para rastreamento de aquisições por ângulo de marketing"""
+    list_display = [
+        'user_email',
+        'acquisition_angle_badge',
+        'status_badge',
+        'trial_info',
+        'conversion_info',
+        'created_at'
+    ]
+    list_filter = [
+        'acquisition_angle',
+        'subscription_status',
+        ('converted_at', admin.EmptyFieldListFilter),
+        'created_at'
+    ]
+    search_fields = ['user__email', 'user__first_name', 'user__last_name', 'stripe_subscription_id']
+    readonly_fields = [
+        'user', 'acquisition_angle', 'signup_price_id',
+        'subscription_status', 'stripe_subscription_id',
+        'trial_started_at', 'trial_ended_at', 'converted_at', 'canceled_at',
+        'created_at', 'updated_at', 'stripe_link', 'user_link'
+    ]
+    ordering = ['-created_at']
+
+    fieldsets = (
+        ('Usuário', {
+            'fields': ('user_link', 'user')
+        }),
+        ('Aquisição', {
+            'fields': ('acquisition_angle', 'signup_price_id')
+        }),
+        ('Assinatura', {
+            'fields': ('subscription_status', 'stripe_subscription_id', 'stripe_link')
+        }),
+        ('Datas', {
+            'fields': ('trial_started_at', 'trial_ended_at', 'converted_at', 'canceled_at')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def user_email(self, obj):
+        url = reverse('admin:authentication_user_change', args=[obj.user.id])
+        return format_html('<a href="{}">{}</a>', url, obj.user.email)
+    user_email.short_description = 'Usuário'
+    user_email.admin_order_field = 'user__email'
+
+    def user_link(self, obj):
+        url = reverse('admin:authentication_user_change', args=[obj.user.id])
+        return format_html('<a href="{}" target="_blank">Ver perfil do usuário →</a>', url)
+    user_link.short_description = 'Link do usuário'
+
+    def acquisition_angle_badge(self, obj):
+        colors = {
+            'time': '#3B82F6',       # blue
+            'price': '#10B981',      # green
+            'delay': '#F59E0B',      # amber
+            'visibility': '#8B5CF6', # purple
+            'organic': '#6B7280',    # gray
+            'unknown': '#9CA3AF',    # light gray
+        }
+        color = colors.get(obj.acquisition_angle, '#9CA3AF')
+        label = obj.get_acquisition_angle_display()
+        return format_html(
+            '<span style="background: {}; color: white; padding: 3px 10px; border-radius: 3px; font-size: 11px;">{}</span>',
+            color, label
+        )
+    acquisition_angle_badge.short_description = 'Ângulo'
+    acquisition_angle_badge.admin_order_field = 'acquisition_angle'
+
+    def status_badge(self, obj):
+        colors = {
+            'active': 'green',
+            'trialing': '#3B82F6',
+            'past_due': 'orange',
+            'canceled': 'red',
+            'unpaid': 'red',
+            'incomplete': 'gray',
+        }
+        color = colors.get(obj.subscription_status, 'gray')
+        label = obj.get_subscription_status_display()
+        return format_html(
+            '<span style="background: {}; color: white; padding: 3px 10px; border-radius: 3px;">{}</span>',
+            color, label
+        )
+    status_badge.short_description = 'Status'
+    status_badge.admin_order_field = 'subscription_status'
+
+    def trial_info(self, obj):
+        if obj.trial_started_at:
+            if obj.trial_ended_at:
+                days = (obj.trial_ended_at - obj.trial_started_at).days
+                return format_html('<span style="color: gray;">Trial {} dias</span>', days)
+            elif obj.subscription_status == 'trialing':
+                now = timezone.now()
+                # Assume 7 days trial if no end date
+                return format_html('<span style="color: #3B82F6;">Em trial</span>')
+        return '-'
+    trial_info.short_description = 'Trial'
+
+    def conversion_info(self, obj):
+        if obj.converted_at:
+            return format_html(
+                '<span style="color: green;">✓ Converteu em {}</span>',
+                obj.converted_at.strftime('%d/%m/%Y')
+            )
+        elif obj.canceled_at:
+            return format_html(
+                '<span style="color: red;">✗ Cancelou em {}</span>',
+                obj.canceled_at.strftime('%d/%m/%Y')
+            )
+        elif obj.subscription_status == 'trialing':
+            return format_html('<span style="color: #F59E0B;">Aguardando...</span>')
+        return '-'
+    conversion_info.short_description = 'Conversão'
+
+    def stripe_link(self, obj):
+        if obj.stripe_subscription_id:
+            url = f'https://dashboard.stripe.com/subscriptions/{obj.stripe_subscription_id}'
+            return format_html('<a href="{}" target="_blank">Ver no Stripe Dashboard →</a>', url)
+        return '-'
+    stripe_link.short_description = 'Stripe'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        # Adiciona métricas ao topo da lista
+        extra_context = extra_context or {}
+
+        # Contagem por ângulo de aquisição
+        angle_stats = AcquisitionTracking.objects.values('acquisition_angle').annotate(
+            total=Count('id')
+        ).order_by('-total')
+
+        # Contagem por status
+        status_stats = AcquisitionTracking.objects.values('subscription_status').annotate(
+            total=Count('id')
+        ).order_by('-total')
+
+        # Taxa de conversão por ângulo
+        conversion_stats = []
+        for angle in ['time', 'price', 'delay', 'visibility', 'organic']:
+            total = AcquisitionTracking.objects.filter(acquisition_angle=angle).count()
+            converted = AcquisitionTracking.objects.filter(
+                acquisition_angle=angle,
+                converted_at__isnull=False
+            ).count()
+            if total > 0:
+                rate = (converted / total) * 100
+                conversion_stats.append({
+                    'angle': angle,
+                    'total': total,
+                    'converted': converted,
+                    'rate': f'{rate:.1f}%'
+                })
+
+        extra_context['angle_stats'] = angle_stats
+        extra_context['status_stats'] = status_stats
+        extra_context['conversion_stats'] = conversion_stats
+
+        return super().changelist_view(request, extra_context=extra_context)
 
 
 @admin.register(Customer)
