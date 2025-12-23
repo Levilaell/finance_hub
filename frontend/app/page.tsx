@@ -17,7 +17,7 @@ import {
   Bars3Icon
 } from "@heroicons/react/24/outline";
 import { useState, useEffect } from "react";
-import { trackViewContent } from "@/lib/meta-pixel";
+import { trackViewContent } from "@/lib/tracking";
 
 // Price ID para o plano de R$197
 const PRICE_ID_197 = process.env.NEXT_PUBLIC_PRICE_197 || "price_1SXwA6AhSWJIUR4PV1BYoKLt";

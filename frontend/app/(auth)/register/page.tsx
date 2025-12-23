@@ -16,7 +16,7 @@ import { RegisterData } from '@/types';
 import { EyeIcon, EyeSlashIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { CheckIcon } from 'lucide-react';
 import { validatePhone, phoneMask } from '@/utils/validation';
-import { trackLead, trackViewContent, trackRegistration } from '@/lib/meta-pixel';
+import { trackLead, trackViewContent, trackCompleteRegistration } from '@/lib/tracking';
 import { AuthHeader } from '@/components/landing-v2/AuthHeader';
 import { Footer } from '@/components/landing-v2/Footer';
 import { startStripeCheckout, getPriceIdFromUrl } from '@/utils/checkout';
@@ -76,8 +76,8 @@ function RegisterContent() {
         currency: 'BRL'
       });
 
-      // Evento de cadastro completo para o Meta Pixel
-      trackRegistration({ status: 'success' });
+      // Evento de cadastro completo
+      trackCompleteRegistration({ status: 'success' });
 
       toast.success('Cadastro realizado com sucesso!', {
         description: 'Redirecionando para checkout...',

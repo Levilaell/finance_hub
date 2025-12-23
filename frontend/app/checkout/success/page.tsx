@@ -6,7 +6,7 @@ import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { trackEvent, META_EVENTS } from '@/lib/meta-pixel';
+import { trackStartTrial } from '@/lib/tracking';
 
 function CheckoutSuccessContent() {
   const router = useRouter();
@@ -77,7 +77,7 @@ function CheckoutSuccessContent() {
 
       if (isTrial && !hasTrackedStartTrial.current) {
         hasTrackedStartTrial.current = true;
-        trackEvent(META_EVENTS.START_TRIAL, {
+        trackStartTrial({
           value: 197.00,
           currency: 'BRL',
           content_name: 'CaixaHub Trial 7 dias'

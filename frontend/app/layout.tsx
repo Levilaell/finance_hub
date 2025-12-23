@@ -3,7 +3,6 @@ import { Inter } from 'next/font/google'
 import { GoogleTagManager } from '@next/third-parties/google'
 import './globals.css'
 import { Providers } from './providers'
-import PixelTracker from '@/components/PixelTracker'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -28,16 +27,6 @@ export default function RootLayout({
     <html lang="pt-BR" className="dark">
       <GoogleTagManager gtmId="GTM-K6CD5ZNP" />
       <body className={inter.className}>
-        <noscript>
-          <img
-            height="1"
-            width="1"
-            style={{ display: 'none' }}
-            src="https://www.facebook.com/tr?id=24169428459391565&ev=PageView&noscript=1"
-            alt=""
-          />
-        </noscript>
-        <PixelTracker />
         <Providers>{children}</Providers>
       </body>
     </html>
