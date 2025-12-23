@@ -1,12 +1,6 @@
 // frontend/lib/tracking.ts
 // Tracking via dataLayer para GTM → Server-Side → Meta CAPI
 
-declare global {
-  interface Window {
-    dataLayer: any[];
-  }
-}
-
 export const pushEvent = (eventName: string, params?: Record<string, any>) => {
   if (typeof window !== 'undefined') {
     window.dataLayer = window.dataLayer || [];
