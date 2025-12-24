@@ -6,7 +6,7 @@ import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { trackStartTrial } from '@/lib/tracking';
+import { trackStartTrial, UserData } from '@/lib/tracking';
 
 function CheckoutSuccessContent() {
   const router = useRouter();
@@ -77,10 +77,25 @@ function CheckoutSuccessContent() {
 
       if (isTrial && !hasTrackedStartTrial.current) {
         hasTrackedStartTrial.current = true;
+
+        // Recupera dados do usuário do sessionStorage para Enhanced Match
+        let userData: UserData | undefined;
+        try {
+          const storedUserData = sessionStorage.getItem('tracking_user_data');
+          if (storedUserData) {
+            userData = JSON.parse(storedUserData);
+            // Limpa após uso
+            sessionStorage.removeItem('tracking_user_data');
+          }
+        } catch (e) {
+          console.warn('Failed to parse tracking_user_data:', e);
+        }
+
         trackStartTrial({
           value: 197.00,
           currency: 'BRL',
-          content_name: 'CaixaHub Trial 7 dias'
+          content_name: 'CaixaHub Trial 7 dias',
+          user_data: userData,
         });
         // Set flag to show onboarding tour for new users
         localStorage.setItem('caixahub_show_tour', 'true');

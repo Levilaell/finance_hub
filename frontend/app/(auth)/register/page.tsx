@@ -70,14 +70,34 @@ function RegisterContent() {
       // Limpa o acquisition_angle após registro bem-sucedido
       clearAcquisitionAngle();
 
+      // Extrai primeiro e último nome
+      const nameParts = data.first_name?.trim().split(' ') || [];
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(' ');
+
+      // Dados do usuário para Meta CAPI Enhanced Match
+      const userData = {
+        email: data.email,
+        phone: data.phone,
+        firstName,
+        lastName,
+      };
+
+      // Armazena dados do usuário para uso no checkout/success
+      sessionStorage.setItem('tracking_user_data', JSON.stringify(userData));
+
       trackLead({
         content_name: 'Registration Form',
         value: 0,
-        currency: 'BRL'
+        currency: 'BRL',
+        user_data: userData,
       });
 
       // Evento de cadastro completo
-      trackCompleteRegistration({ status: 'success' });
+      trackCompleteRegistration({
+        status: 'success',
+        user_data: userData,
+      });
 
       toast.success('Cadastro realizado com sucesso!', {
         description: 'Redirecionando para checkout...',
