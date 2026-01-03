@@ -59,6 +59,7 @@ export interface BankAccount {
   id: string;
   connection_id: string;
   institution_name: string;
+  connector_pluggy_id: number;
   type: AccountType;
   subtype?: string;
   name: string;

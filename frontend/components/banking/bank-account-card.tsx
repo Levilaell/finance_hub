@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   ArrowPathIcon,
-  BuildingLibraryIcon,
   TrashIcon,
   EyeIcon,
   ExclamationTriangleIcon,
@@ -95,8 +94,21 @@ export function BankAccountCard({ account, connectionStatus, connectionStatusDet
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             {/* Bank Icon */}
-            <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">
-              <BuildingLibraryIcon className="h-6 w-6 text-gray-400" />
+            <div className="w-10 h-10 bg-white rounded-lg border border-border/50 flex items-center justify-center p-2 flex-shrink-0">
+              <img
+                src={`https://cdn.pluggy.ai/assets/connector-icons/${account.connector_pluggy_id}.svg`}
+                alt={account.institution_name}
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  // Fallback: show generic bank icon
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent && !parent.querySelector('svg')) {
+                    parent.innerHTML = '<svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" /></svg>';
+                  }
+                }}
+              />
             </div>
 
             {/* Bank Name and Account Number */}
