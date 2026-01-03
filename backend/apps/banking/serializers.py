@@ -34,13 +34,14 @@ class BankAccountSerializer(serializers.ModelSerializer):
         model = BankAccount
         fields = [
             'id', 'connection_id', 'institution_name',
-            'type', 'subtype', 'name', 'number',
+            'type', 'subtype', 'name', 'custom_name', 'number',
             'balance', 'currency_code',
             'is_credit_card', 'available_credit_limit', 'credit_limit', 'credit_data',
             'last_synced_at', 'is_active', 'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'connection_id', 'institution_name', 'is_credit_card',
+            'name',  # Nome do Pluggy é read-only
             'last_synced_at', 'created_at', 'updated_at'
         ]
 

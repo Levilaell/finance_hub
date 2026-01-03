@@ -567,13 +567,15 @@ class BankConnectionViewSet(viewsets.ModelViewSet):
             )
 
 
-class BankAccountViewSet(viewsets.ReadOnlyModelViewSet):
+class BankAccountViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for viewing bank accounts.
+    ViewSet for viewing and updating bank accounts.
+    Users can update custom_name only.
     Ref: https://docs.pluggy.ai/reference/accounts
     """
     serializer_class = BankAccountSerializer
     permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'patch', 'head', 'options']
 
     def get_queryset(self):
         # Otimização: select_related para evitar N+1 queries
@@ -586,6 +588,27 @@ class BankAccountViewSet(viewsets.ReadOnlyModelViewSet):
             'connection__connector',
             'connection__user'
         )
+
+    def update(self, request, *args, **kwargs):
+        """
+        Permite atualizar apenas custom_name.
+        PATCH /api/banking/accounts/{id}/
+        Body: { "custom_name": "Nome Personalizado" }
+        """
+        instance = self.get_object()
+
+        # Segurança: só permite atualizar custom_name
+        allowed_fields = {'custom_name'}
+        if not set(request.data.keys()).issubset(allowed_fields):
+            return Response(
+                {'error': 'Apenas custom_name pode ser atualizado'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def sync_transactions(self, request, pk=None):

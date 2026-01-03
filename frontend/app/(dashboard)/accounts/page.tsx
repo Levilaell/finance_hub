@@ -226,6 +226,25 @@ export default function AccountsPage() {
     }
   }, [accounts, startPolling]);
 
+  // Rename account
+  const handleRenameAccount = useCallback(async (accountId: string, customName: string) => {
+    try {
+      await bankingService.updateAccountName(accountId, customName);
+
+      // Update otimista: atualiza o estado local imediatamente
+      setAccounts(prevAccounts =>
+        prevAccounts.map(acc =>
+          acc.id === accountId ? { ...acc, custom_name: customName } : acc
+        )
+      );
+    } catch (error) {
+      console.error('Error renaming account:', error);
+      // Re-fetch em caso de erro para garantir consistência
+      await fetchData();
+      throw error; // Re-throw para que o componente possa mostrar toast de erro
+    }
+  }, []);
+
   // Sync all connections
   const handleSyncAll = useCallback(async () => {
     if (connections.length === 0) return;
@@ -367,6 +386,7 @@ export default function AccountsPage() {
                 onReconnect={() => handleReconnectAccount(account.connection_id)}
                 onView={() => setSelectedAccountId(account.id)}
                 onDelete={() => handleDeleteAccount(account.id)}
+                onRename={(customName) => handleRenameAccount(account.id, customName)}
               />
             );
           })}

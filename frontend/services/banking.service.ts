@@ -137,6 +137,16 @@ class BankingService {
     );
   }
 
+  async updateAccountName(
+    accountId: string,
+    customName: string
+  ): Promise<BankAccount> {
+    return apiClient.patch<BankAccount>(
+      `/api/banking/accounts/${accountId}/`,
+      { custom_name: customName }
+    );
+  }
+
   // Transactions
   async getTransactions(filters?: TransactionFilter): Promise<Transaction[]> {
     // Performance otimização: estratégia inteligente baseada nos filtros

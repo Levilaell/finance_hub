@@ -62,6 +62,7 @@ export interface BankAccount {
   type: AccountType;
   subtype?: string;
   name: string;
+  custom_name?: string;
   number?: string;
   balance: number;
   currency_code: string;

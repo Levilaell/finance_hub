@@ -117,6 +117,7 @@ class BankAccount(models.Model):
     type = models.CharField(max_length=20, choices=ACCOUNT_TYPES)
     subtype = models.CharField(max_length=50, blank=True)
     name = models.CharField(max_length=200)
+    custom_name = models.CharField(max_length=200, blank=True, default='', help_text='User-defined custom name for this account')
     number = models.CharField(max_length=50, blank=True)  # Account number (masked)
 
     # Financial data
@@ -155,6 +156,11 @@ class BankAccount(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.get_type_display()})"
+
+    @property
+    def display_name(self):
+        """Retorna custom_name se definido, senão name original."""
+        return self.custom_name if self.custom_name else self.name
 
 
 class Transaction(models.Model):

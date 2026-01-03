@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { BankAccount } from '@/types/banking';
 import { bankingService } from '@/services/banking.service';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,9 +13,13 @@ import {
   EyeIcon,
   ExclamationTriangleIcon,
   LinkIcon,
+  PencilIcon,
+  CheckIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 interface BankAccountCardProps {
   account: BankAccount;
@@ -24,9 +29,14 @@ interface BankAccountCardProps {
   onReconnect?: () => void;
   onView?: () => void;
   onDelete?: () => void;
+  onRename?: (customName: string) => Promise<void>;
 }
 
-export function BankAccountCard({ account, connectionStatus, connectionStatusDetail, onSync, onReconnect, onView, onDelete }: BankAccountCardProps) {
+export function BankAccountCard({ account, connectionStatus, connectionStatusDetail, onSync, onReconnect, onView, onDelete, onRename }: BankAccountCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedName, setEditedName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
   const getAccountTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       CHECKING: 'Conta Corrente',
@@ -48,8 +58,38 @@ export function BankAccountCard({ account, connectionStatus, connectionStatusDet
     };
     return classes[type] || 'bg-gray-100 text-gray-800';
   };
+
+  const handleStartEdit = () => {
+    setEditedName(account.custom_name || account.name);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedName('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!onRename) return;
+    setIsSaving(true);
+    try {
+      await onRename(editedName.trim());
+      setIsEditing(false);
+      toast.success('Nome atualizado!');
+    } catch (error) {
+      toast.error('Erro ao atualizar nome');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSaveEdit();
+    else if (e.key === 'Escape') handleCancelEdit();
+  };
+
   return (
-    <Card className="hover:shadow-lg transition-all duration-300">
+    <Card className="group hover:shadow-lg transition-all duration-300">
       <CardContent className="p-6 space-y-4">
         {/* Header Row: Bank Icon, Name, and Actions */}
         <div className="flex items-start justify-between">
@@ -60,14 +100,61 @@ export function BankAccountCard({ account, connectionStatus, connectionStatusDet
             </div>
 
             {/* Bank Name and Account Number */}
-            <div>
-              <h3 className="font-semibold text-base">
-                {account.name}
-              </h3>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {account.institution_name}
-                {account.number && ` • ****${account.number.slice(-4)}`}
-              </p>
+            <div className="flex-1">
+              {isEditing ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={editedName}
+                    onChange={(e) => setEditedName(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="flex-1 px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    autoFocus
+                    disabled={isSaving}
+                    maxLength={200}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
+                    onClick={handleSaveEdit}
+                    disabled={isSaving}
+                  >
+                    <CheckIcon className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                    onClick={handleCancelEdit}
+                    disabled={isSaving}
+                  >
+                    <XMarkIcon className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-base">
+                      {account.custom_name || account.name}
+                    </h3>
+                    {onRename && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={handleStartEdit}
+                      >
+                        <PencilIcon className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600" />
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {account.institution_name}
+                    {account.number && ` • ****${account.number.slice(-4)}`}
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
