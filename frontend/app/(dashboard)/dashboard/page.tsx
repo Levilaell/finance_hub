@@ -185,7 +185,17 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer"
+          onClick={() => {
+            const params = new URLSearchParams({
+              type: 'CREDIT',
+              startDate: summary?.period_start || '',
+              endDate: summary?.period_end || ''
+            });
+            router.push(`/transactions?${params.toString()}`);
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Receitas (Mês)</CardTitle>
             <ArrowDownIcon className="h-4 w-4 text-green-500" />
@@ -200,7 +210,17 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer"
+          onClick={() => {
+            const params = new URLSearchParams({
+              type: 'DEBIT',
+              startDate: summary?.period_start || '',
+              endDate: summary?.period_end || ''
+            });
+            router.push(`/transactions?${params.toString()}`);
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Despesas (Mês)</CardTitle>
             <ArrowUpIcon className="h-4 w-4 text-red-500" />

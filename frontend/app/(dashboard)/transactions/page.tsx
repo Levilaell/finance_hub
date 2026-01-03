@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { bankingService } from '@/services/banking.service';
 import { Transaction, BankAccount, Category } from '@/types/banking';
@@ -48,6 +48,7 @@ import { LinkBillDialog, CategoryConfirmModal, CategoryPopoverContent } from '@/
 
 export default function TransactionsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isAuthenticated } = useAuthStore();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
@@ -84,6 +85,26 @@ export default function TransactionsPage() {
     }
     fetchData();
   }, [isAuthenticated, router]);
+
+  // Apply filters from URL query params on mount
+  useEffect(() => {
+    const type = searchParams.get('type');
+    const start = searchParams.get('startDate');
+    const end = searchParams.get('endDate');
+
+    if (type) {
+      setSelectedType(type);
+      setShowFilters(true); // Show filters panel when coming from dashboard
+    }
+    if (start) {
+      setStartDate(start);
+      setShowFilters(true);
+    }
+    if (end) {
+      setEndDate(end);
+      setShowFilters(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     applyFilters();
