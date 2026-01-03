@@ -133,18 +133,15 @@ export function useOnboarding() {
           closeMobileSidebar();
         }
 
-        // Only mark as done if user completed the tour (clicked last button)
-        if (driverInstance.isLastStep()) {
-          localStorage.setItem(STORAGE_KEYS.TOUR_DONE, 'true');
-          localStorage.removeItem(STORAGE_KEYS.SHOW_TOUR);
-          driverInstance.destroy();
-          // Navigate to accounts if not already there
-          if (pathname !== '/accounts') {
-            router.push('/accounts');
-          }
-        } else {
-          // User closed early - just destroy, don't mark as done
-          driverInstance.destroy();
+        // Always mark as done when tour is closed (whether completed or dismissed)
+        // This prevents the tour from appearing repeatedly
+        localStorage.setItem(STORAGE_KEYS.TOUR_DONE, 'true');
+        localStorage.removeItem(STORAGE_KEYS.SHOW_TOUR);
+        driverInstance.destroy();
+
+        // Navigate to accounts only if user completed the tour
+        if (driverInstance.isLastStep() && pathname !== '/accounts') {
+          router.push('/accounts');
         }
       },
     });
