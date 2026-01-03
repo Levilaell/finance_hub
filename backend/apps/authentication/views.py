@@ -116,19 +116,28 @@ def login_view(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['GET'])
+@api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def profile_view(request):
     """
     Dados do usuário logado
-    GET /api/auth/profile/
+    GET /api/auth/profile/ - Obter dados do perfil
+    PATCH /api/auth/profile/ - Atualizar dados do perfil
     """
     user = request.user
-    serializer = UserSerializer(user)
-    
-    return Response({
-        'user': serializer.data
-    }, status=status.HTTP_200_OK)
+
+    if request.method == 'GET':
+        serializer = UserSerializer(user)
+        return Response({
+            'user': serializer.data
+        }, status=status.HTTP_200_OK)
+
+    elif request.method == 'PATCH':
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class RefreshView(TokenRefreshView):
