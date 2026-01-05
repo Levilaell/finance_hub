@@ -756,7 +756,10 @@ class TransactionViewSet(viewsets.ModelViewSet):
             applied_count = Transaction.objects.filter(
                 id__in=similar_ids,
                 account__connection__user=request.user
-            ).update(user_category=instance.user_category)
+            ).update(
+                user_category=instance.user_category,
+                user_subcategory=instance.user_subcategory
+            )
             logger.info(f"Applied category to {applied_count} similar transactions")
 
         # Create rule if requested
@@ -765,7 +768,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 CategoryRuleService.create_rule_from_transaction(
                     request.user,
                     instance,
-                    instance.user_category
+                    instance.user_category,
+                    instance.user_subcategory
                 )
                 rule_created = True
                 logger.info(f"Created category rule from transaction {instance.id}")

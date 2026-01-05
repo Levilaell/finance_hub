@@ -946,10 +946,11 @@ class TransactionService:
                         pluggy_transaction_id=pluggy_tx['id']
                     ).first()
 
-                    # Determine category to use
+                    # Determine category and subcategory to use
                     if existing_tx and existing_tx.user_category:
-                        # Preserve existing user category (was manually categorized)
+                        # Preserve existing user category and subcategory (was manually categorized)
                         category_to_use = existing_tx.user_category
+                        subcategory_to_use = existing_tx.user_subcategory
                     else:
                         # New transaction - try to apply category rules first
                         temp_tx = TransactionModel(
@@ -958,13 +959,17 @@ class TransactionService:
                             type=tx_type,
                             account=account
                         )
-                        rule_category = CategoryRuleService.apply_rules_to_transaction(temp_tx)
-                        if rule_category:
-                            category_to_use = rule_category
-                            logger.info(f"Applied category rule to transaction: {description[:30]}...")
+                        rule_result = CategoryRuleService.apply_rules_to_transaction(temp_tx)
+                        if rule_result:
+                            category_to_use, subcategory_to_use = rule_result
+                            category_display = category_to_use.name
+                            if subcategory_to_use:
+                                category_display = f"{category_to_use.name} > {subcategory_to_use.name}"
+                            logger.info(f"Applied category rule to transaction: {description[:30]}... → {category_display}")
                         else:
                             # Fallback to Pluggy category
                             category_to_use = get_or_create_category(user, pluggy_category, tx_type)
+                            subcategory_to_use = None
 
                     tx_obj, created = TransactionModel.objects.update_or_create(
                         pluggy_transaction_id=pluggy_tx['id'],
@@ -981,6 +986,7 @@ class TransactionService:
                             'merchant_category': merchant_category,
                             'payment_data': pluggy_tx.get('paymentData'),
                             'user_category': category_to_use,
+                            'user_subcategory': subcategory_to_use,
                         }
                     )
                     synced_count += 1
@@ -1780,7 +1786,7 @@ class CategoryRuleService:
         return sorted(similar, key=lambda x: -x['score'])[:limit]
 
     @staticmethod
-    def create_rule_from_transaction(user, transaction, category) -> 'CategoryRule':
+    def create_rule_from_transaction(user, transaction, category, subcategory=None) -> 'CategoryRule':
         """
         Cria uma regra de categorização baseada em uma transação.
 
@@ -1788,14 +1794,23 @@ class CategoryRuleService:
             user: Usuário dono da regra
             transaction: Transação que servirá de base para o padrão
             category: Categoria a ser aplicada
+            subcategory: Subcategoria a ser aplicada (opcional)
 
         Returns:
             CategoryRule criada ou atualizada
 
         Raises:
             ValueError: Se o padrão for muito curto (< 3 chars)
+            ValueError: Se subcategoria não pertencer à categoria
         """
         from .models import CategoryRule
+
+        # Valida que subcategoria pertence à categoria (se definida)
+        if subcategory:
+            if not category:
+                raise ValueError("Subcategoria requer uma categoria definida")
+            if subcategory.parent_id != category.id:
+                raise ValueError("Subcategoria deve pertencer à categoria selecionada")
 
         # Determina o melhor padrão baseado nos dados disponíveis
         if transaction.merchant_name:
@@ -1817,44 +1832,52 @@ class CategoryRuleService:
             match_type=match_type,
             defaults={
                 'category': category,
+                'subcategory': subcategory,
                 'created_from_transaction': transaction
             }
         )
 
         if not created:
-            # Atualiza categoria se a regra já existia
+            # Atualiza categoria e subcategoria se a regra já existia
             rule.category = category
-            rule.save(update_fields=['category', 'updated_at'])
+            rule.subcategory = subcategory
+            rule.save(update_fields=['category', 'subcategory', 'updated_at'])
 
+        category_display = category.name
+        if subcategory:
+            category_display = f"{category.name} > {subcategory.name}"
         logger.info(
             f"{'Created' if created else 'Updated'} category rule: "
-            f"'{pattern}' ({match_type}) -> {category.name} for user {user.id}"
+            f"'{pattern}' ({match_type}) -> {category_display} for user {user.id}"
         )
 
         return rule
 
     @staticmethod
-    def apply_rules_to_transaction(transaction) -> Optional[Category]:
+    def apply_rules_to_transaction(transaction) -> Optional[tuple[Category, Optional[Category]]]:
         """
         Aplica regras de categorização a uma transação.
 
         Verifica todas as regras ativas do usuário e retorna a primeira
-        categoria que fizer match (ordenado por data de criação).
+        categoria que fizer match. Regras com subcategoria têm prioridade
+        sobre regras sem subcategoria.
 
         Args:
             transaction: Transação a ser categorizada
 
         Returns:
-            Category se encontrar match, None caso contrário
+            Tuple (category, subcategory) se encontrar match, None caso contrário
         """
         from difflib import SequenceMatcher
         from .models import CategoryRule
 
         user = transaction.account.connection.user
+        # Ordena por prioridade: regras com subcategory primeiro (subcategory__isnull=False vem antes)
+        # Depois por data de criação como desempate
         rules = CategoryRule.objects.filter(
             user=user,
             is_active=True
-        ).select_related('category').order_by('created_at')
+        ).select_related('category', 'subcategory').order_by('subcategory__isnull', 'created_at')
 
         t_desc = CategoryRuleService.normalize_text(transaction.description)
         t_merchant = CategoryRuleService.normalize_text(transaction.merchant_name)
@@ -1871,15 +1894,25 @@ class CategoryRuleService:
                 matched = ratio >= 0.70
 
             if matched:
+                # Valida que subcategoria pertence à categoria (se definida)
+                if rule.subcategory and rule.subcategory.parent_id != rule.category_id:
+                    logger.warning(
+                        f"Rule {rule.id} has invalid subcategory (parent mismatch), skipping"
+                    )
+                    continue
+
                 # Incrementa contador de aplicações
                 CategoryRule.objects.filter(id=rule.id).update(
                     applied_count=models.F('applied_count') + 1
                 )
+                category_display = rule.category.name
+                if rule.subcategory:
+                    category_display = f"{rule.category.name} > {rule.subcategory.name}"
                 logger.debug(
                     f"Rule '{rule.pattern}' matched transaction {transaction.id}, "
-                    f"applying category {rule.category.name}"
+                    f"applying {category_display}"
                 )
-                return rule.category
+                return (rule.category, rule.subcategory)
 
         return None
 
@@ -1923,10 +1956,21 @@ class CategoryRuleService:
 
             if matched:
                 matched_count += 1
-                # Atualiza a categoria da transação
-                if tx.user_category_id != rule.category_id:
+                # Atualiza a categoria e subcategoria da transação
+                category_changed = tx.user_category_id != rule.category_id
+                subcategory_changed = tx.user_subcategory_id != (rule.subcategory_id if rule.subcategory else None)
+
+                if category_changed or subcategory_changed:
+                    # Valida que subcategoria pertence à categoria (se definida)
+                    if rule.subcategory and rule.subcategory.parent_id != rule.category_id:
+                        logger.warning(
+                            f"Rule {rule.id} has invalid subcategory (parent mismatch), skipping transaction {tx.id}"
+                        )
+                        continue
+
                     tx.user_category = rule.category
-                    tx.save(update_fields=['user_category', 'updated_at'])
+                    tx.user_subcategory = rule.subcategory
+                    tx.save(update_fields=['user_category', 'user_subcategory', 'updated_at'])
                     updated_count += 1
 
         # Atualiza contador de aplicações da regra

@@ -610,6 +610,16 @@ class CategoryRule(models.Model):
     # Categoria a aplicar quando houver match
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='rules')
 
+    # Subcategoria a aplicar (opcional, deve pertencer à categoria)
+    subcategory = models.ForeignKey(
+        Category,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='subcategory_rules',
+        help_text='Subcategoria a aplicar (opcional, deve pertencer à categoria)'
+    )
+
     # Status e métricas
     is_active = models.BooleanField(default=True)
     applied_count = models.IntegerField(default=0)  # Quantas vezes foi aplicada
@@ -638,4 +648,7 @@ class CategoryRule(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.get_match_type_display()}: '{self.pattern}' → {self.category.name}"
+        category_display = self.category.name
+        if self.subcategory:
+            category_display = f"{self.category.name} > {self.subcategory.name}"
+        return f"{self.get_match_type_display()}: '{self.pattern}' → {category_display}"

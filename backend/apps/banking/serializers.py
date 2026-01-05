@@ -810,15 +810,37 @@ class CategoryRuleSerializer(serializers.ModelSerializer):
     category_icon = serializers.CharField(source='category.icon', read_only=True)
     match_type_display = serializers.CharField(source='get_match_type_display', read_only=True)
 
+    # Subcategory fields
+    subcategory_id = serializers.PrimaryKeyRelatedField(
+        source='subcategory',
+        queryset=Category.objects.none(),
+        required=False,
+        allow_null=True
+    )
+    subcategory_name = serializers.CharField(source='subcategory.name', read_only=True, default=None)
+    subcategory_color = serializers.CharField(source='subcategory.color', read_only=True, default=None)
+    subcategory_icon = serializers.CharField(source='subcategory.icon', read_only=True, default=None)
+
     class Meta:
         model = CategoryRule
         fields = [
             'id', 'pattern', 'match_type', 'match_type_display',
             'category', 'category_name', 'category_color', 'category_icon',
+            'subcategory_id', 'subcategory_name', 'subcategory_color', 'subcategory_icon',
             'is_active', 'applied_count',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'applied_count', 'created_at', 'updated_at']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set queryset for subcategory based on request user (only subcategories)
+        if 'request' in self.context:
+            user = self.context['request'].user
+            self.fields['subcategory_id'].queryset = Category.objects.filter(
+                user=user,
+                parent__isnull=False
+            )
 
     def validate_pattern(self, value):
         """Validate pattern minimum length."""
@@ -832,6 +854,24 @@ class CategoryRuleSerializer(serializers.ModelSerializer):
         if request and value.user != request.user:
             raise serializers.ValidationError("Categoria inválida")
         return value
+
+    def validate(self, data):
+        """Validate that subcategory belongs to the category."""
+        category = data.get('category')
+        subcategory = data.get('subcategory')
+
+        # If subcategory is set, validate it belongs to the category
+        if subcategory:
+            if not category:
+                raise serializers.ValidationError({
+                    'subcategory_id': 'Subcategoria requer uma categoria definida'
+                })
+            if subcategory.parent_id != category.id:
+                raise serializers.ValidationError({
+                    'subcategory_id': 'Subcategoria deve pertencer à categoria selecionada'
+                })
+
+        return data
 
 
 class SimilarTransactionSerializer(serializers.Serializer):
