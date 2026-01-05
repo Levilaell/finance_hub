@@ -14,6 +14,12 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
 # Note: Railway now uses multiple services in the dashboard
-# You need to create a separate "Worker" service in Railway dashboard
-# with the following command:
-# cd backend && celery -A core worker --loglevel=info --concurrency=2
+# You need to create separate services:
+#
+# 1. Worker service (for async task processing):
+#    cd backend && celery -A core worker --loglevel=info --concurrency=2
+#
+# 2. Beat service (for scheduled tasks - REQUIRED for AI Insights):
+#    cd backend && bash celery_beat.sh
+#
+# See docs/CELERY_BEAT_SETUP.md for detailed setup instructions

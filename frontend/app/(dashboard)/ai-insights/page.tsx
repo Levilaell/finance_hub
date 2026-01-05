@@ -56,10 +56,20 @@ export default function AIInsightsPage() {
   }, []);
 
   // Polling effect: check for new insight every 5 seconds if enabled but no insight yet
+  // Stop after 3 minutes to prevent infinite loading
   useEffect(() => {
     if (config?.is_enabled && !latestInsight && !isLoading) {
+      let pollCount = 0;
+      const maxPolls = 36; // 3 minutes (36 * 5 seconds)
+
       const interval = setInterval(() => {
-        loadData();
+        pollCount++;
+        if (pollCount >= maxPolls) {
+          clearInterval(interval);
+          setError('A geração está demorando mais que o esperado. Tente regenerar manualmente.');
+        } else {
+          loadData();
+        }
       }, 5000); // Poll every 5 seconds
 
       return () => clearInterval(interval);
@@ -123,7 +133,12 @@ export default function AIInsightsPage() {
 
     try {
       await aiInsightsService.regenerate();
-      // Keep polling
+      // Clear current insight to trigger loading state and polling
+      setLatestInsight(null);
+      // Reload data after a short delay
+      setTimeout(() => {
+        loadData();
+      }, 2000);
     } catch (err: any) {
       console.error('Error regenerating insights:', err);
       setError(err.response?.data?.error || 'Erro ao forçar regeneração');
@@ -268,23 +283,42 @@ export default function AIInsightsPage() {
         <div className="flex items-center justify-center min-h-[500px]">
           <Card className="max-w-md">
             <CardContent className="pt-6 text-center space-y-4">
-              <div className="bg-muted rounded-full p-4 w-16 h-16 mx-auto flex items-center justify-center">
-                <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Gerando sua primeira análise</h3>
-                <p className="text-sm text-muted-foreground">
-                  Estamos analisando seus dados financeiros. A página atualizará automaticamente quando pronto.
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Isso pode levar de 10 a 30 segundos...
-                </p>
-              </div>
-              <div className="flex items-center justify-center gap-1">
-                <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-              </div>
+              {error ? (
+                <>
+                  <div className="bg-yellow-500/20 rounded-full p-4 w-16 h-16 mx-auto flex items-center justify-center">
+                    <Clock className="h-8 w-8 text-yellow-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2 text-yellow-400">Tempo Limite Excedido</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {error}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Isso pode acontecer se houver muitos dados para processar ou problemas temporários no servidor.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="bg-muted rounded-full p-4 w-16 h-16 mx-auto flex items-center justify-center">
+                    <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Gerando sua primeira análise</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Estamos analisando seus dados financeiros. A página atualizará automaticamente quando pronto.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Isso pode levar de 10 a 30 segundos...
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center gap-1">
+                    <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                </>
+              )}
               <Button
                 onClick={handleRegenerate}
                 variant="outline"
@@ -347,6 +381,10 @@ export default function AIInsightsPage() {
     );
   }
 
+  // Check if insight is old (more than 7 days)
+  const insightAge = latestInsight ? Math.floor((new Date().getTime() - new Date(latestInsight.generated_at).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+  const isOldInsight = insightAge > 7;
+
   // Show insights
   return (
     <div className="space-y-6">
@@ -359,6 +397,26 @@ export default function AIInsightsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {isOldInsight && (
+            <Button
+              onClick={handleRegenerate}
+              variant="default"
+              disabled={isRegenerating}
+              className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+            >
+              {isRegenerating ? (
+                <>
+                  <LoadingSpinner />
+                  <span className="ml-2">Gerando...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Gerar Nova Análise
+                </>
+              )}
+            </Button>
+          )}
           <Link href="/ai-insights/history">
             <Button variant="outline">
               <History className="mr-2 h-4 w-4" />
@@ -389,6 +447,27 @@ export default function AIInsightsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Old Insight Warning */}
+      {isOldInsight && (
+        <Card className="border-yellow-500/20 bg-yellow-500/10">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="bg-yellow-500/20 rounded-full p-2">
+                <Clock className="h-5 w-5 text-yellow-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-yellow-400 mb-1">
+                  Análise Desatualizada
+                </h3>
+                <p className="text-sm text-yellow-400/80">
+                  Esta análise tem {insightAge} dias. Clique em "Gerar Nova Análise" para obter insights atualizados baseados nos seus dados mais recentes.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Health Score */}
       <HealthScoreCard

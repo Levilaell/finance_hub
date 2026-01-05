@@ -43,8 +43,9 @@ def init_sentry():
             CeleryIntegration(
                 # Monitor Celery tasks
                 monitor_beat_tasks=True,
-                # Exclude successful tasks from transactions
-                exclude_beat_tasks=False,
+                # Exclude beat tasks from monitoring (list of task names or None)
+                # Set to [] to monitor all tasks, or add task names to exclude specific ones
+                exclude_beat_tasks=[],
             ),
             RedisIntegration(),
         ],

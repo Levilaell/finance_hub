@@ -29,6 +29,33 @@ logger = logging.getLogger(__name__)
 # confusion with the Transaction model (TransactionModel)
 
 
+def safe_decimal(value, default=0) -> Decimal:
+    """
+    Safely convert a value to Decimal, handling None, empty strings, and invalid values.
+
+    Args:
+        value: Value to convert (can be number, string, None, etc.)
+        default: Default value if conversion fails (default: 0)
+
+    Returns:
+        Decimal value or Decimal(default)
+    """
+    if value is None or value == '':
+        return Decimal(str(default))
+
+    try:
+        # Handle dict/list (invalid types)
+        if isinstance(value, (dict, list)):
+            logger.warning(f"Attempted to convert {type(value).__name__} to Decimal: {value}")
+            return Decimal(str(default))
+
+        # Convert to string and then Decimal
+        return Decimal(str(value))
+    except (ValueError, TypeError, Exception) as e:
+        logger.warning(f"Failed to convert '{value}' to Decimal: {e}. Using default: {default}")
+        return Decimal(str(default))
+
+
 # Load Pluggy categories translations
 def load_category_translations() -> Dict[str, str]:
     """
@@ -777,7 +804,7 @@ class BankConnectionService:
                     'subtype': pluggy_account.get('subtype', ''),
                     'name': pluggy_account.get('name', ''),
                     'number': pluggy_account.get('number', ''),
-                    'balance': Decimal(str(pluggy_account.get('balance', 0))),
+                    'balance': safe_decimal(pluggy_account.get('balance'), 0),
                     'currency_code': pluggy_account.get('currencyCode', 'BRL'),
                     'bank_data': pluggy_account.get('bankData') or {},
                     'last_synced_at': timezone.now(),
@@ -787,8 +814,8 @@ class BankConnectionService:
                 if pluggy_type == 'CREDIT':
                     credit_data = pluggy_account.get('creditData') or {}
                     defaults['credit_data'] = credit_data
-                    defaults['available_credit_limit'] = Decimal(str(credit_data.get('availableCreditLimit', 0)))
-                    defaults['credit_limit'] = Decimal(str(credit_data.get('creditLimit', 0)))
+                    defaults['available_credit_limit'] = safe_decimal(credit_data.get('availableCreditLimit'), 0)
+                    defaults['credit_limit'] = safe_decimal(credit_data.get('creditLimit'), 0)
                     logger.info(f"Credit card synced - Available: {defaults['available_credit_limit']}, Total: {defaults['credit_limit']}, Balance: {defaults['balance']}")
                 else:
                     # For non-credit accounts, clear credit fields
@@ -977,7 +1004,7 @@ class TransactionService:
                             'account': account,
                             'type': tx_type,
                             'description': description,
-                            'amount': abs(Decimal(str(pluggy_tx.get('amount', 0)))),
+                            'amount': abs(safe_decimal(pluggy_tx.get('amount'), 0)),
                             'currency_code': pluggy_tx.get('currencyCode', 'BRL'),
                             'date': datetime.fromisoformat(pluggy_tx['date'].replace('Z', '+00:00')),
                             'pluggy_category': pluggy_category,
