@@ -1,5 +1,26 @@
 # Configuração do Celery Beat no Railway
 
+## ⚡ Quick Start (5 minutos)
+
+1. **Railway Dashboard** → Seu projeto → **"+ New Service"**
+2. **GitHub Repo** → mesmo repositório
+3. **Nome:** `celery-beat`
+4. **Settings** → **Deploy** → **Start Command:**
+   ```bash
+   cd backend && bash celery_beat.sh
+   ```
+5. **Variáveis:** Copie do serviço Worker (ou use Shared Variables)
+6. **Deploy** → Verificar logs
+
+**Logs esperados:**
+```
+✅ REDIS_URL is configured
+✅ Redis connection successful
+📅 Starting Celery Beat
+```
+
+---
+
 ## Problema
 
 Os **Insights com IA** não estão sendo atualizados automaticamente porque o **Celery Beat** (scheduler de tasks periódicas) não está rodando.

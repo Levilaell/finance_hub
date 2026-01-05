@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Sparkles, Clock, Calendar, RefreshCw, History } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,9 @@ export default function AIInsightsPage() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Poll count ref for timeout
+  const pollCountRef = useRef(0);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -59,12 +62,12 @@ export default function AIInsightsPage() {
   // Stop after 3 minutes to prevent infinite loading
   useEffect(() => {
     if (config?.is_enabled && !latestInsight && !isLoading) {
-      let pollCount = 0;
       const maxPolls = 36; // 3 minutes (36 * 5 seconds)
+      pollCountRef.current = 0; // Reset counter when starting polling
 
       const interval = setInterval(() => {
-        pollCount++;
-        if (pollCount >= maxPolls) {
+        pollCountRef.current++;
+        if (pollCountRef.current >= maxPolls) {
           clearInterval(interval);
           setError('A geração está demorando mais que o esperado. Tente regenerar manualmente.');
         } else {
@@ -72,7 +75,10 @@ export default function AIInsightsPage() {
         }
       }, 5000); // Poll every 5 seconds
 
-      return () => clearInterval(interval);
+      return () => {
+        clearInterval(interval);
+        pollCountRef.current = 0; // Reset on cleanup
+      };
     }
   }, [config?.is_enabled, latestInsight, isLoading]);
 
