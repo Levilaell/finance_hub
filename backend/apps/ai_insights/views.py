@@ -6,8 +6,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
+from django.db.models import Subquery, OuterRef, F
+from django.db import transaction
 from decimal import Decimal
 import logging
+import hashlib
 
 from apps.ai_insights.models import AIInsight, AIInsightConfig
 from apps.ai_insights.serializers import (
@@ -41,8 +44,23 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AIInsightListSerializer
 
     def get_queryset(self):
-        """Return insights for the authenticated user."""
-        return AIInsight.objects.filter(user=self.request.user)
+        """Return insights for the authenticated user with optimized score_change calculation."""
+        queryset = AIInsight.objects.filter(user=self.request.user)
+
+        # For list actions, annotate score_change to avoid N+1 queries
+        if self.action in ['list', 'history']:
+            # Subquery to get the previous insight's health_score
+            previous_score_subquery = AIInsight.objects.filter(
+                user=self.request.user,
+                generated_at__lt=OuterRef('generated_at')
+            ).order_by('-generated_at').values('health_score')[:1]
+
+            queryset = queryset.annotate(
+                _previous_score=Subquery(previous_score_subquery),
+                _score_change=F('health_score') - F('_previous_score')
+            )
+
+        return queryset
 
     def get_serializer_class(self):
         """Use detailed serializer for retrieve action."""
@@ -52,14 +70,17 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=['get'])
     def latest(self, request):
-        """Get the latest insight for the user."""
+        """Get the latest insight for the user with cache control headers."""
         latest_insight = self.get_queryset().filter(has_error=False).first()
 
         if not latest_insight:
-            return Response(
+            response = Response(
                 {'error': 'Nenhuma análise disponível. Ative os Insights com IA primeiro.'},
                 status=status.HTTP_404_NOT_FOUND
             )
+            # Even 404 should not be cached during polling
+            response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            return response
 
         # Log insight view
         UserActivityLog.log_event(
@@ -72,7 +93,13 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
         serializer = AIInsightDetailSerializer(latest_insight)
-        return Response(serializer.data)
+        response = Response(serializer.data)
+
+        # Add cache control headers - allow short cache for successful responses
+        response['Cache-Control'] = 'private, max-age=60'  # Cache for 1 minute
+        response['Vary'] = 'Authorization'
+
+        return response
 
     @action(detail=False, methods=['get'])
     def config(self, request):
@@ -82,10 +109,12 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(serializer.data)
 
     @action(detail=False, methods=['post'])
+    @transaction.atomic
     def enable(self, request):
         """
         Enable AI insights for the user.
         Requires company_type and business_sector.
+        Uses atomic transaction to ensure consistency between Company and Config.
         """
         from apps.companies.models import Company
 
@@ -101,9 +130,8 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
             company.save(update_fields=['company_type', 'business_sector', 'updated_at'])
         else:
             # Create minimal company for AI insights
-            # Use email as company name and generate a placeholder CNPJ
-            import random
-            placeholder_cnpj = f"{random.randint(10, 99)}.{random.randint(100, 999)}.{random.randint(100, 999)}/{random.randint(1000, 9999)}-{random.randint(10, 99)}"
+            # Generate deterministic placeholder CNPJ based on user ID to avoid collisions
+            placeholder_cnpj = self._generate_placeholder_cnpj(request.user)
 
             # Create without validation since CNPJ is placeholder
             company = Company(
@@ -133,8 +161,8 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
                 business_sector=serializer.validated_data['business_sector']
             )
 
-            # Generate first insight immediately (async)
-            generate_insight_for_user.delay(request.user.id)
+            # Generate first insight immediately (async) - outside transaction
+            transaction.on_commit(lambda: generate_insight_for_user.delay(request.user.id))
 
             return Response({
                 'message': 'Insights com IA habilitados com sucesso! Sua primeira análise será gerada em instantes.',
@@ -146,6 +174,16 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
                 'message': 'Insights com IA já estavam habilitados. Informações da empresa atualizadas.',
                 'config': AIInsightConfigSerializer(config).data
             })
+
+    def _generate_placeholder_cnpj(self, user) -> str:
+        """Generate a deterministic placeholder CNPJ based on user ID to avoid collisions."""
+        # Create hash from user ID for deterministic generation
+        hash_input = f"placeholder_cnpj_{user.id}_{user.email}".encode('utf-8')
+        hash_digest = hashlib.sha256(hash_input).hexdigest()
+
+        # Extract numbers from hash to form CNPJ pattern: XX.XXX.XXX/XXXX-XX
+        nums = ''.join(c for c in hash_digest if c.isdigit())[:14].ljust(14, '0')
+        return f"{nums[0:2]}.{nums[2:5]}.{nums[5:8]}/{nums[8:12]}-{nums[12:14]}"
 
     @action(detail=False, methods=['post'])
     def regenerate(self, request):
@@ -278,9 +316,15 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
         """Build comparison data between two insights."""
         score_change = insight1.health_score - insight2.health_score
 
+        # Safe division: check for zero using Decimal comparison to handle edge cases
+        if insight2.health_score and insight2.health_score > Decimal('0'):
+            score_change_pct = float((score_change / insight2.health_score) * 100)
+        else:
+            score_change_pct = 0.0
+
         return {
             'score_change': float(score_change),
-            'score_change_percentage': float((score_change / insight2.health_score) * 100) if insight2.health_score > 0 else 0,
+            'score_change_percentage': score_change_pct,
             'status_changed': insight1.health_status != insight2.health_status,
             'period1': {
                 'start': insight1.period_start.isoformat(),
@@ -332,17 +376,24 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=['get'])
     def history(self, request):
-        """Get paginated history of insights."""
+        """Get paginated history of insights with cache control headers."""
         insights = self.get_queryset()
 
         # Pagination
         page = self.paginate_queryset(insights)
         if page is not None:
             serializer = AIInsightListSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            response = self.get_paginated_response(serializer.data)
+        else:
+            serializer = AIInsightListSerializer(insights, many=True)
+            response = Response(serializer.data)
 
-        serializer = AIInsightListSerializer(insights, many=True)
-        return Response(serializer.data)
+        # Add cache control headers to prevent stale data
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+
+        return response
 
     @action(detail=False, methods=['get'])
     def score_evolution(self, request):

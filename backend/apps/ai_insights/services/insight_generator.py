@@ -70,9 +70,10 @@ class InsightGenerator:
 
         except Exception as e:
             logger.error(f'❌ Error generating insight for user {self.user.id}: {str(e)}')
-            # Save error insight
+            # Save error insight and return it instead of re-raising
+            # This prevents Celery from retrying and creating duplicate error insights
             error_insight = self._save_error_insight(str(e))
-            raise
+            return error_insight
 
     def _validate_prerequisites(self):
         """Validate that user has required information for insights."""

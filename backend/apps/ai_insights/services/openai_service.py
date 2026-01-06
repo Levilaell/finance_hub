@@ -3,11 +3,17 @@ OpenAI Service for GPT-4o mini integration
 """
 import json
 import logging
+import time
 from typing import Dict, Any, Optional
 from decouple import config
 import requests
 
 logger = logging.getLogger(__name__)
+
+# Retry configuration
+MAX_RETRIES = 3
+INITIAL_BACKOFF = 1  # seconds
+MAX_BACKOFF = 30  # seconds
 
 
 class OpenAIService:
@@ -19,6 +25,8 @@ class OpenAIService:
         self.api_key = config('OPENAI_API_KEY', default='')
         self.model = 'gpt-4o-mini'
         self.api_url = 'https://api.openai.com/v1/chat/completions'
+        self.connect_timeout = 10  # seconds for connection
+        self.read_timeout = 60  # seconds for response
 
         if not self.api_key:
             logger.warning('⚠️ OPENAI_API_KEY not configured in environment variables')
@@ -133,7 +141,7 @@ Retorne APENAS o JSON, sem texto adicional antes ou depois."""
         return True
 
     def _call_api(self, prompt: str) -> Dict[str, Any]:
-        """Call OpenAI API with the prompt."""
+        """Call OpenAI API with the prompt, with retry and exponential backoff."""
         headers = {
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {self.api_key}'
@@ -155,20 +163,78 @@ Retorne APENAS o JSON, sem texto adicional antes ou depois."""
             'response_format': {'type': 'json_object'}
         }
 
-        try:
-            response = requests.post(
-                self.api_url,
-                headers=headers,
-                json=payload,
-                timeout=60
-            )
-            response.raise_for_status()
-            return response.json()
+        last_exception = None
+        backoff = INITIAL_BACKOFF
 
-        except requests.exceptions.Timeout:
-            raise Exception('OpenAI API request timed out')
-        except requests.exceptions.RequestException as e:
-            raise Exception(f'OpenAI API request failed: {str(e)}')
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = requests.post(
+                    self.api_url,
+                    headers=headers,
+                    json=payload,
+                    timeout=(self.connect_timeout, self.read_timeout)
+                )
+
+                # Handle rate limiting (429) with exponential backoff
+                if response.status_code == 429:
+                    retry_after = int(response.headers.get('Retry-After', backoff))
+                    wait_time = min(retry_after, MAX_BACKOFF)
+                    logger.warning(f'Rate limited (429). Retrying in {wait_time}s (attempt {attempt + 1}/{MAX_RETRIES})')
+                    time.sleep(wait_time)
+                    backoff = min(backoff * 2, MAX_BACKOFF)
+                    continue
+
+                # Handle server errors (5xx) with retry
+                if response.status_code >= 500:
+                    logger.warning(f'Server error ({response.status_code}). Retrying in {backoff}s (attempt {attempt + 1}/{MAX_RETRIES})')
+                    time.sleep(backoff)
+                    backoff = min(backoff * 2, MAX_BACKOFF)
+                    continue
+
+                response.raise_for_status()
+
+                # Parse JSON response with error handling
+                try:
+                    return response.json()
+                except json.JSONDecodeError as e:
+                    logger.error(f'Invalid JSON response from OpenAI: {response.text[:500]}')
+                    raise Exception(f'OpenAI returned invalid JSON: {str(e)}')
+
+            except requests.exceptions.ConnectTimeout:
+                last_exception = Exception('Falha ao conectar com OpenAI API (timeout de conexão)')
+                logger.warning(f'Connection timeout (attempt {attempt + 1}/{MAX_RETRIES})')
+            except requests.exceptions.ReadTimeout:
+                last_exception = Exception('OpenAI API demorou muito para responder (timeout de leitura)')
+                logger.warning(f'Read timeout (attempt {attempt + 1}/{MAX_RETRIES})')
+            except requests.exceptions.ConnectionError as e:
+                last_exception = Exception(f'Erro de conexão com OpenAI API: {str(e)}')
+                logger.warning(f'Connection error (attempt {attempt + 1}/{MAX_RETRIES}): {str(e)}')
+            except requests.exceptions.HTTPError as e:
+                # Don't retry client errors (4xx except 429)
+                if response.status_code < 500 and response.status_code != 429:
+                    error_detail = self._extract_api_error(response)
+                    raise Exception(f'OpenAI API error ({response.status_code}): {error_detail}')
+                last_exception = e
+                logger.warning(f'HTTP error (attempt {attempt + 1}/{MAX_RETRIES}): {str(e)}')
+            except requests.exceptions.RequestException as e:
+                last_exception = Exception(f'OpenAI API request failed: {str(e)}')
+                logger.warning(f'Request error (attempt {attempt + 1}/{MAX_RETRIES}): {str(e)}')
+
+            # Wait before retry (except on last attempt)
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(backoff)
+                backoff = min(backoff * 2, MAX_BACKOFF)
+
+        # All retries exhausted
+        raise last_exception or Exception('OpenAI API request failed after all retries')
+
+    def _extract_api_error(self, response: requests.Response) -> str:
+        """Extract error message from OpenAI API error response."""
+        try:
+            error_data = response.json()
+            return error_data.get('error', {}).get('message', response.text[:200])
+        except (json.JSONDecodeError, KeyError):
+            return response.text[:200]
 
     def _parse_response(self, api_response: Dict[str, Any]) -> Dict[str, Any]:
         """Parse OpenAI API response and extract insights."""
@@ -221,10 +287,11 @@ Retorne APENAS o JSON, sem texto adicional antes ou depois."""
             logger.error('insights field must be a list')
             return False
 
-        for insight in insights['insights']:
+        for idx, insight in enumerate(insights['insights']):
             required_insight_fields = ['type', 'severity', 'title', 'description', 'recommendation']
-            if not all(field in insight for field in required_insight_fields):
-                logger.error(f'Invalid insight structure: {insight}')
+            missing_fields = [f for f in required_insight_fields if f not in insight]
+            if missing_fields:
+                logger.error(f'Invalid insight structure at index {idx}: missing fields {missing_fields}. Got: {list(insight.keys())}')
                 return False
 
         # Validate recommendations

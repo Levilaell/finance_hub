@@ -69,9 +69,17 @@ class DataAggregator:
             has_error=False
         ).first()
 
+        # Safe company attribute access with full null checks
+        if company is not None:
+            company_type = getattr(company, 'get_company_type_display', lambda: 'N/A')()
+            business_sector = getattr(company, 'get_business_sector_display', lambda: 'N/A')()
+        else:
+            company_type = 'N/A'
+            business_sector = 'N/A'
+
         return {
-            'company_type': company.get_company_type_display() if company else 'N/A',
-            'business_sector': company.get_business_sector_display() if company else 'N/A',
+            'company_type': company_type or 'N/A',
+            'business_sector': business_sector or 'N/A',
             'period': f"{start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}",
             'previous_analysis_date': previous_insight.generated_at.strftime('%d/%m/%Y') if previous_insight else 'Primeira análise'
         }

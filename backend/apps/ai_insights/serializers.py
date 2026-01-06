@@ -23,7 +23,10 @@ class AIInsightConfigSerializer(serializers.ModelSerializer):
 
 class AIInsightListSerializer(serializers.ModelSerializer):
     """Serializer for listing AI Insights (without full details)."""
-    score_change = serializers.DecimalField(max_digits=3, decimal_places=1, read_only=True)
+    # Use FloatField to ensure frontend receives number, not string
+    # score_change is calculated via annotation in viewset to avoid N+1 queries
+    health_score = serializers.FloatField(read_only=True)
+    score_change = serializers.SerializerMethodField()
     is_recent = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -45,10 +48,26 @@ class AIInsightListSerializer(serializers.ModelSerializer):
             'recommendations'
         ]
 
+    def get_score_change(self, obj):
+        """Get score_change from annotation or calculate if single object."""
+        # Check if score_change was annotated by the viewset
+        if hasattr(obj, '_score_change'):
+            return float(obj._score_change) if obj._score_change is not None else None
+        # Fallback for single object retrieval (already fetched, no N+1)
+        if hasattr(obj, '_prefetched_previous'):
+            prev = obj._prefetched_previous
+            if prev:
+                return float(obj.health_score - prev.health_score)
+            return None
+        # Last resort: use model property (only for single object, not lists)
+        return float(obj.score_change) if obj.score_change is not None else None
+
 
 class AIInsightDetailSerializer(serializers.ModelSerializer):
     """Serializer for AI Insight details."""
-    score_change = serializers.DecimalField(max_digits=3, decimal_places=1, read_only=True)
+    # Use FloatField to ensure frontend receives number, not string
+    health_score = serializers.FloatField(read_only=True)
+    score_change = serializers.SerializerMethodField()
     is_recent = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -72,6 +91,12 @@ class AIInsightDetailSerializer(serializers.ModelSerializer):
             'has_error',
             'error_message'
         ]
+
+    def get_score_change(self, obj):
+        """Get score_change, calculating only for single object retrieval."""
+        # For detail view, it's a single object so the property query is acceptable
+        score_change = obj.score_change
+        return float(score_change) if score_change is not None else None
 
 
 class AIInsightComparisonSerializer(serializers.Serializer):

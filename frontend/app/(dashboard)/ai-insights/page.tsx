@@ -51,34 +51,98 @@ export default function AIInsightsPage() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Poll count ref for timeout
+  // Refs for polling control to avoid race conditions
   const pollCountRef = useRef(0);
+  const isPollingRef = useRef(false);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Polling progress state for user feedback
+  const [pollingStatus, setPollingStatus] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
   }, []);
 
   // Polling effect: check for new insight every 5 seconds if enabled but no insight yet
-  // Stop after 3 minutes to prevent infinite loading
+  // Uses refs to prevent race conditions from useEffect dependency changes
   useEffect(() => {
-    if (config?.is_enabled && !latestInsight && !isLoading) {
-      const maxPolls = 36; // 3 minutes (36 * 5 seconds)
-      pollCountRef.current = 0; // Reset counter when starting polling
+    const shouldPoll = config?.is_enabled && !latestInsight && !isLoading;
 
-      const interval = setInterval(() => {
+    if (shouldPoll && !isPollingRef.current) {
+      const maxPolls = 36; // 3 minutes (36 * 5 seconds)
+      pollCountRef.current = 0;
+      isPollingRef.current = true;
+      setPollingStatus('Iniciando análise...');
+
+      const poll = async () => {
         pollCountRef.current++;
+        const elapsedSeconds = pollCountRef.current * 5;
+
+        // Update polling status with intermediate feedback
+        if (elapsedSeconds <= 15) {
+          setPollingStatus('Coletando seus dados financeiros...');
+        } else if (elapsedSeconds <= 30) {
+          setPollingStatus('Analisando transações e categorias...');
+        } else if (elapsedSeconds <= 60) {
+          setPollingStatus('Gerando insights com IA...');
+        } else if (elapsedSeconds <= 120) {
+          setPollingStatus('Processando análise detalhada...');
+        } else {
+          setPollingStatus('Finalizando (isso pode levar mais alguns segundos)...');
+        }
+
         if (pollCountRef.current >= maxPolls) {
-          clearInterval(interval);
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          isPollingRef.current = false;
+          setPollingStatus(null);
           setError('A geração está demorando mais que o esperado. Tente regenerar manualmente.');
         } else {
-          loadData();
+          // Only fetch latest insight, not full reload to avoid state thrashing
+          try {
+            const insight = await aiInsightsService.getLatest();
+            setLatestInsight(insight);
+            setPollingStatus(null);
+            // Stop polling on success
+            if (intervalRef.current) {
+              clearInterval(intervalRef.current);
+              intervalRef.current = null;
+            }
+            isPollingRef.current = false;
+          } catch (err: any) {
+            // 404 means still generating, continue polling
+            if (err.response?.status !== 404) {
+              // Show error to user instead of silently logging
+              console.error('Error polling for insight:', err);
+              setError(err.response?.data?.error || 'Erro ao verificar status da análise. Tentando novamente...');
+            }
+          }
         }
-      }, 5000); // Poll every 5 seconds
+      };
+
+      intervalRef.current = setInterval(poll, 5000);
 
       return () => {
-        clearInterval(interval);
-        pollCountRef.current = 0; // Reset on cleanup
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        isPollingRef.current = false;
+        pollCountRef.current = 0;
+        setPollingStatus(null);
       };
+    }
+
+    // Stop polling if insight arrived
+    if (latestInsight && isPollingRef.current) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      isPollingRef.current = false;
+      setPollingStatus(null);
     }
   }, [config?.is_enabled, latestInsight, isLoading]);
 
@@ -312,11 +376,22 @@ export default function AIInsightsPage() {
                   <div>
                     <h3 className="text-lg font-semibold mb-2">Gerando sua primeira análise</h3>
                     <p className="text-sm text-muted-foreground">
-                      Estamos analisando seus dados financeiros. A página atualizará automaticamente quando pronto.
+                      {pollingStatus || 'Estamos analisando seus dados financeiros. A página atualizará automaticamente quando pronto.'}
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
                       Isso pode levar de 10 a 30 segundos...
                     </p>
+                  </div>
+                  {/* Progress indicator */}
+                  <div className="w-full max-w-xs mx-auto">
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500 ease-out"
+                        style={{
+                          width: `${Math.min((pollCountRef.current / 36) * 100, 100)}%`
+                        }}
+                      />
+                    </div>
                   </div>
                   <div className="flex items-center justify-center gap-1">
                     <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>

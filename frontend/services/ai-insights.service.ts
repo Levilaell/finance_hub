@@ -52,6 +52,13 @@ export interface ScoreEvolution {
   status: string;
 }
 
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
 export interface EnableAIInsightsRequest {
   company_type: string;
   business_sector: string;
@@ -141,8 +148,16 @@ class AIInsightsService {
   /**
    * Get insight history (paginated)
    */
-  async getHistory(): Promise<AIInsight[]> {
-    const response = await apiClient.get<{ results: AIInsight[] }>('/api/ai-insights/insights/history/');
+  async getHistory(page: number = 1): Promise<PaginatedResponse<AIInsight>> {
+    return apiClient.get<PaginatedResponse<AIInsight>>(`/api/ai-insights/insights/history/?page=${page}`);
+  }
+
+  /**
+   * Get all history (legacy - fetches first page only)
+   * @deprecated Use getHistory(page) instead for proper pagination
+   */
+  async getHistoryAll(): Promise<AIInsight[]> {
+    const response = await apiClient.get<PaginatedResponse<AIInsight>>('/api/ai-insights/insights/history/');
     return response.results;
   }
 
