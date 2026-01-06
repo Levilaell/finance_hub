@@ -204,7 +204,21 @@ export default function AIInsightsPage() {
       // Reload config immediately to show "generating" state
       loadData();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao habilitar insights');
+      const errorData = err.response?.data;
+      const errorCode = errorData?.code;
+      const errorMessage = errorData?.error;
+
+      // Handle specific error codes
+      if (errorCode === 'SERVICE_UNAVAILABLE') {
+        setError('O serviço está temporariamente indisponível. Tente novamente em alguns minutos.');
+      } else if (err.response?.status === 429) {
+        setError('Você atingiu o limite de tentativas. Aguarde alguns minutos.');
+      } else if (errorData?.details) {
+        // Show detailed error with account/transaction info
+        setError(errorMessage);
+      } else {
+        setError(errorMessage || 'Erro ao habilitar insights. Tente novamente.');
+      }
       setIsSubmitting(false);
     }
   };
@@ -228,7 +242,21 @@ export default function AIInsightsPage() {
       // This prevents the old insight from being loaded back immediately
     } catch (err: any) {
       console.error('Error regenerating insights:', err);
-      setError(err.response?.data?.error || 'Erro ao forçar regeneração');
+
+      const errorData = err.response?.data;
+      const errorCode = errorData?.code;
+
+      // Handle specific error codes
+      if (errorCode === 'GENERATION_IN_PROGRESS') {
+        setError('Uma análise já está sendo gerada. Aguarde a conclusão.');
+      } else if (errorCode === 'SERVICE_UNAVAILABLE') {
+        setError('O serviço está temporariamente indisponível. Tente novamente em alguns minutos.');
+      } else if (err.response?.status === 429) {
+        setError('Você atingiu o limite de regenerações por hora. Aguarde antes de tentar novamente.');
+      } else {
+        setError(errorData?.error || 'Erro ao forçar regeneração. Tente novamente.');
+      }
+
       // Clear the previous ID on error so normal behavior resumes
       previousInsightIdRef.current = null;
     } finally {

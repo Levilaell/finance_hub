@@ -5,9 +5,11 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.throttling import UserRateThrottle
 from django.utils import timezone
 from django.db.models import Subquery, OuterRef, F
 from django.db import transaction
+from django.core.cache import cache
 from decimal import Decimal
 import logging
 import hashlib
@@ -23,8 +25,94 @@ from apps.ai_insights.serializers import (
 from apps.ai_insights.services.insight_generator import InsightGenerator
 from apps.ai_insights.tasks import generate_insight_for_user
 from apps.authentication.models import UserActivityLog
+from apps.banking.models import BankAccount, Transaction
 
 logger = logging.getLogger(__name__)
+
+
+# Rate limiting classes
+class EnableThrottle(UserRateThrottle):
+    """Limit enable requests to prevent abuse."""
+    rate = '5/hour'
+
+
+class RegenerateThrottle(UserRateThrottle):
+    """Limit regenerate requests to control OpenAI costs."""
+    rate = '3/hour'
+
+
+class LatestThrottle(UserRateThrottle):
+    """Limit polling requests."""
+    rate = '60/minute'
+
+
+def check_celery_available() -> tuple[bool, str]:
+    """
+    Check if Celery workers are available.
+    Returns (is_available, error_message).
+    """
+    try:
+        from celery import current_app
+
+        # Check if we can ping the broker
+        inspect = current_app.control.inspect(timeout=2.0)
+        active_workers = inspect.active()
+
+        if active_workers is None:
+            return False, 'Serviço de processamento indisponível. Tente novamente em alguns minutos.'
+
+        if len(active_workers) == 0:
+            return False, 'Nenhum worker disponível para processar. Tente novamente em alguns minutos.'
+
+        return True, ''
+    except Exception as e:
+        logger.warning(f'Could not check Celery status: {e}')
+        # If we can't check, assume it's available (graceful degradation)
+        return True, ''
+
+
+def check_user_has_financial_data(user) -> tuple[bool, str, dict]:
+    """
+    Check if user has enough financial data for meaningful AI analysis.
+    Returns (has_data, error_message, details).
+    """
+    details = {
+        'has_accounts': False,
+        'has_transactions': False,
+        'accounts_count': 0,
+        'transactions_count': 0
+    }
+
+    # Check for active bank accounts
+    accounts_count = BankAccount.objects.filter(
+        connection__user=user,
+        is_active=True
+    ).count()
+
+    details['accounts_count'] = accounts_count
+    details['has_accounts'] = accounts_count > 0
+
+    if accounts_count == 0:
+        return False, 'Você precisa conectar pelo menos uma conta bancária antes de ativar os Insights com IA. Vá em Configurações > Conexões Bancárias.', details
+
+    # Check for transactions in last 90 days
+    ninety_days_ago = timezone.now().date() - timezone.timedelta(days=90)
+    transactions_count = Transaction.objects.filter(
+        account__connection__user=user,
+        date__gte=ninety_days_ago
+    ).count()
+
+    details['transactions_count'] = transactions_count
+    details['has_transactions'] = transactions_count > 0
+
+    if transactions_count == 0:
+        return False, 'Nenhuma transação encontrada nos últimos 90 dias. Sincronize suas contas bancárias para obter dados atualizados.', details
+
+    # Warn if very few transactions (but allow)
+    if transactions_count < 10:
+        logger.warning(f'User {user.id} has only {transactions_count} transactions - AI analysis may be limited')
+
+    return True, '', details
 
 
 def get_client_ip(request):
@@ -68,7 +156,7 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
             return AIInsightDetailSerializer
         return AIInsightListSerializer
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], throttle_classes=[LatestThrottle])
     def latest(self, request):
         """Get the latest insight for the user with cache control headers."""
         latest_insight = self.get_queryset().filter(has_error=False).first()
@@ -82,15 +170,18 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
             response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
             return response
 
-        # Log insight view
-        UserActivityLog.log_event(
-            user=request.user,
-            event_type='ai_insights_viewed',
-            ip_address=get_client_ip(request),
-            user_agent=request.META.get('HTTP_USER_AGENT', ''),
-            insight_id=str(latest_insight.id),
-            health_score=float(latest_insight.health_score)
-        )
+        # Log insight view (only once per minute per user to avoid spam)
+        cache_key = f'ai_insight_view_log_{request.user.id}'
+        if not cache.get(cache_key):
+            UserActivityLog.log_event(
+                user=request.user,
+                event_type='ai_insights_viewed',
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                insight_id=str(latest_insight.id),
+                health_score=float(latest_insight.health_score)
+            )
+            cache.set(cache_key, True, timeout=60)
 
         serializer = AIInsightDetailSerializer(latest_insight)
         response = Response(serializer.data)
@@ -108,7 +199,7 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = AIInsightConfigSerializer(config)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['post'], throttle_classes=[EnableThrottle])
     @transaction.atomic
     def enable(self, request):
         """
@@ -120,6 +211,22 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
 
         serializer = EnableAIInsightsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        # VALIDATION 1: Check if user has financial data
+        has_data, error_message, data_details = check_user_has_financial_data(request.user)
+        if not has_data:
+            return Response({
+                'error': error_message,
+                'details': data_details
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # VALIDATION 2: Check if Celery is available
+        celery_available, celery_error = check_celery_available()
+        if not celery_available:
+            return Response({
+                'error': celery_error,
+                'code': 'SERVICE_UNAVAILABLE'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         # Get or create company
         if hasattr(request.user, 'company') and request.user.company is not None:
@@ -158,7 +265,9 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
                 ip_address=get_client_ip(request),
                 user_agent=request.META.get('HTTP_USER_AGENT', ''),
                 company_type=serializer.validated_data['company_type'],
-                business_sector=serializer.validated_data['business_sector']
+                business_sector=serializer.validated_data['business_sector'],
+                transactions_count=data_details['transactions_count'],
+                accounts_count=data_details['accounts_count']
             )
 
             # Generate first insight immediately (async) - outside transaction
@@ -166,7 +275,11 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
 
             return Response({
                 'message': 'Insights com IA habilitados com sucesso! Sua primeira análise será gerada em instantes.',
-                'config': AIInsightConfigSerializer(config).data
+                'config': AIInsightConfigSerializer(config).data,
+                'data_summary': {
+                    'accounts_count': data_details['accounts_count'],
+                    'transactions_count': data_details['transactions_count']
+                }
             }, status=status.HTTP_201_CREATED)
 
         else:
@@ -185,11 +298,30 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
         nums = ''.join(c for c in hash_digest if c.isdigit())[:14].ljust(14, '0')
         return f"{nums[0:2]}.{nums[2:5]}.{nums[5:8]}/{nums[8:12]}-{nums[12:14]}"
 
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['post'], throttle_classes=[RegenerateThrottle])
     def regenerate(self, request):
         """Force regenerate insight for the user."""
         try:
             config = AIInsightConfig.objects.get(user=request.user, is_enabled=True)
+
+            # Check if there's already a pending generation (prevent duplicate tasks)
+            cache_key = f'ai_insight_generating_{request.user.id}'
+            if cache.get(cache_key):
+                return Response({
+                    'error': 'Uma análise já está sendo gerada. Aguarde a conclusão.',
+                    'code': 'GENERATION_IN_PROGRESS'
+                }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+            # VALIDATION: Check if Celery is available
+            celery_available, celery_error = check_celery_available()
+            if not celery_available:
+                return Response({
+                    'error': celery_error,
+                    'code': 'SERVICE_UNAVAILABLE'
+                }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+            # Mark as generating (expires in 5 minutes)
+            cache.set(cache_key, True, timeout=300)
 
             # Log AI insights regeneration
             UserActivityLog.log_event(
@@ -208,7 +340,7 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
 
         except AIInsightConfig.DoesNotExist:
             return Response(
-                {'error': 'Insights com IA não estão habilitados'},
+                {'error': 'Insights com IA não estão habilitados. Ative primeiro em Configurações.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -244,7 +376,8 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
         Check if user can enable AI insights.
         Returns validation status and requirements.
         """
-        can_enable, reason = InsightGenerator.can_generate_for_user(request.user)
+        # Check financial data
+        has_data, data_error, data_details = check_user_has_financial_data(request.user)
 
         # Check company info
         has_company = hasattr(request.user, 'company') and request.user.company is not None
@@ -257,12 +390,23 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
             has_type = False
             has_sector = False
 
+        # Determine overall status and message
+        can_enable = has_data  # Now requires financial data, not just company
+        if not has_data:
+            message = data_error
+        else:
+            message = 'Pronto para habilitar'
+
         return Response({
-            'can_enable': has_company,  # Only needs company to enable (type/sector provided in enable action)
+            'can_enable': can_enable,
             'has_company': has_company,
             'has_company_type': has_type,
             'has_business_sector': has_sector,
-            'message': 'Pronto para habilitar' if has_company else 'Empresa não cadastrada'
+            'has_accounts': data_details['has_accounts'],
+            'has_transactions': data_details['has_transactions'],
+            'accounts_count': data_details['accounts_count'],
+            'transactions_count': data_details['transactions_count'],
+            'message': message
         })
 
     @action(detail=True, methods=['get'])

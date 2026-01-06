@@ -3,6 +3,7 @@ Celery tasks for AI Insights
 """
 from celery import shared_task
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.utils import timezone
 import logging
 
@@ -11,6 +12,12 @@ from apps.ai_insights.services.insight_generator import InsightGenerator
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+
+def _clear_generation_cache(user_id: int):
+    """Clear the generation-in-progress cache for a user."""
+    cache_key = f'ai_insight_generating_{user_id}'
+    cache.delete(cache_key)
 
 
 @shared_task(bind=True, max_retries=3)
@@ -28,6 +35,9 @@ def generate_insight_for_user(self, user_id: int):
         generator = InsightGenerator(user)
         insight = generator.generate(force=False)
 
+        # Clear the generation-in-progress cache
+        _clear_generation_cache(user_id)
+
         logger.info(f'✅ Generated insight {insight.id} for user {user.email}')
         return {
             'success': True,
@@ -37,6 +47,7 @@ def generate_insight_for_user(self, user_id: int):
         }
 
     except User.DoesNotExist:
+        _clear_generation_cache(user_id)
         logger.error(f'❌ User {user_id} not found')
         return {'success': False, 'error': 'User not found'}
 
@@ -47,6 +58,8 @@ def generate_insight_for_user(self, user_id: int):
         try:
             raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
         except self.MaxRetriesExceededError:
+            # Clear cache on final failure
+            _clear_generation_cache(user_id)
             logger.error(f'❌ Max retries exceeded for user {user_id}')
             return {'success': False, 'error': str(e)}
 
