@@ -21,11 +21,11 @@ const DTR_CONFIG = {
     headline: "Contador, você gasta horas categorizando extrato dos seus clientes?",
     subheadline: "O CaixaHub faz isso automaticamente por você. Conecta no banco, categoriza e entrega relatórios prontos para todos os seus clientes."
   },
-  escala: {
+  scale: {
     headline: "Atenda mais clientes sem aumentar sua equipe",
     subheadline: "O CaixaHub automatiza a categorização e conciliação bancária. Você foca em análise estratégica, não em trabalho operacional."
   },
-  diferenciacao: {
+  differentiation: {
     headline: "Ofereça visão financeira em tempo real para seus clientes",
     subheadline: "Enquanto outros contadores entregam relatórios só no fim do mês, você entrega atualização diária automatizada pelo CaixaHub."
   },
