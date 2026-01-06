@@ -56,6 +56,9 @@ export default function AIInsightsPage() {
   const isPollingRef = useRef(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Track the insight ID we're waiting to replace (for regeneration)
+  const previousInsightIdRef = useRef<string | null>(null);
+
   // Polling progress state for user feedback
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
 
@@ -103,14 +106,23 @@ export default function AIInsightsPage() {
           // Only fetch latest insight, not full reload to avoid state thrashing
           try {
             const insight = await aiInsightsService.getLatest();
-            setLatestInsight(insight);
-            setPollingStatus(null);
-            // Stop polling on success
-            if (intervalRef.current) {
-              clearInterval(intervalRef.current);
-              intervalRef.current = null;
+
+            // If we're waiting for a NEW insight (regeneration), check if this is actually new
+            const isWaitingForNew = previousInsightIdRef.current !== null;
+            const isNewInsight = !isWaitingForNew || insight.id !== previousInsightIdRef.current;
+
+            if (isNewInsight) {
+              setLatestInsight(insight);
+              setPollingStatus(null);
+              previousInsightIdRef.current = null; // Clear the previous ID
+              // Stop polling on success
+              if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+              }
+              isPollingRef.current = false;
             }
-            isPollingRef.current = false;
+            // If it's the same old insight, continue polling (don't stop)
           } catch (err: any) {
             // 404 means still generating, continue polling
             if (err.response?.status !== 404) {
@@ -202,16 +214,23 @@ export default function AIInsightsPage() {
     setError(null);
 
     try {
+      // Store the current insight ID so polling knows to wait for a NEW insight
+      if (latestInsight) {
+        previousInsightIdRef.current = latestInsight.id;
+      }
+
       await aiInsightsService.regenerate();
+
       // Clear current insight to trigger loading state and polling
       setLatestInsight(null);
-      // Reload data after a short delay
-      setTimeout(() => {
-        loadData();
-      }, 2000);
+
+      // Don't call loadData here - let polling handle it
+      // This prevents the old insight from being loaded back immediately
     } catch (err: any) {
       console.error('Error regenerating insights:', err);
       setError(err.response?.data?.error || 'Erro ao forçar regeneração');
+      // Clear the previous ID on error so normal behavior resumes
+      previousInsightIdRef.current = null;
     } finally {
       setIsRegenerating(false);
     }
