@@ -40,10 +40,27 @@ def process_item_updated(self, item_id: str, payload: dict):
         if connection.status == 'UPDATED':
             service.sync_accounts(connection)
 
-            # Sync transactions for all accounts
-            tx_service = TransactionService()
-            # Don't trigger update from webhook since it's already updated
-            tx_service.sync_all_accounts_transactions(connection, trigger_update=False)
+            # Check if transactions are actually ready before syncing
+            status_detail = connection.status_detail or {}
+            transactions_status = status_detail.get('transactions', {})
+            transactions_updated = transactions_status.get('isUpdated', False)
+
+            if transactions_updated:
+                # Sync transactions for all accounts
+                tx_service = TransactionService()
+                # Don't trigger update from webhook since it's already updated
+                tx_service.sync_all_accounts_transactions(connection, trigger_update=False)
+                logger.info(f"[TASK] Transactions synced for connection {connection.id}")
+            else:
+                # Transactions not ready yet - will be synced when transactions/created webhook arrives
+                execution_status = connection.execution_status
+                logger.warning(
+                    f"[TASK] Transactions not ready for connection {connection.id}. "
+                    f"executionStatus={execution_status}, "
+                    f"transactions.isUpdated={transactions_updated}, "
+                    f"transactions.lastUpdatedAt={transactions_status.get('lastUpdatedAt')}. "
+                    f"Waiting for transactions/created or transactions/updated webhook."
+                )
 
         logger.info(f"[TASK] Successfully processed update for connection {connection.id}")
 
