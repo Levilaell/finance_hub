@@ -1896,15 +1896,22 @@ class CategoryRuleService:
             Tuple (category, subcategory) se encontrar match, None caso contrário
         """
         from difflib import SequenceMatcher
+        from django.db.models import Case, When, Value, IntegerField
         from .models import CategoryRule
 
         user = transaction.account.connection.user
-        # Ordena por prioridade: regras com subcategory primeiro (subcategory__isnull=False vem antes)
+        # Ordena por prioridade: regras com subcategory primeiro (has_subcategory=0 vem antes de 1)
         # Depois por data de criação como desempate
         rules = CategoryRule.objects.filter(
             user=user,
             is_active=True
-        ).select_related('category', 'subcategory').order_by('subcategory__isnull', 'created_at')
+        ).select_related('category', 'subcategory').annotate(
+            has_subcategory=Case(
+                When(subcategory__isnull=False, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField()
+            )
+        ).order_by('has_subcategory', 'created_at')
 
         t_desc = CategoryRuleService.normalize_text(transaction.description)
         t_merchant = CategoryRuleService.normalize_text(transaction.merchant_name)
