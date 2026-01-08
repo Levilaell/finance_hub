@@ -78,6 +78,35 @@ export interface ComparisonData {
   };
 }
 
+export interface RuleBasedAlert {
+  category: 'cash_flow' | 'bills' | 'spending' | 'income' | 'savings' | 'anomaly';
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  action: string;
+  value?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AlertsResponse {
+  alerts: RuleBasedAlert[];
+  alerts_by_severity: {
+    critical: RuleBasedAlert[];
+    high: RuleBasedAlert[];
+    medium: RuleBasedAlert[];
+    low: RuleBasedAlert[];
+  };
+  counts: {
+    total: number;
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  generated_at: string;
+  error?: string;
+}
+
 class AIInsightsService {
   /**
    * Get AI insights configuration
@@ -178,6 +207,13 @@ class AIInsightsService {
   }
 
   /**
+   * Get rule-based alerts (no AI, real-time)
+   */
+  async getAlerts(): Promise<AlertsResponse> {
+    return apiClient.get<AlertsResponse>('/api/ai-insights/insights/alerts/');
+  }
+
+  /**
    * Get health status label
    */
   getHealthStatusLabel(status: string): string {
@@ -238,6 +274,75 @@ class AIInsightsService {
       low: 'text-green-600'
     };
     return colors[severity] || 'text-gray-600';
+  }
+
+  /**
+   * Get alert severity color (for rule-based alerts)
+   */
+  getAlertSeverityColor(severity: string): string {
+    const colors: Record<string, string> = {
+      critical: 'text-red-700',
+      high: 'text-red-600',
+      medium: 'text-yellow-600',
+      low: 'text-blue-600'
+    };
+    return colors[severity] || 'text-gray-600';
+  }
+
+  /**
+   * Get alert severity background color
+   */
+  getAlertSeverityBgColor(severity: string): string {
+    const colors: Record<string, string> = {
+      critical: 'bg-red-100 border-red-300',
+      high: 'bg-red-50 border-red-200',
+      medium: 'bg-yellow-50 border-yellow-200',
+      low: 'bg-blue-50 border-blue-200'
+    };
+    return colors[severity] || 'bg-gray-50 border-gray-200';
+  }
+
+  /**
+   * Get alert severity icon
+   */
+  getAlertSeverityIcon(severity: string): string {
+    const icons: Record<string, string> = {
+      critical: '🚨',
+      high: '⚠️',
+      medium: '📊',
+      low: 'ℹ️'
+    };
+    return icons[severity] || '📌';
+  }
+
+  /**
+   * Get alert category label
+   */
+  getAlertCategoryLabel(category: string): string {
+    const labels: Record<string, string> = {
+      cash_flow: 'Fluxo de Caixa',
+      bills: 'Contas',
+      spending: 'Gastos',
+      income: 'Receitas',
+      savings: 'Poupança',
+      anomaly: 'Anomalia'
+    };
+    return labels[category] || category;
+  }
+
+  /**
+   * Get alert category icon
+   */
+  getAlertCategoryIcon(category: string): string {
+    const icons: Record<string, string> = {
+      cash_flow: '💰',
+      bills: '📋',
+      spending: '💳',
+      income: '📈',
+      savings: '🏦',
+      anomaly: '🔍'
+    };
+    return icons[category] || '📌';
   }
 }
 

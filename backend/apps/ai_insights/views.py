@@ -23,6 +23,7 @@ from apps.ai_insights.serializers import (
     EnableAIInsightsSerializer
 )
 from apps.ai_insights.services.insight_generator import InsightGenerator
+from apps.ai_insights.services.alerts_service import AlertsService
 from apps.ai_insights.tasks import generate_insight_for_user
 from apps.authentication.models import UserActivityLog
 from apps.banking.models import BankAccount, Transaction
@@ -554,3 +555,55 @@ class AIInsightViewSet(viewsets.ReadOnlyModelViewSet):
         ]
 
         return Response({'evolution': evolution})
+
+    @action(detail=False, methods=['get'])
+    def alerts(self, request):
+        """
+        Get rule-based financial alerts for the user.
+        These are generated in real-time without AI, providing immediate actionable insights.
+        """
+        # Check if user has financial data
+        has_data, error_message, data_details = check_user_has_financial_data(request.user)
+        if not has_data:
+            return Response({
+                'alerts': [],
+                'error': error_message,
+                'details': data_details
+            }, status=status.HTTP_200_OK)
+
+        try:
+            alerts_service = AlertsService(request.user)
+            alerts = alerts_service.generate_alerts()
+
+            # Group alerts by severity for easier frontend handling
+            alerts_by_severity = {
+                'critical': [],
+                'high': [],
+                'medium': [],
+                'low': []
+            }
+            for alert in alerts:
+                severity = alert.get('severity', 'low')
+                if severity in alerts_by_severity:
+                    alerts_by_severity[severity].append(alert)
+
+            return Response({
+                'alerts': alerts,
+                'alerts_by_severity': alerts_by_severity,
+                'counts': {
+                    'total': len(alerts),
+                    'critical': len(alerts_by_severity['critical']),
+                    'high': len(alerts_by_severity['high']),
+                    'medium': len(alerts_by_severity['medium']),
+                    'low': len(alerts_by_severity['low'])
+                },
+                'generated_at': timezone.now().isoformat()
+            })
+
+        except Exception as e:
+            logger.error(f'Error generating alerts for user {request.user.id}: {e}')
+            return Response({
+                'alerts': [],
+                'error': 'Erro ao gerar alertas. Tente novamente.',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

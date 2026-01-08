@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { Sparkles, Clock, Calendar, RefreshCw, History } from 'lucide-react';
+import { Sparkles, Clock, Calendar, RefreshCw, History, AlertTriangle, Bell, ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { aiInsightsService, AIInsight, AIInsightConfig } from '@/services/ai-insights.service';
+import { aiInsightsService, AIInsight, AIInsightConfig, AlertsResponse, RuleBasedAlert } from '@/services/ai-insights.service';
 import { HealthScoreCard } from './components/HealthScoreCard';
 import { InsightCard } from './components/InsightCard';
 import { PredictionsCard } from './components/PredictionsCard';
@@ -41,8 +41,11 @@ const businessSectors = [
 export default function AIInsightsPage() {
   const [config, setConfig] = useState<AIInsightConfig | null>(null);
   const [latestInsight, setLatestInsight] = useState<AIInsight | null>(null);
+  const [ruleAlerts, setRuleAlerts] = useState<AlertsResponse | null>(null);
+  const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [canEnable, setCanEnable] = useState(false);
+  const [showAllAlerts, setShowAllAlerts] = useState(false);
 
   // Form state
   const [companyType, setCompanyType] = useState('');
@@ -65,6 +68,25 @@ export default function AIInsightsPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Load rule-based alerts when config is enabled
+  useEffect(() => {
+    if (config?.is_enabled) {
+      loadAlerts();
+    }
+  }, [config?.is_enabled]);
+
+  const loadAlerts = async () => {
+    setIsLoadingAlerts(true);
+    try {
+      const alerts = await aiInsightsService.getAlerts();
+      setRuleAlerts(alerts);
+    } catch (err) {
+      console.error('Error loading alerts:', err);
+    } finally {
+      setIsLoadingAlerts(false);
+    }
+  };
 
   // Polling effect: check for new insight every 5 seconds if enabled but no insight yet
   // Uses refs to prevent race conditions from useEffect dependency changes
@@ -603,6 +625,126 @@ export default function AIInsightsPage() {
         status={latestInsight.health_status}
         scoreChange={latestInsight.score_change}
       />
+
+      {/* Rule-Based Alerts - Real-time, no AI */}
+      {ruleAlerts && ruleAlerts.counts.total > 0 && (
+        <Card className="border-orange-500/20">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-orange-500/20 rounded-full p-2">
+                  <Bell className="h-5 w-5 text-orange-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Alertas em Tempo Real</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Análise automática baseada em regras financeiras
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {ruleAlerts.counts.critical > 0 && (
+                  <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-500/20 text-red-400">
+                    {ruleAlerts.counts.critical} crítico{ruleAlerts.counts.critical > 1 ? 's' : ''}
+                  </span>
+                )}
+                {ruleAlerts.counts.high > 0 && (
+                  <span className="px-2 py-1 text-xs font-semibold rounded-full bg-orange-500/20 text-orange-400">
+                    {ruleAlerts.counts.high} alto{ruleAlerts.counts.high > 1 ? 's' : ''}
+                  </span>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllAlerts(!showAllAlerts)}
+                >
+                  {showAllAlerts ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {/* Critical & High Alerts - Always visible */}
+            {[...ruleAlerts.alerts_by_severity.critical, ...ruleAlerts.alerts_by_severity.high].map((alert, index) => (
+              <div
+                key={`high-${index}`}
+                className={`p-4 rounded-lg border ${aiInsightsService.getAlertSeverityBgColor(alert.severity)}`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-xl">{aiInsightsService.getAlertSeverityIcon(alert.severity)}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`font-semibold ${aiInsightsService.getAlertSeverityColor(alert.severity)}`}>
+                        {alert.title}
+                      </span>
+                      <span className="text-xs px-2 py-0.5 rounded bg-black/20 text-muted-foreground">
+                        {aiInsightsService.getAlertCategoryLabel(alert.category)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">{alert.description}</p>
+                    <p className="text-sm font-medium text-primary">
+                      💡 {alert.action}
+                    </p>
+                    {alert.value !== undefined && alert.value !== null && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Valor: R$ {alert.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Medium & Low Alerts - Collapsed by default */}
+            {showAllAlerts && [...ruleAlerts.alerts_by_severity.medium, ...ruleAlerts.alerts_by_severity.low].map((alert, index) => (
+              <div
+                key={`low-${index}`}
+                className={`p-4 rounded-lg border ${aiInsightsService.getAlertSeverityBgColor(alert.severity)}`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-xl">{aiInsightsService.getAlertSeverityIcon(alert.severity)}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`font-semibold ${aiInsightsService.getAlertSeverityColor(alert.severity)}`}>
+                        {alert.title}
+                      </span>
+                      <span className="text-xs px-2 py-0.5 rounded bg-black/20 text-muted-foreground">
+                        {aiInsightsService.getAlertCategoryLabel(alert.category)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">{alert.description}</p>
+                    <p className="text-sm font-medium text-primary">
+                      💡 {alert.action}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Show more/less button if there are medium/low alerts */}
+            {(ruleAlerts.counts.medium + ruleAlerts.counts.low) > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={() => setShowAllAlerts(!showAllAlerts)}
+              >
+                {showAllAlerts ? (
+                  <>
+                    <ChevronUp className="h-4 w-4 mr-2" />
+                    Ocultar {ruleAlerts.counts.medium + ruleAlerts.counts.low} alerta(s) de menor prioridade
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4 mr-2" />
+                    Ver mais {ruleAlerts.counts.medium + ruleAlerts.counts.low} alerta(s)
+                  </>
+                )}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary */}
       <Card>
