@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { billsService } from '@/services/bills.service';
 import { bankingService } from '@/services/banking.service';
 import { Bill, BillRequest, Category } from '@/types/banking';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,10 @@ import {
   ListBulletIcon,
   PlusCircleIcon,
   QuestionMarkCircleIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PencilIcon,
+  CalendarIcon,
 } from '@heroicons/react/24/outline';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -55,8 +59,16 @@ export default function BillsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState<string | null>(null);
 
+  // Month navigation
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [showAllMonths, setShowAllMonths] = useState(false);
+
+  // Edit state
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingBill, setEditingBill] = useState<Bill | null>(null);
+
   // Form states
-  const [formData, setFormData] = useState<BillRequest>({
+  const initialFormData: BillRequest = {
     type: 'payable',
     description: '',
     amount: 0,
@@ -64,7 +76,8 @@ export default function BillsPage() {
     recurrence: 'once',
     customer_supplier: '',
     notes: ''
-  });
+  };
+  const [formData, setFormData] = useState<BillRequest>(initialFormData);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentNotes, setPaymentNotes] = useState<string>('');
 
@@ -100,7 +113,7 @@ export default function BillsPage() {
       return;
     }
     fetchData();
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, selectedMonth, showAllMonths]);
 
   useEffect(() => {
     applyFilters();
@@ -109,8 +122,14 @@ export default function BillsPage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
+      const filters: import('@/types/banking').BillFilter = {};
+      if (!showAllMonths) {
+        filters.date_from = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
+        filters.date_to = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
+      }
+
       const [billsData, categoriesData] = await Promise.all([
-        billsService.getBills(),
+        billsService.getBills(filters),
         bankingService.getCategories()
       ]);
       setBills(billsData);
@@ -121,6 +140,20 @@ export default function BillsPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePrevMonth = () => {
+    setShowAllMonths(false);
+    setSelectedMonth(prev => subMonths(prev, 1));
+  };
+
+  const handleNextMonth = () => {
+    setShowAllMonths(false);
+    setSelectedMonth(prev => addMonths(prev, 1));
+  };
+
+  const handleToggleAllMonths = () => {
+    setShowAllMonths(prev => !prev);
   };
 
   const handleRefresh = async () => {
@@ -253,16 +286,40 @@ export default function BillsPage() {
     }
   };
 
-  const resetForm = () => {
+  const openEditDialog = (bill: Bill) => {
+    setEditingBill(bill);
     setFormData({
-      type: 'payable',
-      description: '',
-      amount: 0,
-      due_date: '',
-      recurrence: 'once',
-      customer_supplier: '',
-      notes: ''
+      type: bill.type,
+      description: bill.description,
+      amount: bill.amount,
+      due_date: bill.due_date,
+      category: bill.category || undefined,
+      recurrence: bill.recurrence,
+      customer_supplier: bill.customer_supplier || '',
+      notes: bill.notes || ''
     });
+    setShowEditDialog(true);
+  };
+
+  const handleEditBill = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBill) return;
+
+    try {
+      await billsService.updateBill(editingBill.id, formData);
+      toast.success('Conta atualizada com sucesso!');
+      setShowEditDialog(false);
+      setEditingBill(null);
+      resetForm();
+      await fetchData();
+    } catch (error) {
+      console.error('Error updating bill:', error);
+      toast.error('Erro ao atualizar conta');
+    }
+  };
+
+  const resetForm = () => {
+    setFormData(initialFormData);
   };
 
   if (!isAuthenticated || !user || isLoading) {
@@ -496,6 +553,41 @@ export default function BillsPage() {
             </DialogContent>
           </Dialog>
         </div>
+      </div>
+
+      {/* Month Navigation */}
+      <div className="flex items-center justify-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handlePrevMonth}
+          className="text-white border-white/20 hover:bg-white/10 h-9 w-9 p-0"
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+        </Button>
+        <Button
+          variant={showAllMonths ? 'default' : 'outline'}
+          size="sm"
+          onClick={handleToggleAllMonths}
+          className={showAllMonths
+            ? 'min-w-[180px] h-9'
+            : 'min-w-[180px] h-9 text-white border-white/20 hover:bg-white/10'
+          }
+        >
+          <CalendarIcon className="h-4 w-4 mr-2" />
+          {showAllMonths
+            ? 'Todos os meses'
+            : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })
+          }
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleNextMonth}
+          className="text-white border-white/20 hover:bg-white/10 h-9 w-9 p-0"
+        >
+          <ChevronRightIcon className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -777,6 +869,21 @@ export default function BillsPage() {
                           </Tooltip>
                         </TooltipProvider>
                       )}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 sm:h-9 sm:w-9 p-0"
+                              onClick={() => openEditDialog(bill)}
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Editar</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <Button
                         size="sm"
                         variant="outline"
@@ -804,6 +911,150 @@ export default function BillsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={(open) => {
+        setShowEditDialog(open);
+        if (!open) {
+          setEditingBill(null);
+          resetForm();
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Conta</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditBill} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>Tipo</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value: any) => setFormData({ ...formData, type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="payable">A Pagar</SelectItem>
+                    <SelectItem value="receivable">A Receber</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Recorrência</Label>
+                <Select
+                  value={formData.recurrence}
+                  onValueChange={(value: any) => setFormData({ ...formData, recurrence: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="once">Uma vez</SelectItem>
+                    <SelectItem value="monthly">Mensal</SelectItem>
+                    <SelectItem value="weekly">Semanal</SelectItem>
+                    <SelectItem value="yearly">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label>Descrição</Label>
+              <Input
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Ex: Aluguel da loja"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>Valor</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={formData.amount || ''}
+                  onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              <div>
+                <Label>Data de Vencimento</Label>
+                <Input
+                  type="date"
+                  value={formData.due_date}
+                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Cliente/Fornecedor</Label>
+              <Input
+                value={formData.customer_supplier}
+                onChange={(e) => setFormData({ ...formData, customer_supplier: e.target.value })}
+                placeholder="Nome do cliente ou fornecedor"
+              />
+            </div>
+
+            <div>
+              <Label>Categoria (Opcional)</Label>
+              <Select
+                value={formData.category}
+                onValueChange={(value) => setFormData({ ...formData, category: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {flattenCategories(
+                    categories,
+                    formData.type === 'receivable' ? 'income' : 'expense'
+                  ).map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-4 h-4 rounded"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                        <span className={cat.isSubcategory ? 'text-muted-foreground' : ''}>
+                          {cat.displayName || cat.name}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Observações</Label>
+              <Textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Observações adicionais"
+                rows={3}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => {
+                setShowEditDialog(false);
+                setEditingBill(null);
+                resetForm();
+              }}>
+                Cancelar
+              </Button>
+              <Button type="submit">Salvar Alterações</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Payment Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
