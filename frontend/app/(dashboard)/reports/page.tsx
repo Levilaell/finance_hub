@@ -271,35 +271,39 @@ export default function ReportsPage() {
   const categoryData = useMemo(() => {
     if (!filteredTransactions || filteredTransactions.length === 0) return [];
 
-    const categoryMap: Record<string, number> = {};
+    const categoryMap: Record<string, { value: number; count: number }> = {};
     filteredTransactions.forEach(t => {
       if (t.is_expense) {
         const cat = t.category || 'Sem categoria';
-        categoryMap[cat] = (categoryMap[cat] || 0) + Math.abs(t.amount);
+        if (!categoryMap[cat]) categoryMap[cat] = { value: 0, count: 0 };
+        categoryMap[cat].value += Math.abs(t.amount);
+        categoryMap[cat].count += 1;
       }
     });
 
     return Object.entries(categoryMap)
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => b[1].value - a[1].value)
       .slice(0, 8)
-      .map(([name, value]) => ({ name, value }));
+      .map(([name, { value, count }]) => ({ name, value, count }));
   }, [filteredTransactions]);
 
   const incomeCategoryData = useMemo(() => {
     if (!filteredTransactions || filteredTransactions.length === 0) return [];
 
-    const categoryMap: Record<string, number> = {};
+    const categoryMap: Record<string, { value: number; count: number }> = {};
     filteredTransactions.forEach(t => {
       if (t.is_income) {
         const cat = t.category || 'Sem categoria';
-        categoryMap[cat] = (categoryMap[cat] || 0) + Math.abs(t.amount);
+        if (!categoryMap[cat]) categoryMap[cat] = { value: 0, count: 0 };
+        categoryMap[cat].value += Math.abs(t.amount);
+        categoryMap[cat].count += 1;
       }
     });
 
     return Object.entries(categoryMap)
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => b[1].value - a[1].value)
       .slice(0, 8)
-      .map(([name, value]) => ({ name, value }));
+      .map(([name, { value, count }]) => ({ name, value, count }));
   }, [filteredTransactions]);
 
   const monthlyData = useMemo(() => {
@@ -412,10 +416,11 @@ export default function ReportsPage() {
 
     if (section === 'all' || section === 'categories') {
       if (categoryData.length > 0) {
-        const expenseHeaders = ['Categoria', 'Valor', '% do Total'];
+        const expenseHeaders = ['Categoria', 'Transações', 'Valor', '% do Total'];
         const totalExpenses = categoryData.reduce((sum, c) => sum + c.value, 0);
         const expenseRows = categoryData.map(cat => [
           cat.name,
+          cat.count,
           cat.value,
           `${((cat.value / totalExpenses) * 100).toFixed(1)}%`
         ]);
@@ -424,10 +429,11 @@ export default function ReportsPage() {
       }
 
       if (incomeCategoryData.length > 0) {
-        const incomeHeaders = ['Categoria', 'Valor', '% do Total'];
+        const incomeHeaders = ['Categoria', 'Transações', 'Valor', '% do Total'];
         const totalIncome = incomeCategoryData.reduce((sum, c) => sum + c.value, 0);
         const incomeRows = incomeCategoryData.map(cat => [
           cat.name,
+          cat.count,
           cat.value,
           `${((cat.value / totalIncome) * 100).toFixed(1)}%`
         ]);
@@ -464,10 +470,10 @@ export default function ReportsPage() {
     if (section === 'categories' || section === 'all') {
       if (categoryData.length > 0) {
         csvContent += 'Despesas por Categoria\n';
-        csvContent += 'Categoria,Valor,Percentual\n';
+        csvContent += 'Categoria,Transações,Valor,Percentual\n';
         const totalExpenses = categoryData.reduce((sum, c) => sum + c.value, 0);
         categoryData.forEach(cat => {
-          csvContent += `${cat.name},${cat.value},${((cat.value / totalExpenses) * 100).toFixed(1)}%\n`;
+          csvContent += `${cat.name},${cat.count},${cat.value},${((cat.value / totalExpenses) * 100).toFixed(1)}%\n`;
         });
         csvContent += '\n';
       }
@@ -544,13 +550,14 @@ export default function ReportsPage() {
         const totalExpenses = categoryData.reduce((sum, c) => sum + c.value, 0);
         const categoryTableData = categoryData.slice(0, 5).map(cat => [
           cat.name,
+          String(cat.count),
           formatCurrency(cat.value),
           `${((cat.value / totalExpenses) * 100).toFixed(1)}%`
         ]);
 
         autoTable(doc, {
           startY: yPosition,
-          head: [['Categoria', 'Total', '% do Total']],
+          head: [['Categoria', 'Transações', 'Total', '% do Total']],
           body: categoryTableData,
           theme: 'grid',
           headStyles: { fillColor: [239, 68, 68] },
@@ -918,7 +925,10 @@ export default function ReportsPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-center mb-1">
                               <span className="text-sm truncate">{cat.name}</span>
-                              <span className="text-sm font-medium text-red-400">{formatCurrency(cat.value)}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-white/40">{cat.count} tx</span>
+                                <span className="text-sm font-medium text-red-400">{formatCurrency(cat.value)}</span>
+                              </div>
                             </div>
                             <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
                               <div
@@ -955,7 +965,10 @@ export default function ReportsPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-center mb-1">
                               <span className="text-sm truncate">{cat.name}</span>
-                              <span className="text-sm font-medium text-green-400">{formatCurrency(cat.value)}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-white/40">{cat.count} tx</span>
+                                <span className="text-sm font-medium text-green-400">{formatCurrency(cat.value)}</span>
+                              </div>
                             </div>
                             <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
                               <div
@@ -1002,7 +1015,10 @@ export default function ReportsPage() {
                       </Pie>
                       <Tooltip
                         contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                        formatter={(value: number) => formatCurrency(value)}
+                        formatter={(value: number, _name: string, props: any) => [
+                          `${formatCurrency(value)} (${props.payload.count} transações)`,
+                          props.payload.name
+                        ]}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -1036,7 +1052,10 @@ export default function ReportsPage() {
                       </Pie>
                       <Tooltip
                         contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                        formatter={(value: number) => formatCurrency(value)}
+                        formatter={(value: number, _name: string, props: any) => [
+                          `${formatCurrency(value)} (${props.payload.count} transações)`,
+                          props.payload.name
+                        ]}
                       />
                     </PieChart>
                   </ResponsiveContainer>
